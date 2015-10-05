@@ -1,0 +1,3 @@
+[submodule "tests/media"]
+	path = tests/media
+	url = https://github.com/simple2d/test_media.git

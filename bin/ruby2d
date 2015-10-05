@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+require 'ruby2d/version'
+
+class String
+  def colorize(c); "\e[#{c}m#{self}\e[0m" end
+  def error; colorize('1;31') end
+  def bold; colorize('1') end
+end
+
+
+def build_native(rb_file)
+  if `which mruby`.empty?
+    puts "",
+         "  mruby not found!".error, "",
+         "  mruby is needed to build a native Ruby 2D applications.".bold, "",
+         "  Install using Homebrew on OS X:",
+         "    brew install mruby", ""
+    exit
+  end
+  
+  `mkdir -p build`
+  `mrbc -Bruby2d_app_symbol -obuild/app.c #{rb_file}`
+  
+  open('build/app.c', 'a') do |f|
+    f << %(
+#include "mruby.h"
+#include "mruby/irep.h"
+
+int main(void) {
+  mrb_state *mrb = mrb_open();
+  if (!mrb) { /* handle error */ }
+  mrb_load_irep(mrb, ruby2d_app_symbol);
+  mrb_close(mrb);
+}
+    )
+  end
+  
+  `cc -std=c99 -lmruby build/app.c -o build/app`
+end
+
+
+def build_package
+  require 'fileutils'
+  
+  icon_path = "#{Gem::Specification.find_by_name('ruby2d').gem_dir}/assets/app.icns"
+  
+  FileUtils.mkpath "build/App.app/Contents/MacOS"
+  FileUtils.mkpath "build/App.app/Contents/Resources"
+  FileUtils.cp icon_path, "build/App.app/Contents/Resources"
+  
+  info_plist = %(
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>app</string>
+  <key>CFBundleIconFile</key>
+  <string>app.icns</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>1.0</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleSignature</key>
+  <string>????</string>
+  <key>CFBundleVersion</key>
+  <string>1.0</string>
+</dict>
+</plist>
+)
+  
+  File.open("build/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
+  
+  FileUtils.cp "build/app", "build/App.app/Contents/MacOS/"
+  
+  puts "App written to `build/App.app`."
+end
+
+
+# Command line usage and tree ##################################################
+
+usage = "
+Usage: ruby2d [-v|--version]
+              <command> <options>
+
+Summary of commands and options:
+  build         Build the application...
+    native        ...compile with mruby.
+    web           ...for web platform.
+  package       Create application package.
+  -v|--version  Prints the installed version.
+
+"
+
+case ARGV[0]
+when 'build'
+  puts "Running build..."
+  case ARGV[1]
+  when 'native'
+    puts "Running build native..."
+    build_native ARGV[2]
+  when 'web'
+    puts "Running build web..."
+  else
+    puts usage
+  end
+when 'package'
+  puts "Running package..."
+  build_package
+when '-v', '--version'
+  puts Ruby2D::VERSION
+else
+  puts usage
+end
+
+exit
