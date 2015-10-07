@@ -26,6 +26,9 @@ struct sound_data {
   Sound snd;
 };
 
+static void close_window() {
+  S2D_Close(window);
+}
 
 static void free_image(struct image_data *data) {
   S2D_FreeImage(data->img);
@@ -212,6 +215,7 @@ static VALUE ruby2d_show(VALUE s) {
   
   S2D_Show(window);
   
+  atexit(close_window);
   return Qnil;
 }
 
