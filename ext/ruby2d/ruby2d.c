@@ -32,6 +32,7 @@ static void close_window() {
 
 static void free_image(struct image_data *data) {
   S2D_FreeImage(data->img);
+  xfree(data);
 }
 
 static VALUE init_image(char *path) {
@@ -44,6 +45,7 @@ static VALUE init_image(char *path) {
 
 static void free_text(struct text_data *data) {
   S2D_FreeText(data->txt);
+  xfree(data);
 }
 
 static VALUE init_text(char *font, char *msg, int size) {
