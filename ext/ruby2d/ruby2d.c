@@ -1,40 +1,55 @@
 #include <ruby.h>
 #include <simple2d.h>
 
+// @type_id values for rendering
 #define TRIANGLE 1
 #define QUAD     2
 #define IMAGE    3
 #define TEXT     4
 
+// Ruby 2D window
+VALUE self;
+
+// Simple 2D window
+Window *window;
+
+// Ruby data types
 static VALUE ruby2d_module;
 static VALUE ruby2d_window_klass;
 static VALUE c_data_klass;
 
-VALUE self;
-Window *window;
-
-
+// Structures for Ruby 2D classes
 struct image_data {
   Image img;
 };
-
 struct text_data {
   Text txt;
 };
-
 struct sound_data {
   Sound snd;
 };
 
+
+/*
+ * Function pointer to close the Simple 2D window
+ */
 static void close_window() {
   S2D_Close(window);
 }
 
+
+/*
+ * Free image structure attached to Ruby 2D `Image` class
+ */
 static void free_image(struct image_data *data) {
   S2D_FreeImage(data->img);
   xfree(data);
 }
 
+
+/*
+ * Initialize image structure data
+ */
 static VALUE init_image(char *path) {
   struct image_data *data = ALLOC(struct image_data);
   data->img = S2D_CreateImage(path);
@@ -42,12 +57,18 @@ static VALUE init_image(char *path) {
 }
 
 
-
+/*
+ * Free text structure attached to Ruby 2D `Text` class
+ */
 static void free_text(struct text_data *data) {
   S2D_FreeText(data->txt);
   xfree(data);
 }
 
+
+/*
+ * Initialize text structure data
+ */
 static VALUE init_text(char *font, char *msg, int size) {
   struct text_data *data = ALLOC(struct text_data);
   data->txt = S2D_CreateText(font, msg, size);
@@ -55,17 +76,27 @@ static VALUE init_text(char *font, char *msg, int size) {
 }
 
 
-
+/*
+ * Simple 2D `on_key` input callback function
+ */
 void on_key(const char *key) {
   rb_funcall(self, rb_intern("key_callback"), 1, rb_str_new2(key));
 }
 
+
+/*
+ * Simple 2D `on_key_down` input callback function
+ */
 void on_key_down(const char *key) {
   rb_funcall(self, rb_intern("key_down_callback"), 1, rb_str_new2(key));
 }
 
 
+/*
+ * Simple 2D `update` callback function
+ */
 void update() {
+  
   // Set the cursor
   rb_iv_set(self, "@mouse_x", INT2NUM(window->mouse.x));
   rb_iv_set(self, "@mouse_y", INT2NUM(window->mouse.y));
@@ -75,6 +106,9 @@ void update() {
 }
 
 
+/*
+ * Simple 2D `render` callback function
+ */
 void render() {
   
   // Read window objects
@@ -175,13 +209,11 @@ void render() {
       
       case TEXT: {
         if (rb_iv_get(el, "@data") == Qnil) {
-          
           VALUE data = init_text(
             RSTRING_PTR(rb_iv_get(el, "@font")),
             RSTRING_PTR(rb_iv_get(el, "@text")),
             NUM2DBL(rb_iv_get(el, "@size"))
           );
-          
           rb_iv_set(el, "@data", data);
         }
         
