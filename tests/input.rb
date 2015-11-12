@@ -3,7 +3,11 @@ require 'ruby2d'
 set width: 200, height: 100
 
 on key: 'a' do
-  puts "a pressed!"
+  puts "a key"
+end
+
+on key_down: 'p' do
+  puts "p key down"
 end
 
 show
