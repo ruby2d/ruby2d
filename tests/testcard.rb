@@ -36,10 +36,24 @@ Rectangle.new(450, 50, 50, 50, 'fuchsia')
 Rectangle.new(500, 50, 50, 50, 'purple')
 Rectangle.new(550, 50, 50, 50, 'brown')
 
-Rectangle.new(600, 0, 50, 50,  'random')
-Rectangle.new(650, 0, 50, 50,  'random')
+# Mix of named colors and numbers
+Rectangle.new(600, 0, 50, 50,
+[
+  'red',
+  'green',
+  'blue',
+  'yellow'
+])
+Rectangle.new(650, 0, 50, 50,
+[
+  [1.0, 0, 0, 255],
+  'green',
+  [0.0, 0, 255, 1.0],
+  'yellow'
+])
 Rectangle.new(600, 50, 50, 50, 'random')
 Rectangle.new(650, 50, 50, 50, 'random')
+
 
 # White to black gradient
 Rectangle.new(0, 100, 700, 25,
@@ -119,8 +133,8 @@ Image.new(580, 290, "media/image.jpg")
 Image.new(580, 400, "media/image.bmp")
 
 # Text
-Text.new(0, 300)
-# Text.new(0, 350, 30, "Hello Ruby 2D!")
+Text.new(0, 250)  # Default message
+Text.new(0, 275, 30, "Hello Ruby 2D!")  # Custom message
 
 
 # Pointer for mouse

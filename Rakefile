@@ -25,13 +25,20 @@ task :build do
   system "gem install ruby2d-0.0.0.gem --local"  # --verbose
 end
 
-
-desc "Run Testcard"
+desc "Run testcard"
 task :testcard do
-  Rake::Task['build'].invoke
-  system '( cd tests/ ; ruby testcard.rb )'
+  run_test 'testcard'
 end
 
+desc "Run input"
+task :input do
+  run_test 'input'
+end
+
+desc "Run controller"
+task :controller do
+  run_test 'controller'
+end
 
 desc "Test and build"
 task :all do

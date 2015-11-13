@@ -1,54 +1,21 @@
 require 'ruby2d'
 
-set width: 200, height: 100
+set width: 200, height: 100, title: "Ruby 2D – Input"
 
 on key: 'a' do
   puts "a key"
 end
 
-on key_down: 'p' do
-  puts "p key down"
+on key_down: 's' do
+  puts "s key down"
+end
+
+on mouse: 'up' do
+  puts "mouse up"
+end
+
+on mouse: 'down' do
+  puts "mouse down"
 end
 
 show
-
-# on :mouse 'up' do
-#   
-# end
-# 
-# on :mouse 'down' do
-#   
-# end
-# 
-# on :key 'a' do
-#   
-# end
-# 
-# on :key_down 'a' do
-#   
-# end
-# 
-# on :mouse 'click' do
-#   
-# end
-# 
-# on :mouse 'right' do
-#   
-# end
-# 
-# on :mouse 'left' do
-#   
-# end
-# 
-# 
-# on key: 'any' do
-#   
-# end
-# 
-# on key: 'a' do
-#   
-# end
-# 
-# on key: 'shift' do
-#   
-# end
