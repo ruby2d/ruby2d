@@ -1,11 +1,17 @@
-# require 'rake/testtask'
+require 'rspec/core/rake_task'
 
 task default: 'all'
 
-# Rake::TestTask.new do |t|
-#   t.test_files = FileList['test/*_test.rb']
-#   t.verbose = true
-# end
+def run_test(file)
+  Rake::Task['build'].invoke
+  Rake::Task['spec'].invoke
+  system "( cd tests/ ; ruby #{file}.rb )"
+end
+
+desc "Run the specs"
+RSpec::Core::RakeTask.new do |t|
+  t.pattern = "spec/*spec.rb"
+end
 
 desc "Build Gem"
 task :build do
@@ -27,8 +33,8 @@ task :testcard do
 end
 
 
-desc "Test and Build"
+desc "Test and build"
 task :all do
-  # Rake::Task['test'].invoke
   Rake::Task['build'].invoke
+  Rake::Task['spec'].invoke
 end
