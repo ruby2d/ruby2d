@@ -19,5 +19,11 @@ module Ruby2D
       end
     end
     
+    def remove
+      if defined? Ruby2D::DSL
+        Ruby2D::Application.remove(self)
+      end
+    end
+    
   end
 end

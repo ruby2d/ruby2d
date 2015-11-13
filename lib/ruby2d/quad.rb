@@ -30,6 +30,12 @@ module Ruby2D
       update_color(c)
     end
     
+    def remove
+      if defined? Ruby2D::DSL
+        Ruby2D::Application.remove(self)
+      end
+    end
+    
     private
     
     def update_color(c)
