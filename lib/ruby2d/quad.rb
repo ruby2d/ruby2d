@@ -39,18 +39,24 @@ module Ruby2D
     private
     
     def update_color(c)
-      # If a 2D array
-      if c.class == Array && c.all? { |el| el.class == Array }
+      
+      # If a valid color, use it for each vertex
+      if Color.is_valid? c
+        @c1 = Ruby2D::Color.new(c)
+        @c2 = Ruby2D::Color.new(c)
+        @c3 = Ruby2D::Color.new(c)
+        @c4 = Ruby2D::Color.new(c)
+      
+      # If a valid array of colors, assign them to each vertex, respectively
+      elsif c.all? { |el| Color.is_valid? el }
         @c1 = Ruby2D::Color.new(c[0])
         @c2 = Ruby2D::Color.new(c[1])
         @c3 = Ruby2D::Color.new(c[2])
         @c4 = Ruby2D::Color.new(c[3])
       else
-        @c1 = Ruby2D::Color.new(c)
-        @c2 = Ruby2D::Color.new(c)
-        @c3 = Ruby2D::Color.new(c)
-        @c4 = Ruby2D::Color.new(c)
+        raise Error, "Not a valid color for #{self.class}"
       end
+      
     end
   end
 end

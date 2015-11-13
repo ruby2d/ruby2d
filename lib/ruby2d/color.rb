@@ -6,6 +6,10 @@ module Ruby2D
     attr_reader :r, :g, :b, :a
     
     def initialize(c)
+      if !self.class.is_valid? c
+        raise Error, "`#{c}` is not a valid color"
+      end
+      
       case c
       when 'black'
         @r, @g, @b, @a = to_f([0, 0, 0, 255])
@@ -48,14 +52,24 @@ module Ruby2D
       when Array
         @r, @g, @b, @a = to_f([c[0], c[1], c[2], c[3]])
       else
-        # raise Error, "Color does not exist!"
-        puts "Error! Bad color."
+        raise Error, "`#{c}` is not a valid color"
       end
+    end
+    
+    # Color must be String, like 'red', or Array, like [1.0, 0, 0, 1.0]
+    def self.is_valid?(c)
+      # TODO: Check if valid color string
+      #   (c.class == String && c.has_key?(c)) ||
+      (c.class == String) ||
+      (c.class == Array && c.length == 4 &&
+       c.all? { |el| el.is_a? Numeric } &&
+       c.all? { |el| el.class == Fixnum && (0..255).include?(el) ||
+                     el.class == Float  && (0.0..1.0).include?(el) })
     end
     
     private
     
-    # Convert from Uint8 (0..255) to Float (0..1.0)
+    # Convert from Fixnum (0..255) to Float (0.0..1.0)
     def to_f(a)
       b = []
       a.each do |n|
