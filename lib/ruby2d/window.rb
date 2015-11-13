@@ -48,13 +48,6 @@ module Ruby2D
       end
     end
     
-    def on(mouse: nil, key: nil, &proc)
-      puts "mouse: #{mouse}"
-      puts "key: #{key}"
-      # proc.call
-      key(key, &proc)
-    end
-    
     def add(o)
       case o
       when nil
@@ -83,12 +76,26 @@ module Ruby2D
       @objects.clear
     end
     
-    # Register key string with proc
-    def key(key, &proc)
-      @keys[key] = proc
+    def update(&proc)
+      @update_proc = proc
       true
     end
     
+    def on(mouse: nil, key: nil, key_down: nil, controller: nil, &proc)
+      unless mouse.nil?
+        case mouse
+        when 'click'
+        end
+      end
+      
+      unless key.nil?
+        reg_key(key, &proc)
+      end
+      
+      unless key_down.nil?
+        reg_key_down(key_down, &proc)
+      end
+      
       unless controller.nil?
         reg_controller(controller, &proc)
       end
@@ -101,12 +108,6 @@ module Ruby2D
       end
     end
     
-    # Register key string with proc
-    def key_down(key, &proc)
-      @keys_down[key] = proc
-      true
-    end
-    
     def key_down_callback(key)
       key.downcase!
       if @keys_down.has_key? key
@@ -114,9 +115,6 @@ module Ruby2D
       end
     end
     
-    def update(&proc)
-      @update_proc = proc
-      true
     end
     
     def update_callback
@@ -132,6 +130,18 @@ module Ruby2D
       else
         false
       end
+    end
+    
+    # Register key string with proc
+    def reg_key(key, &proc)
+      @keys[key] = proc
+      true
+    end
+    
+    # Register key string with proc
+    def reg_key_down(key, &proc)
+      @keys_down[key] = proc
+      true
     end
     
     # Register controller string with proc
