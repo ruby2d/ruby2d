@@ -1,4 +1,5 @@
 require 'rspec/core/rake_task'
+require './lib/ruby2d/version'
 
 task default: 'all'
 
@@ -17,12 +18,12 @@ desc "Build Gem"
 task :build do
   puts "==> uninstall gem"
   system "gem uninstall ruby2d --executables"
-
+  
   puts "==> build gem"
   system "gem build ruby2d.gemspec --verbose"
-
+  
   puts "==> install gem"
-  system "gem install ruby2d-0.0.0.gem --local"  # --verbose
+  system "gem install ruby2d-#{Ruby2D::VERSION}.gem --local"
 end
 
 desc "Run testcard"
