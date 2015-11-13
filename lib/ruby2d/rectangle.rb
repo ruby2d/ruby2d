@@ -5,7 +5,7 @@ module Ruby2D
     
     attr_reader :x, :y, :width, :height
     
-    def initialize(x, y, w, h, c='white')
+    def initialize(x=0, y=0, w=200, h=100, c='white')
       @type_id = 2
       @x, @y, @width, @height, @color = x, y, w, h, c
       update_coords(x, y, w, h)
