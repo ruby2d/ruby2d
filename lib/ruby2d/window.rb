@@ -13,6 +13,7 @@ module Ruby2D
       @objects = []
       @keys = {}
       @keys_down = {}
+      @controller = {}
       @update_proc = Proc.new {}
     end
     
@@ -88,6 +89,11 @@ module Ruby2D
       true
     end
     
+      unless controller.nil?
+        reg_controller(controller, &proc)
+      end
+    end
+    
     def key_callback(key)
       key.downcase!
       if @keys.has_key? key
@@ -126,6 +132,12 @@ module Ruby2D
       else
         false
       end
+    end
+    
+    # Register controller string with proc
+    def reg_controller(event, &proc)
+      @controller[event] = proc
+      true
     end
     
   end

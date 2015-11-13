@@ -93,6 +93,17 @@ void on_key_down(const char *key) {
 
 
 /*
+ * Simple 2D `on_controller` input callback function
+ */
+void on_controller(bool is_axis, int axis, int val, bool is_btn, int btn) {
+  rb_funcall(self, rb_intern("controller_callback"), 5,
+    is_axis ? Qtrue : Qfalse, INT2NUM(axis), INT2NUM(val),
+    is_btn  ? Qtrue : Qfalse, INT2NUM(btn)
+  );
+}
+
+
+/*
  * Simple 2D `update` callback function
  */
 void update() {
@@ -246,6 +257,7 @@ static VALUE ruby2d_show(VALUE s) {
   
   window->on_key = on_key;
   window->on_key_down = on_key_down;
+  window->on_controller = on_controller;
   
   S2D_Show(window);
   

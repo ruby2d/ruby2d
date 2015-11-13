@@ -13,8 +13,8 @@ module Ruby2D::DSL
     Ruby2D::Application.set(opts)
   end
   
-  def on(mouse: nil, key: nil, &proc)
-    Ruby2D::Application.on(mouse: mouse, key: key, &proc)
+  def on(mouse: nil, key: nil, key_down: nil, controller: nil, &proc)
+    Ruby2D::Application.on(mouse: mouse, key: key, key_down: key_down, controller: controller, &proc)
   end
   
   def update(&proc)
