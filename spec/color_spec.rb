@@ -6,7 +6,6 @@ RSpec.describe Ruby2D::Color do
   describe '#is_valid?' do
     
     it 'determines if a color string is valid' do
-      pending 'need hash of valid strings'
       expect(Ruby2D::Color.is_valid? 'red').to be true
       expect(Ruby2D::Color.is_valid? 'balloons').to be false
     end
