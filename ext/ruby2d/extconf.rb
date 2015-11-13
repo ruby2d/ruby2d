@@ -34,7 +34,7 @@ if RUBY_PLATFORM =~ /darwin/
     # If Homebrew not installed, print and quit
     if `which brew`.empty?
       errors << "Ruby 2D uses a library called Simple 2D." <<
-                "On OS X,this can be installed using Homebrew." <<
+                "On OS X, this can be installed using Homebrew." <<
                 "Install Homebrew, then try installing this gem again.\n" <<
                 "Learn more at http://brew.sh"
       print_errors(errors)
@@ -45,6 +45,16 @@ if RUBY_PLATFORM =~ /darwin/
       `brew tap simple2d/tap`
       `brew install simple2d`
     end
+    
+  # Simple 2D is installed, update to latest version
+  else
+    if `which brew`.empty?
+      # TODO: Check for latest version manually
+    else
+      # TODO: Get latest version of Simple 2D
+      #   `brew update`
+      #   `brew upgrade simple2d`
+    end
   end
   
   $LDFLAGS << `simple2d --libs`
@@ -52,7 +62,7 @@ if RUBY_PLATFORM =~ /darwin/
 # Windows
 elsif RUBY_PLATFORM =~ /mingw/
   
-  puts "Ruby 2D doesn't support windows yet :("
+  puts "Ruby 2D doesn't support Windows yet :("
   exit
   
 # Linux
@@ -60,9 +70,8 @@ else
   
   # If Simple 2D not installed
   if `which simple2d`.empty?
-    
     errors << "Ruby 2D uses a library called Simple 2D." <<
-              "On Linux, there's a script to make installaton easy.\n" <<
+              "There's a script to make installaton easy on Linux.\n" <<
               "Follow the instructions in the README to get started:" <<
               "  https://github.com/simple2d/simple2d"
     print_errors(errors)
