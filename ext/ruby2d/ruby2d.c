@@ -255,7 +255,7 @@ static VALUE ruby2d_show(VALUE s) {
   int height  = NUM2INT(rb_iv_get(self, "@height"));
   
   window = S2D_CreateWindow(
-    title, width, height, update, render
+    title, width, height, update, render, NULL
   );
   
   window->on_key = on_key;
