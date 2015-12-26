@@ -112,6 +112,9 @@ void update() {
   rb_iv_set(self, "@mouse_x", INT2NUM(window->mouse.x));
   rb_iv_set(self, "@mouse_y", INT2NUM(window->mouse.y));
   
+  // Store frame rate
+  rb_iv_set(self, "@fps", INT2NUM(window->fps));
+  
   // Call update proc, `window.update`
   rb_funcall(self, rb_intern("update_callback"), 0);
 }

@@ -8,6 +8,7 @@ module Ruby2D
       @width, @height, @title = width, height, title
       @mouse_x = @mouse_y = 0
       @fps_cap = fps
+      @fps = 0
       @vsync = vsync
       
       @objects = []
@@ -27,6 +28,8 @@ module Ruby2D
         return @width
       when :height
         return @height
+      when :fps
+        return @fps
       when :mouse_x
         return @mouse_x
       when :mouse_y
