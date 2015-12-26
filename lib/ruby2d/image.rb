@@ -8,7 +8,7 @@ module Ruby2D
     def initialize(x, y, path)
       
       unless File.exists? path
-        raise Ruby2D::Error, "Cannot find image file!"
+        raise Error, "Cannot find image file `#{path}`"
       end
       
       @type_id = 3
