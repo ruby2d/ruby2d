@@ -134,15 +134,18 @@ Image.new(580, 400, "media/image.bmp")
 
 # Text
 Text.new(0, 250)  # Default message
-Text.new(0, 275, 30, "Hello Ruby 2D!")  # Custom message
-
+t = Text.new(0, 275, 30, "Hello Ruby 2D!")  # Custom message
+t.color = 'red'
+fps = Text.new(0, 325, 20)
 
 # Pointer for mouse
-pointer = Square.new(0, 0, 10, 'red')
+pointer = Square.new(0, 0, 10, 'white')
 
 update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
+  
+  fps.text = "FPS: #{get :fps}"
 end
 
 show

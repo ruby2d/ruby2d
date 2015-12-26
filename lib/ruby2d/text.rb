@@ -31,6 +31,10 @@ module Ruby2D
       update_color(c)
     end
     
+    def text=(t)
+      
+    end
+    
     def remove
       if defined? Ruby2D::DSL
         Ruby2D::Application.remove(self)
@@ -40,6 +44,7 @@ module Ruby2D
     private
     
     def resolve_path(font)
+      # TODO: Consider CSS names, like 'serif', 'san-serif', 'monospace'
       if RUBY_PLATFORM =~ /darwin/
         font_path = "/Library/Fonts/#{font}.ttf"
         unless File.exists? font_path
