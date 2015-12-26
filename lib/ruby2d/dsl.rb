@@ -24,4 +24,8 @@ module Ruby2D::DSL
   def show
     Ruby2D::Application.show
   end
+  
+  def clear
+    Ruby2D::Application.clear
+  end
 end
