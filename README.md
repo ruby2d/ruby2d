@@ -4,6 +4,8 @@ This is the Ruby 2D gem. [Check out the website](http://www.ruby2d.com) for help
 
 ## Running Tests
 
+Ruby 2D uses both RSpec and custom tests. Run `bundle install` to get all development dependences.
+
 ### Getting the Test Media
 
 To keep the size of this repository small, media needed for tests are checked into the Simple 2D [`test_media`](https://github.com/simple2d/test_media) repo and referenced as a [Git submodule](http://git-scm.com/book/en/v2/Git-Tools-Submodules). After cloning this repo, init the submodule and get its contents by using:
