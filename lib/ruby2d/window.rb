@@ -118,6 +118,27 @@ module Ruby2D
       end
     end
     
+    def controller_callback(is_axis, axis, val, is_btn, btn)
+      
+      # puts "is_axis: #{is_axis}, axis: #{axis}, val: #{val}, is_btn: #{is_btn}, btn: #{btn}"
+      
+      if is_axis
+        if axis == 0 && val == -32768
+          event = 'left'
+        elsif axis == 0 && val == 32767
+          event = 'right'
+        elsif axis == 1 && val == -32768
+          event = 'up'
+        elsif axis == 1 && val == 32767
+          event = 'down'
+        end
+      elsif is_btn
+        event = btn
+      end
+      
+      if @controller.has_key? event
+        @controller[event].call
+      end
     end
     
     def update_callback
