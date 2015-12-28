@@ -22,15 +22,10 @@ def print_errors(errors)
 end
 
 
-# Add space to flags
-$LDFLAGS << ' '
-
-# Mac OS
+# OS X
 if RUBY_PLATFORM =~ /darwin/
-  
   # If Simple 2D not installed
   if `which simple2d`.empty?
-    
     # If Homebrew not installed, print and quit
     if `which brew`.empty?
       errors << "Ruby 2D uses a library called Simple 2D." <<
@@ -39,49 +34,41 @@ if RUBY_PLATFORM =~ /darwin/
                 "Learn more at http://brew.sh"
       print_errors(errors)
       exit
-      
     # Install Simple 2D using Homebrew
     else
       `brew tap simple2d/tap`
       `brew install simple2d`
     end
-    
   # Simple 2D is installed, update to latest version
   else
     if `which brew`.empty?
       # TODO: Check for latest version manually
     else
       # TODO: Get latest version of Simple 2D
-      #   `brew update`
-      #   `brew upgrade simple2d`
+      # `brew update`
+      # `brew upgrade simple2d`
     end
   end
   
-  $LDFLAGS << `simple2d --libs`
-  
-# Windows
-elsif RUBY_PLATFORM =~ /mingw/
-  
-  puts "Ruby 2D doesn't support Windows yet :("
-  exit
-  
 # Linux
-else
-  
+elsif RUBY_PLATFORM =~ /linux/
   # If Simple 2D not installed
   if `which simple2d`.empty?
     errors << "Ruby 2D uses a library called Simple 2D." <<
-              "There's a script to make installaton easy on Linux.\n" <<
+              "There's a script to make installation easy on Linux.\n" <<
               "Follow the instructions in the README to get started:" <<
               "  https://github.com/simple2d/simple2d"
     print_errors(errors)
     exit
   end
   
-  $LDFLAGS << `simple2d --libs`
+# Windows
+elsif RUBY_PLATFORM =~ /mingw/
+  puts "Ruby 2D doesn't support Windows yet :("
+  exit
 end
 
-# Remove newlines in flags, they cause problems
-$LDFLAGS.gsub!(/\n/, ' ')
+$LDFLAGS << ' ' << `simple2d --libs`
+$LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they cause problems
 
 create_makefile('ruby2d/ruby2d')
