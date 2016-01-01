@@ -10,12 +10,24 @@ on key_down: 's' do
   puts "s key down"
 end
 
-on mouse: 'up' do
-  puts "mouse up"
+on mouse: 'left' do
+  puts "mouse left"
+end
+
+on mouse: 'right' do
+  puts "mouse right"
 end
 
 on mouse: 'down' do
   puts "mouse down"
+end
+
+on mouse: 'up' do
+  puts "mouse up"
+end
+
+on mouse: 'any' do
+  puts "mouse any"
 end
 
 show

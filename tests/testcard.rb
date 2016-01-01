@@ -8,6 +8,7 @@ puts "
 Title:  #{get :title}
 Width:  #{get :width}
 Height: #{get :height}
+FPS:    #{get :fps}
 Self:   #{get :window}\n\n"
 
 # Primary colors

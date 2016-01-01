@@ -8,7 +8,7 @@ module Ruby2D
       @width, @height, @title = width, height, title
       @mouse_x = @mouse_y = 0
       @fps_cap = fps
-      @fps = 0
+      @fps = 60
       @vsync = vsync
       
       @objects = []
@@ -86,9 +86,7 @@ module Ruby2D
     
     def on(mouse: nil, key: nil, key_down: nil, controller: nil, &proc)
       unless mouse.nil?
-        case mouse
-        when 'click'
-        end
+        # reg_mouse(btn, &proc)
       end
       
       unless key.nil?
