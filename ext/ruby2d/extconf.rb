@@ -1,7 +1,5 @@
 require 'mkmf'
 
-errors = []
-
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
   def error; colorize('1;31') end
@@ -19,40 +17,44 @@ def print_errors(errors)
 #{"============================================================".bold}"
 end
 
+errors = []
+
+# Install Simple 2D on supported platforms
 
 # OS X
 if RUBY_PLATFORM =~ /darwin/
-  
-  # Simple 2D not installed
-  if `which simple2d`.empty?
-    # Homebrew not installed, print and quit
-    if `which brew`.empty?
-      errors << "Ruby 2D uses a library called Simple 2D." <<
-                "On OS X, this can be installed using Homebrew." <<
-                "Install Homebrew, then try installing this gem again.\n" <<
-                "Learn more at http://brew.sh"
-      print_errors(errors)
-      exit
-    # Install Simple 2D using Homebrew
-    else
-      `brew tap simple2d/tap`
-      `brew install simple2d`
-    end
-    
-  # Simple 2D installed, update to latest version
-  else
-    # Homebrew not installed
-    if `which brew`.empty?
-      # TODO: Check for latest version manually and update
-    # Homebrew installed, get latest version of Simple 2D
-    else
-      # An alternative, but slower and updates all formulas:
-      #   `brew update`
-      #   `brew upgrade simple2d`
+  unless ARGV.include? "--no-brew"
+    # Simple 2D not installed
+    if `which simple2d`.empty?
+      # Homebrew not installed, print and quit
+      if `which brew`.empty?
+        errors << "Ruby 2D uses a library called Simple 2D." <<
+                  "On OS X, this can be installed using Homebrew." <<
+                  "Install Homebrew, then try installing this gem again.\n" <<
+                  "Learn more at http://brew.sh"
+        print_errors(errors)
+        exit
+      # Install Simple 2D using Homebrew
+      else
+        `brew tap simple2d/tap`
+        `brew install simple2d`
+      end
       
-      `brew untap simple2d/tap`
-      `brew tap simple2d/tap`
-      `brew upgrade simple2d`
+    # Simple 2D installed, update to latest version
+    else
+      # Homebrew not installed
+      if `which brew`.empty?
+        # TODO: Check for latest version manually and update
+      # Homebrew installed, get latest version of Simple 2D
+      else
+        # An alternative, but slower and updates all formulas:
+        #   `brew update`
+        #   `brew upgrade simple2d`
+        
+        `brew untap simple2d/tap`
+        `brew tap simple2d/tap`
+        `brew upgrade simple2d`
+      end
     end
   end
   
@@ -74,6 +76,7 @@ elsif RUBY_PLATFORM =~ /mingw/
   exit
 end
 
+# Configure Simple 2D and create Makefile
 
 $LDFLAGS << ' ' << `simple2d --libs`
 $LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they cause problems

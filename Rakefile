@@ -23,7 +23,8 @@ task :build do
   system "gem build ruby2d.gemspec --verbose"
   
   puts "==> install gem"
-  system "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose"
+  system "gem install ruby2d-#{Ruby2D::VERSION}.gem "\
+         "--local --verbose -- --no-brew"
 end
 
 desc "Run testcard"
