@@ -11,7 +11,7 @@
 VALUE self;
 
 // Simple 2D window
-Window *window;
+S2D_Window *window;
 
 // Ruby data types
 static VALUE ruby2d_module;
@@ -20,13 +20,13 @@ static VALUE c_data_klass;
 
 // Structures for Ruby 2D classes
 struct image_data {
-  Image img;
+  S2D_Image* img;
 };
 struct text_data {
-  Text txt;
+  S2D_Text* txt;
 };
 struct sound_data {
-  Sound snd;
+  S2D_Sound* snd;
 };
 
 
@@ -215,8 +215,8 @@ void render() {
         struct image_data *data;
         Data_Get_Struct(rb_iv_get(el, "@data"), struct image_data, data);
         
-        data->img.x = NUM2DBL(rb_iv_get(el, "@x"));
-        data->img.y = NUM2DBL(rb_iv_get(el, "@y"));
+        data->img->x = NUM2DBL(rb_iv_get(el, "@x"));
+        data->img->y = NUM2DBL(rb_iv_get(el, "@y"));
         S2D_DrawImage(data->img);
       }
       break;
@@ -234,8 +234,8 @@ void render() {
         struct text_data *data;
         Data_Get_Struct(rb_iv_get(el, "@data"), struct text_data, data);
         
-        data->txt.x = NUM2DBL(rb_iv_get(el, "@x"));
-        data->txt.y = NUM2DBL(rb_iv_get(el, "@y"));
+        data->txt->x = NUM2DBL(rb_iv_get(el, "@x"));
+        data->txt->y = NUM2DBL(rb_iv_get(el, "@y"));
         S2D_DrawText(data->txt);
       }
       break;
