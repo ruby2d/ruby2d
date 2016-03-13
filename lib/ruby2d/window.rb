@@ -1,5 +1,4 @@
 # window.rb
-require 'pry'
 
 module Ruby2D
   class Window
