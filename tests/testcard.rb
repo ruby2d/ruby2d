@@ -1,5 +1,6 @@
 require 'ruby2d'
 
+binding.pry
 set width: 700, height: 500, title: "Ruby 2D – Testcard"
 
 # Read window attributes

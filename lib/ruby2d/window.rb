@@ -1,4 +1,5 @@
 # window.rb
+require 'pry'
 
 module Ruby2D
   class Window
@@ -38,16 +39,15 @@ module Ruby2D
     end
     
     def set(opts)
-      if opts.include? :title
-        @title = opts[:title]
-      end
-      
-      if opts.include? :width
-        @width = opts[:width]
-      end
-      
-      if opts.include? :height
-        @height = opts[:height]
+      valid_keys = [:title, :width, :height]
+      valid_opts = opts.reject { |k| !valid_keys.include?(k) }
+      if !valid_opts.empty?
+        @title = valid_opts[:title]
+        @width = valid_opts[:width]
+        @height = valid_opts[:height]
+        return true
+      else
+        return false
       end
     end
     
