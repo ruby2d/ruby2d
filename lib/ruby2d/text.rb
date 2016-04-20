@@ -5,20 +5,17 @@ module Ruby2D
     
     attr_accessor :x, :y, :size, :text
     
-    def initialize(x=0, y=0, size=20, text="Hello World!", font="Arial", c="white")
-      if font.include? '.'
-        unless File.exists? font
-          raise Error, "Cannot find font file!"
-        else
-          @font = font
-        end
+    def initialize(x=0, y=0, size=20, msg="Hello World!", font="Arial", c="white")
+      
+      if File.exists? font
+        @font = font
       else
         @font = resolve_path(font)
       end
       
       @type_id = 4
       @x, @y, @size = x, y, size
-      @text, @color = text, c
+      @text, @color = msg, c
       update_color(c)
       
       if defined? Ruby2D::DSL
@@ -44,14 +41,18 @@ module Ruby2D
     private
     
     def resolve_path(font)
-      # TODO: Consider CSS names, like 'serif', 'san-serif', 'monospace'
       if RUBY_PLATFORM =~ /darwin/
         font_path = "/Library/Fonts/#{font}.ttf"
-        unless File.exists? font_path
-          raise Error, "Cannot find system font!"
-        end
+      else
+        # Linux
+        font_path = "/usr/share/fonts/truetype/#{font}.ttf"
       end
-      font_path
+      
+      unless File.exists? font_path
+        raise Error, "Cannot find system font"
+      else
+        font_path
+      end
     end
     
     def update_color(c)
