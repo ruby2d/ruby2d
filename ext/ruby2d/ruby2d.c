@@ -20,13 +20,13 @@ static VALUE c_data_klass;
 
 // Structures for Ruby 2D classes
 struct image_data {
-  S2D_Image* img;
+  S2D_Image *img;
 };
 struct text_data {
-  S2D_Text* txt;
+  S2D_Text *txt;
 };
 struct sound_data {
-  S2D_Sound* snd;
+  S2D_Sound *snd;
 };
 
 
@@ -253,9 +253,10 @@ static VALUE ruby2d_show(VALUE s) {
   char *title = RSTRING_PTR(rb_iv_get(self, "@title"));
   int width   = NUM2INT(rb_iv_get(self, "@width"));
   int height  = NUM2INT(rb_iv_get(self, "@height"));
+  int flags   = 0;
   
   window = S2D_CreateWindow(
-    title, width, height, update, render, 0
+    title, width, height, update, render, flags
   );
   
   window->on_key = on_key;
