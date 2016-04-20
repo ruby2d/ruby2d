@@ -17,10 +17,10 @@ Rectangle.new(50, 0, 50, 100,  [0, 1.0, 0, 1.0])
 Rectangle.new(100, 0, 50, 100, [0, 0, 1.0, 1.0])
 
 # Color strings
-Rectangle.new(150, 0, 50, 50,  'black')
-Rectangle.new(200, 0, 50, 50,  'gray')
-Rectangle.new(250, 0, 50, 50,  'silver')
-Rectangle.new(300, 0, 50, 50,  'white')
+Square.new(   150, 0, 50,      'black')
+Square.new(   200, 0, 50,      'gray')
+Square.new(   250, 0, 50,      'silver')
+Square.new(   300, 0, 50,      'white')
 Rectangle.new(350, 0, 50, 50,  'navy')
 Rectangle.new(400, 0, 50, 50,  'blue')
 Rectangle.new(450, 0, 50, 50,  'aqua')
@@ -129,15 +129,16 @@ Quad.new(
 )
 
 # Images
-Image.new(580, 180, "media/image.png")
-Image.new(580, 290, "media/image.jpg")
-Image.new(580, 400, "media/image.bmp")
+Image.new(590, 180, "media/image.png")
+Image.new(590, 290, "media/image.jpg")
+Image.new(590, 400, "media/image.bmp")
 
 # Text
 Text.new(0, 250)  # Default message
-t = Text.new(0, 275, 30, "Hello Ruby 2D!")  # Custom message
-t.color = 'red'
+t = Text.new(0, 275, 30, "Hello Ruby 2D!", "media/bitstream_vera/vera.ttf")
+t.color = 'red'   # Doesn't work yet
 fps = Text.new(0, 325, 20)
+
 
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, 'white')
