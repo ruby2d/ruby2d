@@ -4,7 +4,6 @@ require 'ruby2d/version'
 Gem::Specification.new do |s|
   s.name        = 'ruby2d'
   s.version     = Ruby2D::VERSION
-  s.date        = '2016-01-01'
   s.author      = 'Tom Black'
   s.email       = '@blacktm'
   s.summary     = 'Ruby 2D'
