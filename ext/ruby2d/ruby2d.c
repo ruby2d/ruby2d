@@ -31,10 +31,10 @@ struct sound_data {
 
 
 /*
- * Function pointer to close the Simple 2D window
+ * Function pointer to free the Simple 2D window
  */
-static void close_window() {
-  S2D_Close(window);
+static void free_window() {
+  S2D_FreeWindow(window);
 }
 
 
@@ -265,7 +265,7 @@ static VALUE ruby2d_show(VALUE s) {
   
   S2D_Show(window);
   
-  atexit(close_window);
+  atexit(free_window);
   return Qnil;
 }
 
