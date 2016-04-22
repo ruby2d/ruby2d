@@ -1,0 +1,10 @@
+os: osx
+language: ruby
+rvm:
+  - 2.2.3
+before_install:
+  - brew update
+  - brew tap simple2d/tap
+  - brew install simple2d
+script:
+  - rake

@@ -1,5 +1,7 @@
 # Welcome to Ruby 2D!
 
+[![Build Status](https://travis-ci.org/ruby2d/ruby2d.svg?branch=master)](https://travis-ci.org/ruby2d/ruby2d)
+
 This is the [Ruby 2D gem](https://rubygems.org/gems/ruby2d). Check out the [website](http://www.ruby2d.com) for help getting started, documentation, news, and more. See where we're headed in the [roadmap](http://www.ruby2d.com/roadmap) and learn about [contributing](http://www.ruby2d.com/contribute). If you encounter any issues, ping the [mailing list](https://groups.google.com/d/forum/ruby2d).
 
 ## Development
