@@ -38,16 +38,10 @@ module Ruby2D
     end
     
     def set(opts)
-      valid_keys = [:title, :width, :height]
-      valid_opts = opts.reject { |k| !valid_keys.include?(k) }
-      if !valid_opts.empty?
-        @title = valid_opts[:title]
-        @width = valid_opts[:width]
-        @height = valid_opts[:height]
-        return true
-      else
-        return false
-      end
+      # Store new window attributes, or ignore if nil
+      @title  = opts[:title]  || @title
+      @width  = opts[:width]  || @width
+      @height = opts[:height] || @height
     end
     
     def add(o)
