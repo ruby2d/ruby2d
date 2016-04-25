@@ -1,6 +1,6 @@
 require 'mkmf'
 
-S2D_VERSION = '0.2.1'  # Simple 2D version required
+S2D_VERSION = '0.2.1'  # Simple 2D minimum version required
 $errors = []
 
 class String

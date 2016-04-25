@@ -24,7 +24,7 @@ Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and
 
 ## Preparing a Release
 
-1. Update the minimum Simple 2D version required in [extconf.rb](ext/ruby2d/extconf.rb)
+1. Update the Simple 2D minimum version required in [extconf.rb](ext/ruby2d/extconf.rb)
 2. Run tests on all supported platforms
 3. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
 4. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`

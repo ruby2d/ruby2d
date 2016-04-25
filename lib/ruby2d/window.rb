@@ -10,7 +10,6 @@ module Ruby2D
       @fps_cap = fps
       @fps = 60
       @vsync = vsync
-      
       @objects = []
       @keys = {}
       @keys_down = {}
@@ -20,20 +19,13 @@ module Ruby2D
     
     def get(sym)
       case sym
-      when :window
-        return self
-      when :title
-        return @title
-      when :width
-        return @width
-      when :height
-        return @height
-      when :fps
-        return @fps
-      when :mouse_x
-        return @mouse_x
-      when :mouse_y
-        return @mouse_y
+      when :window;  self
+      when :title;   @title
+      when :width;   @width
+      when :height;  @height
+      when :fps;     @fps
+      when :mouse_x; @mouse_x
+      when :mouse_y; @mouse_y
       end
     end
     

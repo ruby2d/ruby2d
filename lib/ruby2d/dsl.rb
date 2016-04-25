@@ -1,10 +1,6 @@
 # dsl.rb
 
 module Ruby2D::DSL
-  def hello
-    puts "hi"
-  end
-  
   def get(sym)
     Ruby2D::Application.get(sym)
   end
