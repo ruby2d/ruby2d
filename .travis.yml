@@ -1,8 +1,10 @@
 os: osx
+osx_image: xcode7.1
 language: ruby
 rvm:
-  - 2.2.3
+  - 2.2.4
 before_install:
+  - sw_vers
   - brew update
   - brew tap simple2d/tap
   - brew install simple2d
