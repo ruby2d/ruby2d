@@ -8,10 +8,10 @@
 #define TEXT     4
 
 // Ruby 2D window
-VALUE self;
+static VALUE self;
 
 // Simple 2D window
-S2D_Window *window;
+static S2D_Window *window;
 
 // Ruby data types
 static VALUE ruby2d_module;
@@ -79,7 +79,7 @@ static VALUE init_text(char *font, char *msg, int size) {
 /*
  * Simple 2D `on_key` input callback function
  */
-void on_key(const char *key) {
+static void on_key(const char *key) {
   rb_funcall(self, rb_intern("key_callback"), 1, rb_str_new2(key));
 }
 
@@ -87,7 +87,7 @@ void on_key(const char *key) {
 /*
  * Simple 2D `on_key_down` input callback function
  */
-void on_key_down(const char *key) {
+static void on_key_down(const char *key) {
   rb_funcall(self, rb_intern("key_down_callback"), 1, rb_str_new2(key));
 }
 
@@ -95,7 +95,7 @@ void on_key_down(const char *key) {
 /*
  * Simple 2D `on_controller` input callback function
  */
-void on_controller(bool is_axis, int axis, int val, bool is_btn, int btn) {
+static void on_controller(bool is_axis, int axis, int val, bool is_btn, int btn) {
   rb_funcall(self, rb_intern("controller_callback"), 5,
     is_axis ? Qtrue : Qfalse, INT2NUM(axis), INT2NUM(val),
     is_btn  ? Qtrue : Qfalse, INT2NUM(btn)
@@ -106,7 +106,7 @@ void on_controller(bool is_axis, int axis, int val, bool is_btn, int btn) {
 /*
  * Simple 2D `update` callback function
  */
-void update() {
+static void update() {
   
   // Set the cursor
   rb_iv_set(self, "@mouse_x", INT2NUM(window->mouse.x));
@@ -123,7 +123,7 @@ void update() {
 /*
  * Simple 2D `render` callback function
  */
-void render() {
+static void render() {
   
   // Read window objects
   VALUE objects = rb_iv_get(self, "@objects");
