@@ -14,14 +14,14 @@ module Ruby2D
       @type_id = 3
       @x, @y, @path = x, y, path
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     
     def remove
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.remove(self)
+      if defined? DSL
+        Application.remove(self)
       end
     end
     

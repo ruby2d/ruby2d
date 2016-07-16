@@ -1,7 +1,7 @@
 # rectangle.rb
 
 module Ruby2D
-  class Rectangle < Ruby2D::Quad
+  class Rectangle < Quad
     
     attr_reader :x, :y, :width, :height
     
@@ -11,8 +11,8 @@ module Ruby2D
       update_coords(x, y, w, h)
       update_color(c)
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     

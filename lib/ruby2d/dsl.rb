@@ -2,23 +2,24 @@
 
 module Ruby2D::DSL
   def get(sym)
-    Ruby2D::Application.get(sym)
+    Application.get(sym)
   end
   
   def set(opts)
-    Ruby2D::Application.set(opts)
+    Application.set(opts)
   end
   
   def on(mouse: nil, key: nil, key_down: nil, controller: nil, &proc)
-    Ruby2D::Application.on(mouse: mouse, key: key, key_down: key_down, controller: controller, &proc)
+    Application.on(mouse: mouse, key: key, key_down: key_down, controller: controller, &proc)
   end
   
   def update(&proc)
-    Ruby2D::Application.update(&proc)
+    Application.update(&proc)
+  end
   end
   
   def show
-    Ruby2D::Application.show
+    Application.show
   end
   
   def clear

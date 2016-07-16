@@ -20,8 +20,8 @@ module Ruby2D
       @color = c
       update_color(c)
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     
@@ -31,8 +31,8 @@ module Ruby2D
     end
     
     def remove
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.remove(self)
+      if defined? DSL
+        Application.remove(self)
       end
     end
     
@@ -42,17 +42,17 @@ module Ruby2D
       
       # If a valid color, use it for each vertex
       if Color.is_valid? c
-        @c1 = Ruby2D::Color.new(c)
-        @c2 = Ruby2D::Color.new(c)
-        @c3 = Ruby2D::Color.new(c)
-        @c4 = Ruby2D::Color.new(c)
-      
+        @c1 = Color.new(c)
+        @c2 = Color.new(c)
+        @c3 = Color.new(c)
+        @c4 = Color.new(c)
+        
       # If a valid array of colors, assign them to each vertex, respectively
       elsif c.all? { |el| Color.is_valid? el }
-        @c1 = Ruby2D::Color.new(c[0])
-        @c2 = Ruby2D::Color.new(c[1])
-        @c3 = Ruby2D::Color.new(c[2])
-        @c4 = Ruby2D::Color.new(c[3])
+        @c1 = Color.new(c[0])
+        @c2 = Color.new(c[1])
+        @c3 = Color.new(c[2])
+        @c4 = Color.new(c[3])
       else
         raise Error, "Not a valid color for #{self.class}"
       end

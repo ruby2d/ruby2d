@@ -16,8 +16,8 @@ module Ruby2D
       @color = c
       update_color(c)
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     
@@ -27,8 +27,8 @@ module Ruby2D
     end
     
     def remove
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.remove(self)
+      if defined? DSL
+        Application.remove(self)
       end
     end
     
@@ -37,13 +37,13 @@ module Ruby2D
     def update_color(c)
       # If a 2D array
       if c.class == Array && c.all? { |el| el.class == Array }
-        @c1 = Ruby2D::Color.new(c[0])
-        @c2 = Ruby2D::Color.new(c[1])
-        @c3 = Ruby2D::Color.new(c[2])
+        @c1 = Color.new(c[0])
+        @c2 = Color.new(c[1])
+        @c3 = Color.new(c[2])
       else
-        @c1 = Ruby2D::Color.new(c)
-        @c2 = Ruby2D::Color.new(c)
-        @c3 = Ruby2D::Color.new(c)
+        @c1 = Color.new(c)
+        @c2 = Color.new(c)
+        @c3 = Color.new(c)
       end
     end
     

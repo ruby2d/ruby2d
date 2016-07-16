@@ -18,8 +18,8 @@ module Ruby2D
       @text, @color = msg, c
       update_color(c)
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     
@@ -33,8 +33,8 @@ module Ruby2D
     end
     
     def remove
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.remove(self)
+      if defined? DSL
+        Application.remove(self)
       end
     end
     
@@ -56,7 +56,7 @@ module Ruby2D
     end
     
     def update_color(c)
-      @c = Ruby2D::Color.new(c)
+      @c = Color.new(c)
     end
     
   end

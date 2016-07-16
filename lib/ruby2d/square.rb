@@ -1,7 +1,7 @@
 # square.rb
 
 module Ruby2D
-  class Square < Ruby2D::Rectangle
+  class Square < Rectangle
     
     attr_reader :size
     
@@ -12,8 +12,8 @@ module Ruby2D
       update_coords(x, y, s, s)
       update_color(c)
       
-      if defined? Ruby2D::DSL
-        Ruby2D::Application.add(self)
+      if defined? DSL
+        Application.add(self)
       end
     end
     
