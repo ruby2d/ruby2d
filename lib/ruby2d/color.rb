@@ -67,6 +67,20 @@ module Ruby2D
       end
       return b
     end
+    #convert from "#FFF000" to Float (0.0..1.0) 
+    def hex_to_f(a)
+      c=[]	    
+      b=a.delete("#")
+      n=(b.length)
+      #n1=n/3
+      j=0
+      for i in (0..n-1).step(n/3)
+      	c[j]=Integer("0x".concat(b[i,n/3]))
+	j=j+1
+      end
+      f = to_f(c)
+      return f
+    end
     
   end
 end
