@@ -125,6 +125,13 @@ static void update() {
  */
 static void render() {
   
+  // Set background color
+  VALUE bc = rb_iv_get(self, "@background");
+  window->background.r = NUM2DBL(rb_iv_get(bc, "@r"));
+  window->background.g = NUM2DBL(rb_iv_get(bc, "@g"));
+  window->background.b = NUM2DBL(rb_iv_get(bc, "@b"));
+  window->background.a = NUM2DBL(rb_iv_get(bc, "@a"));
+  
   // Read window objects
   VALUE objects = rb_iv_get(self, "@objects");
   int num_objects = NUM2INT(rb_funcall(objects, rb_intern("count"), 0));

@@ -6,6 +6,7 @@ module Ruby2D
     
     def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
       @width, @height, @title = width, height, title
+      @background = Color.new([0.0, 0.0, 0.0, 1.0])
       @mouse_x = @mouse_y = 0
       @fps_cap = fps
       @fps = 60
@@ -34,6 +35,9 @@ module Ruby2D
       @title  = opts[:title]  || @title
       @width  = opts[:width]  || @width
       @height = opts[:height] || @height
+      if Color.is_valid? opts[:background]
+        @background    = Color.new(opts[:background])
+      end
     end
     
     def add(o)
