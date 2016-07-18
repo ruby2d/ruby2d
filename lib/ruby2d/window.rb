@@ -6,6 +6,7 @@ module Ruby2D
     
     def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
       @width, @height, @title = width, height, title
+      @viewport_width, @viewport_height = nil, nil
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
       @resizable = false
       @mouse_x = @mouse_y = 0
@@ -36,6 +37,8 @@ module Ruby2D
       @title  = opts[:title]  || @title
       @width  = opts[:width]  || @width
       @height = opts[:height] || @height
+      @viewport_width  = opts[:viewport_width]  || @viewport_width
+      @viewport_height = opts[:viewport_height] || @viewport_height
       @resizable       = opts[:resizable]       || @resizable
       @borderless      = opts[:borderless]      || @borderless
       @fullscreen      = opts[:fullscreen]      || @fullscreen

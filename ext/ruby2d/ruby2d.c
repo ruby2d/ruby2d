@@ -276,6 +276,24 @@ static VALUE ruby2d_show(VALUE s) {
     flags = flags | S2D_HIGHDPI;
   }
   
+  // Check viewport size and set
+  
+  int viewport_width;
+  VALUE vp_w = rb_iv_get(self, "@viewport_width");
+  if (vp_w == Qnil) {
+    viewport_width = width;
+  } else {
+    viewport_width = NUM2INT(vp_w);
+  }
+  
+  int viewport_height;
+  VALUE vp_h = rb_iv_get(self, "@viewport_height");
+  if (vp_h == Qnil) {
+    viewport_height = height;
+  } else {
+    viewport_height = NUM2INT(vp_h);
+  }
+  
   window = S2D_CreateWindow(
     title, width, height, update, render, flags
   );
@@ -283,6 +301,8 @@ static VALUE ruby2d_show(VALUE s) {
   window->on_key = on_key;
   window->on_key_down = on_key_down;
   window->on_controller = on_controller;
+  window->viewport.width  = viewport_width;
+  window->viewport.height = viewport_height;
   
   S2D_Show(window);
   
