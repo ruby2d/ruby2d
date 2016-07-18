@@ -139,9 +139,12 @@ t = Text.new(0, 275, 30, "Hello Ruby 2D!", "media/bitstream_vera/vera.ttf")
 t.color = 'red'   # Doesn't work yet
 fps = Text.new(0, 325, 20)
 
-
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, 'white')
+
+on key: "escape" do
+  close
+end
 
 update do
   pointer.x = (get :mouse_x) - 5

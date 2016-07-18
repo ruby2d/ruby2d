@@ -271,6 +271,15 @@ static VALUE ruby2d_show(VALUE s) {
 
 
 /*
+ * Ruby2D::Window#close
+ */
+static VALUE ruby2d_close() {
+  S2D_Close(window);
+  return Qnil;
+}
+
+
+/*
  * Ruby C extension init
  */
 void Init_ruby2d() {
@@ -283,6 +292,9 @@ void Init_ruby2d() {
   
   // Ruby2D::Window#show
   rb_define_method(ruby2d_window_klass, "show", ruby2d_show, 0);
+  
+  // Ruby2D::Window#close
+  rb_define_method(ruby2d_window_klass, "close", ruby2d_close, 0);
   
   // Ruby2D::CData
   c_data_klass = rb_define_class_under(ruby2d_module, "CData", rb_cObject);

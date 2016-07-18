@@ -16,13 +16,17 @@ module Ruby2D::DSL
   def update(&proc)
     Application.update(&proc)
   end
+  
+  def clear
+    Application.clear
   end
   
   def show
     Application.show
   end
   
-  def clear
-    Ruby2D::Application.clear
+  def close
+    Application.close
   end
+  
 end

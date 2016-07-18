@@ -35,5 +35,9 @@ module Ruby2D::Application
     def show
       @@window.show
     end
+    
+    def close
+      @@window.close
+    end
   end
 end
