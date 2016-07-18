@@ -262,6 +262,20 @@ static VALUE ruby2d_show(VALUE s) {
   int height  = NUM2INT(rb_iv_get(self, "@height"));
   int flags   = 0;
   
+  // Get window flags
+  if (rb_iv_get(self, "@resizable") == Qtrue) {
+    flags = flags | S2D_RESIZABLE;
+  }
+  if (rb_iv_get(self, "@borderless") == Qtrue) {
+    flags = flags | S2D_BORDERLESS;
+  }
+  if (rb_iv_get(self, "@fullscreen") == Qtrue) {
+    flags = flags | S2D_FULLSCREEN;
+  }
+  if (rb_iv_get(self, "@highdpi") == Qtrue) {
+    flags = flags | S2D_HIGHDPI;
+  }
+  
   window = S2D_CreateWindow(
     title, width, height, update, render, flags
   );
