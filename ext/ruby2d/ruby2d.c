@@ -257,6 +257,7 @@ static void render() {
 static VALUE ruby2d_show(VALUE s) {
   self = s;
   
+  // Get window attributes
   char *title = RSTRING_PTR(rb_iv_get(self, "@title"));
   int width   = NUM2INT(rb_iv_get(self, "@width"));
   int height  = NUM2INT(rb_iv_get(self, "@height"));
@@ -298,11 +299,11 @@ static VALUE ruby2d_show(VALUE s) {
     title, width, height, update, render, flags
   );
   
-  window->on_key = on_key;
-  window->on_key_down = on_key_down;
-  window->on_controller = on_controller;
   window->viewport.width  = viewport_width;
   window->viewport.height = viewport_height;
+  window->on_key          = on_key;
+  window->on_key_down     = on_key_down;
+  window->on_controller   = on_controller;
   
   S2D_Show(window);
   

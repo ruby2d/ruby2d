@@ -5,7 +5,8 @@ module Ruby2D
     attr_reader :title, :width, :height, :mouse_x, :mouse_y
     
     def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
-      @width, @height, @title = width, height, title
+      @title = title
+      @width, @height = width, height
       @viewport_width, @viewport_height = nil, nil
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
       @resizable = false
@@ -34,9 +35,9 @@ module Ruby2D
     
     def set(opts)
       # Store new window attributes, or ignore if nil
-      @title  = opts[:title]  || @title
-      @width  = opts[:width]  || @width
-      @height = opts[:height] || @height
+      @title           = opts[:title]           || @title
+      @width           = opts[:width]           || @width
+      @height          = opts[:height]          || @height
       @viewport_width  = opts[:viewport_width]  || @viewport_width
       @viewport_height = opts[:viewport_height] || @viewport_height
       @resizable       = opts[:resizable]       || @resizable
