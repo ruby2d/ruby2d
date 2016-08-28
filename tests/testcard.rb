@@ -135,9 +135,11 @@ Image.new(590, 400, "media/image.bmp")
 
 # Text
 Text.new(0, 250)  # Default message
-t = Text.new(0, 275, 30, "Hello Ruby 2D!", "media/bitstream_vera/vera.ttf")
-t.color = 'red'   # Doesn't work yet
-fps = Text.new(0, 325, 20)
+t1 = Text.new(0, 275, 30, "Hello Ruby 2D!", "media/bitstream_vera/vera.ttf")
+t1.color = 'red'   # Doesn't work yet
+t2 = Text.new(0, 325, 20) # Default message
+t2.text = "Text can be changed"
+fps = Text.new(0, 375, 20)
 
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, 'white')

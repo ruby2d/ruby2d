@@ -243,6 +243,7 @@ static void render() {
         
         data->txt->x = NUM2DBL(rb_iv_get(el, "@x"));
         data->txt->y = NUM2DBL(rb_iv_get(el, "@y"));
+        S2D_SetText(data->txt, RSTRING_PTR(rb_iv_get(el, "@text")));
         S2D_DrawText(data->txt);
       }
       break;
