@@ -35,6 +35,8 @@ module Ruby2D
         when String
           if c == 'random'
             @r, @g, @b, @a = rand(0..1.0), rand(0..1.0), rand(0..1.0), 1.0
+          elsif self.class.is_hex(c)
+            @r, @g, @b, @a = hex_to_f(c)
           else
             @r, @g, @b, @a = to_f(@@colors[c])
           end
@@ -43,10 +45,17 @@ module Ruby2D
         end
       end
     end
-    
+
+    # test whether input string is Hex color
+    def self.is_hex(a)
+      result = !(/^#[0-9A-F]{6}$/i.match(a).nil?)
+      return result
+    end
+
     # Color must be String, like 'red', or Array, like [1.0, 0, 0, 1.0]
     def self.is_valid?(c)
       (c.class == String && @@colors.key?(c)) ||
+      (c.class == String && self.is_hex(c)) ||
       (c.class == Array && c.length == 4 &&
        c.all? { |el| el.is_a? Numeric } &&
        c.all? { |el| el.class == Fixnum && (0..255).include?(el) ||
@@ -67,7 +76,8 @@ module Ruby2D
       end
       return b
     end
-    #convert from "#FFF000" to Float (0.0..1.0) 
+
+    # convert from "#FFF000" to Float (0.0..1.0) 
     def hex_to_f(a)
       c=[]	    
       b=a.delete("#")
@@ -76,8 +86,9 @@ module Ruby2D
       j=0
       for i in (0..n-1).step(n/3)
       	c[j]=Integer("0x".concat(b[i,n/3]))
-	j=j+1
+	      j=j+1
       end
+      c[3] = 255 #set @a to 255
       f = to_f(c)
       return f
     end
