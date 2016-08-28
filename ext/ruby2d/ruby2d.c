@@ -95,7 +95,7 @@ static void on_key_down(const char *key) {
 /*
  * Simple 2D `on_controller` input callback function
  */
-static void on_controller(bool is_axis, int axis, int val, bool is_btn, int btn) {
+static void on_controller(int which, bool is_axis, int axis, int val, bool is_btn, int btn) {
   rb_funcall(self, rb_intern("controller_callback"), 5,
     is_axis ? Qtrue : Qfalse, INT2NUM(axis), INT2NUM(val),
     is_btn  ? Qtrue : Qfalse, INT2NUM(btn)
