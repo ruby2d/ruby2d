@@ -2,11 +2,11 @@
 
 module Ruby2D
   class Text
-    
+
     attr_accessor :x, :y, :size, :text
     
     def initialize(x=0, y=0, size=20, msg="Hello World!", font="Arial", c="white")
-      
+
       if File.exists? font
         @font = font
       else
@@ -29,7 +29,7 @@ module Ruby2D
     end
     
     def text=(t)
-      
+      @text = t
     end
     
     def remove
@@ -43,7 +43,7 @@ module Ruby2D
     def resolve_path(font)
       if RUBY_PLATFORM =~ /darwin/
         font_path = "/Library/Fonts/#{font}.ttf"
-      else
+      else  
         # Linux
         font_path = "/usr/share/fonts/truetype/#{font}.ttf"
       end
