@@ -108,6 +108,14 @@ static void on_key(const char *key) {
 
 
 /*
+ * Simple 2D `on_key_up` input callback function
+ */
+static void on_key_up(const char *key) {
+  rb_funcall(self, rb_intern("key_up_callback"), 1, rb_str_new2(key));
+}
+
+
+/*
  * Simple 2D `on_key_down` input callback function
  */
 static void on_key_down(const char *key) {
@@ -350,6 +358,7 @@ static VALUE ruby2d_show(VALUE s) {
   window->viewport.width  = viewport_width;
   window->viewport.height = viewport_height;
   window->on_key          = on_key;
+  window->on_key_up       = on_key_up;
   window->on_key_down     = on_key_down;
   window->on_controller   = on_controller;
   
