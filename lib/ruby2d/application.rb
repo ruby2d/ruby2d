@@ -16,6 +16,10 @@ module Ruby2D::Application
       @@window.on(mouse: mouse, key: key, key_up: key_up, key_down: key_down, controller: controller, &proc)
     end
     
+    def on_key(&proc)
+      @@window.on_key(&proc)
+    end
+    
     def add(o)
       @@window.add(o)
     end

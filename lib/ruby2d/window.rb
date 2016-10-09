@@ -16,6 +16,7 @@ module Ruby2D
       @vsync = vsync
       @objects = []
       @keys, @keys_up, @keys_down, @controller = {}, {}, {}, {}
+      @on_key_proc = Proc.new {}
       @update_proc = Proc.new {}
     end
     
@@ -102,8 +103,14 @@ module Ruby2D
       end
     end
     
+    def on_key(&proc)
+      @on_key_proc = proc
+      true
+    end
+    
     def key_callback(key)
       key.downcase!
+      @on_key_proc.call(key)
       if @keys.has_key? key
         @keys[key].call
       end

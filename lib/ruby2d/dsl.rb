@@ -13,6 +13,10 @@ module Ruby2D::DSL
     Application.on(mouse: mouse, key: key, key_up: key_up, key_down: key_down, controller: controller, &proc)
   end
   
+  def on_key(&proc)
+    Application.on_key(&proc)
+  end
+  
   def update(&proc)
     Application.update(&proc)
   end
