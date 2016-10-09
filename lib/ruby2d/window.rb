@@ -112,6 +112,9 @@ module Ruby2D
     def key_callback(key)
       key.downcase!
       @on_key_proc.call(key)
+      if @keys.has_key? 'any'
+        @keys['any'].call
+      end
       if @keys.has_key? key
         @keys[key].call
       end
@@ -129,6 +132,9 @@ module Ruby2D
     
     def key_down_callback(key)
       key.downcase!
+      if @keys_down.has_key? 'any'
+        @keys_down['any'].call
+      end
       if @keys_down.has_key? key
         @keys_down[key].call
       end
