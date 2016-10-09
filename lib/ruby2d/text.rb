@@ -13,7 +13,7 @@ module Ruby2D
         @font = resolve_path(font)
       end
       
-      @type_id = 4
+      @type_id = 5
       @x, @y, @size = x, y, size
       @text, @color = msg, c
       update_color(c)

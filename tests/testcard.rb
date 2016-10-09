@@ -141,6 +141,16 @@ t2 = Text.new(0, 325, 20) # Default message
 t2.text = "Text can be changed"
 fps = Text.new(0, 375, 20)
 
+
+# Sprites
+s1 = Sprite.new(350, 200, "media/sprite_sheet.png")
+s1.add(forwards: [
+  [  0, 0, 50, 50, 30],
+  [ 50, 0, 50, 50, 40],
+  [100, 0, 50, 50, 50],
+  [150, 0, 50, 50, 60]
+])
+
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, 'white')
 
@@ -151,7 +161,7 @@ end
 update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
-  
+  s1.animate(:forwards)
   fps.text = "FPS: #{get :fps}"
 end
 

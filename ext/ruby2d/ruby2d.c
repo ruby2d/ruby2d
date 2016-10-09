@@ -2,10 +2,11 @@
 #include <simple2d.h>
 
 // @type_id values for rendering
-#define TRIANGLE 1
-#define QUAD     2
-#define IMAGE    3
-#define TEXT     4
+#define R2D_TRIANGLE 1
+#define R2D_QUAD     2
+#define R2D_IMAGE    3
+#define R2D_SPRITE   4
+#define R2D_TEXT     5
 
 // Ruby 2D window
 static VALUE self;
@@ -21,6 +22,9 @@ static VALUE c_data_klass;
 // Structures for Ruby 2D classes
 struct image_data {
   S2D_Image *img;
+};
+struct sprite_data {
+  S2D_Sprite *spr;
 };
 struct text_data {
   S2D_Text *txt;
@@ -54,6 +58,25 @@ static VALUE init_image(char *path) {
   struct image_data *data = ALLOC(struct image_data);
   data->img = S2D_CreateImage(path);
   return Data_Wrap_Struct(c_data_klass, NULL, free_image, data);
+}
+
+
+/*
+ * Free sprite structure attached to Ruby 2D `Sprite` class
+ */
+static void free_sprite(struct sprite_data *data) {
+  S2D_FreeSprite(data->spr);
+  xfree(data);
+}
+
+
+/*
+ * Initialize sprite structure data
+ */
+static VALUE init_sprite(char *path) {
+  struct sprite_data *data = ALLOC(struct sprite_data);
+  data->spr = S2D_CreateSprite(path);
+  return Data_Wrap_Struct(c_data_klass, NULL, free_sprite, data);
 }
 
 
@@ -145,7 +168,7 @@ static void render() {
     // Switch on the object's type_id
     switch(type_id) {
       
-      case TRIANGLE: {
+      case R2D_TRIANGLE: {
         VALUE c1 = rb_iv_get(el, "@c1");
         VALUE c2 = rb_iv_get(el, "@c2");
         VALUE c3 = rb_iv_get(el, "@c3");
@@ -175,7 +198,7 @@ static void render() {
       }
       break;
       
-      case QUAD: {
+      case R2D_QUAD: {
         VALUE c1 = rb_iv_get(el, "@c1");
         VALUE c2 = rb_iv_get(el, "@c2");
         VALUE c3 = rb_iv_get(el, "@c3");
@@ -213,10 +236,10 @@ static void render() {
       }
       break;
       
-      case IMAGE: {
+      case R2D_IMAGE: {
         if (rb_iv_get(el, "@data") == Qnil) {
           VALUE data = init_image(RSTRING_PTR(rb_iv_get(el, "@path")));
-          rb_iv_set(el, "@data", data);
+          rb_iv_set(el, "@data",   data);
         }
         
         struct image_data *data;
@@ -228,7 +251,31 @@ static void render() {
       }
       break;
       
-      case TEXT: {
+      case R2D_SPRITE: {
+        if (rb_iv_get(el, "@data") == Qnil) {
+          VALUE data = init_sprite(RSTRING_PTR(rb_iv_get(el, "@path")));
+          rb_iv_set(el, "@data", data);
+        }
+        
+        struct sprite_data *data;
+        Data_Get_Struct(rb_iv_get(el, "@data"), struct sprite_data, data);
+        
+        data->spr->x = NUM2DBL(rb_iv_get(el, "@x"));
+        data->spr->y = NUM2DBL(rb_iv_get(el, "@y"));
+        
+        S2D_ClipSprite(
+          data->spr,
+          NUM2INT(rb_iv_get(el, "@clip_x")),
+          NUM2INT(rb_iv_get(el, "@clip_y")),
+          NUM2INT(rb_iv_get(el, "@clip_w")),
+          NUM2INT(rb_iv_get(el, "@clip_h"))
+        );
+        
+        S2D_DrawSprite(data->spr);
+      }
+      break;
+      
+      case R2D_TEXT: {
         if (rb_iv_get(el, "@data") == Qnil) {
           VALUE data = init_text(
             RSTRING_PTR(rb_iv_get(el, "@font")),
