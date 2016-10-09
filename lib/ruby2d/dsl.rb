@@ -17,6 +17,10 @@ module Ruby2D::DSL
     Application.on_key(&proc)
   end
   
+  def on_controller(&proc)
+    Application.on_controller(&proc)
+  end
+  
   def update(&proc)
     Application.update(&proc)
   end

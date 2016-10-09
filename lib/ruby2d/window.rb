@@ -17,6 +17,7 @@ module Ruby2D
       @objects = []
       @keys, @keys_up, @keys_down, @controller = {}, {}, {}, {}
       @on_key_proc = Proc.new {}
+      @on_controller_proc = Proc.new {}
       @update_proc = Proc.new {}
     end
     
@@ -133,9 +134,13 @@ module Ruby2D
       end
     end
     
-    def controller_callback(is_axis, axis, val, is_btn, btn)
-      
-      # puts "is_axis: #{is_axis}, axis: #{axis}, val: #{val}, is_btn: #{is_btn}, btn: #{btn}"
+    def on_controller(&proc)
+      @on_controller_proc = proc
+      true
+    end
+    
+    def controller_callback(which, is_axis, axis, val, is_btn, btn)
+      @on_controller_proc.call(which, is_axis, axis, val, is_btn, btn)
       
       if is_axis
         if axis == 0 && val == -32768

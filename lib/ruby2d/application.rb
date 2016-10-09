@@ -20,6 +20,10 @@ module Ruby2D::Application
       @@window.on_key(&proc)
     end
     
+    def on_controller(&proc)
+      @@window.on_controller(&proc)
+    end
+    
     def add(o)
       @@window.add(o)
     end
