@@ -15,9 +15,7 @@ module Ruby2D
       @fps = 60
       @vsync = vsync
       @objects = []
-      @keys = {}
-      @keys_down = {}
-      @controller = {}
+      @keys, @keys_up, @keys_down, @controller = {}, {}, {}, {}
       @update_proc = Proc.new {}
     end
     
@@ -82,13 +80,17 @@ module Ruby2D
       true
     end
     
-    def on(mouse: nil, key: nil, key_down: nil, controller: nil, &proc)
+    def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
       unless mouse.nil?
         # reg_mouse(btn, &proc)
       end
       
       unless key.nil?
         reg_key(key, &proc)
+      end
+      
+      unless key_up.nil?
+        reg_key_up(key_up, &proc)
       end
       
       unless key_down.nil?
@@ -104,6 +106,16 @@ module Ruby2D
       key.downcase!
       if @keys.has_key? key
         @keys[key].call
+      end
+    end
+    
+    def key_up_callback(key)
+      key.downcase!
+      if @keys_up.has_key? 'any'
+        @keys_up['any'].call
+      end
+      if @keys_up.has_key? key
+        @keys_up[key].call
       end
     end
     
@@ -155,6 +167,12 @@ module Ruby2D
     # Register key string with proc
     def reg_key(key, &proc)
       @keys[key] = proc
+      true
+    end
+    
+    # Register key string with proc
+    def reg_key_up(key, &proc)
+      @keys_up[key] = proc
       true
     end
     
