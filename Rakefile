@@ -23,9 +23,7 @@ def run_cmd(cmd)
 end
 
 def run_test(file)
-  Rake::Task['build'].invoke
-  Rake::Task['spec'].invoke
-  print "==> ".blue, "running tests/#{file}.rb".bold, "\n"
+  print "\n==> ".blue, "running tests/#{file}.rb".bold, "\n"
   system "( cd tests/ ; ruby #{file}.rb )"
 end
 
@@ -33,17 +31,25 @@ end
 
 task default: 'all'
 
-desc "Run the RSpec tests"
-RSpec::Core::RakeTask.new do |t|
-  print "\n==> ".blue, "running RSpec".bold, "\n\n"
-  t.pattern = "spec/*spec.rb"
+desc "Uninstall gem"
+task :uninstall do
+  run_cmd "gem uninstall ruby2d --executables"
 end
 
 desc "Build gem"
 task :build do
-  run_cmd "gem uninstall ruby2d --executables"
   run_cmd "gem build ruby2d.gemspec --verbose"
+end
+
+desc "Install gem"
+task :install do
   run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose"
+end
+
+desc "Run the RSpec tests"
+RSpec::Core::RakeTask.new do |t|
+  print "\n==> ".blue, "running RSpec".bold, "\n\n"
+  t.pattern = "spec/*spec.rb"
 end
 
 desc "Run testcard"
@@ -61,8 +67,10 @@ task :controller do
   run_test 'controller'
 end
 
-desc "Test and build"
+desc "Uninstall, build, install, and test"
 task :all do
+  Rake::Task['uninstall'].invoke
   Rake::Task['build'].invoke
+  Rake::Task['install'].invoke
   Rake::Task['spec'].invoke
 end
