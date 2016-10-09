@@ -1,6 +1,6 @@
 require 'mkmf'
 
-S2D_VERSION = '0.3.0'  # Simple 2D minimum version required
+S2D_VERSION = '0.4.1'  # Simple 2D minimum version required
 $errors = []
 
 class String
@@ -70,14 +70,23 @@ elsif RUBY_PLATFORM =~ /linux/
   end
   
   $CFLAGS << ' -std=c99'
+
+# Windows / MinGW
+elsif RUBY_PLATFORM =~ /mingw/
+  # Add flags
+  $CFLAGS  << ' -std=c99 -I/usr/local/include'
+  $LDFLAGS << ' -Dmain=SDL_main -L/usr/local/lib -lmingw32 -lsimple2d -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lopengl32 -lglew32 -mwindows'
 end
 
-# Simple 2D installed, check version
-check_s2d_version
+unless RUBY_PLATFORM =~ /mingw/
+  # Simple 2D installed, check version
+  check_s2d_version
 
-# Configure Simple 2D and create Makefile
+  # Add flags
+  $LDFLAGS << ' ' << `simple2d --libs`
+end
 
-$LDFLAGS << ' ' << `simple2d --libs`
+
 $LDFLAGS.gsub!(/\n/, ' ')  # Remove newlines in flags, they cause problems
 
 create_makefile('ruby2d/ruby2d')
