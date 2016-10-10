@@ -12,7 +12,7 @@ module Ruby2D
       @resizable = false
       @mouse_x = @mouse_y = 0
       @fps_cap = fps
-      @fps = 60
+      @fps = fps
       @vsync = vsync
       @objects = []
       @keys, @keys_up, @keys_down, @controller = {}, {}, {}, {}
