@@ -1,10 +1,9 @@
 require 'ruby2d'
 
-set width: 700, height: 500, title: "Ruby 2D – Testcard"
+set width: 700, height: 500, title: "Ruby 2D – Test Card"
 
 # Read window attributes
-puts "
-=== Window Attributes ===
+puts "=== Window Attributes ===
 Title:  #{get :title}
 Width:  #{get :width}
 Height: #{get :height}
@@ -55,7 +54,6 @@ Rectangle.new(650, 0, 50, 50,
 Rectangle.new(600, 50, 50, 50, 'random')
 Rectangle.new(650, 50, 50, 50, 'random')
 
-
 # White to black gradient
 Rectangle.new(0, 100, 700, 25,
 [
@@ -93,7 +91,7 @@ Triangle.new(175, 200, 200, 250, 150, 250,
   [0, 1.0, 0, 1.0],
   [0, 0, 1.0, 1.0]
 ])
-Rectangle.new(200, 200, 50, 50, 'gray')  # add background for transparancy
+Rectangle.new(200, 200, 50, 50, [0.5, 0.5, 0.5, 1.0])  # add background for transparancy
 Triangle.new(225, 200, 250, 250, 200, 250,
 [
   [1.0, 1.0, 1.0, 1.0],
@@ -132,18 +130,29 @@ Quad.new(
 Image.new(590, 180, "media/image.png")
 Image.new(590, 290, "media/image.jpg")
 Image.new(590, 400, "media/image.bmp")
+img_r = Image.new(350, 200, "media/colors.png")
+# img_r.width, img_r.height = 50, 50
+# img_r.color = [1.0, 0.3, 0.3, 1.0]
+img_g = Image.new(400, 200, "media/colors.png")
+# img_g.width, img_g.height = 50, 50
+# img_g.color = [0.3, 1.0, 0.3, 1.0]
+img_b = Image.new(450, 200, "media/colors.png")
+# img_b.width, img_b.height = 50, 50
+# img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-Text.new(0, 250)  # Default message
-t1 = Text.new(0, 275, 30, "Hello Ruby 2D!", "media/bitstream_vera/vera.ttf")
-t1.color = 'red'   # Doesn't work yet
-t2 = Text.new(0, 325, 20) # Default message
-t2.text = "Text can be changed"
-fps = Text.new(0, 375, 20)
+txt_r = Text.new( 44, 202, 20, "R", "media/bitstream_vera/vera.ttf")
+# txt_r.color = [1.0, 0.0, 0.0, 1.0]
+txt_g = Text.new( 92, 202, 20, "G", "media/bitstream_vera/vera.ttf")
+# txt_g.color = [0.0, 1.0, 0.0, 1.0]
+txt_b = Text.new(144, 202, 20, "B", "media/bitstream_vera/vera.ttf")
+# txt_b.color = [0.0, 0.0, 1.0, 1.0]
 
+# Frames per second
+fps = Text.new(10, 470, 20, "media/bitstream_vera/vera.ttf")
 
 # Sprites
-s1 = Sprite.new(350, 200, "media/sprite_sheet.png")
+s1 = Sprite.new(500, 200, "media/sprite_sheet.png")
 s1.add(forwards: [
   [  0, 0, 50, 50, 30],
   [ 50, 0, 50, 50, 40],
@@ -154,7 +163,7 @@ s1.add(forwards: [
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, 'white')
 
-on key: "escape" do
+on key: 'escape' do
   close
 end
 
@@ -162,7 +171,7 @@ update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
   s1.animate(:forwards)
-  fps.text = "FPS: #{get :fps}"
+  fps.text = "FPS: #{(get :fps).round(3)}"
 end
 
 show

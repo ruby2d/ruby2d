@@ -23,7 +23,7 @@ def run_cmd(cmd)
 end
 
 def run_test(file)
-  print "\n==> ".blue, "running tests/#{file}.rb".bold, "\n"
+  print "\n==> ".blue, "running tests/#{file}.rb".bold, "\n\n"
   system "( cd tests/ ; ruby #{file}.rb )"
 end
 
