@@ -34,29 +34,29 @@ module Ruby2D
         case c
         when String
           if c == 'random'
-            @r, @g, @b, @a = rand(0..1.0), rand(0..1.0), rand(0..1.0), 1.0
+            @r, @g, @b, @a = rand, rand, rand, 1.0
           elsif self.class.is_hex(c)
             @r, @g, @b, @a = hex_to_f(c)
           else
             @r, @g, @b, @a = to_f(@@colors[c])
           end
         when Array
-          @r, @g, @b, @a = to_f([c[0], c[1], c[2], c[3]])
+          @r, @g, @b, @a = [c[0], c[1], c[2], c[3]]
         end
       end
     end
-
-    # test whether input string is Hex color
+    
+    # Check if string is a proper hex value
     def self.is_hex(a)
-      # result = !(/^#[0-9A-F]{6}$/i.match(a).nil?)
-      # return result
+      # MRuby doesn't support regex, otherwise we'd do:
+      #   !(/^#[0-9A-F]{6}$/i.match(a).nil?)
       if (a.include? "#") && (a.length == 7)
         true
       else
         false
       end
     end
-
+    
     # Color must be String, like 'red', or Array, like [1.0, 0, 0, 1.0]
     def self.is_valid?(c)
       (c.class == String && @@colors.key?(c)) ||
@@ -69,31 +69,28 @@ module Ruby2D
     
     private
     
+    # TODO: Only `Number` supported in JS
     # Convert from Fixnum (0..255) to Float (0.0..1.0)
     def to_f(a)
       b = []
       a.each do |n|
-        if n.class == Fixnum
-          b.push(n / 255.0)
-        else
-          b.push(n)
-        end
+        b.push(n / 255.0)
       end
       return b
     end
-
-    # convert from "#FFF000" to Float (0.0..1.0) 
+    
+    # Convert from "#FFF000" to Float (0.0..1.0) 
     def hex_to_f(a)
-      c=[]	    
-      b=a.delete("#")
-      n=(b.length)
-      #n1=n/3
-      j=0
-      for i in (0..n-1).step(n/3)
-      	c[j]=Integer("0x".concat(b[i,n/3]))
-	      j=j+1
+      c = []	    
+      b = a.delete('#')
+      n = (b.length)
+      
+      j = 0
+      for i in (0..n-1).step(n / 3)
+      	c[j] = Integer("0x".concat(b[i, n / 3]))
+	      j = j + 1
       end
-      c[3] = 255 #set @a to 255
+      c[3] = 255  # set `a` to 255
       f = to_f(c)
       return f
     end
