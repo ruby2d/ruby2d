@@ -1,4 +1,14 @@
-require 'ruby2d'
+unless RUBY_ENGINE == 'opal'
+  require 'ruby2d'
+end
+
+if RUBY_ENGINE == 'opal'
+  media = "../tests/media"
+else
+  media = "media"
+end
+
+set diagnostics: true
 
 set width: 700, height: 500, title: "Ruby 2D – Test Card"
 
@@ -11,9 +21,9 @@ FPS:    #{get :fps}
 Self:   #{get :window}\n\n"
 
 # Primary colors
-Rectangle.new(0, 0, 50, 100,   [1.0, 0, 0, 1.0])
-Rectangle.new(50, 0, 50, 100,  [0, 1.0, 0, 1.0])
-Rectangle.new(100, 0, 50, 100, [0, 0, 1.0, 1.0])
+Rectangle.new(0, 0, 50, 100,   [1, 0, 0, 1])
+Rectangle.new(50, 0, 50, 100,  [0, 1, 0, 1])
+Rectangle.new(100, 0, 50, 100, [0, 0, 1, 1])
 
 # Color strings
 Square.new(   150, 0, 50,      'black')
@@ -46,9 +56,9 @@ Rectangle.new(600, 0, 50, 50,
 ])
 Rectangle.new(650, 0, 50, 50,
 [
-  [1.0, 0, 0, 255],
+  [1.0, 0, 0, 1],
   'green',
-  [0.0, 0, 255, 1.0],
+  [0.0, 0, 1, 1.0],
   'yellow'
 ])
 Rectangle.new(600, 50, 50, 50, 'random')
@@ -58,8 +68,8 @@ Rectangle.new(650, 50, 50, 50, 'random')
 Rectangle.new(0, 100, 700, 25,
 [
   [1.0, 1.0, 1.0, 1.0],
-  [0.0, 0.0, 0.0, 0.0],  # testing Float
-  [  0,   0,   0,   0],  # testing Fixnum
+  [0.0, 0.0, 0.0, 0.0],
+  [0.0, 0.0, 0.0, 0.0],
   [1.0, 1.0, 1.0, 1.0]
 ])
 
@@ -82,9 +92,9 @@ Rectangle.new(0, 165, 700, 35,
 ])
 
 # Triangles
-Triangle.new(25, 200, 50, 250, 0, 250,     [1.0, 0, 0, 1.0])
-Triangle.new(75, 200, 100, 250, 50, 250,   [0, 1.0, 1, 1.0])
-Triangle.new(125, 200, 150, 250, 100, 250, [0, 0, 1.0, 1.0])
+Triangle.new(25, 200, 50, 250, 0, 250,     [1.0,   0,   0, 1.0])
+Triangle.new(75, 200, 100, 250, 50, 250,   [  0, 1.0,   0, 1.0])
+Triangle.new(125, 200, 150, 250, 100, 250, [  0,   0, 1.0, 1.0])
 Triangle.new(175, 200, 200, 250, 150, 250,
 [
   [1.0, 0, 0, 1.0],
@@ -127,32 +137,32 @@ Quad.new(
 )
 
 # Images
-Image.new(590, 180, "media/image.png")
-Image.new(590, 290, "media/image.jpg")
-Image.new(590, 400, "media/image.bmp")
-img_r = Image.new(350, 200, "media/colors.png")
-# img_r.width, img_r.height = 50, 50
+Image.new(590, 180, "#{media}/image.png")
+Image.new(590, 290, "#{media}/image.jpg")
+Image.new(590, 400, "#{media}/image.bmp")
+img_r = Image.new(350, 200, "#{media}/colors.png")
+img_r.width, img_r.height = 50, 50
 # img_r.color = [1.0, 0.3, 0.3, 1.0]
-img_g = Image.new(400, 200, "media/colors.png")
-# img_g.width, img_g.height = 50, 50
+img_g = Image.new(400, 200, "#{media}/colors.png")
+img_g.width, img_g.height = 50, 50
 # img_g.color = [0.3, 1.0, 0.3, 1.0]
-img_b = Image.new(450, 200, "media/colors.png")
-# img_b.width, img_b.height = 50, 50
+img_b = Image.new(450, 200, "#{media}/colors.png")
+img_b.width, img_b.height = 50, 50
 # img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-txt_r = Text.new( 44, 202, 20, "R", "media/bitstream_vera/vera.ttf")
+txt_r = Text.new( 44, 202, 20, "R", "#{media}/bitstream_vera/vera.ttf")
 # txt_r.color = [1.0, 0.0, 0.0, 1.0]
-txt_g = Text.new( 92, 202, 20, "G", "media/bitstream_vera/vera.ttf")
+txt_g = Text.new( 92, 202, 20, "G", "#{media}/bitstream_vera/vera.ttf")
 # txt_g.color = [0.0, 1.0, 0.0, 1.0]
-txt_b = Text.new(144, 202, 20, "B", "media/bitstream_vera/vera.ttf")
+txt_b = Text.new(144, 202, 20, "B", "#{media}/bitstream_vera/vera.ttf")
 # txt_b.color = [0.0, 0.0, 1.0, 1.0]
 
 # Frames per second
-fps = Text.new(10, 470, 20, "media/bitstream_vera/vera.ttf")
+fps = Text.new(10, 470, 20, "", "#{media}/bitstream_vera/vera.ttf")
 
 # Sprites
-s1 = Sprite.new(500, 200, "media/sprite_sheet.png")
+s1 = Sprite.new(500, 200, "#{media}/sprite_sheet.png")
 s1.add(forwards: [
   [  0, 0, 50, 50, 30],
   [ 50, 0, 50, 50, 40],
@@ -171,6 +181,7 @@ update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
   s1.animate(:forwards)
+  # puts get :fps
   fps.text = "FPS: #{(get :fps).round(3)}"
 end
 
