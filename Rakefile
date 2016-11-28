@@ -17,13 +17,17 @@ if `which simple2d`.empty?
   exit
 end
 
+def print_task(task)
+  print "\n", "==> ".blue, task.bold, "\n\n"
+end
+
 def run_cmd(cmd)
-  print "\n==> ".blue, cmd.bold, "\n\n"
+  puts "==> #{cmd}\n"
   system cmd
 end
 
 def run_test(file)
-  print "\n==> ".blue, "running tests/#{file}.rb".bold, "\n\n"
+  print_task "Running tests/#{file}.rb"
   system "( cd tests/ ; ruby #{file}.rb )"
 end
 
@@ -33,22 +37,25 @@ task default: 'all'
 
 desc "Uninstall gem"
 task :uninstall do
+  print_task "Uninstalling"
   run_cmd "gem uninstall ruby2d --executables"
 end
 
 desc "Build gem"
 task :build do
+  print_task "Building"
   run_cmd "gem build ruby2d.gemspec --verbose"
 end
 
 desc "Install gem"
 task :install do
+  print_task "Installing"
   run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose"
 end
 
 desc "Run the RSpec tests"
 RSpec::Core::RakeTask.new do |t|
-  print "\n==> ".blue, "running RSpec".bold, "\n\n"
+  print_task "Running RSpec"
   t.pattern = "spec/*spec.rb"
 end
 
@@ -62,9 +69,18 @@ task :input do
   run_test 'input'
 end
 
-desc "Run controller tests"
-task :controller do
-  run_test 'controller'
+desc "Run native build test"
+task :native do
+  print_task "Running native build test"
+  run_cmd "ruby2d build native tests/testcard.rb"
+  print_task "Running native tests/testcard.rb"
+  system "( cd tests/ ; ../build/app )"
+end
+
+desc "Run web build test"
+task :web do
+  print_task "Running web build test"
+  run_cmd "ruby2d build web tests/testcard.rb"
 end
 
 desc "Uninstall, build, install, and test"
