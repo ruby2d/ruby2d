@@ -82,7 +82,14 @@ module Ruby2D
       true
     end
     
-    def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
+    # def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
+    def on(args = {}, &proc)
+      mouse      = args[:mouse]
+      key        = args[:key]
+      key_up     = args[:key_up]
+      key_down   = args[:key_down]
+      controller = args[:controller]
+      
       unless mouse.nil?
         # reg_mouse(btn, &proc)
       end

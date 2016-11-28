@@ -48,8 +48,13 @@ module Ruby2D
 
     # test whether input string is Hex color
     def self.is_hex(a)
-      result = !(/^#[0-9A-F]{6}$/i.match(a).nil?)
-      return result
+      # result = !(/^#[0-9A-F]{6}$/i.match(a).nil?)
+      # return result
+      if (a.include? "#") && (a.length == 7)
+        true
+      else
+        false
+      end
     end
 
     # Color must be String, like 'red', or Array, like [1.0, 0, 0, 1.0]

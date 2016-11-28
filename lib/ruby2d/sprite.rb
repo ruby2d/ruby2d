@@ -7,9 +7,9 @@ module Ruby2D
     
     def initialize(x, y, path)
       
-      unless File.exists? path
-        raise Error, "Cannot find image file `#{path}`"
-      end
+      # unless File.exists? path
+      #   raise Error, "Cannot find image file `#{path}`"
+      # end
       
       @type_id = 4
       @x, @y, @path = x, y, path
@@ -20,7 +20,7 @@ module Ruby2D
       @current_frame = 0
       @current_frame_time = 0
       
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.add(self)
       end
     end
@@ -49,7 +49,7 @@ module Ruby2D
     end
     
     def remove
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.remove(self)
       end
     end

@@ -12,7 +12,7 @@ module Ruby2D
       update_coords(x, y, s, s)
       update_color(c)
       
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.add(self)
       end
     end

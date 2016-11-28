@@ -8,17 +8,19 @@ module Ruby2D
     def initialize(x=0, y=0, size=20, msg="Hello World!", font="Arial", c="white")
 
       if File.exists? font
+      
+      # if File.exists? font
         @font = font
-      else
-        @font = resolve_path(font)
-      end
+      # else
+      #   @font = resolve_path(font)
+      # end
       
       @type_id = 5
       @x, @y, @size = x, y, size
       @text, @color = msg, c
       update_color(c)
       
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.add(self)
       end
     end
@@ -33,7 +35,7 @@ module Ruby2D
     end
     
     def remove
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.remove(self)
       end
     end

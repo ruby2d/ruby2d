@@ -20,7 +20,7 @@ module Ruby2D
       @color = c
       update_color(c)
       
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.add(self)
       end
     end
@@ -31,7 +31,7 @@ module Ruby2D
     end
     
     def remove
-      if defined? DSL
+      if Module.const_defined? :DSL
         Application.remove(self)
       end
     end

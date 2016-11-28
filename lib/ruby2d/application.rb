@@ -12,8 +12,9 @@ module Ruby2D::Application
       @@window.set(opts)
     end
     
-    def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
-      @@window.on(mouse: mouse, key: key, key_up: key_up, key_down: key_down, controller: controller, &proc)
+    # def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
+    def on(args = {}, &proc)
+      @@window.on(args, &proc)
     end
     
     def on_key(&proc)
