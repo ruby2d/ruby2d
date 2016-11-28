@@ -1,48 +1,147 @@
 #!/usr/bin/env ruby
 require 'ruby2d/version'
+require 'fileutils'
 
+# Extending `String` to include some fancy colors
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def error; colorize('1;31') end
-  def bold; colorize('1') end
+  def bold; colorize('1')   end
+  def red; colorize('1;31') end
+  def red_underline; colorize('4;31') end
+end
+
+# The installed gem directory
+@gem_dir = "#{Gem::Specification.find_by_name('ruby2d').gem_dir}"
+
+# The Ruby 2D library files
+@lib_files = [
+  'color',
+  'window',
+  'application',
+  'dsl',
+  'quad',
+  'rectangle',
+  'square',
+  'triangle',
+  'image',
+  'sprite',
+  'text',
+  'exceptions'
+]
+
+
+# Check if source file provided is good
+def check_build_src_file(rb_file)
+  if !rb_file
+    puts "Please provide a Ruby file to build."
+    exit
+  elsif !File.exists? rb_file
+    puts "Can't find file: #{rb_file}"
+    exit
+  end
 end
 
 
+# Assemble the Ruby 2D library in one `.rb` file
+def make_lib
+  FileUtils.mkdir_p 'build'
+  
+  lib_dir = "#{@gem_dir}/lib/ruby2d/"
+  
+  lib = ""
+  @lib_files.each do |f|
+    lib << File.read("#{lib_dir + f}.rb") + "\n\n"
+  end
+  
+  lib << "
+include Ruby2D::DSL
+include Ruby2D
+
+def require(str)
+  if str == 'ruby2d'
+    true
+  end
+end\n"
+  
+  File.write('build/lib.rb', lib)
+end
+
+
+# Build a native version of the provided Ruby application
 def build_native(rb_file)
+  
+  # Check if MRuby exists; if not, quit
   if `which mruby`.empty?
-    puts "",
-         "  mruby not found!".error, "",
-         "  mruby is needed to build a native Ruby 2D applications.".bold, "",
-         "  Install using Homebrew on OS X:",
-         "    brew install mruby", ""
+    puts "\n#{"mruby".bold} is needed to build native Ruby 2D applications.\n\n",
+         "  On macOS, install using #{"Homebrew".bold}:",
+         "    brew install mruby\n\n"
     exit
   end
   
-  `mkdir -p build`
-  `mrbc -Bruby2d_app_symbol -obuild/app.c #{rb_file}`
+  # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
+  make_lib
+  `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
   
-  open('build/app.c', 'a') do |f|
-    f << %(
-#include "mruby.h"
-#include "mruby/irep.h"
-
-int main(void) {
-  mrb_state *mrb = mrb_open();
-  if (!mrb) { /* handle error */ }
-  mrb_load_irep(mrb, ruby2d_app_symbol);
-  mrb_close(mrb);
-}
-    )
+  # Read the provided Ruby source file, copy to build dir and compile to bytecode
+  File.write('build/src.rb', File.read(rb_file))
+  `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
+  
+  # Combine contents of C source files and bytecode into one file
+  open('build/app.c', 'w') do |f|
+    f << "#define MRUBY 1" << "\n\n"
+    f << File.read("build/lib.c") << "\n\n"
+    f << File.read("build/src.c") << "\n\n"
+    f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
   end
   
-  `cc -std=c99 -lmruby build/app.c -o build/app`
+  # Compile to native executable
+  puts "Compiling..."
+  `cc -lmruby \`simple2d --libs\` build/app.c -o build/app`
+  
+  # Success!
+  puts "App created at `build/app`"
 end
 
 
+# Build a web-based version of the provided Ruby application
+def build_web(rb_file)
+  
+  # Assemble the Ruby 2D library in one `.rb` file and compile to JS
+  make_lib
+  `opal --compile --no-opal build/lib.rb > build/lib.js`
+  
+  # Read the provided Ruby source file, copy to build dir, and compile to JS
+  File.write('build/src.rb', File.read(rb_file))
+  `opal --compile --no-opal build/src.rb > build/src.js`
+  
+  FileUtils.cp "#{@gem_dir}/ext/ruby2d/ruby2d-opal.rb", "build/"
+  `opal --compile --no-opal build/ruby2d-opal.rb > build/ruby2d-opal.js`
+  
+  File.write('build/src.rb', File.read(rb_file))
+  
+  # Combine contents of JS source files and compiled JS into one file
+  open('build/app.js', 'w') do |f|
+    f << File.read("#{@gem_dir}/assets/simple2d.js") << "\n\n"
+    f << File.read("#{@gem_dir}/assets/opal.js") << "\n\n"
+    f << File.read("build/lib.js") << "\n\n"
+    f << File.read("build/ruby2d-opal.js") << "\n\n"
+    f << File.read("build/src.js") << "\n\n"
+  end
+  
+  # Copy over HTML template
+  FileUtils.cp "#{@gem_dir}/assets/template.html", "build/app.html"
+  
+  # Success!
+  puts "App created at `build/app.js`",
+       "  Run by opening `build/app.html`"
+end
+
+
+# Build an application package for the current platform
 def build_package
   require 'fileutils'
   
-  icon_path = "#{Gem::Specification.find_by_name('ruby2d').gem_dir}/assets/app.icns"
+  icon_path = "#{@gem_dir}/assets/app.icns"
   
   FileUtils.mkpath "build/App.app/Contents/MacOS"
   FileUtils.mkpath "build/App.app/Contents/Resources"
@@ -70,47 +169,46 @@ def build_package
 )
   
   File.open("build/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
-  
   FileUtils.cp "build/app", "build/App.app/Contents/MacOS/"
-  
   puts "App written to `build/App.app`."
 end
 
 
-# Command line usage and tree ##################################################
+# Check Command-line Arguments #################################################
 
-usage = "
-Usage: ruby2d [-v|--version]
-              <command> <options>
+usage = "Ruby 2D: Make cross-platform 2D applications in Ruby".bold + "\n
+Usage: ruby2d <command> <options>
+              [-v|--version]
 
 Summary of commands and options:
   build         Build the application...
     native        ...compile with mruby.
     web           ...for web platform.
   package       Create application package.
-  -v|--version  Prints the installed version.
-
-"
+  -v|--version  Prints the installed version.\n\n"
 
 case ARGV[0]
 when 'build'
-  puts "Running build..."
+  if ARGV[2]
+    check_build_src_file(ARGV[2])
+  end
+  
   case ARGV[1]
   when 'native'
-    puts "Running build native..."
-    build_native ARGV[2]
+    build_native(ARGV[2])
   when 'web'
-    puts "Running build web..."
+    build_web(ARGV[2])
   else
     puts usage
   end
+  
 when 'package'
   puts "Running package..."
   build_package
+  
 when '-v', '--version'
   puts Ruby2D::VERSION
+  
 else
   puts usage
 end
-
-exit
