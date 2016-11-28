@@ -2,12 +2,10 @@
 
 module Ruby2D
   class Text
-
-    attr_accessor :x, :y, :size, :text
     
-    def initialize(x=0, y=0, size=20, msg="Hello World!", font="Arial", c="white")
-
-      if File.exists? font
+    attr_accessor :x, :y, :size, :text, :data
+    
+    def initialize(x=0, y=0, size=20, text="Hello World!", font="Arial", c="white")
       
       # if File.exists? font
         @font = font
@@ -17,7 +15,7 @@ module Ruby2D
       
       @type_id = 5
       @x, @y, @size = x, y, size
-      @text, @color = msg, c
+      @text, @color = text, c
       update_color(c)
       
       if Module.const_defined? :DSL

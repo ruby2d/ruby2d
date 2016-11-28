@@ -3,7 +3,8 @@
 module Ruby2D
   class Image
     
-    attr_accessor :x, :y
+    attr_accessor :x, :y, :width, :height, :data
+    attr_reader :path
     
     def initialize(x, y, path)
       
