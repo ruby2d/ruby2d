@@ -2,23 +2,29 @@
 
 module Ruby2D
   class Window
-    attr_reader :title, :width, :height, :mouse_x, :mouse_y
+    attr_reader :title, :width, :height,
+                :objects, :diagnostics
     
-    def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
-      @title = title
-      @width, @height = width, height
+    attr_accessor :mouse_x, :mouse_y
+    
+    # def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
+    def initialize(args = {})
+      @title   = args[:title]  || "Ruby 2D"
+      @width   = args[:width]  || 640
+      @height  = args[:height] || 480
+      @fps_cap = args[:fps]    || 60
+      @vsync   = args[:vsync]  || true
       @viewport_width, @viewport_height = nil, nil
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
       @resizable = false
       @mouse_x = @mouse_y = 0
-      @fps_cap = fps
-      @fps = fps
-      @vsync = vsync
+      @fps = @fps_cap
       @objects = []
-      @keys, @keys_up, @keys_down, @controller = {}, {}, {}, {}
+      @keys_down, @keys, @keys_up, @controller = {}, {}, {}, {}
       @on_key_proc = Proc.new {}
       @on_controller_proc = Proc.new {}
       @update_proc = Proc.new {}
+      @diagnostics = false
     end
     
     def get(sym)
@@ -47,6 +53,7 @@ module Ruby2D
       if Color.is_valid? opts[:background]
         @background    = Color.new(opts[:background])
       end
+      @diagnostics     = opts[:diagnostics]     || @diagnostics
     end
     
     def add(o)
@@ -94,16 +101,16 @@ module Ruby2D
         # reg_mouse(btn, &proc)
       end
       
+      unless key_down.nil?
+        reg_key_down(key_down, &proc)
+      end
+      
       unless key.nil?
         reg_key(key, &proc)
       end
       
       unless key_up.nil?
         reg_key_up(key_up, &proc)
-      end
-      
-      unless key_down.nil?
-        reg_key_down(key_down, &proc)
       end
       
       unless controller.nil?
@@ -114,6 +121,16 @@ module Ruby2D
     def on_key(&proc)
       @on_key_proc = proc
       true
+    end
+    
+    def key_down_callback(key)
+      key.downcase!
+      if @keys_down.has_key? 'any'
+        @keys_down['any'].call
+      end
+      if @keys_down.has_key? key
+        @keys_down[key].call
+      end
     end
     
     def key_callback(key)
@@ -134,16 +151,6 @@ module Ruby2D
       end
       if @keys_up.has_key? key
         @keys_up[key].call
-      end
-    end
-    
-    def key_down_callback(key)
-      key.downcase!
-      if @keys_down.has_key? 'any'
-        @keys_down['any'].call
-      end
-      if @keys_down.has_key? key
-        @keys_down[key].call
       end
     end
     
