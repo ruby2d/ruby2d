@@ -27,8 +27,8 @@ def run_cmd(cmd)
 end
 
 def run_test(file)
-  print_task "Running tests/#{file}.rb"
-  system "( cd tests/ ; ruby #{file}.rb )"
+  print_task "Running test/#{file}.rb"
+  system "( cd test/ ; ruby #{file}.rb )"
 end
 
 # Tasks
@@ -56,7 +56,7 @@ end
 desc "Run the RSpec tests"
 RSpec::Core::RakeTask.new do |t|
   print_task "Running RSpec"
-  t.pattern = "spec/*spec.rb"
+  t.pattern = "test/*spec.rb"
 end
 
 desc "Run testcard"
@@ -72,15 +72,15 @@ end
 desc "Run native build test"
 task :native do
   print_task "Running native build test"
-  run_cmd "ruby2d build native tests/testcard.rb"
-  print_task "Running native tests/testcard.rb"
-  system "( cd tests/ ; ../build/app )"
+  run_cmd "ruby2d build native test/testcard.rb"
+  print_task "Running native test/testcard.rb"
+  system "( cd test/ ; ../build/app )"
 end
 
 desc "Run web build test"
 task :web do
   print_task "Running web build test"
-  run_cmd "ruby2d build web tests/testcard.rb"
+  run_cmd "ruby2d build web test/testcard.rb"
 end
 
 desc "Uninstall, build, install, and test"

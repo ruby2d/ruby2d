@@ -1,2 +1,3 @@
---color
+--default-path test
 --require spec_helper
+--color

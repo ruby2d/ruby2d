@@ -34,4 +34,14 @@ on controller: 3 do
   puts "conroller btn 3"
 end
 
+on_controller do |which, is_axis, axis, val, is_btn, btn|
+  puts "=== Controller Pressed ===",
+       "which: which",
+       "is_axis: #{is_axis}",
+       "axis: #{axis}",
+       "val: #{val}",
+       "is_btn: #{is_btn}",
+       "btn: #{btn}"
+end
+
 show

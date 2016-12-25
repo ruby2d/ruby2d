@@ -1,5 +1,5 @@
-[submodule "tests/media"]
-	path = tests/media
+[submodule "test/media"]
+	path = test/media
 	url = https://github.com/simple2d/test_media.git
 [submodule "assets"]
 	path = assets
