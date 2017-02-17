@@ -3,7 +3,7 @@
 module Ruby2D
   class Sprite
     
-    attr_accessor :x, :y, :data
+    attr_accessor :x, :y, :clip_x, :clip_y, :clip_w, :clip_h, :data
     
     def initialize(x, y, path)
       
