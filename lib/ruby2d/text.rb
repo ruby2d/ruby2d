@@ -3,10 +3,10 @@
 module Ruby2D
   class Text
     
-    attr_accessor :x, :y, :size, :text, :data
+    attr_accessor :x, :y, :size, :data
     attr_reader :color
     
-    def initialize(x=0, y=0, size=20, text="Hello World!", font="Arial", c="white")
+    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white")
       
       # if File.exists? font
         @font = font
@@ -25,10 +25,6 @@ module Ruby2D
       @color = Color.new(c)
     end
     
-    def text=(t)
-      @text = t
-    end
-        
     def add
       if Module.const_defined? :DSL
         Application.add(self)
