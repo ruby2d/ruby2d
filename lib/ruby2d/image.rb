@@ -4,7 +4,7 @@ module Ruby2D
   class Image
     
     attr_accessor :x, :y, :width, :height, :data
-    attr_reader :path
+    attr_reader :path, :color
     
     def initialize(x, y, path)
       
@@ -14,10 +14,15 @@ module Ruby2D
       
       @type_id = 3
       @x, @y, @path = x, y, path
+      @color = Color.new([1, 1, 1, 1])
       
       if Module.const_defined? :DSL
         Application.add(self)
       end
+    end
+    
+    def color=(c)
+      @color = Color.new(c)
     end
     
     def remove
