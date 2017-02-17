@@ -5,26 +5,27 @@ module Ruby2D
     
     attr_reader :r, :g, :b, :a
     
+    # Based on clrs.cc
     @@colors = {
-      'black'   => [  0,   0,   0, 255],
-      'gray'    => [170, 170, 170, 255],
-      'silver'  => [221, 221, 221, 255],
-      'white'   => [255, 255, 255, 255],
-      'navy'    => [  0,  31,  63, 255],
-      'blue'    => [  0, 116, 217, 255],
-      'aqua'    => [127, 219, 255, 255],
-      'teal'    => [ 57, 204, 204, 255],
-      'olive'   => [ 61, 153, 112, 255],
-      'green'   => [ 46, 204,  64, 255],
-      'lime'    => [  1, 255, 112, 255],
-      'yellow'  => [255, 220,   0, 255],
-      'orange'  => [255, 133,  27, 255],
-      'red'     => [255,  65,  54, 255],
-      'maroon'  => [133,  20,  75, 255],
-      'fuchsia' => [240,  18, 190, 255],
-      'purple'  => [177,  13, 201, 255],
-      'brown'   => [102,  51,   0, 255],
-      'random'  => []
+      'navy'    => '#001F3F',
+      'blue'    => '#0074D9',
+      'aqua'    => '#7FDBFF',
+      'teal'    => '#39CCCC',
+      'olive'   => '#3D9970',
+      'green'   => '#2ECC40',
+      'lime'    => '#01FF70',
+      'yellow'  => '#FFDC00',
+      'orange'  => '#FF851B',
+      'red'     => '#FF4136',
+      'brown'   => '#663300',
+      'fuchsia' => '#F012BE',
+      'purple'  => '#B10DC9',
+      'maroon'  => '#85144B',
+      'white'   => '#FFFFFF',
+      'silver'  => '#DDDDDD',
+      'gray'    => '#AAAAAA',
+      'black'   => '#111111',
+      'random'  => ''
     }
     
     def initialize(c)
@@ -35,10 +36,10 @@ module Ruby2D
         when String
           if c == 'random'
             @r, @g, @b, @a = rand, rand, rand, 1.0
-          elsif self.class.is_hex(c)
+          elsif self.class.is_hex?(c)
             @r, @g, @b, @a = hex_to_f(c)
           else
-            @r, @g, @b, @a = to_f(@@colors[c])
+            @r, @g, @b, @a = hex_to_f(@@colors[c])
           end
         when Array
           @r, @g, @b, @a = [c[0], c[1], c[2], c[3]]
@@ -47,24 +48,22 @@ module Ruby2D
     end
     
     # Check if string is a proper hex value
-    def self.is_hex(a)
+    def self.is_hex?(s)
       # MRuby doesn't support regex, otherwise we'd do:
       #   !(/^#[0-9A-F]{6}$/i.match(a).nil?)
-      if (a.include? "#") && (a.length == 7)
-        true
-      else
-        false
-      end
+      s.class == String && s[0] == '#' && s.length == 7
     end
     
-    # Color must be String, like 'red', or Array, like [1.0, 0, 0, 1.0]
+    # Check if the color is valid
     def self.is_valid?(c)
-      (c.class == String && @@colors.key?(c)) ||
-      (c.class == String && self.is_hex(c)) ||
-      (c.class == Array && c.length == 4 &&
-       c.all? { |el| el.is_a? Numeric } &&
-       c.all? { |el| el.class == Fixnum && (0..255).include?(el) ||
-                     el.class == Float  && (0.0..1.0).include?(el) })
+      @@colors.key?(c) ||  # keyword
+      self.is_hex?(c)  ||  # hexadecimal value
+      
+      # Array of Floats from 0.0..1.0
+      c.class == Array && c.length == 4 &&
+      c.all? { |el|
+        el.is_a?(Numeric) && (0.0..1.0).include?(el)
+      }
     end
     
     private
@@ -79,20 +78,17 @@ module Ruby2D
       return b
     end
     
-    # Convert from "#FFF000" to Float (0.0..1.0) 
-    def hex_to_f(a)
-      c = []	    
-      b = a.delete('#')
-      n = (b.length)
+    # Convert from hex value (e.g. #FFF000) to Float (0.0..1.0)
+    def hex_to_f(h)
+      h = (h[1..-1]).chars.each_slice(2).map(&:join)
+      a = []
       
-      j = 0
-      for i in (0..n-1).step(n / 3)
-      	c[j] = Integer("0x".concat(b[i, n / 3]))
-	      j = j + 1
+      h.each do |el|
+        a.push(el.to_i(16))
       end
-      c[3] = 255  # set `a` to 255
-      f = to_f(c)
-      return f
+      
+      a.push(255)
+      return to_f(a)
     end
     
   end

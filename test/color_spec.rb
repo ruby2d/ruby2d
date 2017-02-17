@@ -7,24 +7,22 @@ RSpec.describe Ruby2D::Color do
       expect(Ruby2D::Color.is_valid? 'red').to eq true
       expect(Ruby2D::Color.is_valid? 'balloons').to eq false
     end
-
-    it 'determines if a color string is valid hex value: # follow by 6 letters/numbers' do
+    
+    it 'determines if a color string is a valid hex value' do
       expect(Ruby2D::Color.is_valid? '#c0c0c0').to eq true
       expect(Ruby2D::Color.is_valid? '#00000').to eq false
       expect(Ruby2D::Color.is_valid? '123456').to eq false
     end
     
     it 'determines if an array is a valid color' do
-      expect(Ruby2D::Color.is_valid? [1.0, 0, 0, 1.0]).to eq true
+      expect(Ruby2D::Color.is_valid? [1, 0, 0.0, 1.0]).to eq true
       expect(Ruby2D::Color.is_valid? [1.0, 0, 0]).to eq false
     end
     
-    it 'prevents allow color values out of range' do
-      expect(Ruby2D::Color.is_valid? [1.0, 0, 0.0, 255]).to eq true
+    it 'prevents color values that are out of range' do
       expect(Ruby2D::Color.is_valid? [1.2, 0, 0, 0]).to eq false
-      expect(Ruby2D::Color.is_valid? [-0.1, 0, 0, 0]).to eq false
-      expect(Ruby2D::Color.is_valid? [255, 255, 256, 255]).to eq false
-      expect(Ruby2D::Color.is_valid? [-1, 0, 127, 255]).to eq false
+      expect(Ruby2D::Color.is_valid? [0, 0, -0.1, 0]).to eq false
+      expect(Ruby2D::Color.is_valid? [0, 0, 0, 2]).to eq false
     end
   end
   
