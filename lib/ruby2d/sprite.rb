@@ -20,6 +20,7 @@ module Ruby2D
       @current_frame = 0
       @current_frame_time = 0
       
+      init(path)
       if Module.const_defined? :DSL
         Application.add(self)
       end

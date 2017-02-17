@@ -18,6 +18,7 @@ module Ruby2D
       @x, @y, @size = x, y, size
       @text = text
       @color = Color.new(c)
+      init
       add
     end
     

@@ -8,6 +8,7 @@ module Ruby2D
     
     def initialize(path)
       # TODO: Check if file exists
+      init(path)
       @path = path
     end
     

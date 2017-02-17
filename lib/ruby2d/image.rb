@@ -18,6 +18,7 @@ module Ruby2D
       @type_id = 3
       @x, @y, @path = x, y, path
       @color = Color.new([1, 1, 1, 1])
+      init(path)
       add
     end
     
