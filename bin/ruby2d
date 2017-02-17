@@ -57,15 +57,19 @@ def make_lib
   
   lib << "
 include Ruby2D::DSL
-include Ruby2D
-
-def require(str)
-  if str == 'ruby2d'
-    true
-  end
-end\n"
+include Ruby2D\n"
   
   File.write('build/lib.rb', lib)
+end
+
+
+# Remove `require 'ruby2d'` from source file
+def strip_require(file)
+  output = ''
+  File.foreach(file) do |line|
+    output << line unless line =~ /require ('|")ruby2d('|")/
+  end
+  return output
 end
 
 
