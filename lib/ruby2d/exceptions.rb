@@ -8,9 +8,8 @@ module Ruby2D
     
     def initialize(msg)
       super(msg)
-      puts error("\nRuby 2D Error:") << " " << msg
-      puts bold("Occurred in:")
-      puts bold("  " + caller.last), "\n"
+      puts error("\nRuby 2D Error:") << " #{msg}" <<
+      bold("\nOccurred in:\n  #{caller.last}\n")
     end
   end
 end

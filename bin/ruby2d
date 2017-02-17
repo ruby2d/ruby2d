@@ -15,6 +15,7 @@ end
 
 # The Ruby 2D library files
 @lib_files = [
+  'exceptions',
   'color',
   'window',
   'application',
@@ -26,7 +27,6 @@ end
   'image',
   'sprite',
   'text',
-  'exceptions'
 ]
 
 
