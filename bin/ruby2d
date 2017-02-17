@@ -89,7 +89,11 @@ def build_native(rb_file)
   `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
   
   # Read the provided Ruby source file, copy to build dir and compile to bytecode
-  File.write('build/src.rb', File.read(rb_file))
+  
+  File.open('build/src.rb', 'w') do |file|
+    file << strip_require(rb_file)
+  end
+  
   `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
   
   # Combine contents of C source files and bytecode into one file
@@ -101,11 +105,10 @@ def build_native(rb_file)
   end
   
   # Compile to native executable
-  puts "Compiling..."
   `cc -lmruby \`simple2d --libs\` build/app.c -o build/app`
   
   # Success!
-  puts "App created at `build/app`"
+  puts "Native app created at `build/app`"
 end
 
 
@@ -117,13 +120,15 @@ def build_web(rb_file)
   `opal --compile --no-opal build/lib.rb > build/lib.js`
   
   # Read the provided Ruby source file, copy to build dir, and compile to JS
-  File.write('build/src.rb', File.read(rb_file))
+  
+  File.open('build/src.rb', 'w') do |file|
+    file << strip_require(rb_file)
+  end
+  
   `opal --compile --no-opal build/src.rb > build/src.js`
   
   FileUtils.cp "#{@gem_dir}/ext/ruby2d/ruby2d-opal.rb", "build/"
   `opal --compile --no-opal build/ruby2d-opal.rb > build/ruby2d-opal.js`
-  
-  File.write('build/src.rb', File.read(rb_file))
   
   # Combine contents of JS source files and compiled JS into one file
   open('build/app.js', 'w') do |f|
@@ -138,7 +143,7 @@ def build_web(rb_file)
   FileUtils.cp "#{@gem_dir}/assets/template.html", "build/app.html"
   
   # Success!
-  puts "App created at `build/app.js`",
+  puts "Web app created at `build/app.js`",
        "  Run by opening `build/app.html`"
 end
 
@@ -180,6 +185,16 @@ def build_package
 end
 
 
+# Clean up unneeded build files
+def clean_up
+  FileUtils.rm(
+    Dir.glob('build/{src,lib}.{rb,c,js}') +
+    Dir.glob('build/ruby2d-opal.{rb,js}') +
+    Dir.glob('build/app.c')
+  )
+end
+
+
 # Check Command-line Arguments #################################################
 
 usage = "Ruby 2D: Make cross-platform 2D applications in Ruby".bold + "\n
@@ -187,34 +202,33 @@ Usage: ruby2d <command> <options>
               [-v|--version]
 
 Summary of commands and options:
-  build         Build the application...
-    native        ...compile with mruby.
-    web           ...for web platform.
-  package       Create application package.
-  -v|--version  Prints the installed version.\n\n"
+  build         Build the application both natively and for the web
+    --native      Build only native
+    --web         Build only web
+    --debug       Build native and web, keeping all intermediate files
+  package       Create application package for distribution (experimental)
+  -v|--version  Prints the installed version\n\n"
 
 case ARGV[0]
 when 'build'
-  if ARGV[2]
-    check_build_src_file(ARGV[2])
-  end
-  
+  puts "Building..."
   case ARGV[1]
-  when 'native'
+  when '--native'
     build_native(ARGV[2])
-  when 'web'
+  when '--web'
     build_web(ARGV[2])
   else
-    puts usage
+    if ARGV[2]; puts usage; exit end
+    check_build_src_file(ARGV[1])
+    build_native(ARGV[1])
+    build_web(ARGV[1])
   end
-  
+  unless ARGV.include? '--debug'; clean_up end
 when 'package'
   puts "Running package..."
   build_package
-  
 when '-v', '--version'
   puts Ruby2D::VERSION
-  
 else
   puts usage
 end
