@@ -17,6 +17,10 @@ if `which simple2d`.empty?
   exit
 end
 
+def get_args
+  ARGV.each { |a| task a.to_sym do ; end }
+end
+
 def print_task(task)
   print "\n", "==> ".blue, task.bold, "\n\n"
 end
@@ -29,6 +33,19 @@ end
 def run_test(file)
   print_task "Running test/#{file}.rb"
   system "( cd test/ ; ruby #{file}.rb )"
+end
+
+def run_native_test(file)
+  print_task "Running native test: #{file}.rb"
+  run_cmd "ruby2d build --native test/#{file}.rb --debug"
+  print_task "Running native test/#{file}.rb"
+  system "( cd test/ ; ../build/app )"
+end
+
+def run_web_test(file)
+  print_task "Running web build test"
+  run_cmd "ruby2d build --web test/#{file}.rb --debug"
+  system "open build/app.html"
 end
 
 # Tasks
@@ -59,28 +76,22 @@ RSpec::Core::RakeTask.new do |t|
   t.pattern = "test/*spec.rb"
 end
 
-desc "Run testcard"
-task :testcard do
-  run_test 'testcard'
+desc "Run test"
+task :test do
+  get_args
+  run_test ARGV[1]
 end
 
-desc "Run input tests"
-task :input do
-  run_test 'input'
-end
-
-desc "Run native build test"
+desc "Run native test"
 task :native do
-  print_task "Running native build test"
-  run_cmd "ruby2d build native test/testcard.rb"
-  print_task "Running native test/testcard.rb"
-  system "( cd test/ ; ../build/app )"
+  get_args
+  run_native_test ARGV[1]
 end
 
-desc "Run web build test"
+desc "Run web test"
 task :web do
-  print_task "Running web build test"
-  run_cmd "ruby2d build web test/testcard.rb"
+  get_args
+  run_web_test ARGV[1]
 end
 
 desc "Uninstall, build, install, and test"
