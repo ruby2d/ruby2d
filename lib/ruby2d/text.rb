@@ -46,7 +46,7 @@ module Ruby2D
     def resolve_path(font)
       if RUBY_PLATFORM =~ /darwin/
         font_path = "/Library/Fonts/#{font}.ttf"
-      else  
+      else
         # Linux
         font_path = "/usr/share/fonts/truetype/#{font}.ttf"
       end

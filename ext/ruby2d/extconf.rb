@@ -5,8 +5,8 @@ $errors = []
 
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def bold; colorize('1')   end
-  def red; colorize('1;31') end
+  def bold; colorize('1')    end
+  def red;  colorize('1;31') end
 end
 
 def print_errors
