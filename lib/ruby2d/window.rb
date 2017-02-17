@@ -5,43 +5,58 @@ module Ruby2D
     attr_reader :title, :width, :height,
                 :objects, :diagnostics
     
-    attr_accessor :mouse_x, :mouse_y
+    attr_accessor :mouse_x, :mouse_y, :frames, :fps
     
-    # def initialize(width: 640, height: 480, title: "Ruby 2D", fps: 60, vsync: true)
     def initialize(args = {})
-      @title   = args[:title]  || "Ruby 2D"
-      @width   = args[:width]  || 640
-      @height  = args[:height] || 480
-      @fps_cap = args[:fps]    || 60
-      @vsync   = args[:vsync]  || true
-      @viewport_width, @viewport_height = nil, nil
+      @title      = args[:title]  || "Ruby 2D"
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
-      @resizable = false
-      @mouse_x = @mouse_y = 0
-      @fps = @fps_cap
-      @objects = []
-      @keys_down, @keys, @keys_up, @controller = {}, {}, {}, {}
-      @on_key_proc = Proc.new {}
+      @width      = args[:width]  || 640
+      @height     = args[:height] || 480
+      @viewport_width, @viewport_height = nil, nil
+      @resizable  = false
+      @borderless = false
+      @fullscreen = false
+      @highdpi    = false
+      @frames     = 0
+      @fps_cap    = args[:fps] || 60
+      @fps        = @fps_cap
+      @vsync      = args[:vsync] || true
+      @mouse_x = 0; @mouse_y = 0
+      @objects    = []
+      @keys_down, @keys, @keys_up, @mouse, @controller = {}, {}, {}, {}, {}
+      @on_key_proc        = Proc.new {}
       @on_controller_proc = Proc.new {}
-      @update_proc = Proc.new {}
-      @diagnostics = false
+      @update_proc        = Proc.new {}
+      @diagnostics        = false
     end
     
     def get(sym)
       case sym
-      when :window;  self
-      when :title;   @title
-      when :width;   @width
-      when :height;  @height
-      when :fps;     @fps
-      when :mouse_x; @mouse_x
-      when :mouse_y; @mouse_y
+      when :window;          self
+      when :title;           @title
+      when :background;      @background
+      when :width;           @width
+      when :height;          @height
+      when :viewport_width;  @viewport_width
+      when :viewport_height; @viewport_height
+      when :resizable;       @resizable
+      when :borderless;      @borderless
+      when :fullscreen;      @fullscreen
+      when :highdpi;         @highdpi
+      when :frames;          @frames
+      when :fps;             @fps
+      when :mouse_x;         @mouse_x
+      when :mouse_y;         @mouse_y
+      when :diagnostics;     @diagnostics
       end
     end
     
     def set(opts)
       # Store new window attributes, or ignore if nil
       @title           = opts[:title]           || @title
+      if Color.is_valid? opts[:background]
+        @background    = Color.new(opts[:background])
+      end
       @width           = opts[:width]           || @width
       @height          = opts[:height]          || @height
       @viewport_width  = opts[:viewport_width]  || @viewport_width
@@ -50,9 +65,6 @@ module Ruby2D
       @borderless      = opts[:borderless]      || @borderless
       @fullscreen      = opts[:fullscreen]      || @fullscreen
       @highdpi         = opts[:highdpi]         || @highdpi
-      if Color.is_valid? opts[:background]
-        @background    = Color.new(opts[:background])
-      end
       @diagnostics     = opts[:diagnostics]     || @diagnostics
     end
     
@@ -98,7 +110,7 @@ module Ruby2D
       controller = args[:controller]
       
       unless mouse.nil?
-        # reg_mouse(btn, &proc)
+        reg_mouse(mouse, &proc)
       end
       
       unless key_down.nil?
@@ -118,13 +130,19 @@ module Ruby2D
       end
     end
     
+    def mouse_callback(btn, x, y)
+      if @mouse.has_key? 'any'
+        @mouse[btn].call(x, y)
+      end
+    end
+    
     def on_key(&proc)
       @on_key_proc = proc
       true
     end
     
     def key_down_callback(key)
-      key.downcase!
+      key = key.downcase
       if @keys_down.has_key? 'any'
         @keys_down['any'].call
       end
@@ -134,7 +152,7 @@ module Ruby2D
     end
     
     def key_callback(key)
-      key.downcase!
+      key = key.downcase
       @on_key_proc.call(key)
       if @keys.has_key? 'any'
         @keys['any'].call
@@ -145,7 +163,7 @@ module Ruby2D
     end
     
     def key_up_callback(key)
-      key.downcase!
+      key = key.downcase
       if @keys_up.has_key? 'any'
         @keys_up['any'].call
       end
@@ -197,6 +215,12 @@ module Ruby2D
     end
     
     # Register key string with proc
+    def reg_key_down(key, &proc)
+      @keys_down[key] = proc
+      true
+    end
+    
+    # Register key string with proc
     def reg_key(key, &proc)
       @keys[key] = proc
       true
@@ -208,9 +232,9 @@ module Ruby2D
       true
     end
     
-    # Register key string with proc
-    def reg_key_down(key, &proc)
-      @keys_down[key] = proc
+    # Register mouse button string with proc
+    def reg_mouse(btn, &proc)
+      @mouse[btn] = proc
       true
     end
     
