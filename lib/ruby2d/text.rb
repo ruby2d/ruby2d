@@ -4,6 +4,7 @@ module Ruby2D
   class Text
     
     attr_accessor :x, :y, :size, :text, :data
+    attr_reader :color
     
     def initialize(x=0, y=0, size=20, text="Hello World!", font="Arial", c="white")
       
@@ -15,8 +16,8 @@ module Ruby2D
       
       @type_id = 5
       @x, @y, @size = x, y, size
-      @text, @color = text, c
-      update_color(c)
+      @text = text
+      @color = Color.new(c)
       
       if Module.const_defined? :DSL
         Application.add(self)
@@ -24,8 +25,7 @@ module Ruby2D
     end
     
     def color=(c)
-      @color = c
-      update_color(c)
+      @color = Color.new(c)
     end
     
     def text=(t)
@@ -53,10 +53,6 @@ module Ruby2D
       else
         font_path
       end
-    end
-    
-    def update_color(c)
-      @c = Color.new(c)
     end
     
   end
