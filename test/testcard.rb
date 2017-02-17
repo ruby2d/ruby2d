@@ -1,24 +1,24 @@
-unless RUBY_ENGINE == 'opal'
-  require 'ruby2d'
-end
+require 'ruby2d'
 
 if RUBY_ENGINE == 'opal'
-  media = "../tests/media"
+  media = "../test/media"
+  font = "sans-serif"
 else
   media = "media"
+  font = "#{media}/bitstream_vera/vera.ttf"
 end
 
 set diagnostics: true
 
-set width: 700, height: 500, title: "Ruby 2D – Test Card"
+set width: 700, height: 500, title: "Ruby 2D — Test Card"
 
 # Read window attributes
 puts "=== Window Attributes ===
-Title:  #{get :title}
+Title: #{get :title}
+Background: #{get :background}
 Width:  #{get :width}
 Height: #{get :height}
-FPS:    #{get :fps}
-Self:   #{get :window}\n\n"
+Window: #{get :window}\n\n"
 
 # Primary colors
 Rectangle.new(0, 0, 50, 100,   [1, 0, 0, 1])
@@ -26,7 +26,7 @@ Rectangle.new(50, 0, 50, 100,  [0, 1, 0, 1])
 Rectangle.new(100, 0, 50, 100, [0, 0, 1, 1])
 
 # Color strings
-Square.new(   150, 0, 50,      'black')
+Square.new(   150, 0, 50,      'teal')
 Square.new(   200, 0, 50,      'gray')
 Square.new(   250, 0, 50,      'silver')
 Square.new(   300, 0, 50,      'white')
@@ -142,24 +142,24 @@ Image.new(590, 290, "#{media}/image.jpg")
 Image.new(590, 400, "#{media}/image.bmp")
 img_r = Image.new(350, 200, "#{media}/colors.png")
 img_r.width, img_r.height = 50, 50
-# img_r.color = [1.0, 0.3, 0.3, 1.0]
+img_r.color = [1.0, 0.3, 0.3, 1.0]
 img_g = Image.new(400, 200, "#{media}/colors.png")
 img_g.width, img_g.height = 50, 50
-# img_g.color = [0.3, 1.0, 0.3, 1.0]
+img_g.color = [0.3, 1.0, 0.3, 1.0]
 img_b = Image.new(450, 200, "#{media}/colors.png")
 img_b.width, img_b.height = 50, 50
-# img_b.color = [0.3, 0.3, 1.0, 1.0]
+img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-txt_r = Text.new( 44, 202, 20, "R", "#{media}/bitstream_vera/vera.ttf")
-# txt_r.color = [1.0, 0.0, 0.0, 1.0]
-txt_g = Text.new( 92, 202, 20, "G", "#{media}/bitstream_vera/vera.ttf")
-# txt_g.color = [0.0, 1.0, 0.0, 1.0]
-txt_b = Text.new(144, 202, 20, "B", "#{media}/bitstream_vera/vera.ttf")
-# txt_b.color = [0.0, 0.0, 1.0, 1.0]
+txt_r = Text.new( 44, 202, "R", 20, font)
+txt_r.color = [1.0, 0.0, 0.0, 1.0]
+txt_g = Text.new( 92, 202, "G", 20, font)
+txt_g.color = [0.0, 1.0, 0.0, 1.0]
+txt_b = Text.new(144, 202, "B", 20, font)
+txt_b.color = [0.0, 0.0, 1.0, 1.0]
 
 # Frames per second
-fps = Text.new(10, 470, 20, "", "#{media}/bitstream_vera/vera.ttf")
+fps = Text.new(10, 470, "", 20, font)
 
 # Sprites
 s1 = Sprite.new(500, 200, "#{media}/sprite_sheet.png")
@@ -171,18 +171,37 @@ s1.add(forwards: [
 ])
 
 # Pointer for mouse
-pointer = Square.new(0, 0, 10, 'white')
+pointer = Square.new(0, 0, 10, [1, 1, 1, 1])
+pointer_outline = Square.new(0, 0, 14, [0, 1, 0, 0])
+flash = 0
 
 on key: 'escape' do
   close
 end
 
+on mouse: 'any' do |x, y|
+  puts "Mouse down at: #{x}, #{y}"
+  pointer_outline.x = (get :mouse_x) - 7
+  pointer_outline.y = (get :mouse_y) - 9
+  flash = 2
+end
+
 update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
+  
+  if flash > 0
+    pointer_outline.color = [0, 1, 0, 1]
+    flash -= 1
+  else
+    pointer_outline.color = [0, 1, 0, 0]
+  end
+  
   s1.animate(:forwards)
-  # puts get :fps
-  fps.text = "FPS: #{(get :fps).round(3)}"
+  
+  if (get :frames) % 20 == 0
+    fps.text = "FPS: #{(get :fps).round(3)}"
+  end
 end
 
 show
