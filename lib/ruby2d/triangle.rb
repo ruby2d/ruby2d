@@ -15,15 +15,18 @@ module Ruby2D
       @x3, @y3 = x3, y3
       @color = c
       update_color(c)
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def color=(c)
       update_color(c)
       @color = c
+    end
+    
+    def add
+      if Module.const_defined? :DSL
+        Application.add(self)
+      end
     end
     
     def remove

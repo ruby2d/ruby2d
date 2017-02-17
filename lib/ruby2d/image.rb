@@ -15,14 +15,17 @@ module Ruby2D
       @type_id = 3
       @x, @y, @path = x, y, path
       @color = Color.new([1, 1, 1, 1])
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def color=(c)
       @color = Color.new(c)
+    end
+    
+    def add
+      if Module.const_defined? :DSL
+        Application.add(self)
+      end
     end
     
     def remove

@@ -19,15 +19,18 @@ module Ruby2D
       @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4 = x1, y1, x2, y2, x3, y3, x4, y4
       @color = c
       update_color(c)
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def color=(c)
       @color = c
       update_color(c)
+    end
+    
+    def add
+      if Module.const_defined? :DSL
+        Application.add(self)
+      end
     end
     
     def remove

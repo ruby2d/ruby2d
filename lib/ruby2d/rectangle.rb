@@ -10,10 +10,7 @@ module Ruby2D
       @x, @y, @width, @height, @color = x, y, w, h, c
       update_coords(x, y, w, h)
       update_color(c)
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def x=(x)

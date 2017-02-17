@@ -18,10 +18,7 @@ module Ruby2D
       @x, @y, @size = x, y, size
       @text = text
       @color = Color.new(c)
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def color=(c)
@@ -30,6 +27,12 @@ module Ruby2D
     
     def text=(t)
       @text = t
+    end
+        
+    def add
+      if Module.const_defined? :DSL
+        Application.add(self)
+      end
     end
     
     def remove

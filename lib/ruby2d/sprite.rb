@@ -48,6 +48,13 @@ module Ruby2D
       @current_animation = nil
     end
     
+    # TODO: Sprite already has an `add` method, have to reconsile
+    # def add
+    #   if Module.const_defined? :DSL
+    #     Application.add(self)
+    #   end
+    # end
+    
     def remove
       if Module.const_defined? :DSL
         Application.remove(self)

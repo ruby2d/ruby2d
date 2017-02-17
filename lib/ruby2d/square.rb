@@ -11,10 +11,7 @@ module Ruby2D
       @width = @height = @size = s
       update_coords(x, y, s, s)
       update_color(c)
-      
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
+      add
     end
     
     def size=(s)
