@@ -1,14 +1,15 @@
-# sound.rb
+# music.rb
 
 module Ruby2D
-  class Sound
+  class Music
     
-    attr_accessor :data
+    attr_accessor :data, :loop
     attr_reader :path
     
     def initialize(path)
       # TODO: Check if file exists
       @path = path
+      @loop = false
     end
     
   end

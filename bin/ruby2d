@@ -27,6 +27,8 @@ end
   'image',
   'sprite',
   'text',
+  'sound',
+  'music'
 ]
 
 
