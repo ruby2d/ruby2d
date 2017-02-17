@@ -47,16 +47,22 @@ module Ruby2D
         @c3 = Color.new(c)
         @c4 = Color.new(c)
         
+      elsif c.class == Array && c.length < 4
+        raise Error, "Quads require 4 colors, one for each vertex. Only " <<
+                     "#{c.length} were given."
+        
       # If a valid array of colors, assign them to each vertex, respectively
       elsif c.all? { |el| Color.is_valid? el }
         @c1 = Color.new(c[0])
         @c2 = Color.new(c[1])
         @c3 = Color.new(c[2])
         @c4 = Color.new(c[3])
+        
       else
         raise Error, "Not a valid color for #{self.class}"
       end
       
     end
+    
   end
 end

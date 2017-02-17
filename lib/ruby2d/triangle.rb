@@ -35,16 +35,27 @@ module Ruby2D
     private
     
     def update_color(c)
-      # If a 2D array
-      if c.class == Array && c.all? { |el| el.class == Array }
-        @c1 = Color.new(c[0])
-        @c2 = Color.new(c[1])
-        @c3 = Color.new(c[2])
-      else
+      
+      # If a valid color, use it for each vertex
+      if Color.is_valid? c
         @c1 = Color.new(c)
         @c2 = Color.new(c)
         @c3 = Color.new(c)
+        
+      elsif c.class == Array && c.length < 3
+        raise Error, "Triangles require 3 colors, one for each vertex. Only " <<
+                     "#{c.length} were given."
+        
+      # If a valid array of colors, assign them to each vertex, respectively
+      elsif c.all? { |el| Color.is_valid? el }
+        @c1 = Color.new(c[0])
+        @c2 = Color.new(c[1])
+        @c3 = Color.new(c[2])
+        
+      else
+        raise Error, "Not a valid color for #{self.class}"
       end
+      
     end
     
   end
