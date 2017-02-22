@@ -1,4 +1,5 @@
 require 'ruby2d'
+include Ruby2D::DSL
 
 RSpec.describe Ruby2D::DSL do
   

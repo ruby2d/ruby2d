@@ -16,5 +16,5 @@ require 'ruby2d/sound'
 require 'ruby2d/music'
 require 'ruby2d/ruby2d'  # load native extension
 
-include Ruby2D::DSL
 include Ruby2D
+extend  Ruby2D::DSL
