@@ -675,21 +675,13 @@ static R_VAL ruby2d_show(R_VAL self) {
   
   // Check viewport size and set
   
-  int viewport_width;
   R_VAL vp_w = r_iv_get(self, "@viewport_width");
-  if (r_test(vp_w)) {
-    viewport_width = NUM2INT(vp_w);
-  } else {
-    viewport_width = width;
-  }
+  int viewport_width = r_test(vp_w) ? NUM2INT(vp_w) : width;
   
-  int viewport_height;
   R_VAL vp_h = r_iv_get(self, "@viewport_height");
-  if (r_test(vp_h)) {
-    viewport_height = NUM2INT(vp_h);
-  } else {
-    viewport_height = height;
-  }
+  int viewport_height = r_test(vp_h) ? NUM2INT(vp_h) : height;
+  
+  // Create and show window
   
   window = S2D_CreateWindow(
     title, width, height, update, render, flags
