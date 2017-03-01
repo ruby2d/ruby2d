@@ -14,7 +14,7 @@ git clone --recursive https://github.com/ruby2d/ruby2d.git
 
 Along with cloning this repo, the command above will grab the contents of the [`test_media`](https://github.com/simple2d/test_media) repo and place it in the `test/media` directory, and [assets](https://github.com/ruby2d/assets) used by the gem. Simply run `git submodule update --remote` anytime to get the latest changes from `test_media` (i.e. when there's a new commit available). If you've already cloned this repo without the `--recursive` flag, make sure to run `git submodule init` before updating the submodule.
 
-Next, install [Bundler](http://bundler.io) and run `bundle install` to get the required development gems. Install the native graphics library [Simple 2D]((https://github.com/simple2d/simple2d)) by following the instructions in its README. Finally, run `rake` to build and install the gem locally.
+Next, install [Bundler](http://bundler.io) and run `bundle install` to get the required development gems. Install the native graphics library [Simple 2D](https://github.com/simple2d/simple2d) by following the instructions in its README. Finally, run `rake` to build and install the gem locally.
 
 ## Tests
 
@@ -26,4 +26,4 @@ Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and
 2. Run tests on all supported platforms
 3. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
 4. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`
-5. Push to [rubygems.org](rubygems.org) with `gem push ruby2d-#.#.#.gem`
+5. Push to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
