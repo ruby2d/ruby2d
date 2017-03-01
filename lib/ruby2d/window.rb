@@ -2,9 +2,8 @@
 
 module Ruby2D
   class Window
-    attr_reader :title, :width, :height,
-                :objects, :diagnostics
     
+    attr_reader :objects
     attr_accessor :mouse_x, :mouse_y, :frames, :fps
     
     def initialize(args = {})
