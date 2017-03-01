@@ -172,7 +172,7 @@ s1.add(forwards: [
 
 # Pointer for mouse
 pointer = Square.new(0, 0, 10, [1, 1, 1, 1])
-pointer_outline = Square.new(0, 0, 14, [0, 1, 0, 0])
+pointer_outline = Square.new(0, 0, 18, [0, 1, 0, 0])
 flash = 0
 
 on key: 'escape' do
@@ -181,8 +181,8 @@ end
 
 on mouse: 'any' do |x, y|
   puts "Mouse down at: #{x}, #{y}"
-  pointer_outline.x = (get :mouse_x) - 7
-  pointer_outline.y = (get :mouse_y) - 9
+  pointer_outline.x = (get :mouse_x) - 9
+  pointer_outline.y = (get :mouse_y) - 11
   flash = 2
 end
 
