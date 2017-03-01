@@ -1,6 +1,11 @@
 # ruby2d-opal.rb
 
-$SELF = nil
+# Ruby 2D window
+$R2D_WINDOW = nil
+
+# Simple 2D window
+`var win;`
+
 
 `// ruby2d.js
 
@@ -15,37 +20,43 @@ const $R2D_TEXT     = 5;
 function on_key(e, key) {
   switch (e) {
     case S2D.KEYDOWN:
-      #{$SELF.key_down_callback(`key`)};
+      #{$R2D_WINDOW.key_down_callback(`key`)};
       break;
     
     case S2D.KEY:
-      #{$SELF.key_callback(`key`)};
+      #{$R2D_WINDOW.key_callback(`key`)};
       break;
     
     case S2D.KEYUP:
-      #{$SELF.key_up_callback(`key`)};
+      #{$R2D_WINDOW.key_up_callback(`key`)};
       break;
   }
 }
 
 
 function on_mouse(x, y) {
-  #{$SELF.mouse_callback("any", `x`, `y`)};
+  #{$R2D_WINDOW.mouse_callback("any", `x`, `y`)};
 }
 
 
 function update() {
-  #{$SELF.mouse_x = `win.mouse.x`};
-  #{$SELF.mouse_y = `win.mouse.y`};
-  #{$SELF.frames  = `win.frames`};
-  #{$SELF.fps     = `win.fps`};
-  #{$SELF.update_callback};
+  #{$R2D_WINDOW.mouse_x = `win.mouse.x`};
+  #{$R2D_WINDOW.mouse_y = `win.mouse.y`};
+  #{$R2D_WINDOW.frames  = `win.frames`};
+  #{$R2D_WINDOW.fps     = `win.fps`};
+  #{$R2D_WINDOW.update_callback};
 }
 
 
 function render() {
   
-  var objects = #{$SELF.objects};
+  // Set background color
+  win.background.r = #{$R2D_WINDOW.get(:background).r};
+  win.background.g = #{$R2D_WINDOW.get(:background).g};
+  win.background.b = #{$R2D_WINDOW.get(:background).b};
+  win.background.a = #{$R2D_WINDOW.get(:background).a};
+  
+  var objects = #{$R2D_WINDOW.objects};
   
   for (var i = 0; i < objects.length; i++) {
     
@@ -181,16 +192,24 @@ module Ruby2D
   
   class Window
     def show
-      $SELF = self
+      $R2D_WINDOW = self
       
-      if $SELF.diagnostics
-        # `S2D.Diagnostics(true);`
-      end
+      `
+      var width  = #{$R2D_WINDOW.get(:width)};
+      var height = #{$R2D_WINDOW.get(:height)};
       
-      `win = S2D.CreateWindow(
-        #{$SELF.title}, #{$SELF.width}, #{$SELF.height}, update, render, "ruby2d-app", {}
+      var vp_w = #{$R2D_WINDOW.get(:viewport_width)};
+      var viewport_width = vp_w != Opal.nil ? vp_w : width;
+      
+      var vp_h = #{$R2D_WINDOW.get(:viewport_height)};
+      var viewport_height = vp_h != Opal.nil ? vp_h : height;
+      
+      win = S2D.CreateWindow(
+        #{$R2D_WINDOW.get(:title)}, width, height, update, render, "ruby2d-app", {}
       );
       
+      win.viewport.width  = viewport_width;
+      win.viewport.height = viewport_height;
       win.on_key          = on_key;
       win.on_mouse        = on_mouse;
       
