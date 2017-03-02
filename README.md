@@ -20,10 +20,10 @@ Next, install [Bundler](http://bundler.io) and run `bundle install` to get the r
 
 Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and manual, interactive tests to verify the correctness of visual, audio, and input functionality. Build the gem and run all automated tests with the `rake` command. Run the interactive tests in the [`test/`](test/) directory using `rake test <name_of_test>`, such as `rake test testcard`. To run the test as a native or web application, use `rake native <name_of_test>` and `rake web <name_of_test>`, respectfully.
 
-## Preparing a Release
+## Preparing a release
 
 1. Update the Simple 2D minimum version required in [extconf.rb](ext/ruby2d/extconf.rb)
 2. Run tests on all supported platforms
 3. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
 4. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`
-5. Push to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
+5. Run `rake` to build the gem and push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
