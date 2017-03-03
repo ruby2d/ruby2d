@@ -456,10 +456,10 @@ void on_mouse(int x, int y) {
  * Simple 2D `on_controller` input callback function
  */
 static void on_controller(int which, bool is_axis, int axis, int val, bool is_btn, int btn, bool pressed) {
-  r_funcall(ruby2d_window, "controller_callback", 6,
+  r_funcall(ruby2d_window, "controller_callback", 7,
     INT2NUM(which),
     is_axis ? R_TRUE : R_FALSE, INT2NUM(axis), INT2NUM(val),
-    is_btn  ? R_TRUE : R_FALSE, INT2NUM(btn)
+    is_btn  ? R_TRUE : R_FALSE, INT2NUM(btn), pressed ? R_TRUE : R_FALSE
   );
 }
 
