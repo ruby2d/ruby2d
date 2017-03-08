@@ -45,7 +45,9 @@ end
 def run_web_test(file)
   print_task "Running web build test"
   run_cmd "ruby2d build --web test/#{file}.rb --debug"
-  system "open build/app.html"
+  open_cmd = 'open'
+  if RUBY_PLATFORM =~ /linux/ then open_cmd = "xdg-#{open_cmd}" end
+  system "#{open_cmd} build/app.html"
 end
 
 # Tasks
