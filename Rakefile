@@ -78,22 +78,24 @@ RSpec::Core::RakeTask.new do |t|
   t.pattern = "test/*spec.rb"
 end
 
-desc "Run test"
-task :test do
-  get_args
-  run_test ARGV[1]
-end
-
-desc "Run native test"
-task :native do
-  get_args
-  run_native_test ARGV[1]
-end
-
-desc "Run web test"
-task :web do
-  get_args
-  run_web_test ARGV[1]
+namespace :test do
+  desc "Run test"
+  task :mri do
+    get_args
+    run_test ARGV[1]
+  end
+  
+  desc "Run native test"
+  task :native do
+    get_args
+    run_native_test ARGV[1]
+  end
+  
+  desc "Run web test"
+  task :web do
+    get_args
+    run_web_test ARGV[1]
+  end
 end
 
 desc "Uninstall, build, install, and test"
