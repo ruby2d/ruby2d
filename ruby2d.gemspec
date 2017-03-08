@@ -1,5 +1,4 @@
-$:.push File.expand_path('../lib', __FILE__)
-require 'ruby2d/version'
+require_relative 'lib/ruby2d/version'
 
 Gem::Specification.new do |s|
   s.name        = 'ruby2d'
