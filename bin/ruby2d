@@ -5,9 +5,8 @@ require 'fileutils'
 # Extending `String` to include some fancy colors
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def bold; colorize('1')   end
-  def red; colorize('1;31') end
-  def red_underline; colorize('4;31') end
+  def bold;  colorize('1')    end
+  def error; colorize('4;31') end
 end
 
 # The installed gem directory
@@ -78,9 +77,7 @@ def build_native(rb_file)
   
   # Check if MRuby exists; if not, quit
   if `which mruby`.empty?
-    puts "\n#{"mruby".bold} is needed to build native Ruby 2D applications.\n\n",
-         "  On macOS, install using #{"Homebrew".bold}:",
-         "    brew install mruby\n\n"
+    puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
     exit
   end
   
@@ -105,7 +102,7 @@ def build_native(rb_file)
   end
   
   # Compile to native executable
-  `cc -lmruby \`simple2d --libs\` build/app.c -o build/app`
+  `cc build/app.c -lmruby \`simple2d --libs\` -o build/app`
   
   # Success!
   puts "Native app created at `build/app`"
