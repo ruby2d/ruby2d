@@ -30,20 +30,19 @@ def run_cmd(cmd)
   system cmd
 end
 
-def run_test(file)
-  print_task "Running test/#{file}.rb"
+def run_mri_test(file)
+  print_task "Running MRI test: #{file}.rb"
   system "( cd test/ ; ruby #{file}.rb )"
 end
 
 def run_native_test(file)
   print_task "Running native test: #{file}.rb"
   run_cmd "ruby2d build --native test/#{file}.rb --debug"
-  print_task "Running native test/#{file}.rb"
   system "( cd test/ ; ../build/app )"
 end
 
 def run_web_test(file)
-  print_task "Running web build test"
+  print_task "Running web test: #{file}.rb"
   run_cmd "ruby2d build --web test/#{file}.rb --debug"
   open_cmd = 'open'
   if RUBY_PLATFORM =~ /linux/ then open_cmd = "xdg-#{open_cmd}" end
@@ -79,10 +78,10 @@ RSpec::Core::RakeTask.new do |t|
 end
 
 namespace :test do
-  desc "Run test"
+  desc "Run MRI test"
   task :mri do
     get_args
-    run_test ARGV[1]
+    run_mri_test ARGV[1]
   end
   
   desc "Run native test"
