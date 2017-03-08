@@ -69,19 +69,19 @@ elsif RUBY_PLATFORM =~ /linux/
     exit
   end
   
-  $CFLAGS << ' -std=c99'
-
+  $CFLAGS << ' -std=c11'
+  
 # Windows / MinGW
 elsif RUBY_PLATFORM =~ /mingw/
   # Add flags
-  $CFLAGS  << ' -std=c99 -I/usr/local/include'
+  $CFLAGS  << ' -std=c11 -I/usr/local/include'
   $LDFLAGS << ' -Dmain=SDL_main -L/usr/local/lib -lmingw32 -lsimple2d -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lopengl32 -lglew32 -mwindows'
 end
 
 unless RUBY_PLATFORM =~ /mingw/
   # Simple 2D installed, check version
   check_s2d_version
-
+  
   # Add flags
   $LDFLAGS << ' ' << `simple2d --libs`
 end
