@@ -84,7 +84,7 @@ module Ruby2D
       end
       
       if i = @objects.index(o)
-        @objects.slice!(i)
+        @objects.delete_at(i)
         true
       else
         false
