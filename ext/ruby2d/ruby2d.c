@@ -235,14 +235,14 @@ static R_VAL ruby2d_text_init(R_VAL self) {
 
 
 /*
- * Ruby2D::Text#text=
+ * Ruby2D::Text#ext_text_set
  */
 #if MRUBY
-static R_VAL ruby2d_text_equals(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_ext_text_set(mrb_state* mrb, R_VAL self) {
   mrb_value text;
   mrb_get_args(mrb, "o", &text);
 #else
-static R_VAL ruby2d_text_equals(R_VAL self, R_VAL text) {
+static R_VAL ruby2d_ext_text_set(R_VAL self, R_VAL text) {
   r_iv_set(self, "@text", text);
 #endif
   
@@ -748,8 +748,8 @@ void Init_ruby2d() {
   // Ruby2D::Text#init
   r_define_method(ruby2d_text_class, "init", ruby2d_text_init, r_args_none);
   
-  // Ruby2D::Text#text=
-  r_define_method(ruby2d_text_class, "text=", ruby2d_text_equals, r_args_req(1));
+  // Ruby2D::Text#ext_text_set
+  r_define_method(ruby2d_text_class, "ext_text_set", ruby2d_ext_text_set, r_args_req(1));
   
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
