@@ -16,10 +16,15 @@ module Ruby2D
       
       @type_id = 5
       @x, @y, @size = x, y, size
-      @text = text
+      @text = text.to_s
       @color = Color.new(c)
       init
       add
+    end
+    
+    def text=(msg)
+      @text = msg.to_s
+      ext_text_set(@text)
     end
     
     def color=(c)
