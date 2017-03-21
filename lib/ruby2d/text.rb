@@ -17,7 +17,7 @@ module Ruby2D
       @type_id = 5
       @x, @y, @size = x, y, size
       @text = text.to_s
-      @color = Color.new(c)
+      self.color = c
       init
       add
     end

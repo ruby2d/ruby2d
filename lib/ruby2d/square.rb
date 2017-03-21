@@ -7,10 +7,11 @@ module Ruby2D
     
     def initialize(x=0, y=0, s=100, c='white')
       @type_id = 2
-      @x, @y, @color = x, y, c
+      @x, @y = x, y
       @width = @height = @size = s
       update_coords(x, y, s, s)
-      update_color(c)
+
+      self.color = c
       add
     end
     
