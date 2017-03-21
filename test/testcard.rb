@@ -175,6 +175,10 @@ pointer = Square.new(0, 0, 10, [1, 1, 1, 1])
 pointer_outline = Square.new(0, 0, 18, [0, 1, 0, 0])
 flash = 0
 
+# Updating opacity
+opacity_square = Square.new(500, 255, 50, ["red", "green", "blue", "yellow"])
+time_start     = Time.now
+
 on key: 'escape' do
   close
 end
@@ -202,6 +206,10 @@ update do
   if (get :frames) % 20 == 0
     fps.text = "FPS: #{(get :fps).round(3)}"
   end
+
+  elapsed_time = Time.now - time_start
+  opacity = Math.sin(3 * elapsed_time.to_f).abs
+  opacity_square.color.opacity = opacity
 end
 
 show

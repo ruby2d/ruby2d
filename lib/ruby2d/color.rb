@@ -2,6 +2,26 @@
 
 module Ruby2D
   class Color
+    # Color::Set represents an array of colors
+    class Set
+      def initialize(colors)
+        @colors = colors.map{|c| Color.new(c)}
+      end
+
+      def [](i)
+        @colors[i]
+      end
+
+      def length
+        @colors.length
+      end
+
+      def opacity=(opacity)
+        @colors.each do |color|
+          color.opacity = opacity
+        end
+      end
+    end
     
     attr_reader :r, :g, :b, :a
     
@@ -64,6 +84,20 @@ module Ruby2D
       c.all? { |el|
         el.is_a?(Numeric) && (0.0..1.0).include?(el)
       }
+    end
+
+    def self.from(input)
+      # If a valid array of colors, return a Color::Set with those colors
+      # Else return single color
+      if input.is_a? Array and input.all? { |el| Color.is_valid? el }
+        Color::Set.new(input)
+      else
+        Color.new(input)
+      end
+    end
+
+    def opacity=(opacity)
+      @a = opacity
     end
     
     private

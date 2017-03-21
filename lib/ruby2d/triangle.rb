@@ -13,14 +13,14 @@ module Ruby2D
       @x1, @y1 = x1, y1
       @x2, @y2 = x2, y2
       @x3, @y3 = x3, y3
-      @color = c
-      update_color(c)
+
+      self.color = c
       add
     end
     
     def color=(c)
-      update_color(c)
-      @color = c
+      @color = Color.from(c)
+      update_color(@color)
     end
     
     def add
@@ -38,28 +38,19 @@ module Ruby2D
     private
     
     def update_color(c)
-      
-      # If a valid color, use it for each vertex
-      if Color.is_valid? c
-        @c1 = Color.new(c)
-        @c2 = Color.new(c)
-        @c3 = Color.new(c)
-        
-      elsif c.class == Array && c.length < 3
-        raise Error, "Triangles require 3 colors, one for each vertex. Only " <<
-                     "#{c.length} were given."
-        
-      # If a valid array of colors, assign them to each vertex, respectively
-      elsif c.all? { |el| Color.is_valid? el }
-        @c1 = Color.new(c[0])
-        @c2 = Color.new(c[1])
-        @c3 = Color.new(c[2])
-        
+      if c.is_a? Color::Set
+        if c.length == 3
+          @c1 = c[0]
+          @c2 = c[1]
+          @c3 = c[2]
+        else
+          raise ArgumentError, "Triangles require 3 colors, one for each vertex. #{c.length} were given."
+        end
       else
-        raise Error, "Not a valid color for #{self.class}"
+        @c1 = c
+        @c2 = c
+        @c3 = c
       end
-      
     end
-    
   end
 end
