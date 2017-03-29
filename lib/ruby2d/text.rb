@@ -7,9 +7,14 @@ module Ruby2D
     attr_reader :text, :size, :font, :color
     
     def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white")
-      
-      # if File.exists? font
+      if font.nil?
+        @font = Font.default
+      else
         @font = font
+      end
+
+      # if File.exists? font
+        # @font = font
       # else
       #   @font = resolve_path(font)
       # end

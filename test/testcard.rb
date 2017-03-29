@@ -179,6 +179,10 @@ flash = 0
 opacity_square = Square.new(500, 255, 50, ["red", "green", "blue", "yellow"])
 time_start     = Time.now
 
+# Default font for text
+Text.new(150, 470, "Default font", 20)
+
+
 on key: 'escape' do
   close
 end

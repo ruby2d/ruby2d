@@ -14,5 +14,9 @@ RSpec.describe Ruby2D::Text do
       t.text = 0
       expect(t.text).to eq "0"
     end
+
+    it "works nicely without explicitly passed font file" do
+      Text.new(0, 0, 0, 40)
+    end
   end
 end
