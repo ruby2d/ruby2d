@@ -243,7 +243,6 @@ static R_VAL ruby2d_ext_text_set(mrb_state* mrb, R_VAL self) {
   mrb_get_args(mrb, "o", &text);
 #else
 static R_VAL ruby2d_ext_text_set(R_VAL self, R_VAL text) {
-  r_iv_set(self, "@text", text);
 #endif
   
   // If called before window is shown, return
