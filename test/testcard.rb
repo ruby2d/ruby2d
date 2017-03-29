@@ -179,6 +179,30 @@ flash = 0
 opacity_square = Square.new(500, 255, 50, ["red", "green", "blue", "yellow"])
 time_start     = Time.now
 
+# Text size
+created_text = Text.new(10, 270, "Created text", 20, font)
+created_text_background = Rectangle.new(
+  created_text.x - 10,
+  created_text.y - 10,
+  created_text.width + 20,
+  created_text.height + 20,
+  "red"
+)
+created_text.remove
+created_text.add
+
+updated_text = Text.new(20 + created_text_background.x2, 270, "Updated text", 20, font)
+updated_text_background = Rectangle.new(
+  updated_text.x - 10,
+  updated_text.y - 10,
+  updated_text.width + 20,
+  updated_text.height + 20,
+  "blue"
+)
+updated_text.remove
+updated_text.add
+UPDATED_TEXT_OPTIONS = "of various size".split(" ")
+
 on key: 'escape' do
   close
 end
@@ -210,6 +234,11 @@ update do
   elapsed_time = Time.now - time_start
   opacity = Math.sin(3 * elapsed_time.to_f).abs
   opacity_square.color.opacity = opacity
+
+  if (get :frames) % 60 == 0
+    updated_text.text = "Updated text " + UPDATED_TEXT_OPTIONS[Time.now.to_i % UPDATED_TEXT_OPTIONS.length]
+    updated_text_background.width = updated_text.width + 20
+  end
 end
 
 show

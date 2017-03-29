@@ -130,7 +130,6 @@ function render() {
 
 
 module Ruby2D
-  
   class Image
     def init(path)
       `#{self}.data = S2D.CreateImage(path);`
@@ -146,11 +145,14 @@ module Ruby2D
   class Text
     def init
       `#{self}.data = S2D.CreateText(#{self}.font, #{self}.text, #{self}.size);`
+      @width  = `#{self}.data.width;`
+      @height = `#{self}.data.height;`
     end
     
-    def text=(t)
-      @text = t
-      `S2D.SetText(#{self}.data, #{self}.text);`
+    def ext_text_set(msg)
+      `S2D.SetText(#{self}.data, #{msg});`
+      @width  = `#{self}.data.width;`
+      @height = `#{self}.data.height;`
     end
   end
   
