@@ -229,6 +229,9 @@ static R_VAL ruby2d_text_init(R_VAL self) {
     NUM2DBL(r_iv_get(self, "@size"))
   );
   
+  r_iv_set(self, "@width", INT2NUM(txt->width));
+  r_iv_set(self, "@height", INT2NUM(txt->height));
+  
   r_iv_set(self, "@data", r_data_wrap_struct(text, txt));
   return R_NIL;
 }
@@ -245,14 +248,14 @@ static R_VAL ruby2d_ext_text_set(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_ext_text_set(R_VAL self, R_VAL text) {
   r_iv_set(self, "@text", text);
 #endif
-  
-  // If called before window is shown, return
-  if (!r_test(ruby2d_window)) return R_NIL;
-  
   S2D_Text *txt;
   r_data_get_struct(self, "@data", &text_data_type, S2D_Text, txt);
   
   S2D_SetText(txt, RSTRING_PTR(text));
+  
+  r_iv_set(self, "@width", INT2NUM(txt->width));
+  r_iv_set(self, "@height", INT2NUM(txt->height));
+  
   return R_NIL;
 }
 

@@ -4,7 +4,7 @@ module Ruby2D
   class Text
     
     attr_accessor :x, :y, :data
-    attr_reader :text, :size, :font, :color
+    attr_reader :text, :size, :width, :height, :font, :color
     
     def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white")
       
