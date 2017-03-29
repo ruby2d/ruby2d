@@ -1,7 +1,8 @@
 # quad.rb
 
 module Ruby2D
-  class Quad
+  class Quad 
+    include Renderable
     # Coordinates in clockwise order, starting at top left:
     # x1,y1 == top left
     # x2,y2 == top right
@@ -25,18 +26,6 @@ module Ruby2D
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
-    end
-    
-    def add
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
-    end
-    
-    def remove
-      if Module.const_defined? :DSL
-        Application.remove(self)
-      end
     end
     
     private

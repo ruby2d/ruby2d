@@ -1,5 +1,6 @@
 # ruby2d.rb
 
+require 'ruby2d/renderable'
 require 'ruby2d/exceptions'
 require 'ruby2d/color'
 require 'ruby2d/window'
