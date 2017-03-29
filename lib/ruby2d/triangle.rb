@@ -2,6 +2,7 @@
 
 module Ruby2D
   class Triangle
+    include Renderable
     
     attr_accessor :x1, :y1, :c1,
                   :x2, :y2, :c2,
@@ -21,18 +22,6 @@ module Ruby2D
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
-    end
-    
-    def add
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
-    end
-    
-    def remove
-      if Module.const_defined? :DSL
-        Application.remove(self)
-      end
     end
     
     private

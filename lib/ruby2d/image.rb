@@ -2,7 +2,8 @@
 
 module Ruby2D
   class Image
-    
+    include Renderable
+
     attr_accessor :x, :y, :width, :height, :data
     attr_reader :path, :color
     
@@ -25,18 +26,5 @@ module Ruby2D
     def color=(c)
       @color = Color.new(c)
     end
-    
-    def add
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
-    end
-    
-    def remove
-      if Module.const_defined? :DSL
-        Application.remove(self)
-      end
-    end
-    
   end
 end

@@ -2,6 +2,7 @@
 
 module Ruby2D
   class Text
+    include Renderable
     
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
@@ -29,18 +30,6 @@ module Ruby2D
     
     def color=(c)
       @color = Color.new(c)
-    end
-    
-    def add
-      if Module.const_defined? :DSL
-        Application.add(self)
-      end
-    end
-    
-    def remove
-      if Module.const_defined? :DSL
-        Application.remove(self)
-      end
     end
     
     private
