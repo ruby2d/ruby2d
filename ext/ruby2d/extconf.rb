@@ -17,7 +17,7 @@ def print_errors
 end
 
 def check_s2d_version
-  unless Gem::Version.new(`simple2d --version`) >= Gem::Version.new(S2D_VERSION)
+  unless Gem::Version.new(`bash simple2d --version`) >= Gem::Version.new(S2D_VERSION)
     $errors << "Simple 2D needs to be updated for this version of Ruby 2D." <<
                "Run the following, then try reinstalling this gem:\n" <<
                "  simple2d update".bold
@@ -28,9 +28,10 @@ end
 
 
 # Install Simple 2D on supported platforms
+case RUBY_PLATFORM
 
-# OS X
-if RUBY_PLATFORM =~ /darwin/
+# macOS
+when /darwin/
   
   # Simple 2D not installed
   if `which simple2d`.empty?
@@ -57,36 +58,25 @@ if RUBY_PLATFORM =~ /darwin/
     end
   end
   
-# Linux
-elsif RUBY_PLATFORM =~ /linux/
+# Linux and Windows / MinGW
+when /linux|mingw/
   
   # Simple 2D not installed
   if `which simple2d`.empty?
     $errors << "Ruby 2D uses a native library called Simple 2D.\n" <<
-               "To install Simple 2D on Linux, follow the instructions" <<
-               "in the README: #{"https://github.com/simple2d/simple2d".bold}"
+               "To install Simple 2D, follow the instructions in the README:" <<
+               "  #{"https://github.com/simple2d/simple2d".bold}"
     print_errors
     exit
   end
-  
-  $CFLAGS << ' -std=c11'
-  
-# Windows / MinGW
-elsif RUBY_PLATFORM =~ /mingw/
-  # Add flags
-  $CFLAGS  << ' -std=c11 -I/usr/local/include'
-  $LDFLAGS << ' -Dmain=SDL_main -L/usr/local/lib -lmingw32 -lsimple2d -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lopengl32 -lglew32 -mwindows'
-end
-
-unless RUBY_PLATFORM =~ /mingw/
-  # Simple 2D installed, check version
-  check_s2d_version
-  
-  # Add flags
-  $LDFLAGS << ' ' << `simple2d --libs`
 end
 
 
+check_s2d_version
+
+# Add flags
+$CFLAGS  << ' -std=c11 -I/usr/local/include'
+$LDFLAGS << ' ' << `bash simple2d --libs`
 $LDFLAGS.gsub!(/\n/, ' ')  # Remove newlines in flags, they cause problems
 
 create_makefile('ruby2d/ruby2d')
