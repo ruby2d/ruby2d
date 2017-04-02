@@ -32,20 +32,25 @@ end
 
 def run_mri_test(file)
   print_task "Running MRI test: #{file}.rb"
-  system "( cd test/ ; ruby #{file}.rb )"
+  system "( cd test/ && ruby #{file}.rb )"
 end
 
 def run_native_test(file)
   print_task "Running native test: #{file}.rb"
   run_cmd "ruby2d build --native test/#{file}.rb --debug"
-  system "( cd test/ ; ../build/app )"
+  system "( cd test/ && ../build/app )"
 end
 
 def run_web_test(file)
   print_task "Running web test: #{file}.rb"
   run_cmd "ruby2d build --web test/#{file}.rb --debug"
   open_cmd = 'open'
-  if RUBY_PLATFORM =~ /linux/ then open_cmd = "xdg-#{open_cmd}" end
+  case RUBY_PLATFORM
+  when /linux/
+    open_cmd = "xdg-#{open_cmd}"
+  when /mingw/
+    open_cmd = "start"
+  end
   system "#{open_cmd} build/app.html"
 end
 
