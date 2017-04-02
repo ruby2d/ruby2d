@@ -205,7 +205,6 @@ updated_text_background = Rectangle.new(
 updated_text.remove
 updated_text.add
 UPDATED_TEXT_OPTIONS = "of various size".split(" ")
->>>>>>> master
 
 on key: 'escape' do
   close
