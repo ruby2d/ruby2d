@@ -35,6 +35,10 @@ module Ruby2D::Application
     def clear
       @@window.clear
     end
+
+    def z_sort
+      @@window.dirty = true
+    end
     
     def update(&proc)
       @@window.update(&proc)

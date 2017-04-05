@@ -13,11 +13,11 @@ module Ruby2D
                   :x3, :y3, :c3,
                   :x4, :y4, :c4
     
-    attr_reader :color
+    attr_reader :color, :z
     
-    def initialize(x1=0, y1=0, x2=100, y2=0, x3=100, y3=100, x4=100, y4=100, c='white')
+    def initialize(x1=0, y1=0, x2=100, y2=0, x3=100, y3=100, x4=100, y4=100, c='white', z=0)
       @type_id = 2
-      @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4 = x1, y1, x2, y2, x3, y3, x4, y4
+      @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4, @z = x1, y1, x2, y2, x3, y3, x4, y4, z
       
       self.color = c
       add
@@ -26,6 +26,11 @@ module Ruby2D
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
+    end
+
+    def z=(z)
+      @z = z
+      Application.z_sort
     end
     
     private
