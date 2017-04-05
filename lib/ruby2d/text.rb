@@ -5,9 +5,9 @@ module Ruby2D
     include Renderable
     
     attr_accessor :x, :y, :data
-    attr_reader :text, :size, :width, :height, :font, :color
+    attr_reader :text, :size, :width, :height, :font, :color, :z
     
-    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white")
+    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white", z=0)
       
       # if File.exists? font
         @font = font
@@ -16,7 +16,7 @@ module Ruby2D
       # end
       
       @type_id = 5
-      @x, @y, @size = x, y, size
+      @x, @y, @z, @size = x, y, z, size
       @text = text.to_s
       self.color = c
       init
@@ -30,6 +30,11 @@ module Ruby2D
     
     def color=(c)
       @color = Color.new(c)
+    end
+
+    def z=(z)
+      @z = z
+      Application.z_sort
     end
     
     private

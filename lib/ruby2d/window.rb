@@ -4,7 +4,7 @@ module Ruby2D
   class Window
     
     attr_reader :objects
-    attr_accessor :mouse_x, :mouse_y, :frames, :fps
+    attr_accessor :mouse_x, :mouse_y, :frames, :fps, :dirty
     
     def initialize(args = {})
       @title      = args[:title]  || "Ruby 2D"
@@ -27,6 +27,7 @@ module Ruby2D
       @on_controller_proc = Proc.new {}
       @update_proc        = Proc.new {}
       @diagnostics        = false
+      @dirty              = false
     end
     
     def get(sym)
@@ -89,6 +90,11 @@ module Ruby2D
       else
         false
       end
+    end
+
+    def z_sort
+      @objects = @objects.sort_by {|o| o.z }
+      @dirty = false
     end
     
     def clear
@@ -182,6 +188,7 @@ module Ruby2D
     
     def update_callback
       @update_proc.call
+      z_sort if @dirty
     end
     
     private

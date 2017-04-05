@@ -4,15 +4,16 @@ module Ruby2D
   class Sprite
     
     attr_accessor :x, :y, :clip_x, :clip_y, :clip_w, :clip_h, :data
+    attr_reader :z
     
-    def initialize(x, y, path)
+    def initialize(x, y, path, z=0)
       
       # unless File.exists? path
       #   raise Error, "Cannot find image file `#{path}`"
       # end
       
       @type_id = 4
-      @x, @y, @path = x, y, path
+      @x, @y, @z, @path = x, y, z, path
       @clip_x, @clip_y, @clip_w, @clip_h = 0, 0, 0, 0
       @default = nil
       @animations = {}
@@ -61,6 +62,11 @@ module Ruby2D
         Application.remove(self)
       end
     end
+
+    def z=(z)
+      @z = z
+      Application.z_sort
+    end    
     
     private
     

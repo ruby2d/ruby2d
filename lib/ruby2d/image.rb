@@ -5,9 +5,9 @@ module Ruby2D
     include Renderable
 
     attr_accessor :x, :y, :width, :height, :data
-    attr_reader :path, :color
+    attr_reader :path, :color, :z
     
-    def initialize(x, y, path)
+    def initialize(x, y, path, z=0)
       
       # TODO: Check if file exists
       #   `File.exists?` is not available in MRuby
@@ -17,7 +17,7 @@ module Ruby2D
       #     end
       
       @type_id = 3
-      @x, @y, @path = x, y, path
+      @x, @y, @z, @path = x, y, z, path
       @color = Color.new([1, 1, 1, 1])
       init(path)
       add
@@ -26,5 +26,11 @@ module Ruby2D
     def color=(c)
       @color = Color.new(c)
     end
+
+    def z=(z)
+      @z = z
+      Application.z_sort
+    end
+        
   end
 end
