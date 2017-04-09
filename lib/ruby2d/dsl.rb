@@ -9,8 +9,8 @@ module Ruby2D::DSL
     Application.set(opts)
   end
   
-  def on(args = {}, &proc)
-    Application.on(args, &proc)
+  def on(event, &proc)
+    Application.on(event, &proc)
   end
   
   def on_key(&proc)

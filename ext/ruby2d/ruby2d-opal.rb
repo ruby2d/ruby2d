@@ -17,25 +17,69 @@ const $R2D_SPRITE   = 4;
 const $R2D_TEXT     = 5;
 
 
-function on_key(e, key) {
-  switch (e) {
-    case S2D.KEYDOWN:
-      #{$R2D_WINDOW.key_down_callback(`key`)};
+function on_key(e) {
+  
+  switch (e.type) {
+    case S2D.KEY_DOWN:
+      #{type = :down};
       break;
-    
-    case S2D.KEY:
-      #{$R2D_WINDOW.key_callback(`key`)};
+    case S2D.KEY_HELD:
+      #{type = :held};
       break;
-    
-    case S2D.KEYUP:
-      #{$R2D_WINDOW.key_up_callback(`key`)};
+    case S2D.KEY_UP:
+      #{type = :up};
       break;
   }
+  
+  #{$R2D_WINDOW.key_callback(type, `e.key`)};
 }
 
 
-function on_mouse(x, y) {
-  #{$R2D_WINDOW.mouse_callback("any", `x`, `y`)};
+function on_mouse(e) {
+  
+  #{direction = nil}
+  #{button    = nil}
+  
+  switch (e.type) {
+    case S2D.MOUSE_DOWN:
+      #{type = :down};
+      break;
+    case S2D.MOUSE_UP:
+      #{type = :up};
+      break;
+    case S2D.MOUSE_SCROLL:
+      #{type = :scroll};
+      #{direction} = e.direction == S2D.MOUSE_SCROLL_NORMAL ? #{:normal} : #{:inverted};
+      break;
+    case S2D.MOUSE_MOVE:
+      #{type = :move};
+      break;
+  }
+  
+  if (e.type == S2D.MOUSE_DOWN || e.type == S2D.MOUSE_UP) {
+    switch (e.button) {
+      case S2D.MOUSE_LEFT:
+        #{button = :left};
+        break;
+      case S2D.MOUSE_MIDDLE:
+        #{button = :middle};
+        break;
+      case S2D.MOUSE_RIGHT:
+        #{button = :right};
+        break;
+      case S2D.MOUSE_X1:
+        #{button = :x1};
+        break;
+      case S2D.MOUSE_X2:
+        #{button = :x2};
+        break;
+    }
+  }
+  
+  #{$R2D_WINDOW.mouse_callback(
+    type, button, direction,
+    `e.x`, `e.y`, `e.delta_x`, `e.delta_y`
+  )};
 }
 
 

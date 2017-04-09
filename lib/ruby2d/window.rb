@@ -6,27 +6,32 @@ module Ruby2D
     attr_reader :objects
     attr_accessor :mouse_x, :mouse_y, :frames, :fps
     
+    MouseEvent      = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
+    KeyEvent        = Struct.new(:type, :key)
+    ControllerEvent = Struct.new(:which, :type, :axis, :value, :button)
+    
     def initialize(args = {})
-      @title      = args[:title]  || "Ruby 2D"
-      @background = Color.new([0.0, 0.0, 0.0, 1.0])
-      @width      = args[:width]  || 640
-      @height     = args[:height] || 480
+      @title       = args[:title]  || "Ruby 2D"
+      @background  = Color.new([0.0, 0.0, 0.0, 1.0])
+      @width       = args[:width]  || 640
+      @height      = args[:height] || 480
       @viewport_width, @viewport_height = nil, nil
-      @resizable  = false
-      @borderless = false
-      @fullscreen = false
-      @highdpi    = false
-      @frames     = 0
-      @fps_cap    = args[:fps] || 60
-      @fps        = @fps_cap
-      @vsync      = args[:vsync] || true
-      @mouse_x = 0; @mouse_y = 0
-      @objects    = []
-      @keys_down, @keys, @keys_up, @mouse, @controller = {}, {}, {}, {}, {}
-      @on_key_proc        = Proc.new {}
-      @on_controller_proc = Proc.new {}
-      @update_proc        = Proc.new {}
-      @diagnostics        = false
+      @resizable   = false
+      @borderless  = false
+      @fullscreen  = false
+      @highdpi     = false
+      @frames      = 0
+      @fps_cap     = args[:fps]    || 60
+      @fps         = @fps_cap
+      @vsync       = args[:vsync]  || true
+      @mouse_x, @mouse_y = 0, 0
+      @objects     = []
+      @key, @key_down, @key_held, @key_up = [], [], [], []
+      @mouse, @mouse_down, @mouse_up, @mouse_scroll, @mouse_move = [], [], [], [], []
+      @controller, @controller_axis = [], []
+      @controller_button_down, @controller_button_up = [], []
+      @update_proc = Proc.new {}
+      @diagnostics = false
     end
     
     def get(sym)
@@ -100,84 +105,121 @@ module Ruby2D
       true
     end
     
-    # def on(mouse: nil, key: nil, key_up: nil, key_down: nil, controller: nil, &proc)
-    def on(args = {}, &proc)
-      mouse      = args[:mouse]
-      key        = args[:key]
-      key_up     = args[:key_up]
-      key_down   = args[:key_down]
-      controller = args[:controller]
-      
-      unless mouse.nil?
-        reg_mouse(mouse, &proc)
-      end
-      
-      unless key_down.nil?
-        reg_key_down(key_down, &proc)
-      end
-      
-      unless key.nil?
-        reg_key(key, &proc)
-      end
-      
-      unless key_up.nil?
-        reg_key_up(key_up, &proc)
-      end
-      
-      unless controller.nil?
-        reg_controller(controller, &proc)
-      end
-    end
-    
-    def mouse_callback(btn, x, y)
-      if @mouse.has_key? 'any'
-        @mouse[btn].call(x, y)
+    def on(event, &proc)
+      case event
+      when :key
+        @key.push(proc)
+      when :key_down
+        @key_down.push(proc)
+      when :key_held
+        @key_held.push(proc)
+      when :key_up
+        @key_up.push(proc)
+      when :mouse
+        @mouse.push(proc)
+      when :mouse_up
+        @mouse_up.push(proc)
+      when :mouse_down
+        @mouse_down.push(proc)
+      when :mouse_scroll
+        @mouse_scroll.push(proc)
+      when :mouse_move
+        @mouse_move.push(proc)
+      when :controller
+        @controller.push(proc)
+      when :controller_axis
+        @controller_axis.push(proc)
+      when :controller_button
+        @controller_button.push(proc)
       end
     end
     
-    def on_key(&proc)
-      @on_key_proc = proc
-      true
-    end
-    
-    def key_down_callback(key)
+    def key_callback(type, key)
+      # puts "===", "type: #{type}", "key: #{key}"
+      
       key = key.downcase
-      if @keys_down.has_key? 'any'
-        @keys_down['any'].call
+      
+      # All key events
+      @key.each do |e|
+        e.call(KeyEvent.new(type, key))
       end
-      if @keys_down.has_key? key
-        @keys_down[key].call
-      end
-    end
-    
-    def key_callback(key)
-      key = key.downcase
-      @on_key_proc.call(key)
-      if @keys.has_key? 'any'
-        @keys['any'].call
-      end
-      if @keys.has_key? key
-        @keys[key].call
-      end
-    end
-    
-    def key_up_callback(key)
-      key = key.downcase
-      if @keys_up.has_key? 'any'
-        @keys_up['any'].call
-      end
-      if @keys_up.has_key? key
-        @keys_up[key].call
+      
+      case type
+      # When key is pressed, fired once
+      when :down
+        @key_down.each do |e|
+          e.call(KeyEvent.new(type, key))
+        end
+      # When key is being held down, fired every frame
+      when :held
+        @key_held.each do |e|
+          e.call(KeyEvent.new(type, key))
+        end
+      # When key released, fired once
+      when :up
+        @key_up.each do |e|
+          e.call(KeyEvent.new(type, key))
+        end
       end
     end
     
-    def on_controller(&proc)
-      @on_controller_proc = proc
-      true
+    def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
+      # Convert to symbols (see MRuby bug in native extension)
+      button    = button.to_sym    unless button    == nil
+      direction = direction.to_sym unless direction == nil
+      
+      # All mouse events
+      @mouse.each do |e|
+        e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
+      end
+      
+      case type
+      # When mouse button pressed
+      when :down
+        @mouse_down.each do |e|
+          e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
+        end
+      # When mouse button released
+      when :up
+        @mouse_up.each do |e|
+          e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
+        end
+      # When mouse motion / movement
+      when :scroll
+        @mouse_scroll.each do |e|
+          e.call(MouseEvent.new(type, nil, direction, nil, nil, delta_x, delta_y))
+        end
+      # When mouse scrolling, wheel or trackpad
+      when :move
+        @mouse_move.each do |e|
+          e.call(MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y))
+        end
+      end
     end
     
-    def controller_callback(which, is_axis, axis, val, is_btn, btn, pressed)
-      @on_controller_proc.call(which, is_axis, axis, val, is_btn, btn, pressed)
+    def controller_callback(which, type, axis, value, button)
+      # All controller events
+      @controller.each do |e|
+        e.call(ControllerEvent.new(which, type, axis, value, button))
+      end
+      
+      case type
+      # When controller axis motion, like analog sticks
+      when :axis
+        @controller_axis.each do |e|
+          e.call(ControllerEvent.new(which, type, axis, value, nil))
+        end
+      # When controller button is pressed
+      when :button_down
+        @controller_button_down.each do |e|
+          e.call(ControllerEvent.new(which, type, nil, nil, button))
+        end
+      # When controller button is released
+      when :button_up
+        @controller_button_up.each do |e|
+          e.call(ControllerEvent.new(which, type, nil, nil, button))
+        end
+      end
     end
     
     def update_callback
@@ -193,36 +235,6 @@ module Ruby2D
       else
         false
       end
-    end
-    
-    # Register key string with proc
-    def reg_key_down(key, &proc)
-      @keys_down[key] = proc
-      true
-    end
-    
-    # Register key string with proc
-    def reg_key(key, &proc)
-      @keys[key] = proc
-      true
-    end
-    
-    # Register key string with proc
-    def reg_key_up(key, &proc)
-      @keys_up[key] = proc
-      true
-    end
-    
-    # Register mouse button string with proc
-    def reg_mouse(btn, &proc)
-      @mouse[btn] = proc
-      true
-    end
-    
-    # Register controller string with proc
-    def reg_controller(event, &proc)
-      @controller[event] = proc
-      true
     end
     
   end
