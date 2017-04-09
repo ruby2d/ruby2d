@@ -203,12 +203,11 @@ updated_text.remove
 updated_text.add
 UPDATED_TEXT_OPTIONS = "of various size".split(" ")
 
-on key: 'escape' do
-  close
+on :key_down do |event|
+  close if event.key == 'escape'
 end
 
-on mouse: 'any' do |x, y|
-  puts "Mouse down at: #{x}, #{y}"
+on :mouse_down do
   pointer_outline.x = (get :mouse_x) - 9
   pointer_outline.y = (get :mouse_y) - 11
   flash = 2

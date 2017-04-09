@@ -59,10 +59,12 @@
   #define r_data_wrap_struct(name, data)  mrb_obj_value(Data_Wrap_Struct(mrb, mrb->object_class, &name##_data_type, data))
   #define r_data_get_struct(self, var, mrb_type, rb_type, data)  Data_Get_Struct(mrb, r_iv_get(self, var), mrb_type, data)
   #define r_define_module(name)  mrb_module_get(mrb, name)
-  #define r_define_class(module, name)  mrb_class_get_under(mrb, module, name);
+  #define r_define_class(module, name)  mrb_class_get_under(mrb, module, name)
   #define r_define_method(class, name, function, args)  mrb_define_method(mrb, class, name, function, args)
   #define r_args_none  (MRB_ARGS_NONE())
   #define r_args_req(n)  MRB_ARGS_REQ(n)
+  // Helpers
+  #define r_char_to_sym(str)  mrb_check_intern_cstr(mrb, str)
 #else
   // Ruby
   #define R_VAL  VALUE
@@ -79,10 +81,12 @@
   #define r_data_wrap_struct(name, data)  Data_Wrap_Struct(rb_cObject, NULL, (free_##name), data)
   #define r_data_get_struct(self, var, mrb_type, rb_type, data)  Data_Get_Struct(r_iv_get(self, var), rb_type, data)
   #define r_define_module(name)  rb_define_module(name)
-  #define r_define_class(module, name)  rb_define_class_under(module, name, rb_cObject);
+  #define r_define_class(module, name)  rb_define_class_under(module, name, rb_cObject)
   #define r_define_method(class, name, function, args)  rb_define_method(class, name, function, args)
   #define r_args_none  0
   #define r_args_req(n)  n
+  // Helpers
+  #define r_char_to_sym(str)  ID2SYM(rb_intern(str))
 #endif
 
 // @type_id values for rendering
@@ -429,39 +433,106 @@ static void free_music(S2D_Music *mus) {
 /*
  * Simple 2D `on_key` input callback function
  */
-static void on_key(S2D_Event e, const char *key) {
-  switch (e) {
-    case S2D_KEYDOWN:
-      r_funcall(ruby2d_window, "key_down_callback", 1, r_str_new(key));
+static void on_key(S2D_Event e) {
+  
+  R_VAL type;
+  
+  switch (e.type) {
+    case S2D_KEY_DOWN:
+      type = r_char_to_sym("down");
       break;
-    
-    case S2D_KEY:
-      r_funcall(ruby2d_window, "key_callback", 1, r_str_new(key));
+    case S2D_KEY_HELD:
+      type = r_char_to_sym("held");
       break;
-    
-    case S2D_KEYUP:
-      r_funcall(ruby2d_window, "key_up_callback", 1, r_str_new(key));
+    case S2D_KEY_UP:
+      type = r_char_to_sym("up");
       break;
   }
+  
+  r_funcall(ruby2d_window, "key_callback", 2, type, r_str_new(e.key));
 }
 
 
 /*
  * Simple 2D `on_mouse` input callback function
  */
-void on_mouse(int x, int y) {
-  r_funcall(ruby2d_window, "mouse_callback", 3, r_str_new("any"), INT2NUM(x), INT2NUM(y));
+void on_mouse(S2D_Event e) {
+  
+  R_VAL type = R_NIL; R_VAL button = R_NIL; R_VAL direction = R_NIL;
+  
+  switch (e.type) {
+    case S2D_MOUSE_DOWN:
+      // type, button, x, y
+      type = r_char_to_sym("down");
+      break;
+    case S2D_MOUSE_UP:
+      // type, button, x, y
+      type = r_char_to_sym("up");
+      break;
+    case S2D_MOUSE_SCROLL:
+      // type, direction, delta_x, delta_y
+      type = r_char_to_sym("scroll");
+      direction = e.direction == S2D_MOUSE_SCROLL_NORMAL ?
+        r_str_new("normal") : r_str_new("inverted");
+      break;
+    case S2D_MOUSE_MOVE:
+      // type, x, y, delta_x, delta_y
+      type = r_char_to_sym("move");
+      break;
+  }
+  
+  if (e.type == S2D_MOUSE_DOWN || e.type == S2D_MOUSE_UP) {
+    switch (e.button) {
+      case S2D_MOUSE_LEFT:
+        button = r_str_new("left");
+        break;
+      case S2D_MOUSE_MIDDLE:
+        button = r_str_new("middle");
+        break;
+      case S2D_MOUSE_RIGHT:
+        button = r_str_new("right");
+        break;
+      case S2D_MOUSE_X1:
+        button = r_str_new("x1");
+        break;
+      case S2D_MOUSE_X2:
+        button = r_str_new("x2");
+        break;
+    }
+  }
+  
+  // Bug in MRuby: If `button` or `direction` are symbols (created with
+  // r_char_to_sym), they will always both be `nil`. Use `r_str_new` for now.
+  
+  r_funcall(
+    ruby2d_window, "mouse_callback", 7, type, button, direction,
+    INT2NUM(e.x), INT2NUM(e.y), INT2NUM(e.delta_x), INT2NUM(e.delta_y)
+  );
 }
 
 
 /*
  * Simple 2D `on_controller` input callback function
  */
-static void on_controller(int which, bool is_axis, int axis, int val, bool is_btn, int btn, bool pressed) {
-  r_funcall(ruby2d_window, "controller_callback", 7,
-    INT2NUM(which),
-    is_axis ? R_TRUE : R_FALSE, INT2NUM(axis), INT2NUM(val),
-    is_btn  ? R_TRUE : R_FALSE, INT2NUM(btn), pressed ? R_TRUE : R_FALSE
+static void on_controller(S2D_Event e) {
+  
+  R_VAL type = R_NIL;
+  
+  switch (e.type) {
+    case S2D_AXIS:
+      type = r_char_to_sym("axis");
+      break;
+    case S2D_BUTTON_DOWN:
+      type = r_char_to_sym("button_down");
+      break;
+    case S2D_BUTTON_UP:
+      type = r_char_to_sym("button_up");
+      break;
+  }
+  
+  r_funcall(
+    ruby2d_window, "controller_callback", 5, INT2NUM(e.which), type,
+    INT2NUM(e.axis), INT2NUM(e.value), INT2NUM(e.button)
   );
 }
 

@@ -12,8 +12,8 @@ module Ruby2D::Application
       @@window.set(opts)
     end
     
-    def on(args = {}, &proc)
-      @@window.on(args, &proc)
+    def on(event, &proc)
+      @@window.on(event, &proc)
     end
     
     def on_key(&proc)
