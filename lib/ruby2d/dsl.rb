@@ -13,12 +13,8 @@ module Ruby2D::DSL
     Application.on(event, &proc)
   end
   
-  def on_key(&proc)
-    Application.on_key(&proc)
-  end
-  
-  def on_controller(&proc)
-    Application.on_controller(&proc)
+  def off(event_descriptor)
+    Application.off(event_descriptor)
   end
   
   def update(&proc)
