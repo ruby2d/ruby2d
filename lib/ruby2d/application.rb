@@ -16,12 +16,8 @@ module Ruby2D::Application
       @@window.on(event, &proc)
     end
     
-    def on_key(&proc)
-      @@window.on_key(&proc)
-    end
-    
-    def on_controller(&proc)
-      @@window.on_controller(&proc)
+    def off(event_descriptor)
+      @@window.off(event_descriptor)
     end
     
     def add(o)

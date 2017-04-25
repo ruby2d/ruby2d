@@ -9,31 +9,48 @@ module Ruby2D
     MouseEvent      = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
     KeyEvent        = Struct.new(:type, :key)
     ControllerEvent = Struct.new(:which, :type, :axis, :value, :button)
-    
+    EventDescriptor = Struct.new(:type, :id)
+
     def initialize(args = {})
-      @title       = args[:title]  || "Ruby 2D"
-      @background  = Color.new([0.0, 0.0, 0.0, 1.0])
-      @width       = args[:width]  || 640
-      @height      = args[:height] || 480
+      @title      = args[:title]  || "Ruby 2D"
+      @background = Color.new([0.0, 0.0, 0.0, 1.0])
+      @width      = args[:width]  || 640
+      @height     = args[:height] || 480
       @viewport_width, @viewport_height = nil, nil
-      @resizable   = false
-      @borderless  = false
-      @fullscreen  = false
-      @highdpi     = false
-      @frames      = 0
-      @fps_cap     = args[:fps]    || 60
-      @fps         = @fps_cap
-      @vsync       = args[:vsync]  || true
+      @resizable  = false
+      @borderless = false
+      @fullscreen = false
+      @highdpi    = false
+      @frames     = 0
+      @fps_cap    = args[:fps]    || 60
+      @fps        = @fps_cap
+      @vsync      = args[:vsync]  || true
       @mouse_x, @mouse_y = 0, 0
-      @objects     = []
-      @key, @key_down, @key_held, @key_up = [], [], [], []
-      @mouse, @mouse_down, @mouse_up, @mouse_scroll, @mouse_move = [], [], [], [], []
-      @controller, @controller_axis = [], []
-      @controller_button_down, @controller_button_up = [], []
+      @objects    = []
+      @event_key  = 0
+      @events     = {
+        key: {},
+        key_down: {},
+        key_held: {},
+        key_up: {},
+        mouse: {},
+        mouse_up: {},
+        mouse_down: {},
+        mouse_scroll: {},
+        mouse_move: {},
+        controller: {},
+        controller_axis: {},
+        controller_button_down: {},
+        controller_button_up: {}
+      }
       @update_proc = Proc.new {}
       @diagnostics = false
     end
     
+    def new_event_key
+      @event_key = @event_key.next
+    end
+
     def get(sym)
       case sym
       when :window;          self
@@ -106,58 +123,39 @@ module Ruby2D
     end
     
     def on(event, &proc)
-      case event
-      when :key
-        @key.push(proc)
-      when :key_down
-        @key_down.push(proc)
-      when :key_held
-        @key_held.push(proc)
-      when :key_up
-        @key_up.push(proc)
-      when :mouse
-        @mouse.push(proc)
-      when :mouse_up
-        @mouse_up.push(proc)
-      when :mouse_down
-        @mouse_down.push(proc)
-      when :mouse_scroll
-        @mouse_scroll.push(proc)
-      when :mouse_move
-        @mouse_move.push(proc)
-      when :controller
-        @controller.push(proc)
-      when :controller_axis
-        @controller_axis.push(proc)
-      when :controller_button
-        @controller_button.push(proc)
-      end
+      event_id = new_event_key
+      @events[event][event_id] = proc
+      EventDescriptor.new(event, event_id)
     end
     
+    def off(event_descriptor)
+      @events[event_descriptor.type].delete(event_descriptor.id)
+    end
+
     def key_callback(type, key)
       # puts "===", "type: #{type}", "key: #{key}"
       
       key = key.downcase
       
       # All key events
-      @key.each do |e|
+      @events[:key].each do |id, e|
         e.call(KeyEvent.new(type, key))
       end
       
       case type
       # When key is pressed, fired once
       when :down
-        @key_down.each do |e|
+        @events[:key_down].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
       # When key is being held down, fired every frame
       when :held
-        @key_held.each do |e|
+        @events[:key_held].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
       # When key released, fired once
       when :up
-        @key_up.each do |e|
+        @events[:key_up].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
       end
@@ -169,29 +167,29 @@ module Ruby2D
       direction = direction.to_sym unless direction == nil
       
       # All mouse events
-      @mouse.each do |e|
+      @events[:mouse].each do |id, e|
         e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
       end
       
       case type
       # When mouse button pressed
       when :down
-        @mouse_down.each do |e|
+        @events[:mouse_down].each do |id, e|
           e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
         end
       # When mouse button released
       when :up
-        @mouse_up.each do |e|
+        @events[:mouse_up].each do |id, e|
           e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
         end
       # When mouse motion / movement
       when :scroll
-        @mouse_scroll.each do |e|
+        @events[:mouse_scroll].each do |id, e|
           e.call(MouseEvent.new(type, nil, direction, nil, nil, delta_x, delta_y))
         end
       # When mouse scrolling, wheel or trackpad
       when :move
-        @mouse_move.each do |e|
+        @events[:mouse_move].each do |id, e|
           e.call(MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y))
         end
       end
@@ -199,24 +197,24 @@ module Ruby2D
     
     def controller_callback(which, type, axis, value, button)
       # All controller events
-      @controller.each do |e|
+      @events[:controller].each do |id, e|
         e.call(ControllerEvent.new(which, type, axis, value, button))
       end
       
       case type
       # When controller axis motion, like analog sticks
       when :axis
-        @controller_axis.each do |e|
+        @events[:controller_axis].each do |id, e|
           e.call(ControllerEvent.new(which, type, axis, value, nil))
         end
       # When controller button is pressed
       when :button_down
-        @controller_button_down.each do |e|
+        @events[:controller_button_down].each do |id, e|
           e.call(ControllerEvent.new(which, type, nil, nil, button))
         end
       # When controller button is released
       when :button_up
-        @controller_button_up.each do |e|
+        @events[:controller_button_up].each do |id, e|
           e.call(ControllerEvent.new(which, type, nil, nil, button))
         end
       end
