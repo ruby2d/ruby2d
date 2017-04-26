@@ -7,7 +7,7 @@ module Ruby2D
     attr_accessor :x, :y, :width, :height, :data
     attr_reader :path, :color
     
-    def initialize(x, y, path)
+    def initialize(x, y, path, z=0)
       
       unless RUBY_ENGINE == 'opal'
         unless File.exists? path
@@ -17,6 +17,7 @@ module Ruby2D
       
       @type_id = 3
       @x, @y, @path = x, y, path
+      @z = z
       @color = Color.new([1, 1, 1, 1])
       init(path)
       add

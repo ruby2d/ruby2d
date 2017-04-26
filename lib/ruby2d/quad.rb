@@ -15,9 +15,10 @@ module Ruby2D
     
     attr_reader :color
     
-    def initialize(x1=0, y1=0, x2=100, y2=0, x3=100, y3=100, x4=100, y4=100, c='white')
+    def initialize(x1=0, y1=0, x2=100, y2=0, x3=100, y3=100, x4=100, y4=100, c='white', z=0)
       @type_id = 2
       @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4 = x1, y1, x2, y2, x3, y3, x4, y4
+      @z = z
       
       self.color = c
       add

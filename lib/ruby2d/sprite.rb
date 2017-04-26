@@ -4,9 +4,10 @@ module Ruby2D
   class Sprite
     
     attr_accessor :x, :y, :clip_x, :clip_y, :clip_w, :clip_h, :data
-    
-    def initialize(x, y, path)
-      
+    attr_reader :z
+
+    def initialize(x, y, path, z=0)
+
       # unless File.exists? path
       #   raise Error, "Cannot find image file `#{path}`"
       # end
@@ -19,7 +20,8 @@ module Ruby2D
       @current_animation = nil
       @current_frame = 0
       @current_frame_time = 0
-      
+      @z = z
+
       init(path)
       if Module.const_defined? :DSL
         Application.add(self)
