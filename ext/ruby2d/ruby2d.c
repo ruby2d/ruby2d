@@ -161,6 +161,8 @@ static R_VAL ruby2d_image_init(R_VAL self, R_VAL path) {
   sprintf(S2D_msg, "Init image: %s", RSTRING_PTR(path));
   S2D_Log(S2D_msg, S2D_INFO);
   S2D_Image *img = S2D_CreateImage(RSTRING_PTR(path));
+  r_iv_set(self, "@width", INT2NUM(img->width));
+  r_iv_set(self, "@height", INT2NUM(img->height));
   r_iv_set(self, "@data", r_data_wrap_struct(image, img));
   return R_NIL;
 }
