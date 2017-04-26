@@ -176,7 +176,14 @@ function render() {
 module Ruby2D
   class Image
     def init(path)
-      `#{self}.data = S2D.CreateImage(path);`
+      `#{self}.data = S2D.CreateImage(path, function() {
+        if (#{@width} == Opal.nil) {
+          #{@width} = #{self}.data.width;
+        }
+        if (#{@height} == Opal.nil) {
+          #{@height} = #{self}.data.height;
+        }
+      });`
     end
   end
   
