@@ -230,7 +230,14 @@ module Ruby2D
     
     def add_object(o)
       if !@objects.include?(o)
-        @objects.push(o)
+        index = @objects.index do |object|
+          object.z > o.z
+        end
+        if index
+          @objects.insert(index, o)
+        else
+          @objects.push(o)
+        end
         true
       else
         false

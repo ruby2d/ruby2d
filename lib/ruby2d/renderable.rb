@@ -1,5 +1,13 @@
 module Ruby2D
   module Renderable
+    attr_reader :z
+
+    def z=(z)
+      remove
+      @z = z
+      add
+    end
+
     def add
       if Module.const_defined? :DSL
         Application.add(self)

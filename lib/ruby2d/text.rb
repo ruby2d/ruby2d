@@ -7,7 +7,7 @@ module Ruby2D
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
     
-    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c="white")
+    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c='white', z=0)
       
       # if File.exists? font
         @font = font
@@ -17,6 +17,7 @@ module Ruby2D
       
       @type_id = 5
       @x, @y, @size = x, y, size
+      @z = z
       @text = text.to_s
       self.color = c
       init
