@@ -11,5 +11,13 @@ module Ruby2D
         Application.remove(self)
       end
     end
+    
+    def opacity
+      self.color.opacity
+    end
+    
+    def opacity=(val)
+      self.color.opacity = val
+    end
   end
 end

@@ -15,7 +15,9 @@ module Ruby2D
       def length
         @colors.length
       end
-
+      
+      def opacity; @colors[0].opacity end
+      
       def opacity=(opacity)
         @colors.each do |color|
           color.opacity = opacity
@@ -95,7 +97,9 @@ module Ruby2D
         Color.new(input)
       end
     end
-
+    
+    def opacity; @a end
+    
     def opacity=(opacity)
       @a = opacity
     end
