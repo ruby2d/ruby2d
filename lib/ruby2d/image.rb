@@ -9,12 +9,11 @@ module Ruby2D
     
     def initialize(x, y, path)
       
-      # TODO: Check if file exists
-      #   `File.exists?` is not available in MRuby
-      #   Ideally would do:
-      #     unless File.exists? path
-      #       raise Error, "Cannot find image file `#{path}`"
-      #     end
+      unless RUBY_ENGINE == 'opal'
+        unless File.exists? path
+          raise Error, "Cannot find image file `#{path}`"
+        end
+      end
       
       @type_id = 3
       @x, @y, @path = x, y, path

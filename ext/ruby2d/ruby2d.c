@@ -148,6 +148,18 @@ static void free_window() {
 
 
 /*
+ * File#exists? for MRuby
+ */
+#if MRUBY
+static R_VAL file_exists(mrb_state* mrb, R_VAL self) {
+  mrb_value path;
+  mrb_get_args(mrb, "o", &path);
+  return S2D_FileExists(RSTRING_PTR(path)) ? R_TRUE : R_FALSE;
+}
+#endif
+
+
+/*
  * Ruby2D::Image#init
  * Initialize image structure data
  */
@@ -793,6 +805,11 @@ int main(void) {
   
   // Load the Ruby 2D library
   mrb_load_irep(mrb, ruby2d_lib);
+  
+  // Add missing MRuby classes, methods
+  R_CLASS file_class = mrb_define_class(mrb, "File", mrb->object_class);
+  mrb_define_class_method(mrb, file_class, "exists?", file_exists, r_args_req(1));
+  
 #else
 /*
  * Ruby C extension init
@@ -866,6 +883,9 @@ void Init_ruby2d() {
 #if MRUBY
   // Load the Ruby 2D app
   mrb_load_irep(mrb, ruby2d_app);
+  
+  // If an exception, print error
+  if (mrb->exc) mrb_print_error(mrb);
   
   // Close the MRuby environment
   mrb_close(mrb);
