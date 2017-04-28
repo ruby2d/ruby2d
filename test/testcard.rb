@@ -179,6 +179,9 @@ flash = 0
 opacity_square = Square.new(500, 255, 50, ["red", "green", "blue", "yellow"])
 time_start     = Time.now
 
+# Default font for text
+Text.new(150, 470, "Default font", 20)
+
 # Text size
 created_text = Text.new(10, 270, "Created text", 20, font)
 created_text_background = Rectangle.new(
