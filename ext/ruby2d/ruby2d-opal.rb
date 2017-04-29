@@ -12,9 +12,10 @@ $R2D_WINDOW = nil
 // @type_id values for rendering
 const $R2D_TRIANGLE = 1;
 const $R2D_QUAD     = 2;
-const $R2D_IMAGE    = 3;
-const $R2D_SPRITE   = 4;
-const $R2D_TEXT     = 5;
+const $R2D_LINE     = 3;
+const $R2D_IMAGE    = 4;
+const $R2D_SPRITE   = 5;
+const $R2D_TEXT     = 6;
 
 
 function on_key(e) {
@@ -123,6 +124,16 @@ function render() {
           el.x2, el.y2, el.c2.r, el.c2.g, el.c2.b, el.c2.a,
           el.x3, el.y3, el.c3.r, el.c3.g, el.c3.b, el.c3.a,
           el.x4, el.y4, el.c4.r, el.c4.g, el.c4.b, el.c4.a
+        );
+        break;
+      
+      case $R2D_LINE:
+        S2D.DrawLine(
+          el.x1, el.y1, el.x2, el.y2, el.width,
+          el.c1.r, el.c1.g, el.c1.b, el.c1.a,
+          el.c2.r, el.c2.g, el.c2.b, el.c2.a,
+          el.c3.r, el.c3.g, el.c3.b, el.c3.a,
+          el.c4.r, el.c4.g, el.c4.b, el.c4.a
         );
         break;
       

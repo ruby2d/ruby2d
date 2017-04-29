@@ -136,18 +136,41 @@ Quad.new(
   ]
 )
 
+# Lines
+Line.new(
+  354, 204, 397, 247,
+  11,
+  [
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1]
+  ]
+);
+
+Line.new(
+  395, 205, 355, 245,
+  15,
+  [
+    [1, 0, 0, 0.5],
+    [0, 1, 0, 0.5],
+    [0, 0, 1, 0.5],
+    [1, 0, 1, 0.5]
+  ]
+);
+
 # Images
 Image.new(590, 180, "#{media}/image.png")
 Image.new(590, 290, "#{media}/image.jpg")
 Image.new(590, 400, "#{media}/image.bmp")
-img_r = Image.new(350, 200, "#{media}/colors.png")
-img_r.width, img_r.height = 50, 50
+img_r = Image.new(400, 200, "#{media}/colors.png")
+img_r.width, img_r.height = 50, 25
 img_r.color = [1.0, 0.3, 0.3, 1.0]
-img_g = Image.new(400, 200, "#{media}/colors.png")
-img_g.width, img_g.height = 50, 50
+img_g = Image.new(400, 225, "#{media}/colors.png")
+img_g.width, img_g.height = 25, 25
 img_g.color = [0.3, 1.0, 0.3, 1.0]
-img_b = Image.new(450, 200, "#{media}/colors.png")
-img_b.width, img_b.height = 50, 50
+img_b = Image.new(425, 225, "#{media}/colors.png")
+img_b.width, img_b.height = 25, 25
 img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
@@ -162,7 +185,7 @@ txt_b.color = [0.0, 0.0, 1.0, 1.0]
 fps = Text.new(10, 470, "", 20, font)
 
 # Sprites
-s1 = Sprite.new(500, 200, "#{media}/sprite_sheet.png")
+s1 = Sprite.new(450, 200, "#{media}/sprite_sheet.png")
 s1.add(forwards: [
   [  0, 0, 50, 50, 30],
   [ 50, 0, 50, 50, 40],
@@ -176,7 +199,7 @@ pointer_outline = Square.new(0, 0, 18, [0, 1, 0, 0])
 flash = 0
 
 # Updating opacity
-opacity_square = Square.new(500, 255, 50, ["red", "green", "blue", "yellow"])
+opacity_square = Square.new(500, 200, 50, ["red", "green", "blue", "yellow"])
 time_start     = Time.now
 
 # Text size
