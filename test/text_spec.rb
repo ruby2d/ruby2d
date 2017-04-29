@@ -6,10 +6,15 @@ RSpec.describe Ruby2D::Text do
     it "raises exception if font file doesn't exist" do
       expect { Text.new(font: "bad_font.ttf") }.to raise_error(Ruby2D::Error)
     end
+
+    it "uses the system default font if one is not provided" do
+      t = Text.new
+      expect(t.font).to eq(Font.default)
+    end
   end
 
   describe "#text=" do
-    it 'maps Time to string' do
+    it "maps Time to string" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = Time.new(1, 1, 1, 1, 1, 1, 1)
       expect(t.text).to eq("0001-01-01 01:01:01 +0000")
