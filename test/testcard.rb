@@ -243,6 +243,9 @@ flash = 0
 
 time_start = Time.now
 
+# Default font for text
+Text.new(x: 150, y: 470, text: "Default font", size: 20)
+
 # Text size
 created_text = Text.new(x: 10, y: 270, text: "Created text", font: font)
 created_text_background = Rectangle.new(

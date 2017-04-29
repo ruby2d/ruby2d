@@ -14,7 +14,7 @@ module Ruby2D
       @text = (opts[:text] || "Hello Ruby!").to_s
       @size = opts[:size] || 20
       @rotate = opts[:rotate] || 0
-      @font = opts[:font]
+      @font = opts[:font] || Font.default
 
       unless RUBY_ENGINE == 'opal'
         unless File.exists? @font

@@ -27,6 +27,7 @@ end
   'triangle',
   'image',
   'sprite',
+  'font',
   'text',
   'sound',
   'music'
