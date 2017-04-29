@@ -15,7 +15,7 @@ module Ruby2D
       #   @font = resolve_path(font)
       # end
       
-      @type_id = 5
+      @type_id = 6
       @x, @y, @size = x, y, size
       @z = z
       @text = text.to_s

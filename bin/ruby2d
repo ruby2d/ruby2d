@@ -21,6 +21,7 @@ end
   'application',
   'dsl',
   'quad',
+  'line',
   'rectangle',
   'square',
   'triangle',

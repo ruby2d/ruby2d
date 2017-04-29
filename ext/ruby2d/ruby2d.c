@@ -92,9 +92,10 @@
 // @type_id values for rendering
 #define R2D_TRIANGLE 1
 #define R2D_QUAD     2
-#define R2D_IMAGE    3
-#define R2D_SPRITE   4
-#define R2D_TEXT     5
+#define R2D_LINE     3
+#define R2D_IMAGE    4
+#define R2D_SPRITE   5
+#define R2D_TEXT     6
 
 // Create the MRuby context
 #if MRUBY
@@ -656,6 +657,42 @@ static void render() {
           
           NUM2DBL(r_iv_get(el, "@x4")),
           NUM2DBL(r_iv_get(el, "@y4")),
+          NUM2DBL(r_iv_get(c4, "@r")),
+          NUM2DBL(r_iv_get(c4, "@g")),
+          NUM2DBL(r_iv_get(c4, "@b")),
+          NUM2DBL(r_iv_get(c4, "@a"))
+        );
+      }
+      break;
+      
+      case R2D_LINE: {
+        R_VAL c1 = r_iv_get(el, "@c1");
+        R_VAL c2 = r_iv_get(el, "@c2");
+        R_VAL c3 = r_iv_get(el, "@c3");
+        R_VAL c4 = r_iv_get(el, "@c4");
+        
+        S2D_DrawLine(
+          NUM2DBL(r_iv_get(el, "@x1")),
+          NUM2DBL(r_iv_get(el, "@y1")),
+          NUM2DBL(r_iv_get(el, "@x2")),
+          NUM2DBL(r_iv_get(el, "@y2")),
+          NUM2DBL(r_iv_get(el, "@width")),
+          
+          NUM2DBL(r_iv_get(c1, "@r")),
+          NUM2DBL(r_iv_get(c1, "@g")),
+          NUM2DBL(r_iv_get(c1, "@b")),
+          NUM2DBL(r_iv_get(c1, "@a")),
+          
+          NUM2DBL(r_iv_get(c2, "@r")),
+          NUM2DBL(r_iv_get(c2, "@g")),
+          NUM2DBL(r_iv_get(c2, "@b")),
+          NUM2DBL(r_iv_get(c2, "@a")),
+          
+          NUM2DBL(r_iv_get(c3, "@r")),
+          NUM2DBL(r_iv_get(c3, "@g")),
+          NUM2DBL(r_iv_get(c3, "@b")),
+          NUM2DBL(r_iv_get(c3, "@a")),
+          
           NUM2DBL(r_iv_get(c4, "@r")),
           NUM2DBL(r_iv_get(c4, "@g")),
           NUM2DBL(r_iv_get(c4, "@b")),

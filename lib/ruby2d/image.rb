@@ -15,7 +15,7 @@ module Ruby2D
         end
       end
       
-      @type_id = 3
+      @type_id = 4
       @x, @y, @path = x, y, path
       @z = z
       @color = Color.new([1, 1, 1, 1])

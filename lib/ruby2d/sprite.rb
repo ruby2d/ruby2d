@@ -12,7 +12,7 @@ module Ruby2D
       #   raise Error, "Cannot find image file `#{path}`"
       # end
       
-      @type_id = 4
+      @type_id = 5
       @x, @y, @path = x, y, path
       @clip_x, @clip_y, @clip_w, @clip_h = 0, 0, 0, 0
       @default = nil
