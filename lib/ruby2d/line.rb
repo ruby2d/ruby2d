@@ -13,14 +13,14 @@ module Ruby2D
       self.color = c
       add
     end
-    
+
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
     end
-    
+
     private
-    
+
     def update_color(c)
       if c.is_a? Color::Set
         if c.length == 4

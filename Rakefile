@@ -88,13 +88,13 @@ namespace :test do
     get_args
     run_mri_test ARGV[1]
   end
-  
+
   desc "Run native test"
   task :native do
     get_args
     run_native_test ARGV[1]
   end
-  
+
   desc "Run web test"
   task :web do
     get_args

@@ -239,16 +239,16 @@ end
 update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
-  
+
   if flash > 0
     pointer_outline.color = [0, 1, 0, 1]
     flash -= 1
   else
     pointer_outline.color = [0, 1, 0, 0]
   end
-  
+
   s1.animate(:forwards)
-  
+
   if (get :frames) % 20 == 0
     fps.text = "FPS: #{(get :fps).round(3)}"
   end

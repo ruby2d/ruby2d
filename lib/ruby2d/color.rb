@@ -15,18 +15,18 @@ module Ruby2D
       def length
         @colors.length
       end
-      
+
       def opacity; @colors[0].opacity end
-      
+
       def opacity=(opacity)
         @colors.each do |color|
           color.opacity = opacity
         end
       end
     end
-    
+
     attr_reader :r, :g, :b, :a
-    
+
     # Based on clrs.cc
     @@colors = {
       'navy'    => '#001F3F',
@@ -49,7 +49,7 @@ module Ruby2D
       'black'   => '#111111',
       'random'  => ''
     }
-    
+
     def initialize(c)
       if !self.class.is_valid? c
         raise Error, "`#{c}` is not a valid color"
@@ -68,19 +68,19 @@ module Ruby2D
         end
       end
     end
-    
+
     # Check if string is a proper hex value
     def self.is_hex?(s)
       # MRuby doesn't support regex, otherwise we'd do:
       #   !(/^#[0-9A-F]{6}$/i.match(a).nil?)
       s.class == String && s[0] == '#' && s.length == 7
     end
-    
+
     # Check if the color is valid
     def self.is_valid?(c)
       @@colors.key?(c) ||  # keyword
       self.is_hex?(c)  ||  # hexadecimal value
-      
+
       # Array of Floats from 0.0..1.0
       c.class == Array && c.length == 4 &&
       c.all? { |el|
@@ -97,15 +97,15 @@ module Ruby2D
         Color.new(input)
       end
     end
-    
+
     def opacity; @a end
-    
+
     def opacity=(opacity)
       @a = opacity
     end
-    
+
     private
-    
+
     # TODO: Only `Number` supported in JS
     # Convert from Fixnum (0..255) to Float (0.0..1.0)
     def to_f(a)
@@ -115,19 +115,19 @@ module Ruby2D
       end
       return b
     end
-    
+
     # Convert from hex value (e.g. #FFF000) to Float (0.0..1.0)
     def hex_to_f(h)
       h = (h[1..-1]).chars.each_slice(2).map(&:join)
       a = []
-      
+
       h.each do |el|
         a.push(el.to_i(16))
       end
-      
+
       a.push(255)
       return to_f(a)
     end
-    
+
   end
 end

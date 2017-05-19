@@ -1,7 +1,7 @@
 # quad.rb
 
 module Ruby2D
-  class Quad 
+  class Quad
     include Renderable
     # Coordinates in clockwise order, starting at top left:
     # x1,y1 == top left
@@ -12,25 +12,25 @@ module Ruby2D
                   :x2, :y2, :c2,
                   :x3, :y3, :c3,
                   :x4, :y4, :c4
-    
+
     attr_reader :color
-    
+
     def initialize(x1=0, y1=0, x2=100, y2=0, x3=100, y3=100, x4=100, y4=100, c='white', z=0)
       @type_id = 2
       @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4 = x1, y1, x2, y2, x3, y3, x4, y4
       @z = z
-      
+
       self.color = c
       add
     end
-    
+
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
     end
-    
+
     private
-    
+
     def update_color(c)
       if c.is_a? Color::Set
         if c.length == 4
