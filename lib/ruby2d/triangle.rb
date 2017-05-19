@@ -3,12 +3,12 @@
 module Ruby2D
   class Triangle
     include Renderable
-    
+
     attr_accessor :x1, :y1, :c1,
                   :x2, :y2, :c2,
                   :x3, :y3, :c3
     attr_reader :color, :type_id
-    
+
     def initialize(x1=50, y1=0, x2=100, y2=100, x3=0, y3=100, c='white', z=0)
       @type_id = 1
       @x1, @y1 = x1, y1
@@ -19,14 +19,14 @@ module Ruby2D
       self.color = c
       add
     end
-    
+
     def color=(c)
       @color = Color.from(c)
       update_color(@color)
     end
-    
+
     private
-    
+
     def update_color(c)
       if c.is_a? Color::Set
         if c.length == 3

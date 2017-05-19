@@ -6,15 +6,15 @@ module Ruby2D
 
     attr_accessor :x, :y, :width, :height, :data
     attr_reader :path, :color
-    
+
     def initialize(x, y, path, z=0)
-      
+
       unless RUBY_ENGINE == 'opal'
         unless File.exists? path
           raise Error, "Cannot find image file `#{path}`"
         end
       end
-      
+
       @type_id = 4
       @x, @y, @path = x, y, path
       @z = z
@@ -22,7 +22,7 @@ module Ruby2D
       ext_image_init(path)
       add
     end
-    
+
     def color=(c)
       @color = Color.new(c)
     end

@@ -9,11 +9,11 @@ Gem::Specification.new do |s|
   s.license     = 'MIT'
   s.author      = 'Tom Black'
   s.email       = 'tom@blacktm.com'
-  
+
   s.required_ruby_version = '>= 2.0.0'
   s.add_dependency 'opal', '~> 0.10'
   s.add_development_dependency 'rspec', '~> 3.5'
-  
+
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('assets/**/*') +
             Dir.glob('ext/**/*.{c,js,rb}')

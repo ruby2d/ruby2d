@@ -48,18 +48,18 @@ end
 # Assemble the Ruby 2D library in one `.rb` file
 def make_lib
   FileUtils.mkdir_p 'build'
-  
+
   lib_dir = "#{@gem_dir}/lib/ruby2d/"
-  
+
   lib = ""
   @lib_files.each do |f|
     lib << File.read("#{lib_dir + f}.rb") + "\n\n"
   end
-  
+
   lib << "
 include Ruby2D::DSL
 include Ruby2D\n"
-  
+
   File.write('build/lib.rb', lib)
 end
 
@@ -76,25 +76,25 @@ end
 
 # Build a native version of the provided Ruby application
 def build_native(rb_file)
-  
+
   # Check if MRuby exists; if not, quit
   if `which mruby`.empty?
     puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
     exit
   end
-  
+
   # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
   make_lib
   `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
-  
+
   # Read the provided Ruby source file, copy to build dir and compile to bytecode
-  
+
   File.open('build/src.rb', 'w') do |file|
     file << strip_require(rb_file)
   end
-  
+
   `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
-  
+
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
     f << "#define MRUBY 1" << "\n\n"
@@ -102,10 +102,10 @@ def build_native(rb_file)
     f << File.read("build/src.c") << "\n\n"
     f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
   end
-  
+
   # Compile to native executable
   `cc build/app.c -lmruby \`simple2d --libs\` -o build/app`
-  
+
   # Success!
   puts "Native app created at `build/app`"
 end
@@ -113,22 +113,22 @@ end
 
 # Build a web-based version of the provided Ruby application
 def build_web(rb_file)
-  
+
   # Assemble the Ruby 2D library in one `.rb` file and compile to JS
   make_lib
   `opal --compile --no-opal build/lib.rb > build/lib.js`
-  
+
   # Read the provided Ruby source file, copy to build dir, and compile to JS
-  
+
   File.open('build/src.rb', 'w') do |file|
     file << strip_require(rb_file)
   end
-  
+
   `opal --compile --no-opal build/src.rb > build/src.js`
-  
+
   FileUtils.cp "#{@gem_dir}/ext/ruby2d/ruby2d-opal.rb", "build/"
   `opal --compile --no-opal build/ruby2d-opal.rb > build/ruby2d-opal.js`
-  
+
   # Combine contents of JS source files and compiled JS into one file
   open('build/app.js', 'w') do |f|
     f << File.read("#{@gem_dir}/assets/simple2d.js") << "\n\n"
@@ -137,10 +137,10 @@ def build_web(rb_file)
     f << File.read("build/ruby2d-opal.js") << "\n\n"
     f << File.read("build/src.js") << "\n\n"
   end
-  
+
   # Copy over HTML template
   FileUtils.cp "#{@gem_dir}/assets/template.html", "build/app.html"
-  
+
   # Success!
   puts "Web app created at `build/app.js`",
        "  Run by opening `build/app.html`"
@@ -150,13 +150,13 @@ end
 # Build an application package for the current platform
 def build_package
   require 'fileutils'
-  
+
   icon_path = "#{@gem_dir}/assets/app.icns"
-  
+
   FileUtils.mkpath "build/App.app/Contents/MacOS"
   FileUtils.mkpath "build/App.app/Contents/Resources"
   FileUtils.cp icon_path, "build/App.app/Contents/Resources"
-  
+
   info_plist = %(
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -177,7 +177,7 @@ def build_package
 </dict>
 </plist>
 )
-  
+
   File.open("build/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
   FileUtils.cp "build/app", "build/App.app/Contents/MacOS/"
   puts "App written to `build/App.app`."

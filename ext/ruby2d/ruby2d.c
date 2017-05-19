@@ -241,16 +241,16 @@ static R_VAL ruby2d_text_init(R_VAL self) {
 #endif
   sprintf(S2D_msg, "Init text: %s", RSTRING_PTR(r_iv_get(self, "@text")));
   S2D_Log(S2D_msg, S2D_INFO);
-  
+
   S2D_Text *txt = S2D_CreateText(
     RSTRING_PTR(r_iv_get(self, "@font")),
     RSTRING_PTR(r_iv_get(self, "@text")),
     NUM2DBL(r_iv_get(self, "@size"))
   );
-  
+
   r_iv_set(self, "@width", INT2NUM(txt->width));
   r_iv_set(self, "@height", INT2NUM(txt->height));
-  
+
   r_iv_set(self, "@data", r_data_wrap_struct(text, txt));
   return R_NIL;
 }
@@ -268,12 +268,12 @@ static R_VAL ruby2d_text_set(R_VAL self, R_VAL text) {
 #endif
   S2D_Text *txt;
   r_data_get_struct(self, "@data", &text_data_type, S2D_Text, txt);
-  
+
   S2D_SetText(txt, RSTRING_PTR(text));
-  
+
   r_iv_set(self, "@width", INT2NUM(txt->width));
   r_iv_set(self, "@height", INT2NUM(txt->height));
-  
+
   return R_NIL;
 }
 
@@ -449,9 +449,9 @@ static void free_music(S2D_Music *mus) {
  * Simple 2D `on_key` input callback function
  */
 static void on_key(S2D_Event e) {
-  
+
   R_VAL type;
-  
+
   switch (e.type) {
     case S2D_KEY_DOWN:
       type = r_char_to_sym("down");
@@ -463,7 +463,7 @@ static void on_key(S2D_Event e) {
       type = r_char_to_sym("up");
       break;
   }
-  
+
   r_funcall(ruby2d_window, "key_callback", 2, type, r_str_new(e.key));
 }
 
@@ -472,9 +472,9 @@ static void on_key(S2D_Event e) {
  * Simple 2D `on_mouse` input callback function
  */
 void on_mouse(S2D_Event e) {
-  
+
   R_VAL type = R_NIL; R_VAL button = R_NIL; R_VAL direction = R_NIL;
-  
+
   switch (e.type) {
     case S2D_MOUSE_DOWN:
       // type, button, x, y
@@ -495,7 +495,7 @@ void on_mouse(S2D_Event e) {
       type = r_char_to_sym("move");
       break;
   }
-  
+
   if (e.type == S2D_MOUSE_DOWN || e.type == S2D_MOUSE_UP) {
     switch (e.button) {
       case S2D_MOUSE_LEFT:
@@ -515,10 +515,10 @@ void on_mouse(S2D_Event e) {
         break;
     }
   }
-  
+
   // Bug in MRuby: If `button` or `direction` are symbols (created with
   // r_char_to_sym), they will always both be `nil`. Use `r_str_new` for now.
-  
+
   r_funcall(
     ruby2d_window, "mouse_callback", 7, type, button, direction,
     INT2NUM(e.x), INT2NUM(e.y), INT2NUM(e.delta_x), INT2NUM(e.delta_y)
@@ -530,9 +530,9 @@ void on_mouse(S2D_Event e) {
  * Simple 2D `on_controller` input callback function
  */
 static void on_controller(S2D_Event e) {
-  
+
   R_VAL type = R_NIL;
-  
+
   switch (e.type) {
     case S2D_AXIS:
       type = r_char_to_sym("axis");
@@ -544,7 +544,7 @@ static void on_controller(S2D_Event e) {
       type = r_char_to_sym("button_up");
       break;
   }
-  
+
   r_funcall(
     ruby2d_window, "controller_callback", 5, INT2NUM(e.which), type,
     INT2NUM(e.axis), INT2NUM(e.value), INT2NUM(e.button)
@@ -556,17 +556,17 @@ static void on_controller(S2D_Event e) {
  * Simple 2D `update` callback function
  */
 static void update() {
-  
+
   // Set the cursor
   r_iv_set(ruby2d_window, "@mouse_x", INT2NUM(window->mouse.x));
   r_iv_set(ruby2d_window, "@mouse_y", INT2NUM(window->mouse.y));
-  
+
   // Store frames
   r_iv_set(ruby2d_window, "@frames", DBL2NUM(window->frames));
-  
+
   // Store frame rate
   r_iv_set(ruby2d_window, "@fps", DBL2NUM(window->fps));
-  
+
   // Call update proc, `window.update`
   r_funcall(ruby2d_window, "update_callback", 0);
 }
@@ -576,32 +576,32 @@ static void update() {
  * Simple 2D `render` callback function
  */
 static void render() {
-  
+
   // Set background color
   R_VAL bc = r_iv_get(ruby2d_window, "@background");
   window->background.r = NUM2DBL(r_iv_get(bc, "@r"));
   window->background.g = NUM2DBL(r_iv_get(bc, "@g"));
   window->background.b = NUM2DBL(r_iv_get(bc, "@b"));
   window->background.a = NUM2DBL(r_iv_get(bc, "@a"));
-  
+
   // Read window objects
   R_VAL objects = r_iv_get(ruby2d_window, "@objects");
   int num_objects = NUM2INT(r_funcall(objects, "length", 0));
-  
+
   // Switch on each object type
   for (int i = 0; i < num_objects; ++i) {
-    
+
     R_VAL el = r_ary_entry(objects, i);
     int type_id = NUM2INT(r_iv_get(el, "@type_id"));
-    
+
     // Switch on the object's type_id
     switch(type_id) {
-      
+
       case R2D_TRIANGLE: {
         R_VAL c1 = r_iv_get(el, "@c1");
         R_VAL c2 = r_iv_get(el, "@c2");
         R_VAL c3 = r_iv_get(el, "@c3");
-        
+
         S2D_DrawTriangle(
           NUM2DBL(r_iv_get(el, "@x1")),
           NUM2DBL(r_iv_get(el, "@y1")),
@@ -609,14 +609,14 @@ static void render() {
           NUM2DBL(r_iv_get(c1, "@g")),
           NUM2DBL(r_iv_get(c1, "@b")),
           NUM2DBL(r_iv_get(c1, "@a")),
-          
+
           NUM2DBL(r_iv_get(el, "@x2")),
           NUM2DBL(r_iv_get(el, "@y2")),
           NUM2DBL(r_iv_get(c2, "@r")),
           NUM2DBL(r_iv_get(c2, "@g")),
           NUM2DBL(r_iv_get(c2, "@b")),
           NUM2DBL(r_iv_get(c2, "@a")),
-          
+
           NUM2DBL(r_iv_get(el, "@x3")),
           NUM2DBL(r_iv_get(el, "@y3")),
           NUM2DBL(r_iv_get(c3, "@r")),
@@ -626,13 +626,13 @@ static void render() {
         );
       }
       break;
-      
+
       case R2D_QUAD: {
         R_VAL c1 = r_iv_get(el, "@c1");
         R_VAL c2 = r_iv_get(el, "@c2");
         R_VAL c3 = r_iv_get(el, "@c3");
         R_VAL c4 = r_iv_get(el, "@c4");
-        
+
         S2D_DrawQuad(
           NUM2DBL(r_iv_get(el, "@x1")),
           NUM2DBL(r_iv_get(el, "@y1")),
@@ -640,21 +640,21 @@ static void render() {
           NUM2DBL(r_iv_get(c1, "@g")),
           NUM2DBL(r_iv_get(c1, "@b")),
           NUM2DBL(r_iv_get(c1, "@a")),
-          
+
           NUM2DBL(r_iv_get(el, "@x2")),
           NUM2DBL(r_iv_get(el, "@y2")),
           NUM2DBL(r_iv_get(c2, "@r")),
           NUM2DBL(r_iv_get(c2, "@g")),
           NUM2DBL(r_iv_get(c2, "@b")),
           NUM2DBL(r_iv_get(c2, "@a")),
-          
+
           NUM2DBL(r_iv_get(el, "@x3")),
           NUM2DBL(r_iv_get(el, "@y3")),
           NUM2DBL(r_iv_get(c3, "@r")),
           NUM2DBL(r_iv_get(c3, "@g")),
           NUM2DBL(r_iv_get(c3, "@b")),
           NUM2DBL(r_iv_get(c3, "@a")),
-          
+
           NUM2DBL(r_iv_get(el, "@x4")),
           NUM2DBL(r_iv_get(el, "@y4")),
           NUM2DBL(r_iv_get(c4, "@r")),
@@ -664,35 +664,35 @@ static void render() {
         );
       }
       break;
-      
+
       case R2D_LINE: {
         R_VAL c1 = r_iv_get(el, "@c1");
         R_VAL c2 = r_iv_get(el, "@c2");
         R_VAL c3 = r_iv_get(el, "@c3");
         R_VAL c4 = r_iv_get(el, "@c4");
-        
+
         S2D_DrawLine(
           NUM2DBL(r_iv_get(el, "@x1")),
           NUM2DBL(r_iv_get(el, "@y1")),
           NUM2DBL(r_iv_get(el, "@x2")),
           NUM2DBL(r_iv_get(el, "@y2")),
           NUM2DBL(r_iv_get(el, "@width")),
-          
+
           NUM2DBL(r_iv_get(c1, "@r")),
           NUM2DBL(r_iv_get(c1, "@g")),
           NUM2DBL(r_iv_get(c1, "@b")),
           NUM2DBL(r_iv_get(c1, "@a")),
-          
+
           NUM2DBL(r_iv_get(c2, "@r")),
           NUM2DBL(r_iv_get(c2, "@g")),
           NUM2DBL(r_iv_get(c2, "@b")),
           NUM2DBL(r_iv_get(c2, "@a")),
-          
+
           NUM2DBL(r_iv_get(c3, "@r")),
           NUM2DBL(r_iv_get(c3, "@g")),
           NUM2DBL(r_iv_get(c3, "@b")),
           NUM2DBL(r_iv_get(c3, "@a")),
-          
+
           NUM2DBL(r_iv_get(c4, "@r")),
           NUM2DBL(r_iv_get(c4, "@g")),
           NUM2DBL(r_iv_get(c4, "@b")),
@@ -700,36 +700,36 @@ static void render() {
         );
       }
       break;
-      
+
       case R2D_IMAGE: {
         S2D_Image *img;
         r_data_get_struct(el, "@data", &image_data_type, S2D_Image, img);
-        
+
         img->x = NUM2DBL(r_iv_get(el, "@x"));
         img->y = NUM2DBL(r_iv_get(el, "@y"));
-        
+
         R_VAL w = r_iv_get(el, "@width");
         R_VAL h = r_iv_get(el, "@height");
         if (r_test(w)) img->width  = NUM2INT(w);
         if (r_test(h)) img->height = NUM2INT(h);
-        
+
         R_VAL c = r_iv_get(el, "@color");
         img->color.r = NUM2DBL(r_iv_get(c, "@r"));
         img->color.g = NUM2DBL(r_iv_get(c, "@g"));
         img->color.b = NUM2DBL(r_iv_get(c, "@b"));
         img->color.a = NUM2DBL(r_iv_get(c, "@a"));
-        
+
         S2D_DrawImage(img);
       }
       break;
-      
+
       case R2D_SPRITE: {
         S2D_Sprite *spr;
         r_data_get_struct(el, "@data", &sprite_data_type, S2D_Sprite, spr);
-        
+
         spr->x = NUM2DBL(r_iv_get(el, "@x"));
         spr->y = NUM2DBL(r_iv_get(el, "@y"));
-        
+
         S2D_ClipSprite(
           spr,
           NUM2INT(r_iv_get(el, "@clip_x")),
@@ -737,24 +737,24 @@ static void render() {
           NUM2INT(r_iv_get(el, "@clip_w")),
           NUM2INT(r_iv_get(el, "@clip_h"))
         );
-        
+
         S2D_DrawSprite(spr);
       }
       break;
-      
+
       case R2D_TEXT: {
         S2D_Text *txt;
         r_data_get_struct(el, "@data", &text_data_type, S2D_Text, txt);
-        
+
         txt->x = NUM2DBL(r_iv_get(el, "@x"));
         txt->y = NUM2DBL(r_iv_get(el, "@y"));
-        
+
         R_VAL c = r_iv_get(el, "@color");
         txt->color.r = NUM2DBL(r_iv_get(c, "@r"));
         txt->color.g = NUM2DBL(r_iv_get(c, "@g"));
         txt->color.b = NUM2DBL(r_iv_get(c, "@b"));
         txt->color.a = NUM2DBL(r_iv_get(c, "@a"));
-        
+
         S2D_DrawText(txt);
       }
       break;
@@ -772,17 +772,17 @@ static R_VAL ruby2d_show(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_show(R_VAL self) {
 #endif
   ruby2d_window = self;
-  
+
   if (r_test(r_iv_get(self, "@diagnostics"))) {
     S2D_Diagnostics(true);
   }
-  
+
   // Get window attributes
   char *title = RSTRING_PTR(r_iv_get(self, "@title"));
   int width   = NUM2INT(r_iv_get(self, "@width"));
   int height  = NUM2INT(r_iv_get(self, "@height"));
   int flags   = 0;
-  
+
   // Get window flags
   if (r_test(r_iv_get(self, "@resizable"))) {
     flags = flags | S2D_RESIZABLE;
@@ -796,29 +796,29 @@ static R_VAL ruby2d_show(R_VAL self) {
   if (r_test(r_iv_get(self, "@highdpi"))) {
     flags = flags | S2D_HIGHDPI;
   }
-  
+
   // Check viewport size and set
-  
+
   R_VAL vp_w = r_iv_get(self, "@viewport_width");
   int viewport_width = r_test(vp_w) ? NUM2INT(vp_w) : width;
-  
+
   R_VAL vp_h = r_iv_get(self, "@viewport_height");
   int viewport_height = r_test(vp_h) ? NUM2INT(vp_h) : height;
-  
+
   // Create and show window
-  
+
   window = S2D_CreateWindow(
     title, width, height, update, render, flags
   );
-  
+
   window->viewport.width  = viewport_width;
   window->viewport.height = viewport_height;
   window->on_key          = on_key;
   window->on_mouse        = on_mouse;
   window->on_controller   = on_controller;
-  
+
   S2D_Show(window);
-  
+
   atexit(free_window);
   return R_NIL;
 }
@@ -841,91 +841,91 @@ int main(void) {
   // Open the MRuby environment
   mrb = mrb_open();
   if (!mrb) { /* handle error */ }
-  
+
   // Load the Ruby 2D library
   mrb_load_irep(mrb, ruby2d_lib);
-  
+
   // Add missing MRuby classes, methods
   R_CLASS file_class = mrb_define_class(mrb, "File", mrb->object_class);
   mrb_define_class_method(mrb, file_class, "exists?", file_exists, r_args_req(1));
-  
+
 #else
 /*
  * Ruby C extension init
  */
 void Init_ruby2d() {
 #endif
-  
+
   // Ruby2D
   R_CLASS ruby2d_module = r_define_module("Ruby2D");
-  
+
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
-  
+
   // Ruby2D::Image#init
   r_define_method(ruby2d_image_class, "ext_image_init", ruby2d_image_init, r_args_req(1));
-  
+
   // Ruby2D::Sprite
   R_CLASS ruby2d_sprite_class = r_define_class(ruby2d_module, "Sprite");
-  
+
   // Ruby2D::Sprite#init
   r_define_method(ruby2d_sprite_class, "ext_sprite_init", ruby2d_sprite_init, r_args_req(1));
-  
+
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
-  
+
   // Ruby2D::Text#init
   r_define_method(ruby2d_text_class, "ext_text_init", ruby2d_text_init, r_args_none);
-  
+
   // Ruby2D::Text#ext_text_set
   r_define_method(ruby2d_text_class, "ext_text_set", ruby2d_text_set, r_args_req(1));
-  
+
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
-  
+
   // Ruby2D::Sound#init
   r_define_method(ruby2d_sound_class, "ext_sound_init", ruby2d_sound_init, r_args_req(1));
-  
+
   // Ruby2D::Sound#play
   r_define_method(ruby2d_sound_class, "ext_sound_play", ruby2d_sound_play, r_args_none);
-  
+
   // Ruby2D::Music
   R_CLASS ruby2d_music_class = r_define_class(ruby2d_module, "Music");
-  
+
   // Ruby2D::Music#init
   r_define_method(ruby2d_music_class, "ext_music_init", ruby2d_music_init, r_args_req(1));
-  
+
   // Ruby2D::Music#play
   r_define_method(ruby2d_music_class, "ext_music_play", ruby2d_music_play, r_args_none);
-  
+
   // Ruby2D::Music#pause
   r_define_method(ruby2d_music_class, "ext_music_pause", ruby2d_music_pause, r_args_none);
-  
+
   // Ruby2D::Music#resume
   r_define_method(ruby2d_music_class, "ext_music_resume", ruby2d_music_resume, r_args_none);
-  
+
   // Ruby2D::Music#stop
   r_define_method(ruby2d_music_class, "ext_music_stop", ruby2d_music_stop, r_args_none);
-  
+
   // Ruby2D::Music#fadeout
   r_define_method(ruby2d_music_class, "ext_music_fadeout", ruby2d_music_fadeout, r_args_req(1));
-  
+
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
-  
+
   // Ruby2D::Window#show
   r_define_method(ruby2d_window_class, "ext_window_show", ruby2d_show, r_args_none);
-  
+
   // Ruby2D::Window#close
   r_define_method(ruby2d_window_class, "ext_window_close", ruby2d_close, r_args_none);
-  
+
 #if MRUBY
   // Load the Ruby 2D app
   mrb_load_irep(mrb, ruby2d_app);
-  
+
   // If an exception, print error
   if (mrb->exc) mrb_print_error(mrb);
-  
+
   // Close the MRuby environment
   mrb_close(mrb);
 #endif

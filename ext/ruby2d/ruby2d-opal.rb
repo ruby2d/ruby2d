@@ -19,7 +19,7 @@ const $R2D_TEXT     = 6;
 
 
 function on_key(e) {
-  
+
   switch (e.type) {
     case S2D.KEY_DOWN:
       #{type = :down};
@@ -31,16 +31,16 @@ function on_key(e) {
       #{type = :up};
       break;
   }
-  
+
   #{$R2D_WINDOW.key_callback(type, `e.key`)};
 }
 
 
 function on_mouse(e) {
-  
+
   #{direction = nil}
   #{button    = nil}
-  
+
   switch (e.type) {
     case S2D.MOUSE_DOWN:
       #{type = :down};
@@ -56,7 +56,7 @@ function on_mouse(e) {
       #{type = :move};
       break;
   }
-  
+
   if (e.type == S2D.MOUSE_DOWN || e.type == S2D.MOUSE_UP) {
     switch (e.button) {
       case S2D.MOUSE_LEFT:
@@ -76,7 +76,7 @@ function on_mouse(e) {
         break;
     }
   }
-  
+
   #{$R2D_WINDOW.mouse_callback(
     type, button, direction,
     `e.x`, `e.y`, `e.delta_x`, `e.delta_y`
@@ -94,30 +94,30 @@ function update() {
 
 
 function render() {
-  
+
   // Set background color
   win.background.r = #{$R2D_WINDOW.get(:background).r};
   win.background.g = #{$R2D_WINDOW.get(:background).g};
   win.background.b = #{$R2D_WINDOW.get(:background).b};
   win.background.a = #{$R2D_WINDOW.get(:background).a};
-  
+
   var objects = #{$R2D_WINDOW.objects};
-  
+
   for (var i = 0; i < objects.length; i++) {
-    
+
     var el = objects[i];
-    
+
     switch (el.type_id) {
-      
+
       case $R2D_TRIANGLE:
-        
+
         S2D.DrawTriangle(
           el.x1, el.y1, el.c1.r, el.c1.g, el.c1.b, el.c1.a,
           el.x2, el.y2, el.c2.r, el.c2.g, el.c2.b, el.c2.a,
           el.x3, el.y3, el.c3.r, el.c3.g, el.c3.b, el.c3.a
         );
         break;
-      
+
       case $R2D_QUAD:
         S2D.DrawQuad(
           el.x1, el.y1, el.c1.r, el.c1.g, el.c1.b, el.c1.a,
@@ -126,7 +126,7 @@ function render() {
           el.x4, el.y4, el.c4.r, el.c4.g, el.c4.b, el.c4.a
         );
         break;
-      
+
       case $R2D_LINE:
         S2D.DrawLine(
           el.x1, el.y1, el.x2, el.y2, el.width,
@@ -136,26 +136,26 @@ function render() {
           el.c4.r, el.c4.g, el.c4.b, el.c4.a
         );
         break;
-      
+
       case $R2D_IMAGE:
         el.data.x = el.x;
         el.data.y = el.y;
-        
+
         if (el.width  != Opal.nil) el.data.width  = el.width;
         if (el.height != Opal.nil) el.data.height = el.height;
-        
+
         el.data.color.r = el.color.r;
         el.data.color.g = el.color.g;
         el.data.color.b = el.color.b;
         el.data.color.a = el.color.a;
-        
+
         S2D.DrawImage(el.data);
         break;
-      
+
       case $R2D_SPRITE:
         el.data.x = el.x;
         el.data.y = el.y;
-        
+
         S2D.ClipSprite(
           el.data,
           el.clip_x,
@@ -163,23 +163,23 @@ function render() {
           el.clip_w,
           el.clip_h
         );
-        
+
         S2D.DrawSprite(el.data);
         break;
-      
+
       case $R2D_TEXT:
         el.data.x = el.x;
         el.data.y = el.y;
-        
+
         el.data.color.r = el.color.r;
         el.data.color.g = el.color.g;
         el.data.color.b = el.color.b;
         el.data.color.a = el.color.a;
-        
+
         S2D.DrawText(el.data);
         break;
     }
-    
+
   }
 }`
 
@@ -197,86 +197,86 @@ module Ruby2D
       });`
     end
   end
-  
+
   class Sprite
     def ext_sprite_init(path)
       `#{self}.data = S2D.CreateSprite(path);`
     end
   end
-  
+
   class Text
     def ext_text_init
       `#{self}.data = S2D.CreateText(#{self}.font, #{self}.text, #{self}.size);`
       @width  = `#{self}.data.width;`
       @height = `#{self}.data.height;`
     end
-    
+
     def ext_text_set(msg)
       `S2D.SetText(#{self}.data, #{msg});`
       @width  = `#{self}.data.width;`
       @height = `#{self}.data.height;`
     end
   end
-  
+
   class Sound
     def ext_sound_init(path)
       `#{self}.data = S2D.CreateSound(path);`
     end
-    
+
     def ext_sound_play
       `S2D.PlaySound(#{self}.data);`
     end
   end
-  
+
   class Music
     def ext_music_init(path)
       `#{self}.data = S2D.CreateMusic(path);`
     end
-    
+
     def ext_music_play
       `S2D.PlayMusic(#{self}.data, #{self}.loop);`
     end
-    
+
     def ext_music_pause
       `S2D.PauseMusic();`
     end
-    
+
     def ext_music_resume
       `S2D.ResumeMusic();`
     end
-    
+
     def ext_music_stop
       `S2D.StopMusic();`
     end
-    
+
     def ext_music_fadeout(ms)
       `S2D.FadeOutMusic(ms);`
     end
   end
-  
+
   class Window
     def ext_window_show
       $R2D_WINDOW = self
-      
+
       `
       var width  = #{$R2D_WINDOW.get(:width)};
       var height = #{$R2D_WINDOW.get(:height)};
-      
+
       var vp_w = #{$R2D_WINDOW.get(:viewport_width)};
       var viewport_width = vp_w != Opal.nil ? vp_w : width;
-      
+
       var vp_h = #{$R2D_WINDOW.get(:viewport_height)};
       var viewport_height = vp_h != Opal.nil ? vp_h : height;
-      
+
       win = S2D.CreateWindow(
         #{$R2D_WINDOW.get(:title)}, width, height, update, render, "ruby2d-app", {}
       );
-      
+
       win.viewport.width  = viewport_width;
       win.viewport.height = viewport_height;
       win.on_key          = on_key;
       win.on_mouse        = on_mouse;
-      
+
       S2D.Show(win);`
     end
   end

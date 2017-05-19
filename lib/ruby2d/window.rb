@@ -2,10 +2,10 @@
 
 module Ruby2D
   class Window
-    
+
     attr_reader :objects
     attr_accessor :mouse_x, :mouse_y, :frames, :fps
-    
+
     MouseEvent      = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
     KeyEvent        = Struct.new(:type, :key)
     ControllerEvent = Struct.new(:which, :type, :axis, :value, :button)
@@ -46,7 +46,7 @@ module Ruby2D
       @update_proc = Proc.new {}
       @diagnostics = false
     end
-    
+
     def new_event_key
       @event_key = @event_key.next
     end
@@ -71,7 +71,7 @@ module Ruby2D
       when :diagnostics;     @diagnostics
       end
     end
-    
+
     def set(opts)
       # Store new window attributes, or ignore if nil
       @title           = opts[:title]           || @title
@@ -88,7 +88,7 @@ module Ruby2D
       @highdpi         = opts[:highdpi]         || @highdpi
       @diagnostics     = opts[:diagnostics]     || @diagnostics
     end
-    
+
     def add(o)
       case o
       when nil
@@ -99,12 +99,12 @@ module Ruby2D
         add_object(o)
       end
     end
-    
+
     def remove(o)
       if o == nil
         raise Error, "Cannot remove '#{o.class}' from window!"
       end
-      
+
       if i = @objects.index(o)
         @objects.delete_at(i)
         true
@@ -112,36 +112,36 @@ module Ruby2D
         false
       end
     end
-    
+
     def clear
       @objects.clear
     end
-    
+
     def update(&proc)
       @update_proc = proc
       true
     end
-    
+
     def on(event, &proc)
       event_id = new_event_key
       @events[event][event_id] = proc
       EventDescriptor.new(event, event_id)
     end
-    
+
     def off(event_descriptor)
       @events[event_descriptor.type].delete(event_descriptor.id)
     end
 
     def key_callback(type, key)
       # puts "===", "type: #{type}", "key: #{key}"
-      
+
       key = key.downcase
-      
+
       # All key events
       @events[:key].each do |id, e|
         e.call(KeyEvent.new(type, key))
       end
-      
+
       case type
       # When key is pressed, fired once
       when :down
@@ -160,17 +160,17 @@ module Ruby2D
         end
       end
     end
-    
+
     def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
       # Convert to symbols (see MRuby bug in native extension)
       button    = button.to_sym    unless button    == nil
       direction = direction.to_sym unless direction == nil
-      
+
       # All mouse events
       @events[:mouse].each do |id, e|
         e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
       end
-      
+
       case type
       # When mouse button pressed
       when :down
@@ -194,13 +194,13 @@ module Ruby2D
         end
       end
     end
-    
+
     def controller_callback(which, type, axis, value, button)
       # All controller events
       @events[:controller].each do |id, e|
         e.call(ControllerEvent.new(which, type, axis, value, button))
       end
-      
+
       case type
       # When controller axis motion, like analog sticks
       when :axis
@@ -219,21 +219,21 @@ module Ruby2D
         end
       end
     end
-    
+
     def update_callback
       @update_proc.call
     end
-    
+
     def show
       ext_window_show
     end
-    
+
     def close
       ext_window_close
     end
-    
+
     private
-    
+
     def add_object(o)
       if !@objects.include?(o)
         index = @objects.index do |object|
@@ -249,6 +249,6 @@ module Ruby2D
         false
       end
     end
-    
+
   end
 end

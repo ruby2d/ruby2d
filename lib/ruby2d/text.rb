@@ -3,18 +3,18 @@
 module Ruby2D
   class Text
     include Renderable
-    
+
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
-    
+
     def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c='white', z=0)
-      
+
       # if File.exists? font
         @font = font
       # else
       #   @font = resolve_path(font)
       # end
-      
+
       @type_id = 6
       @x, @y, @size = x, y, size
       @z = z
@@ -23,18 +23,18 @@ module Ruby2D
       ext_text_init
       add
     end
-    
+
     def text=(msg)
       @text = msg.to_s
       ext_text_set(@text)
     end
-    
+
     def color=(c)
       @color = Color.new(c)
     end
-    
+
     private
-    
+
     def resolve_path(font)
       if RUBY_PLATFORM =~ /darwin/
         font_path = "/Library/Fonts/#{font}.ttf"
@@ -42,13 +42,13 @@ module Ruby2D
         # Linux
         font_path = "/usr/share/fonts/truetype/#{font}.ttf"
       end
-      
+
       unless File.exists? font_path
         raise Error, "Cannot find system font"
       else
         font_path
       end
     end
-    
+
   end
 end

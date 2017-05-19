@@ -32,10 +32,10 @@ case RUBY_PLATFORM
 
 # macOS
 when /darwin/
-  
+
   # Simple 2D not installed
   if `which simple2d`.empty?
-    
+
     # Homebrew not installed
     if `which brew`.empty?
       $errors << "Ruby 2D uses a native library called Simple 2D." <<
@@ -46,7 +46,7 @@ when /darwin/
                  "  brew install simple2d".bold
       print_errors
       exit
-      
+
     # Homebrew installed, instruct to install Simple 2D
     else
       $errors << "Ruby 2D uses a native library called Simple 2D." <<
@@ -57,10 +57,10 @@ when /darwin/
       exit
     end
   end
-  
+
 # Linux and Windows / MinGW
 when /linux|mingw/
-  
+
   # Simple 2D not installed
   if `which simple2d`.empty?
     $errors << "Ruby 2D uses a native library called Simple 2D.\n" <<
