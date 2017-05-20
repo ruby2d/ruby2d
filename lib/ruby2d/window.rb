@@ -224,6 +224,14 @@ module Ruby2D
       @update_proc.call
     end
     
+    def show
+      ext_window_show
+    end
+    
+    def close
+      ext_window_close
+    end
+    
     private
     
     def add_object(o)

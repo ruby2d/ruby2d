@@ -14,8 +14,12 @@ module Ruby2D
         end
       end
       
-      init(path)
       @path = path
+      ext_sound_init(path)
+    end
+    
+    def play
+      ext_sound_play
     end
     
   end

@@ -14,10 +14,29 @@ module Ruby2D
         end
       end
       
-      init(path)
       @path = path
       @loop = false
+      ext_music_init(path)
     end
     
+    def play
+      ext_music_play
+    end
+    
+    def pause
+      ext_music_pause
+    end
+    
+    def resume
+      ext_music_resume
+    end
+    
+    def stop
+      ext_music_stop
+    end
+    
+    def fadeout(ms)
+      ext_music_fadeout(ms)
+    end
   end
 end

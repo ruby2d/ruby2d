@@ -186,7 +186,7 @@ function render() {
 
 module Ruby2D
   class Image
-    def init(path)
+    def ext_image_init(path)
       `#{self}.data = S2D.CreateImage(path, function() {
         if (#{@width} == Opal.nil) {
           #{@width} = #{self}.data.width;
@@ -199,13 +199,13 @@ module Ruby2D
   end
   
   class Sprite
-    def init(path)
+    def ext_sprite_init(path)
       `#{self}.data = S2D.CreateSprite(path);`
     end
   end
   
   class Text
-    def init
+    def ext_text_init
       `#{self}.data = S2D.CreateText(#{self}.font, #{self}.text, #{self}.size);`
       @width  = `#{self}.data.width;`
       @height = `#{self}.data.height;`
@@ -219,43 +219,43 @@ module Ruby2D
   end
   
   class Sound
-    def init(path)
+    def ext_sound_init(path)
       `#{self}.data = S2D.CreateSound(path);`
     end
     
-    def play
+    def ext_sound_play
       `S2D.PlaySound(#{self}.data);`
     end
   end
   
   class Music
-    def init(path)
+    def ext_music_init(path)
       `#{self}.data = S2D.CreateMusic(path);`
     end
     
-    def play
+    def ext_music_play
       `S2D.PlayMusic(#{self}.data, #{self}.loop);`
     end
     
-    def pause
+    def ext_music_pause
       `S2D.PauseMusic();`
     end
     
-    def resume
+    def ext_music_resume
       `S2D.ResumeMusic();`
     end
     
-    def stop
+    def ext_music_stop
       `S2D.StopMusic();`
     end
     
-    def fadeout(ms)
+    def ext_music_fadeout(ms)
       `S2D.FadeOutMusic(ms);`
     end
   end
   
   class Window
-    def show
+    def ext_window_show
       $R2D_WINDOW = self
       
       `

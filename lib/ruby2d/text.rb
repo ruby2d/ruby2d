@@ -20,7 +20,7 @@ module Ruby2D
       @z = z
       @text = text.to_s
       self.color = c
-      init
+      ext_text_init
       add
     end
     

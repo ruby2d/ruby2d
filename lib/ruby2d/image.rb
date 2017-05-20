@@ -19,7 +19,7 @@ module Ruby2D
       @x, @y, @path = x, y, path
       @z = z
       @color = Color.new([1, 1, 1, 1])
-      init(path)
+      ext_image_init(path)
       add
     end
     
