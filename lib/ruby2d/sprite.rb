@@ -22,7 +22,7 @@ module Ruby2D
       @current_frame_time = 0
       @z = z
 
-      init(path)
+      ext_sprite_init(path)
       if Module.const_defined? :DSL
         Application.add(self)
       end

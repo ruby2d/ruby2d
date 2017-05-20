@@ -260,11 +260,11 @@ static R_VAL ruby2d_text_init(R_VAL self) {
  * Ruby2D::Text#ext_text_set
  */
 #if MRUBY
-static R_VAL ruby2d_ext_text_set(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_text_set(mrb_state* mrb, R_VAL self) {
   mrb_value text;
   mrb_get_args(mrb, "o", &text);
 #else
-static R_VAL ruby2d_ext_text_set(R_VAL self, R_VAL text) {
+static R_VAL ruby2d_text_set(R_VAL self, R_VAL text) {
 #endif
   S2D_Text *txt;
   r_data_get_struct(self, "@data", &text_data_type, S2D_Text, txt);
@@ -863,61 +863,61 @@ void Init_ruby2d() {
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
   
   // Ruby2D::Image#init
-  r_define_method(ruby2d_image_class, "init", ruby2d_image_init, r_args_req(1));
+  r_define_method(ruby2d_image_class, "ext_image_init", ruby2d_image_init, r_args_req(1));
   
   // Ruby2D::Sprite
   R_CLASS ruby2d_sprite_class = r_define_class(ruby2d_module, "Sprite");
   
   // Ruby2D::Sprite#init
-  r_define_method(ruby2d_sprite_class, "init", ruby2d_sprite_init, r_args_req(1));
+  r_define_method(ruby2d_sprite_class, "ext_sprite_init", ruby2d_sprite_init, r_args_req(1));
   
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
   
   // Ruby2D::Text#init
-  r_define_method(ruby2d_text_class, "init", ruby2d_text_init, r_args_none);
+  r_define_method(ruby2d_text_class, "ext_text_init", ruby2d_text_init, r_args_none);
   
   // Ruby2D::Text#ext_text_set
-  r_define_method(ruby2d_text_class, "ext_text_set", ruby2d_ext_text_set, r_args_req(1));
+  r_define_method(ruby2d_text_class, "ext_text_set", ruby2d_text_set, r_args_req(1));
   
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
   
   // Ruby2D::Sound#init
-  r_define_method(ruby2d_sound_class, "init", ruby2d_sound_init, r_args_req(1));
+  r_define_method(ruby2d_sound_class, "ext_sound_init", ruby2d_sound_init, r_args_req(1));
   
   // Ruby2D::Sound#play
-  r_define_method(ruby2d_sound_class, "play", ruby2d_sound_play, r_args_none);
+  r_define_method(ruby2d_sound_class, "ext_sound_play", ruby2d_sound_play, r_args_none);
   
   // Ruby2D::Music
   R_CLASS ruby2d_music_class = r_define_class(ruby2d_module, "Music");
   
   // Ruby2D::Music#init
-  r_define_method(ruby2d_music_class, "init", ruby2d_music_init, r_args_req(1));
+  r_define_method(ruby2d_music_class, "ext_music_init", ruby2d_music_init, r_args_req(1));
   
   // Ruby2D::Music#play
-  r_define_method(ruby2d_music_class, "play", ruby2d_music_play, r_args_none);
+  r_define_method(ruby2d_music_class, "ext_music_play", ruby2d_music_play, r_args_none);
   
   // Ruby2D::Music#pause
-  r_define_method(ruby2d_music_class, "pause", ruby2d_music_pause, r_args_none);
+  r_define_method(ruby2d_music_class, "ext_music_pause", ruby2d_music_pause, r_args_none);
   
   // Ruby2D::Music#resume
-  r_define_method(ruby2d_music_class, "resume", ruby2d_music_resume, r_args_none);
+  r_define_method(ruby2d_music_class, "ext_music_resume", ruby2d_music_resume, r_args_none);
   
   // Ruby2D::Music#stop
-  r_define_method(ruby2d_music_class, "stop", ruby2d_music_stop, r_args_none);
+  r_define_method(ruby2d_music_class, "ext_music_stop", ruby2d_music_stop, r_args_none);
   
   // Ruby2D::Music#fadeout
-  r_define_method(ruby2d_music_class, "fadeout", ruby2d_music_fadeout, r_args_req(1));
+  r_define_method(ruby2d_music_class, "ext_music_fadeout", ruby2d_music_fadeout, r_args_req(1));
   
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
   
   // Ruby2D::Window#show
-  r_define_method(ruby2d_window_class, "show", ruby2d_show, r_args_none);
+  r_define_method(ruby2d_window_class, "ext_window_show", ruby2d_show, r_args_none);
   
   // Ruby2D::Window#close
-  r_define_method(ruby2d_window_class, "close", ruby2d_close, r_args_none);
+  r_define_method(ruby2d_window_class, "ext_window_close", ruby2d_close, r_args_none);
   
 #if MRUBY
   // Load the Ruby 2D app
