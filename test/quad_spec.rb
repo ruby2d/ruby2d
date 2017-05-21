@@ -89,4 +89,30 @@ RSpec.describe Ruby2D::Quad do
       end.to raise_error("Quads require 4 colors, one for each vertex. 5 were given.")
     end
   end
+
+  describe '#contains?' do
+    it "returns true if point is inside quad" do
+      quad = Quad.new(
+        -25, 0,
+        0, -25,
+        25, 0,
+        0, 25
+      )
+      expect(quad.contains?(0, 0)).to be true
+    end
+
+    it "returns true if point is not inside quad" do
+      quad = Quad.new(
+        -25, 0,
+        0, -25,
+        25, 0,
+        0, 25
+      )
+
+      expect(quad.contains?( 20,  20)).to be false
+      expect(quad.contains?(-20,  20)).to be false
+      expect(quad.contains?( 20, -20)).to be false
+      expect(quad.contains?(-20, -20)).to be false
+    end
+  end
 end

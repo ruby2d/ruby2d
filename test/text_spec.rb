@@ -41,4 +41,19 @@ RSpec.describe Ruby2D::Text do
       expect(t.height).to eq(48)
     end
   end
+
+  describe '#contains?' do
+    it "returns true if point is inside text" do
+      text = Text.new(0, 0, "Hello world!", 40, "test/media/bitstream_vera/vera.ttf")
+      expect(text.contains?(text.width / 2, text.height / 2)).to be true
+    end
+
+    it "returns true if point is not inside text" do
+      text = Text.new(0, 0, "Hello world!", 40, "test/media/bitstream_vera/vera.ttf")
+      expect(text.contains?(  - text.width / 2,     text.height / 2)).to be false
+      expect(text.contains?(    text.width / 2,   - text.height / 2)).to be false
+      expect(text.contains?(3 * text.width / 2,     text.height / 2)).to be false
+      expect(text.contains?(    text.width / 2, 3 * text.height / 2)).to be false
+    end
+  end
 end

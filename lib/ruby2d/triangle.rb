@@ -25,7 +25,24 @@ module Ruby2D
       update_color(@color)
     end
 
+    # Point is inside a triangle if
+    # the area of 3 triangles, constructed from triangle sides and that point
+    # is equal to the area of triangle.
+    def contains?(x, y)
+      self_area = triangle_area(@x1, @y1, @x2, @y2, @x3, @y3)
+      questioned_area =
+        triangle_area(@x1, @y1, @x2, @y2, x, y) +
+        triangle_area(@x2, @y2, @x3, @y3, x, y) +
+        triangle_area(@x3, @y3, @x1, @y1, x, y)
+
+      questioned_area <= self_area
+    end
+
     private
+
+    def triangle_area(x1, y1, x2, y2, x3, y3)
+      (x1*y2 + x2*y3 + x3*y1 - x3*y2 - x1*y3 - x2*y1).abs / 2
+    end
 
     def update_color(c)
       if c.is_a? Color::Set

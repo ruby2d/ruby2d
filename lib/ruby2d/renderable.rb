@@ -27,5 +27,9 @@ module Ruby2D
     def opacity=(val)
       self.color.opacity = val
     end
+
+    def contains?(x, y)
+      raise "Not implemented yet"
+    end
   end
 end

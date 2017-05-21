@@ -79,4 +79,28 @@ RSpec.describe Ruby2D::Triangle do
       end.to raise_error("Triangles require 3 colors, one for each vertex. 4 were given.")
     end
   end
+
+
+  describe '#contains?' do
+    it "returns true if point is inside triangle" do
+      triangle = Triangle.new(
+        0, 0,
+        0, 100,
+        100, 0
+      )
+      expect(triangle.contains?(25, 25)).to be true
+    end
+
+    it "returns true if point is inside text" do
+      triangle = Triangle.new(
+        0, 0,
+        0, 100,
+        100, 0
+      )
+
+      expect(triangle.contains?(25, -25)).to be false
+      expect(triangle.contains?(-25, 25)).to be false
+      expect(triangle.contains?(100, 100)).to be false
+    end
+  end
 end
