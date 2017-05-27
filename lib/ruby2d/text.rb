@@ -7,19 +7,18 @@ module Ruby2D
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
 
-    def initialize(x=0, y=0, text="Hello World!", size=20, font=nil, c='white', z=0)
-
-      # if File.exists? font
-        @font = font
-      # else
-      #   @font = resolve_path(font)
-      # end
-
+    def initialize(opts = {})
       @type_id = 6
-      @x, @y, @size = x, y, size
-      @z = z
-      @text = text.to_s
-      self.color = c
+
+      @x = opts[:x] || 0
+      @y = opts[:y] || 0
+      @z = opts[:z] || 0
+      @text = (opts[:text] || "Hello World!").to_s
+      @size = opts[:size] || 20
+
+      @font = opts[:font]
+
+      self.color = opts[:color] || 'white'
       ext_text_init
       add
     end

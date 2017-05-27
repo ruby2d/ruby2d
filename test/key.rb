@@ -2,8 +2,17 @@ require 'ruby2d'
 
 set title: "Ruby 2D — Key", width: 300, height: 200
 
-s1 = Square.new(5, 5, 50, [1, 1, 1, 1])
-s2 = Square.new(60, 5, 50, [1, 1, 1, 1])
+s1 = Square.new(
+  x: 5,
+  y: 5,
+  size: 50
+)
+
+s2 = Square.new(
+  x: 60,
+  y: 5,
+  size: 50
+)
 
 on :key do |event|
   puts event
