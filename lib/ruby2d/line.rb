@@ -5,12 +5,17 @@ module Ruby2D
     include Renderable
     attr_accessor :x1, :x2, :y1, :y2, :color, :width
 
-    def initialize(x1, y1, x2, y2, width=2, c='white', z=0)
+    def initialize(opts = {})
       @type_id = 3
-      @x1, @y1, @x2, @y2 = x1, y1, x2, y2
-      @width = width
-      @z = z
-      self.color = c
+
+      @x1 = opts[:x1] || 0
+      @y1 = opts[:y1] || 0
+      @x2 = opts[:x2] || 100
+      @y2 = opts[:y2] || 100
+      @width = opts[:width] || 2
+      @z = opts[:z] || 0
+      self.color = opts[:color] || 'white'
+
       add
     end
 

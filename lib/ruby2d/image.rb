@@ -7,19 +7,24 @@ module Ruby2D
     attr_accessor :x, :y, :width, :height, :data
     attr_reader :path, :color
 
-    def initialize(x, y, path, z=0)
+    def initialize(opts = {})
+      @path = opts[:path]
 
       unless RUBY_ENGINE == 'opal'
-        unless File.exists? path
-          raise Error, "Cannot find image file `#{path}`"
+        unless File.exists? @path
+          raise Error, "Cannot find image file `#{@path}`"
         end
       end
 
+      @x = opts[:x] || 0
+      @y = opts[:y] || 0
+      @z = opts[:x] || 0
+
       @type_id = 4
-      @x, @y, @path = x, y, path
-      @z = z
-      @color = Color.new([1, 1, 1, 1])
-      ext_image_init(path)
+
+      self.color = opts[:color] || 'white'
+
+      ext_image_init(@path)
       add
     end
 

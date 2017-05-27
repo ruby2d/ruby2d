@@ -21,101 +21,139 @@ Height: #{get :height}
 Window: #{get :window}\n\n"
 
 # Primary colors
-Rectangle.new(0, 0, 50, 100,   [1, 0, 0, 1])
-Rectangle.new(50, 0, 50, 100,  [0, 1, 0, 1])
-Rectangle.new(100, 0, 50, 100, [0, 0, 1, 1])
+Rectangle.new(x: 0,   width: 50, color: [1, 0, 0, 1])
+Rectangle.new(x: 50,  width: 50, color: [0, 1, 0, 1])
+Rectangle.new(x: 100, width: 50, color: [0, 0, 1, 1])
 
 # Color strings
-Square.new(   150, 0, 50,      'teal')
-Square.new(   200, 0, 50,      'gray')
-Square.new(   250, 0, 50,      'silver')
-Square.new(   300, 0, 50,      'white')
-Rectangle.new(350, 0, 50, 50,  'navy')
-Rectangle.new(400, 0, 50, 50,  'blue')
-Rectangle.new(450, 0, 50, 50,  'aqua')
-Rectangle.new(500, 0, 50, 50,  'teal')
-Rectangle.new(550, 0, 50, 50,  'olive')
+Square.new(x: 150, size: 50, color: 'teal')
+Square.new(x: 200, size: 50, color: 'gray')
+Square.new(x: 250, size: 50, color: 'silver')
+Square.new(x: 300, size: 50, color: 'white')
+Rectangle.new(x: 350, width: 50, height: 50, color: 'navy')
+Rectangle.new(x: 400, width: 50, height: 50, color: 'blue')
+Rectangle.new(x: 450, width: 50, height: 50, color: 'aqua')
+Rectangle.new(x: 500, width: 50, height: 50, color: 'teal')
+Rectangle.new(x: 550, width: 50, height: 50, color: 'olive')
 
-Rectangle.new(150, 50, 50, 50, 'green')
-Rectangle.new(200, 50, 50, 50, 'lime')
-Rectangle.new(250, 50, 50, 50, 'yellow')
-Rectangle.new(300, 50, 50, 50, 'orange')
-Rectangle.new(350, 50, 50, 50, 'red')
-Rectangle.new(400, 50, 50, 50, 'maroon')
-Rectangle.new(450, 50, 50, 50, 'fuchsia')
-Rectangle.new(500, 50, 50, 50, 'purple')
-Rectangle.new(550, 50, 50, 50, 'brown')
+Rectangle.new(x: 150, y: 50, width: 50, height: 50, color: 'green')
+Rectangle.new(x: 200, y: 50, width: 50, height: 50, color: 'lime')
+Rectangle.new(x: 250, y: 50, width: 50, height: 50, color: 'yellow')
+Rectangle.new(x: 300, y: 50, width: 50, height: 50, color: 'orange')
+Rectangle.new(x: 350, y: 50, width: 50, height: 50, color: 'red')
+Rectangle.new(x: 400, y: 50, width: 50, height: 50, color: 'maroon')
+Rectangle.new(x: 450, y: 50, width: 50, height: 50, color: 'fuchsia')
+Rectangle.new(x: 500, y: 50, width: 50, height: 50, color: 'purple')
+Rectangle.new(x: 550, y: 50, width: 50, height: 50, color: 'brown')
 
 # Mix of named colors and numbers
-Rectangle.new(600, 0, 50, 50,
-[
-  'red',
-  'green',
-  'blue',
-  'yellow'
-])
-Rectangle.new(650, 0, 50, 50,
-[
-  [1.0, 0, 0, 1],
-  'green',
-  [0.0, 0, 1, 1.0],
-  'yellow'
-])
-Rectangle.new(600, 50, 50, 50, 'random')
-Rectangle.new(650, 50, 50, 50, 'random')
+Rectangle.new(
+  x: 600,
+  width: 50,
+  height: 50,
+  color: [
+    'red',
+    'green',
+    'blue',
+    'yellow'
+  ]
+)
+Rectangle.new(
+  x: 650,
+  y: 0,
+  width: 50,
+  height: 50,
+  color: [
+    [1.0, 0, 0, 1],
+    'green',
+    [0.0, 0, 1, 1.0],
+    'yellow'
+  ]
+)
+Rectangle.new(x: 600, y: 50, width: 50, height: 50, color: 'random')
+Rectangle.new(x: 650, y: 50, width: 50, height: 50, color: 'random')
 
 # White to black gradient
-Rectangle.new(0, 100, 700, 25,
-[
-  [1.0, 1.0, 1.0, 1.0],
-  [0.0, 0.0, 0.0, 0.0],
-  [0.0, 0.0, 0.0, 0.0],
-  [1.0, 1.0, 1.0, 1.0]
-])
+Rectangle.new(
+  x: 0,
+  y: 100,
+  width: 700,
+  height: 25,
+  color: [
+    [1.0, 1.0, 1.0, 1.0],
+    [0.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0],
+    [1.0, 1.0, 1.0, 1.0]
+  ]
+)
 
 # Color gradient
-Rectangle.new(0, 125, 700, 50,
-[
-  [1.0, 0.0, 0.0, 1.0],
-  [0.0, 1.0, 0.0, 1.0],
-  [0.0, 0.0, 1.0, 1.0],
-  [1.0, 1.0, 0.0, 1.0]
-])
+Rectangle.new(
+  x: 0,
+  y: 125,
+  width: 700,
+  height: 50,
+  color: [
+    [1.0, 0.0, 0.0, 1.0],
+    [0.0, 1.0, 0.0, 1.0],
+    [0.0, 0.0, 1.0, 1.0],
+    [1.0, 1.0, 0.0, 1.0]
+  ]
+)
 
 # Transparancy
-Rectangle.new(0, 165, 700, 35,
-[
-  [1.0, 1.0, 1.0, 0.0],
-  [1.0, 1.0, 1.0, 1.0],
-  [1.0, 1.0, 1.0, 1.0],
-  [1.0, 1.0, 1.0, 0.0]
-])
+Rectangle.new(
+  x: 0,
+  y: 165,
+  width: 700,
+  height: 35,
+  color: [
+    [1.0, 1.0, 1.0, 0.0],
+    [1.0, 1.0, 1.0, 1.0],
+    [1.0, 1.0, 1.0, 1.0],
+    [1.0, 1.0, 1.0, 0.0]
+  ]
+)
 
 # Triangles
-Triangle.new(25, 200, 50, 250, 0, 250,     [1.0,   0,   0, 1.0])
-Triangle.new(75, 200, 100, 250, 50, 250,   [  0, 1.0,   0, 1.0])
-Triangle.new(125, 200, 150, 250, 100, 250, [  0,   0, 1.0, 1.0])
-Triangle.new(175, 200, 200, 250, 150, 250,
-[
-  [1.0, 0, 0, 1.0],
-  [0, 1.0, 0, 1.0],
-  [0, 0, 1.0, 1.0]
-])
-Rectangle.new(200, 200, 50, 50, [0.5, 0.5, 0.5, 1.0])  # add background for transparancy
-Triangle.new(225, 200, 250, 250, 200, 250,
-[
-  [1.0, 1.0, 1.0, 1.0],
-  [0.0, 0.0, 0.0, 1.0],
-  [1.0, 1.0, 1.0, 0.0]
-])
+Triangle.new(x1: 25,  y1: 200, x2: 50,  y2: 250, x3: 0,   y3: 250, color: [1.0,   0,   0, 1.0])
+Triangle.new(x1: 75,  y1: 200, x2: 100, y2: 250, x3: 50,  y3: 250, color: [  0, 1.0,   0, 1.0])
+Triangle.new(x1: 125, y1: 200, x2: 150, y2: 250, x3: 100, y3: 250, color: [  0,   0, 1.0, 1.0])
+Triangle.new(x1: 175, y1: 200, x2: 200, y2: 250, x3: 150, y3: 250,
+  color: [
+    [1.0, 0, 0, 1.0],
+    [0, 1.0, 0, 1.0],
+    [0, 0, 1.0, 1.0]
+  ]
+)
+Rectangle.new(
+  x: 200,
+  y: 200,
+  width: 50,
+  height: 50,
+  color: [0.5, 0.5, 0.5, 1.0]
+)  # add background for transparancy
+Triangle.new(
+  x1: 225,
+  y1: 200,
+  x2: 250,
+  y2: 250,
+  x3: 200,
+  y3: 250,
+  color: [
+    [1.0, 1.0, 1.0, 1.0],
+    [0.0, 0.0, 0.0, 1.0],
+    [1.0, 1.0, 1.0, 0.0]
+  ]
+)
 
 # Quadrilaterals
 Quad.new(
-  300, 200,
-  350, 200,
-  300, 250,
-  250, 250,
-  [
+  x1: 300, y1: 200,
+  x2: 350, y2: 200,
+  x3: 300, y3: 250,
+  x4: 250, y4: 250,
+  color: [
     [1.0, 0.0, 0.0, 1.0],
     [0.0, 1.0, 0.0, 1.0],
     [0.0, 0.0, 1.0, 1.0],
@@ -124,11 +162,11 @@ Quad.new(
 )
 
 Quad.new(
-  250, 200,
-  300, 200,
-  350, 250,
-  300, 250,
-  [
+  x1: 250, y1: 200,
+  x2: 300, y2: 200,
+  x3: 350, y3: 250,
+  x4: 300, y4: 250,
+  color: [
     [1.0, 1.0, 1.0, 0.0],
     [1.0, 1.0, 1.0, 0.0],
     [1.0, 1.0, 1.0, 1.0],
@@ -138,9 +176,10 @@ Quad.new(
 
 # Lines
 Line.new(
-  354, 204, 397, 247,
-  11,
-  [
+  x1: 354, y1: 204,
+  x2: 397, y2: 247,
+  width: 11,
+  color: [
     [1, 1, 1, 1],
     [1, 1, 1, 1],
     [1, 1, 1, 1],
@@ -149,9 +188,10 @@ Line.new(
 );
 
 Line.new(
-  395, 205, 355, 245,
-  15,
-  [
+  x1: 395, y1: 205,
+  x2: 355, y2: 245,
+  width: 15,
+  color: [
     [1, 0, 0, 0.5],
     [0, 1, 0, 0.5],
     [0, 0, 1, 0.5],
@@ -160,29 +200,26 @@ Line.new(
 );
 
 # Images
-Image.new(590, 180, "#{media}/image.png")
-Image.new(590, 290, "#{media}/image.jpg")
-Image.new(590, 400, "#{media}/image.bmp")
-img_r = Image.new(400, 200, "#{media}/colors.png")
+Image.new(x: 590, y: 180, path: "#{media}/image.png")
+Image.new(x: 590, y: 290, path: "#{media}/image.jpg")
+Image.new(x: 590, y: 400, path: "#{media}/image.bmp")
+img_r = Image.new(x: 400, y: 200, path: "#{media}/colors.png")
 img_r.width, img_r.height = 50, 25
 img_r.color = [1.0, 0.3, 0.3, 1.0]
-img_g = Image.new(400, 225, "#{media}/colors.png")
+img_g = Image.new(x: 400, y: 225, path: "#{media}/colors.png")
 img_g.width, img_g.height = 25, 25
 img_g.color = [0.3, 1.0, 0.3, 1.0]
-img_b = Image.new(425, 225, "#{media}/colors.png")
+img_b = Image.new(x: 425, y: 225, path: "#{media}/colors.png")
 img_b.width, img_b.height = 25, 25
 img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-txt_r = Text.new( 44, 202, "R", 20, font)
-txt_r.color = [1.0, 0.0, 0.0, 1.0]
-txt_g = Text.new( 92, 202, "G", 20, font)
-txt_g.color = [0.0, 1.0, 0.0, 1.0]
-txt_b = Text.new(144, 202, "B", 20, font)
-txt_b.color = [0.0, 0.0, 1.0, 1.0]
+Text.new(x: 44,  y: 202, text: "R", font: font, color: [1.0, 0.0, 0.0, 1.0])
+Text.new(x: 92,  y: 202, text: "G", font: font, color: [0.0, 1.0, 0.0, 1.0])
+Text.new(x: 144, y: 202, text: "B", font: font, color: [0.0, 0.0, 1.0, 1.0])
 
 # Frames per second
-fps = Text.new(10, 470, "", 20, font)
+fps = Text.new(x: 10, y: 470, text: "", font: font)
 
 # Sprites
 s1 = Sprite.new(450, 200, "#{media}/sprite_sheet.png")
@@ -194,33 +231,43 @@ s1.add(forwards: [
 ])
 
 # Pointer for mouse
-pointer = Square.new(0, 0, 10, [1, 1, 1, 1])
-pointer_outline = Square.new(0, 0, 18, [0, 1, 0, 0])
+pointer = Square.new(size: 10)
+pointer_outline = Square.new(size: 18, color: [0, 1, 0, 0])
 flash = 0
 
 # Updating opacity
-opacity_square = Square.new(500, 200, 50, ["red", "green", "blue", "yellow"])
-time_start     = Time.now
+opacity_square = Square.new(
+  x: 500,
+  y: 200,
+  size: 50,
+  color: ["red", "green", "blue", "yellow"]
+)
+time_start = Time.now
 
 # Text size
-created_text = Text.new(10, 270, "Created text", 20, font)
+created_text = Text.new(x: 10, y: 270, text: "Created text", font: font)
 created_text_background = Rectangle.new(
-  created_text.x - 10,
-  created_text.y - 10,
-  created_text.width + 20,
-  created_text.height + 20,
-  "red"
+  x: created_text.x - 10,
+  y: created_text.y - 10,
+  width: created_text.width + 20,
+  height: created_text.height + 20,
+  color: "red"
 )
 created_text.remove
 created_text.add
 
-updated_text = Text.new(20 + created_text_background.x2, 270, "Updated text", 20, font)
+updated_text = Text.new(
+  x: 20 + created_text_background.x2,
+  y: 270,
+  text: "Updated text",
+  font: font
+)
 updated_text_background = Rectangle.new(
-  updated_text.x - 10,
-  updated_text.y - 10,
-  updated_text.width + 20,
-  updated_text.height + 20,
-  "blue"
+  x: updated_text.x - 10,
+  y: updated_text.y - 10,
+  width: updated_text.width + 20,
+  height: updated_text.height + 20,
+  color: "blue"
 )
 updated_text.remove
 updated_text.add

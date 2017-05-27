@@ -23,8 +23,20 @@ class Ruby2D::Square
 end
 
 objects = []
-objects << Square.new(50, 50, 200, "red",   @z_index_generator.get)
-objects << Square.new(100, 50, 200, "blue", @z_index_generator.get)
+objects << Square.new(
+  x: 50,
+  y: 50,
+  size: 200,
+  color: "red",
+  z: @z_index_generator.get
+)
+objects << Square.new(
+  x: 100,
+  y: 50,
+  size: 200,
+  color: "blue",
+  z: @z_index_generator.get
+)
 
 on :mouse_down do |event|
   x = event.x
@@ -39,7 +51,13 @@ on :mouse_down do |event|
     first_object.z = @z_index_generator.get if first_object
   when :right
     # Add new square with z-index of zero, with the middle at mouse position
-    objects << Square.new(x - 100, y - 100, 200, "random", -objects.count)
+    objects << Square.new(
+      x: x - 100,
+      y: y - 100,
+      size: 200,
+      color: "random",
+      z: -objects.count
+    )
   end
 end
 

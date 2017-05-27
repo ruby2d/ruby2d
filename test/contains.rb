@@ -11,13 +11,13 @@ else
 end
 
 objects = []
-objects.push Square.new(50, 50, 100)
-objects.push Rectangle.new(200, 50, 100, 75)
-objects.push Quad.new(350, 50, 500, 75, 450, 150, 375, 125)
-objects.push Triangle.new(550, 50, 600, 125, 500, 150)
-objects.push Line.new(225, 175, 375, 225, 20)
-objects.push Image.new(50, 200, "#{media}/colors.png")
-objects.push Text.new(450, 200, "Hello", 50, font)
+objects.push Square.new(x: 50, y: 50, size: 100)
+objects.push Rectangle.new(x: 200, y: 50, width: 100, height: 75)
+objects.push Quad.new(x1: 350, y1: 50, x2: 500, y2: 75, x3: 450, y3: 150, x4: 375, y4: 125)
+objects.push Triangle.new(x1: 550, y1: 50, x2: 600, y2: 125, x3: 500, y3: 150)
+objects.push Line.new(x1: 225, y1: 175, x2: 375, y2: 225, width: 20)
+objects.push Image.new(x: 50, y: 200, path: "#{media}/colors.png")
+objects.push Text.new(x: 450, y: 200, text: "Hello", size: 50, font: font)
 
 on :key_down do |event|
   close if event.key == 'escape'

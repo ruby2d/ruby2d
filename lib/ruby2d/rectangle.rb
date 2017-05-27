@@ -5,13 +5,18 @@ module Ruby2D
 
     attr_reader :x, :y, :width, :height
 
-    def initialize(x=0, y=0, w=200, h=100, c='white', z=0)
+    def initialize(opts = {})
       @type_id = 2
-      @x, @y, @width, @height = x, y, w, h
-      @z = z
-      update_coords(x, y, w, h)
 
-      self.color = c
+      @x      = opts[:x]      || 0
+      @y      = opts[:y]      || 0
+      @z      = opts[:z]      || 0
+      @width  = opts[:width]  || 200
+      @height = opts[:height] || 100
+
+      update_coords(@x, @y, @width, @height)
+
+      self.color = opts[:color] || 'white'
       add
     end
 
