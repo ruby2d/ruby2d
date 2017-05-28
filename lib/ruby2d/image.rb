@@ -22,11 +22,9 @@ module Ruby2D
       @width  = opts[:width]  || nil
       @height = opts[:height] || nil
 
-      @type_id = 4
-
       self.color = opts[:color] || 'white'
 
-      ext_image_init(@path)
+      ext_init(@path)
       add
     end
 

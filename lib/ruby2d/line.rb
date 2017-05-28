@@ -6,8 +6,6 @@ module Ruby2D
     attr_accessor :x1, :x2, :y1, :y2, :color, :width
 
     def initialize(opts = {})
-      @type_id = 3
-
       @x1 = opts[:x1] || 0
       @y1 = opts[:y1] || 0
       @x2 = opts[:x2] || 100

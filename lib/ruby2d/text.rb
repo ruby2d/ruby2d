@@ -8,8 +8,6 @@ module Ruby2D
     attr_reader :text, :size, :width, :height, :font, :color
 
     def initialize(opts = {})
-      @type_id = 6
-
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
@@ -25,13 +23,13 @@ module Ruby2D
       end
 
       self.color = opts[:color] || 'white'
-      ext_text_init
+      ext_init
       add
     end
 
     def text=(msg)
       @text = msg.to_s
-      ext_text_set(@text)
+      ext_set(@text)
     end
 
     def color=(c)

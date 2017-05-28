@@ -10,8 +10,6 @@ module Ruby2D
     attr_reader :color, :type_id
 
     def initialize(opts= {})
-      @type_id = 1
-
       @x1 = opts[:x1] || 50
       @y1 = opts[:y1] || 0
       @x2 = opts[:x2] || 100

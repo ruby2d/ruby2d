@@ -12,7 +12,6 @@ module Ruby2D
       #   raise Error, "Cannot find image file `#{path}`"
       # end
 
-      @type_id = 5
       @x, @y, @path = x, y, path
       @clip_x, @clip_y, @clip_w, @clip_h = 0, 0, 0, 0
       @default = nil
@@ -22,7 +21,7 @@ module Ruby2D
       @current_frame_time = 0
       @z = z
 
-      ext_sprite_init(path)
+      ext_init(path)
       if Module.const_defined? :DSL
         Application.add(self)
       end
