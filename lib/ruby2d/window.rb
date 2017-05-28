@@ -228,11 +228,11 @@ module Ruby2D
     end
 
     def show
-      ext_window_show
+      ext_show
     end
 
     def close
-      ext_window_close
+      ext_close
     end
 
     private

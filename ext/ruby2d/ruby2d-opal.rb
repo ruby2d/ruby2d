@@ -4,19 +4,10 @@
 $R2D_WINDOW = nil
 
 # Simple 2D window
-`var win;`
+`
+var win;
 
-
-`// ruby2d.js
-
-// @type_id values for rendering
-const $R2D_TRIANGLE = 1;
-const $R2D_QUAD     = 2;
-const $R2D_LINE     = 3;
-const $R2D_IMAGE    = 4;
-const $R2D_SPRITE   = 5;
-const $R2D_TEXT     = 6;
-
+// ruby2d.js
 
 function on_key(e) {
 
@@ -104,148 +95,162 @@ function render() {
   var objects = #{$R2D_WINDOW.objects};
 
   for (var i = 0; i < objects.length; i++) {
-
     var el = objects[i];
-
-    switch (el.type_id) {
-
-      case $R2D_TRIANGLE:
-
-        S2D.DrawTriangle(
-          el.x1, el.y1, el.c1.r, el.c1.g, el.c1.b, el.c1.a,
-          el.x2, el.y2, el.c2.r, el.c2.g, el.c2.b, el.c2.a,
-          el.x3, el.y3, el.c3.r, el.c3.g, el.c3.b, el.c3.a
-        );
-        break;
-
-      case $R2D_QUAD:
-        S2D.DrawQuad(
-          el.x1, el.y1, el.c1.r, el.c1.g, el.c1.b, el.c1.a,
-          el.x2, el.y2, el.c2.r, el.c2.g, el.c2.b, el.c2.a,
-          el.x3, el.y3, el.c3.r, el.c3.g, el.c3.b, el.c3.a,
-          el.x4, el.y4, el.c4.r, el.c4.g, el.c4.b, el.c4.a
-        );
-        break;
-
-      case $R2D_LINE:
-        S2D.DrawLine(
-          el.x1, el.y1, el.x2, el.y2, el.width,
-          el.c1.r, el.c1.g, el.c1.b, el.c1.a,
-          el.c2.r, el.c2.g, el.c2.b, el.c2.a,
-          el.c3.r, el.c3.g, el.c3.b, el.c3.a,
-          el.c4.r, el.c4.g, el.c4.b, el.c4.a
-        );
-        break;
-
-      case $R2D_IMAGE:
-        el.data.x = el.x;
-        el.data.y = el.y;
-
-        if (el.width  != Opal.nil) el.data.width  = el.width;
-        if (el.height != Opal.nil) el.data.height = el.height;
-
-        el.data.color.r = el.color.r;
-        el.data.color.g = el.color.g;
-        el.data.color.b = el.color.b;
-        el.data.color.a = el.color.a;
-
-        S2D.DrawImage(el.data);
-        break;
-
-      case $R2D_SPRITE:
-        el.data.x = el.x;
-        el.data.y = el.y;
-
-        S2D.ClipSprite(
-          el.data,
-          el.clip_x,
-          el.clip_y,
-          el.clip_w,
-          el.clip_h
-        );
-
-        S2D.DrawSprite(el.data);
-        break;
-
-      case $R2D_TEXT:
-        el.data.x = el.x;
-        el.data.y = el.y;
-
-        el.data.color.r = el.color.r;
-        el.data.color.g = el.color.g;
-        el.data.color.b = el.color.b;
-        el.data.color.a = el.color.a;
-
-        S2D.DrawText(el.data);
-        break;
-    }
-
+    el['$ext_render']();
   }
-}`
+}
+`
 
 
 module Ruby2D
+  class Triangle
+    def ext_render
+      `S2D.DrawTriangle(
+        #{self}.x1, #{self}.y1, #{self}.c1.r, #{self}.c1.g, #{self}.c1.b, #{self}.c1.a,
+        #{self}.x2, #{self}.y2, #{self}.c2.r, #{self}.c2.g, #{self}.c2.b, #{self}.c2.a,
+        #{self}.x3, #{self}.y3, #{self}.c3.r, #{self}.c3.g, #{self}.c3.b, #{self}.c3.a
+      );`
+    end
+  end
+
+  class Quad
+    def ext_render
+      `S2D.DrawQuad(
+        #{self}.x1, #{self}.y1, #{self}.c1.r, #{self}.c1.g, #{self}.c1.b, #{self}.c1.a,
+        #{self}.x2, #{self}.y2, #{self}.c2.r, #{self}.c2.g, #{self}.c2.b, #{self}.c2.a,
+        #{self}.x3, #{self}.y3, #{self}.c3.r, #{self}.c3.g, #{self}.c3.b, #{self}.c3.a,
+        #{self}.x4, #{self}.y4, #{self}.c4.r, #{self}.c4.g, #{self}.c4.b, #{self}.c4.a
+      );`
+    end
+  end
+
+  class Line
+    def ext_render
+      `S2D.DrawLine(
+        #{self}.x1, #{self}.y1, #{self}.x2, #{self}.y2, #{self}.width,
+        #{self}.c1.r, #{self}.c1.g, #{self}.c1.b, #{self}.c1.a,
+        #{self}.c2.r, #{self}.c2.g, #{self}.c2.b, #{self}.c2.a,
+        #{self}.c3.r, #{self}.c3.g, #{self}.c3.b, #{self}.c3.a,
+        #{self}.c4.r, #{self}.c4.g, #{self}.c4.b, #{self}.c4.a
+      );`
+    end
+  end
+
   class Image
-    def ext_image_init(path)
-      `#{self}.data = S2D.CreateImage(path, function() {
+    def ext_init(path)
+      `
+      #{self}.data = S2D.CreateImage(path, function() {
         if (#{@width} == Opal.nil) {
           #{@width} = #{self}.data.width;
         }
         if (#{@height} == Opal.nil) {
           #{@height} = #{self}.data.height;
         }
-      });`
+      });
+      `
+    end
+
+    def ext_render
+      `
+      #{self}.data.x = #{self}.x;
+      #{self}.data.y = #{self}.y;
+
+      if (#{self}.width  != Opal.nil) #{self}.data.width  = #{self}.width;
+      if (#{self}.height != Opal.nil) #{self}.data.height = #{self}.height;
+
+      #{self}.data.color.r = #{self}.color.r;
+      #{self}.data.color.g = #{self}.color.g;
+      #{self}.data.color.b = #{self}.color.b;
+      #{self}.data.color.a = #{self}.color.a;
+
+      S2D.DrawImage(#{self}.data);
+      `
     end
   end
 
   class Sprite
-    def ext_sprite_init(path)
+    def ext_init(path)
       `#{self}.data = S2D.CreateSprite(path);`
+    end
+
+    def ext_render
+      `
+      #{self}.data.x = #{self}.x;
+      #{self}.data.y = #{self}.y;
+
+      S2D.ClipSprite(
+        #{self}.data,
+        #{self}.clip_x,
+        #{self}.clip_y,
+        #{self}.clip_w,
+        #{self}.clip_h
+      );
+
+      S2D.DrawSprite(#{self}.data);
+      `
     end
   end
 
   class Text
-    def ext_text_init
-      `#{self}.data = S2D.CreateText(#{self}.font, #{self}.text, #{self}.size);`
-      @width  = `#{self}.data.width;`
-      @height = `#{self}.data.height;`
+    def ext_init
+      `
+      #{self}.data = S2D.CreateText(#{self}.font, #{self}.text, #{self}.size);
+      #{@width}  = #{self}.data.width;
+      #{@height} = #{self}.data.height;
+      `
     end
 
-    def ext_text_set(msg)
-      `S2D.SetText(#{self}.data, #{msg});`
-      @width  = `#{self}.data.width;`
-      @height = `#{self}.data.height;`
+    def ext_set(msg)
+      `
+      S2D.SetText(#{self}.data, #{msg});
+      #{@width}  = #{self}.data.width;
+      #{@height} = #{self}.data.height;
+      `
+    end
+
+    def ext_render
+      `
+      #{self}.data.x = #{self}.x;
+      #{self}.data.y = #{self}.y;
+
+      #{self}.data.color.r = #{self}.color.r;
+      #{self}.data.color.g = #{self}.color.g;
+      #{self}.data.color.b = #{self}.color.b;
+      #{self}.data.color.a = #{self}.color.a;
+
+      S2D.DrawText(#{self}.data);
+      `
     end
   end
 
   class Sound
-    def ext_sound_init(path)
+    def ext_init(path)
       `#{self}.data = S2D.CreateSound(path);`
     end
 
-    def ext_sound_play
+    def ext_play
       `S2D.PlaySound(#{self}.data);`
     end
   end
 
   class Music
-    def ext_music_init(path)
+    def ext_init(path)
       `#{self}.data = S2D.CreateMusic(path);`
     end
 
-    def ext_music_play
+    def ext_play
       `S2D.PlayMusic(#{self}.data, #{self}.loop);`
     end
 
-    def ext_music_pause
+    def ext_pause
       `S2D.PauseMusic();`
     end
 
-    def ext_music_resume
+    def ext_resume
       `S2D.ResumeMusic();`
     end
 
-    def ext_music_stop
+    def ext_stop
       `S2D.StopMusic();`
     end
 
@@ -255,7 +260,7 @@ module Ruby2D
   end
 
   class Window
-    def ext_window_show
+    def ext_show
       $R2D_WINDOW = self
 
       `
@@ -277,7 +282,8 @@ module Ruby2D
       win.on_key          = on_key;
       win.on_mouse        = on_mouse;
 
-      S2D.Show(win);`
+      S2D.Show(win);
+      `
     end
   end
 end

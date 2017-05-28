@@ -6,7 +6,6 @@ module Ruby2D
     attr_reader :size
 
     def initialize(opts = {})
-      @type_id = 2
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
