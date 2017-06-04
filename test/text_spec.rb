@@ -1,6 +1,11 @@
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Text do
+  describe '#new' do
+    it "raises exception if font file doesn't exist" do
+      expect { Text.new(font: 'bad_font.ttf') }.to raise_error(Ruby2D::Error)
+    end
+  end
 
   describe '#text=' do
     it 'maps Time to string' do

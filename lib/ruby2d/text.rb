@@ -18,6 +18,12 @@ module Ruby2D
 
       @font = opts[:font]
 
+      unless RUBY_ENGINE == 'opal'
+        unless File.exists? @font
+          raise Error, "Cannot find font file `#{@font}`"
+        end
+      end
+
       self.color = opts[:color] || 'white'
       ext_text_init
       add
