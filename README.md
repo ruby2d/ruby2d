@@ -39,8 +39,8 @@ rake test:mri testcard
 # Build `test/audio.rb` natively using MRuby and run
 rake test:native audio
 
-# Build `test/testcard.rb` for the web using Opal and run in the default browser
-rake test:web input
+# Build `test/mouse.rb` for the web using Opal and run in the default browser
+rake test:web mouse
 ```
 
 ## Contribute
@@ -65,7 +65,7 @@ In order to achieve such simplicity, a lot has to happen under the hood. We reco
 
 Whether adding a feature or fixing a bug, try to do the following to ensure your pull request gets merged. Some of these might seem daunting, but we're happy to help along the way!
 
-- **Check if there is an existing issue, and if not, open a new one to start a discussion.** Before committing time and energy to an idea or fix, let's make sure it's consistent with the principles and goals of the project, and that we have a solid strategy in place to implement and test.
+- **Check if there is an existing issue, and if not, open a new one to start a discussion.** Before dedicating time and energy to an idea or fix, let's make sure it's consistent with the principles and goals of the project, and that we have a solid strategy in place to implement and test.
 
 - **Use a subset of Ruby that works everywhere.** Ruby 2D applications are, of course, written in Ruby. Some users may choose to harness the full power of the language, standard library, and ecosystem of gems by writing interpreted apps targeting the standard implementation, [MRI](https://en.wikipedia.org/wiki/Ruby_MRI). Others may want to target the web via [Opal](http://opalrb.org), so their app can be run in any browser. And others still may want to compile their app to native code via [MRuby](http://mruby.org), so they can embed it on platforms like the [Raspberry Pi](https://www.raspberrypi.org) and [CHIP](https://getchip.com/pages/chip), or run it on mobile platforms like iOS and Android, or on the big screen with Apple TV or Amazon Fire TV. Or even further, some may want to do all three! Ruby 2D aims to support all of these use cases, even with the same app codebase. Your code contribution to this gem has to support a subset of Ruby that is compatible and behaves similarly across MRI, MRuby, and Opal. Beyond reading the documentation for each Ruby implementation, you can also try out code snippets on the command line using their respective REPLs: `irb` (MRI), `mirb` (MRuby), and `opal-repl` (Opal).
 
