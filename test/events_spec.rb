@@ -1,6 +1,13 @@
 require 'ruby2d'
 
 RSpec.describe Window do
+  describe 'on :bad_event' do
+    it "raises exception if a bad event type is given" do
+      window = Ruby2D::Window.new
+      expect { window.on(:bad_event) }.to raise_error(Ruby2D::Error)
+    end
+  end
+
   [:key, :key_down, :key_held, :key_up].each do |key_event_type|
     describe "on #{key_event_type}" do
       it "allows binding of event" do
