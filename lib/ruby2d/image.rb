@@ -18,7 +18,7 @@ module Ruby2D
 
       @x = opts[:x] || 0
       @y = opts[:y] || 0
-      @z = opts[:x] || 0
+      @z = opts[:z] || 0
 
       @type_id = 4
 
