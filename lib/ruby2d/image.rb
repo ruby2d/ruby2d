@@ -19,6 +19,8 @@ module Ruby2D
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
+      @width  = opts[:width]  || nil
+      @height = opts[:height] || nil
 
       @type_id = 4
 
