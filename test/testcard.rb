@@ -203,8 +203,7 @@ Line.new(
 Image.new(x: 590, y: 180, path: "#{media}/image.png")
 Image.new(x: 590, y: 290, path: "#{media}/image.jpg")
 Image.new(x: 590, y: 400, path: "#{media}/image.bmp")
-img_r = Image.new(x: 400, y: 200, path: "#{media}/colors.png")
-img_r.width, img_r.height = 50, 25
+img_r = Image.new(x: 400, y: 200, width: 50, height: 25, path: "#{media}/colors.png")
 img_r.color = [1.0, 0.3, 0.3, 1.0]
 img_g = Image.new(x: 400, y: 225, path: "#{media}/colors.png")
 img_g.width, img_g.height = 25, 25
