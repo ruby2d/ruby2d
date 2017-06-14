@@ -216,6 +216,11 @@ static R_VAL ruby2d_sprite_init(R_VAL self, R_VAL path) {
   sprintf(S2D_msg, "Init sprite: %s", RSTRING_PTR(path));
   S2D_Log(S2D_msg, S2D_INFO);
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
+  R_VAL w = r_iv_get(self, "@width");
+  R_VAL h = r_iv_get(self, "@height");
+  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(spr->width));
+  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(spr->height));
+
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
   return R_NIL;
 }
@@ -735,6 +740,11 @@ static void render() {
 
         spr->x = NUM2DBL(r_iv_get(el, "@x"));
         spr->y = NUM2DBL(r_iv_get(el, "@y"));
+
+        R_VAL w = r_iv_get(el, "@width");
+        R_VAL h = r_iv_get(el, "@height");
+        if (r_test(w)) spr->width  = NUM2INT(w);
+        if (r_test(h)) spr->height = NUM2INT(h);
 
         S2D_ClipSprite(
           spr,

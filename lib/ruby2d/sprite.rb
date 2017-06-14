@@ -3,17 +3,17 @@
 module Ruby2D
   class Sprite
 
-    attr_accessor :x, :y, :clip_x, :clip_y, :clip_w, :clip_h, :data
+    attr_accessor :x, :y, :width, :height, :clip_x, :clip_y, :clip_w, :clip_h, :data
     attr_reader :z
 
-    def initialize(x, y, path, z=0)
+    def initialize(x, y, width, height, path, z=0)
 
       # unless File.exists? path
       #   raise Error, "Cannot find image file `#{path}`"
       # end
 
       @type_id = 5
-      @x, @y, @path = x, y, path
+      @x, @y, @path, @width, @height = x, y, path, width, height
       @clip_x, @clip_y, @clip_w, @clip_h = 0, 0, 0, 0
       @default = nil
       @animations = {}

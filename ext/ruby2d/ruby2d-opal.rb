@@ -156,6 +156,9 @@ function render() {
         el.data.x = el.x;
         el.data.y = el.y;
 
+        if (el.width  != Opal.nil) el.data.width  = el.width;
+        if (el.height != Opal.nil) el.data.height = el.height;
+
         S2D.ClipSprite(
           el.data,
           el.clip_x,
@@ -200,7 +203,14 @@ module Ruby2D
 
   class Sprite
     def ext_sprite_init(path)
-      `#{self}.data = S2D.CreateSprite(path);`
+      `#{self}.data = S2D.CreateSprite(path, function() {
+        if (#{@width} == Opal.nil) {
+          #{@width} = #{self}.data.width;
+        }
+        if (#{@height} == Opal.nil) {
+          #{@height} = #{self}.data.height;
+        }
+      });`
     end
   end
 
