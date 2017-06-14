@@ -6,7 +6,7 @@ module Ruby2D
     attr_accessor :x, :y, :width, :height, :clip_x, :clip_y, :clip_w, :clip_h, :data
     attr_reader :z
 
-    def initialize(x, y, width, height, path, z=0)
+    def initialize(x, y, path, z=0, width=nil, height=nil)
 
       # unless File.exists? path
       #   raise Error, "Cannot find image file `#{path}`"

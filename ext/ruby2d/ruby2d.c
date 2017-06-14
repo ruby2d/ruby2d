@@ -218,8 +218,9 @@ static R_VAL ruby2d_sprite_init(R_VAL self, R_VAL path) {
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
   R_VAL w = r_iv_get(self, "@width");
   R_VAL h = r_iv_get(self, "@height");
-  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(spr->width));
-  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(spr->height));
+
+  if (r_test(w)) spr->width = w;
+  if (r_test(h)) spr->height = h;
 
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
   return R_NIL;
