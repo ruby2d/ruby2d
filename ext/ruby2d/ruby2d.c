@@ -884,7 +884,7 @@ static R_VAL ruby2d_window_ext_close() {
 /*
  * MRuby entry point
  */
-int main(void) {
+int main() {
   // Open the MRuby environment
   mrb = mrb_open();
   if (!mrb) { /* handle error */ }
@@ -1002,5 +1002,7 @@ void Init_ruby2d() {
 
   // Close the MRuby environment
   mrb_close(mrb);
+
+  return 0;
 #endif
 }
