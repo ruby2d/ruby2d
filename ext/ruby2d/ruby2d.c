@@ -294,8 +294,7 @@ static R_VAL ruby2d_image_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_image_ext_init(R_VAL self, R_VAL path) {
 #endif
-  sprintf(S2D_msg, "Init image: %s", RSTRING_PTR(path));
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Init image: %s", RSTRING_PTR(path));
   S2D_Image *img = S2D_CreateImage(RSTRING_PTR(path));
 
   // Get width and height from Ruby class. If set, use it, else choose the
@@ -350,8 +349,7 @@ static void free_image(mrb_state *mrb, void *p_) {
 #else
 static void free_image(S2D_Image *img) {
 #endif
-  sprintf(S2D_msg, "Free image: %i, %i", img->x, img->y);
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Free image: %i, %i", img->x, img->y);
   S2D_FreeImage(img);
 }
 
@@ -367,8 +365,7 @@ static R_VAL ruby2d_sprite_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
 #endif
-  sprintf(S2D_msg, "Init sprite: %s", RSTRING_PTR(path));
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Init sprite: %s", RSTRING_PTR(path));
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
   return R_NIL;
@@ -412,8 +409,7 @@ static void free_sprite(mrb_state *mrb, void *p_) {
 #else
 static void free_sprite(S2D_Sprite *spr) {
 #endif
-  sprintf(S2D_msg, "Free sprite: %i, %i", spr->x, spr->y);
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Free sprite: %i, %i", spr->x, spr->y);
   S2D_FreeSprite(spr);
 }
 
@@ -427,8 +423,7 @@ static R_VAL ruby2d_text_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_text_ext_init(R_VAL self) {
 #endif
-  sprintf(S2D_msg, "Init text: %s", RSTRING_PTR(r_iv_get(self, "@text")));
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Init text: %s", RSTRING_PTR(r_iv_get(self, "@text")));
 
   S2D_Text *txt = S2D_CreateText(
     RSTRING_PTR(r_iv_get(self, "@font")),
@@ -501,8 +496,7 @@ static void free_text(mrb_state *mrb, void *p_) {
 #else
 static void free_text(S2D_Text *txt) {
 #endif
-  sprintf(S2D_msg, "Free text: %s", txt->msg);
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Free text: %s", txt->msg);
   S2D_FreeText(txt);
 }
 
@@ -518,8 +512,7 @@ static R_VAL ruby2d_sound_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_init(R_VAL self, R_VAL path) {
 #endif
-  sprintf(S2D_msg, "Init sound: %s", RSTRING_PTR(path));
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Init sound: %s", RSTRING_PTR(path));
   S2D_Sound *snd = S2D_CreateSound(RSTRING_PTR(path));
   r_iv_set(self, "@data", r_data_wrap_struct(sound, snd));
   return R_NIL;
@@ -550,8 +543,7 @@ static void free_sound(mrb_state *mrb, void *p_) {
 #else
 static void free_sound(S2D_Sound *snd) {
 #endif
-  sprintf(S2D_msg, "Free sound");
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Free sound");
   S2D_FreeSound(snd);
 }
 
@@ -567,8 +559,7 @@ static R_VAL ruby2d_music_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_init(R_VAL self, R_VAL path) {
 #endif
-  sprintf(S2D_msg, "Init music: %s", RSTRING_PTR(path));
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Init music: %s", RSTRING_PTR(path));
   S2D_Music *mus = S2D_CreateMusic(RSTRING_PTR(path));
   r_iv_set(self, "@data", r_data_wrap_struct(music, mus));
   return R_NIL;
@@ -653,8 +644,7 @@ static void free_music(mrb_state *mrb, void *p_) {
 #else
 static void free_music(S2D_Music *mus) {
 #endif
-  sprintf(S2D_msg, "Free music");
-  S2D_Log(S2D_msg, S2D_INFO);
+  S2D_Log(S2D_INFO, "Free music");
   S2D_FreeMusic(mus);
 }
 
