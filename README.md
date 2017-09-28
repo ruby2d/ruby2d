@@ -19,7 +19,7 @@ git submodule init
 git submodule update --remote
 ```
 
-Update these submodules at any time using `git submodule update --remote`
+Update these submodules at any time using `git submodule update --remote` or the `rake update` task.
 
 Next, install dependencies:
 - With [Bundler](http://bundler.io), run `bundle install` to get the required development gems.

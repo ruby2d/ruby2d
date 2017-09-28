@@ -1,7 +1,11 @@
 // ruby2d.c – Native C extension for Ruby and MRuby
 
 // Simple 2D includes
-#include <simple2d.h>
+#if RUBY2D_IOS_TVOS
+  #include <Simple2D/simple2d.h>
+#else
+  #include <simple2d.h>
+#endif
 
 // Ruby includes
 #if MRUBY
@@ -801,6 +805,22 @@ static void render() {
 
 
 /*
+ * Ruby2D::Window#ext_get_display_dimensions
+ */
+#if MRUBY
+static R_VAL ruby2d_window_ext_get_display_dimensions(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_window_ext_get_display_dimensions(R_VAL self) {
+#endif
+  int w; int h;
+  S2D_GetDisplayDimensions(&w, &h);
+  r_iv_set(self, "@display_width" , INT2NUM(w));
+  r_iv_set(self, "@display_height", INT2NUM(h));
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Window#ext_show
  */
 #if MRUBY
@@ -976,6 +996,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
+
+  // Ruby2D::Window#ext_get_display_dimensions
+  r_define_method(ruby2d_window_class, "ext_get_display_dimensions", ruby2d_window_ext_get_display_dimensions, r_args_none);
 
   // Ruby2D::Window#ext_show
   r_define_method(ruby2d_window_class, "ext_show", ruby2d_window_ext_show, r_args_none);
