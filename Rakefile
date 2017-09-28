@@ -32,17 +32,19 @@ end
 
 def run_mri_test(file)
   print_task "Running MRI test: #{file}.rb"
-  system "( cd test/ && ruby #{file}.rb )"
+  run_cmd "( cd test/ && ruby #{file}.rb )"
 end
 
 def run_native_test(file)
   print_task "Running native test: #{file}.rb"
+  run_cmd "ruby2d build --clean"
   run_cmd "ruby2d build --native test/#{file}.rb --debug"
-  system "( cd test/ && ../build/app )"
+  run_cmd "( cd test/ && ../build/app )"
 end
 
 def run_web_test(file)
   print_task "Running web test: #{file}.rb"
+  run_cmd "ruby2d build --clean"
   run_cmd "ruby2d build --web test/#{file}.rb --debug"
   open_cmd = 'open'
   case RUBY_PLATFORM
@@ -51,7 +53,13 @@ def run_web_test(file)
   when /mingw/
     open_cmd = "start"
   end
-  system "#{open_cmd} build/app.html"
+  run_cmd "#{open_cmd} build/app.html"
+end
+
+def run_apple_test(device)
+  run_cmd "ruby2d build --clean"
+  run_cmd "ruby2d build --#{device} test/triangle-ios-tvos.rb --debug"
+  run_cmd "ruby2d launch --#{device}"
 end
 
 # Tasks
@@ -74,6 +82,11 @@ desc "Install gem"
 task :install do
   print_task "Installing"
   run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose"
+end
+
+desc "Update submodules"
+task :update do
+  run_cmd "git submodule update --remote"
 end
 
 desc "Run the RSpec tests"
@@ -100,6 +113,19 @@ namespace :test do
     get_args
     run_web_test ARGV[1]
   end
+
+  desc "Run iOS test"
+  task :ios do
+    print_task "Running iOS test"
+    run_apple_test('ios')
+  end
+
+  desc "Run tvOS test"
+  task :tvos do
+    print_task "Running tvOS test"
+    run_apple_test('tvos')
+  end
+
 end
 
 desc "Uninstall, build, install, and test"

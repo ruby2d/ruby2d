@@ -17,6 +17,7 @@ module Ruby2D
       @width      = args[:width]  || 640
       @height     = args[:height] || 480
       @viewport_width, @viewport_height = nil, nil
+      @display_width, @display_height = nil, nil
       @resizable  = false
       @borderless = false
       @fullscreen = false
@@ -60,6 +61,13 @@ module Ruby2D
       when :height;          @height
       when :viewport_width;  @viewport_width
       when :viewport_height; @viewport_height
+      when :display_width, :display_height
+        ext_get_display_dimensions
+        if sym == :display_width
+          @display_width
+        else
+          @display_height
+        end
       when :resizable;       @resizable
       when :borderless;      @borderless
       when :fullscreen;      @fullscreen

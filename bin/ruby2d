@@ -6,7 +6,7 @@ require 'fileutils'
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
   def bold;  colorize('1')    end
-  def error; colorize('4;31') end
+  def error; colorize('1;31') end
 end
 
 # The installed gem directory
@@ -32,11 +32,14 @@ end
   'music'
 ]
 
+# Debugging command-line flag
+@debug = false
+
 
 # Check if source file provided is good
 def check_build_src_file(rb_file)
   if !rb_file
-    puts "Please provide a Ruby file to build."
+    puts "Please provide a Ruby file to build"
     exit
   elsif !File.exists? rb_file
     puts "Can't find file: #{rb_file}"
@@ -76,6 +79,7 @@ end
 
 # Build a native version of the provided Ruby application
 def build_native(rb_file)
+  check_build_src_file(rb_file)
 
   # Check if MRuby exists; if not, quit
   if `which mruby`.empty?
@@ -88,11 +92,7 @@ def build_native(rb_file)
   `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
 
   # Read the provided Ruby source file, copy to build dir and compile to bytecode
-
-  File.open('build/src.rb', 'w') do |file|
-    file << strip_require(rb_file)
-  end
-
+  File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
   `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
 
   # Combine contents of C source files and bytecode into one file
@@ -103,8 +103,11 @@ def build_native(rb_file)
     f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
   end
 
-  # Compile to native executable
+  # Compile to a native executable
   `cc build/app.c -lmruby \`simple2d --libs\` -o build/app`
+
+  # Clean up
+  clean_up unless @debug
 
   # Success!
   puts "Native app created at `build/app`"
@@ -113,19 +116,15 @@ end
 
 # Build a web-based version of the provided Ruby application
 def build_web(rb_file)
+  check_build_src_file(rb_file)
 
   # Assemble the Ruby 2D library in one `.rb` file and compile to JS
   make_lib
   `opal --compile --no-opal build/lib.rb > build/lib.js`
 
   # Read the provided Ruby source file, copy to build dir, and compile to JS
-
-  File.open('build/src.rb', 'w') do |file|
-    file << strip_require(rb_file)
-  end
-
+  File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
   `opal --compile --no-opal build/src.rb > build/src.js`
-
   FileUtils.cp "#{@gem_dir}/ext/ruby2d/ruby2d-opal.rb", "build/"
   `opal --compile --no-opal build/ruby2d-opal.rb > build/ruby2d-opal.js`
 
@@ -141,56 +140,127 @@ def build_web(rb_file)
   # Copy over HTML template
   FileUtils.cp "#{@gem_dir}/assets/template.html", "build/app.html"
 
+  # Clean up
+  clean_up unless @debug
+
   # Success!
   puts "Web app created at `build/app.js`",
        "  Run by opening `build/app.html`"
 end
 
 
-# Build an application package for the current platform
-def build_package
-  require 'fileutils'
+# Build an iOS or tvOS app
+def build_apple(rb_file, device)
+  check_build_src_file(rb_file)
 
-  icon_path = "#{@gem_dir}/assets/app.icns"
+  # Check for Simple 2D framework,
+  unless File.exists?('/usr/local/Frameworks/Simple2D/iOS/Simple2D.framework') && File.exists?('/usr/local/Frameworks/Simple2D/tvOS/Simple2D.framework')
+    puts "#{'Error:'.error} Simple 2D iOS and tvOS frameworks not found. Install them and try again.\n"
+    exit
+  end
 
-  FileUtils.mkpath "build/App.app/Contents/MacOS"
-  FileUtils.mkpath "build/App.app/Contents/Resources"
-  FileUtils.cp icon_path, "build/App.app/Contents/Resources"
+  # Check if MRuby exists; if not, quit
+  if `which mruby`.empty?
+    puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
+    exit
+  end
 
-  info_plist = %(
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>app</string>
-  <key>CFBundleIconFile</key>
-  <string>app.icns</string>
-  <key>CFBundleInfoDictionaryVersion</key>
-  <string>1.0</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleSignature</key>
-  <string>????</string>
-  <key>CFBundleVersion</key>
-  <string>1.0</string>
-</dict>
-</plist>
-)
+  # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
+  make_lib
+  `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
 
-  File.open("build/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
-  FileUtils.cp "build/app", "build/App.app/Contents/MacOS/"
-  puts "App written to `build/App.app`."
+  # Read the provided Ruby source file, copy to build dir and compile to bytecode
+  File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
+  `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
+
+  # Copy over iOS project
+  FileUtils.cp_r "#{@gem_dir}/assets/#{device}", "build"
+
+  # Combine contents of C source files and bytecode into one file
+  File.open("build/#{device}/main.c", 'w') do |f|
+    f << "#define RUBY2D_IOS_TVOS 1" << "\n\n"
+    f << "#define MRUBY 1" << "\n\n"
+    f << File.read("build/lib.c") << "\n\n"
+    f << File.read("build/src.c") << "\n\n"
+    f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
+  end
+
+  # Build the Xcode project
+  `simple2d build --#{device} build/#{device}/MyApp.xcodeproj`
+
+  # Clean up
+  clean_up unless @debug
+
+  # Success!
+  puts "App created at `build/#{device}`"
 end
 
 
 # Clean up unneeded build files
-def clean_up
+def clean_up(cmd = nil)
   FileUtils.rm(
     Dir.glob('build/{src,lib}.{rb,c,js}') +
     Dir.glob('build/ruby2d-opal.{rb,js}') +
     Dir.glob('build/app.c')
   )
+  if cmd == :all
+    puts "cleaning up..."
+    FileUtils.rm_f 'build/app'
+    FileUtils.rm_f 'build/app.js'
+    FileUtils.rm_f 'build/app.html'
+    FileUtils.rm_rf 'build/ios'
+    FileUtils.rm_rf 'build/tvos'
+  end
+end
+
+
+# Launch a native app
+def launch_native
+  if !File.exists? 'build/app'
+    puts "No native app built!"
+    exit
+  end
+  `( cd build && ./app )`
+end
+
+
+# Launch a web app
+def launch_web
+  if !File.exists? 'build/app.html'
+    puts "No web app built!"
+    exit
+  end
+  open_cmd = 'open'
+  case RUBY_PLATFORM
+  when /linux/
+    open_cmd = "xdg-#{open_cmd}"
+  when /mingw/
+    open_cmd = "start"
+  end
+  system "#{open_cmd} build/app.html"
+end
+
+
+# Launch an iOS or tvOS app in a simulator
+def launch_apple(device)
+  case device
+  when 'ios'
+    if !File.exists? 'build/ios/build/Release-iphonesimulator/MyApp.app'
+      puts "No iOS app built!"
+      exit
+    end
+    puts `simple2d simulator --open "iPhone 8" &&
+          simple2d simulator --install "build/ios/build/Release-iphonesimulator/MyApp.app" &&
+          simple2d simulator --launch "Ruby2D.MyApp"`
+  when 'tvos'
+    if !File.exists? 'build/tvos/build/Release-appletvsimulator/MyApp.app'
+      puts "No tvOS app built!"
+      exit
+    end
+    puts `simple2d simulator --open "Apple TV" &&
+          simple2d simulator --install "build/tvos/build/Release-appletvsimulator/MyApp.app" &&
+          simple2d simulator --launch "Ruby2D.MyApp"`
+  end
 end
 
 
@@ -201,31 +271,116 @@ Usage: ruby2d <command> <options>
               [-v|--version]
 
 Summary of commands and options:
-  build         Build the application both natively and for the web
-    --native      Build only native
-    --web         Build only web
-    --debug       Build native and web, keeping all intermediate files
-  package       Create application package for distribution (experimental)
+  build         Build a Ruby source file
+  launch        Launch a built Ruby 2D application
+  simulator     Interact with iOS and tvOS simulators
   -v|--version  Prints the installed version\n\n"
+
+usage_build = "
+Use the #{"build".bold} command to compile or build Ruby 2D apps.
+
+To compile and create a native executable, use:
+  build --native <ruby_file>
+
+To build for the web, creating a JavaScript and HTML package, use:
+  build --web <ruby_file>
+
+To build an iOS or tvOS app, use the following:
+  build --ios <ruby_file>
+  build --tvos <ruby_file>
+
+To build for every platform supported by the current system, use:
+  build --all <ruby_file>
+
+To clean up the build directory, use:
+  build --clean
+
+Add the #{"--debug".bold} option to print debugging info
+and keep all intermediate files generated.\n\n"
+
+usage_launch = "
+Use the #{"launch".bold} command to run a Ruby 2D app that has been built.
+Choose one of the following options to select the kind of app to run:
+
+  --native
+  --web
+  --ios
+  --tvos\n\n"
+
+usage_simulator = "
+Choose an option with the #{"simulator".bold} command:
+
+  --list      List available devices
+  --booted    Show currently booted devices
+
+  --open <device_name>    Open a simulator device with a given device name
+
+  --install <app_file>    Install an app on the booted simulator given the path
+                          to the app e.g. \"Release-iphonesimulator/MyApp.app\"
+
+  --launch <bundle_id>    Launch an app given the app bundle's identifier,
+                          e.g. \"Ruby2D.MyApp\"
+
+  --log           Stream log of the booted simulator
+  --log <app>     Stream log for the app only, given the app name
+  --log-errors    Stream log containing only error messages\n\n"
+
+# puts ARGV.inspect
 
 case ARGV[0]
 when 'build'
-  puts "Building..."
+  if ARGV.delete '--debug' then @debug = true end
   case ARGV[1]
   when '--native'
     build_native(ARGV[2])
   when '--web'
     build_web(ARGV[2])
+  when '--ios'
+    build_apple(ARGV[2], 'ios')
+  when '--tvos'
+    build_apple(ARGV[2], 'tvos')
+  when '--all'
+    build_native(ARGV[2])
+    build_web(ARGV[2])
+    build_apple(ARGV[2], 'ios')
+    build_apple(ARGV[2], 'tvos')
+  when '--clean'
+    clean_up(:all)
   else
-    if ARGV[2]; puts usage; exit end
-    check_build_src_file(ARGV[1])
-    build_native(ARGV[1])
-    build_web(ARGV[1])
+    puts usage_build
   end
-  unless ARGV.include? '--debug'; clean_up end
-when 'package'
-  puts "Running package..."
-  build_package
+when 'launch'
+  case ARGV[1]
+  when '--native'
+    launch_native
+  when '--web'
+    launch_web
+  when '--ios'
+    launch_apple('ios')
+  when '--tvos'
+    launch_apple('tvos')
+  else
+    puts usage_launch
+  end
+when 'simulator'
+  case ARGV[1]
+  when '--list'
+    puts `simple2d simulator --list`
+  when '--booted'
+    puts `simple2d simulator --booted`
+  when '--open'
+    puts `simple2d simulator --open "#{ARGV[2]}"`
+  when '--install'
+    puts `simple2d simulator --install "#{ARGV[2]}"`
+  when '--launch'
+    puts `simple2d simulator --launch "#{ARGV[2]}"`
+  when '--log'
+    puts `simple2d simulator --log`
+  when '--log-errors'
+    puts `simple2d simulator --log-errors`
+  else
+    puts usage_simulator
+  end
 when '-v', '--version'
   puts Ruby2D::VERSION
 else
