@@ -1,8 +1,6 @@
 os: osx
-osx_image: xcode8.3
+osx_image: xcode9.1
 language: ruby
-rvm:
-  - 2.4.0
 before_install:
   - sw_vers
   - brew update
