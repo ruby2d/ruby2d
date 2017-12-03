@@ -6,10 +6,12 @@ module Ruby2D
     attr_reader :objects
     attr_accessor :mouse_x, :mouse_y, :frames, :fps
 
-    MouseEvent      = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
-    KeyEvent        = Struct.new(:type, :key)
-    ControllerEvent = Struct.new(:which, :type, :axis, :value, :button)
     EventDescriptor = Struct.new(:type, :id)
+    MouseEvent = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
+    KeyEvent   = Struct.new(:type, :key)
+    ControllerEvent = Struct.new(:which, :type, :axis, :value, :button)
+    ControllerAxisEvent   = Struct.new(:which, :axis, :value)
+    ControllerButtonEvent = Struct.new(:which, :button)
 
     def initialize(args = {})
       @title      = args[:title]  || "Ruby 2D"
@@ -173,10 +175,6 @@ module Ruby2D
     end
 
     def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
-      # Convert to symbols (see MRuby bug in native extension)
-      button    = button.to_sym    unless button    == nil
-      direction = direction.to_sym unless direction == nil
-
       # All mouse events
       @events[:mouse].each do |id, e|
         e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
@@ -216,17 +214,17 @@ module Ruby2D
       # When controller axis motion, like analog sticks
       when :axis
         @events[:controller_axis].each do |id, e|
-          e.call(ControllerEvent.new(which, type, axis, value, nil))
+          e.call(ControllerAxisEvent.new(which, axis, value))
         end
       # When controller button is pressed
       when :button_down
         @events[:controller_button_down].each do |id, e|
-          e.call(ControllerEvent.new(which, type, nil, nil, button))
+          e.call(ControllerButtonEvent.new(which, button))
         end
       # When controller button is released
       when :button_up
         @events[:controller_button_up].each do |id, e|
-          e.call(ControllerEvent.new(which, type, nil, nil, button))
+          e.call(ControllerButtonEvent.new(which, button))
         end
       end
     end
