@@ -68,7 +68,7 @@
   #define r_args_none  (MRB_ARGS_NONE())
   #define r_args_req(n)  MRB_ARGS_REQ(n)
   // Helpers
-  #define r_char_to_sym(str)  mrb_check_intern_cstr(mrb, str)
+  #define r_char_to_sym(str)  mrb_symbol_value(mrb_intern_cstr(mrb, str))
 #else
   // Ruby
   #define R_VAL  VALUE
@@ -141,6 +141,14 @@ static S2D_Window *window;
  */
 static void free_window() {
   S2D_FreeWindow(window);
+}
+
+
+/*
+ * Normalize controller axis values to 0.0...1.0
+ */
+double normalize_controller_axis(int val) {
+  return val > 0 ? val / 32767.0 : val / 32768.0;
 }
 
 
@@ -696,7 +704,7 @@ void on_mouse(S2D_Event e) {
       // type, direction, delta_x, delta_y
       type = r_char_to_sym("scroll");
       direction = e.direction == S2D_MOUSE_SCROLL_NORMAL ?
-        r_str_new("normal") : r_str_new("inverted");
+        r_char_to_sym("normal") : r_char_to_sym("inverted");
       break;
     case S2D_MOUSE_MOVE:
       // type, x, y, delta_x, delta_y
@@ -707,25 +715,22 @@ void on_mouse(S2D_Event e) {
   if (e.type == S2D_MOUSE_DOWN || e.type == S2D_MOUSE_UP) {
     switch (e.button) {
       case S2D_MOUSE_LEFT:
-        button = r_str_new("left");
+        button = r_char_to_sym("left");
         break;
       case S2D_MOUSE_MIDDLE:
-        button = r_str_new("middle");
+        button = r_char_to_sym("middle");
         break;
       case S2D_MOUSE_RIGHT:
-        button = r_str_new("right");
+        button = r_char_to_sym("right");
         break;
       case S2D_MOUSE_X1:
-        button = r_str_new("x1");
+        button = r_char_to_sym("x1");
         break;
       case S2D_MOUSE_X2:
-        button = r_str_new("x2");
+        button = r_char_to_sym("x2");
         break;
     }
   }
-
-  // Bug in MRuby: If `button` or `direction` are symbols (created with
-  // r_char_to_sym), they will always both be `nil`. Use `r_str_new` for now.
 
   r_funcall(
     ruby2d_window, "mouse_callback", 7, type, button, direction,
@@ -739,23 +744,93 @@ void on_mouse(S2D_Event e) {
  */
 static void on_controller(S2D_Event e) {
 
-  R_VAL type = R_NIL;
+  R_VAL type = R_NIL; R_VAL axis = R_NIL; R_VAL button = R_NIL;
 
   switch (e.type) {
     case S2D_AXIS:
       type = r_char_to_sym("axis");
+      switch (e.axis) {
+        case S2D_AXIS_LEFTX:
+          axis = r_char_to_sym("left_x");
+          break;
+        case S2D_AXIS_LEFTY:
+          axis = r_char_to_sym("left_y");
+          break;
+        case S2D_AXIS_RIGHTX:
+          axis = r_char_to_sym("right_x");
+          break;
+        case S2D_AXIS_RIGHTY:
+          axis = r_char_to_sym("right_y");
+          break;
+        case S2D_AXIS_TRIGGERLEFT:
+          axis = r_char_to_sym("trigger_left");
+          break;
+        case S2D_AXIS_TRIGGERRIGHT:
+          axis = r_char_to_sym("trigger_right");
+          break;
+        case S2D_AXIS_INVALID:
+          axis = r_char_to_sym("invalid");
+          break;
+      }
       break;
-    case S2D_BUTTON_DOWN:
-      type = r_char_to_sym("button_down");
-      break;
-    case S2D_BUTTON_UP:
-      type = r_char_to_sym("button_up");
+    case S2D_BUTTON_DOWN: case S2D_BUTTON_UP:
+      type = e.type == S2D_BUTTON_DOWN ? r_char_to_sym("button_down") : r_char_to_sym("button_up");
+      switch (e.button) {
+        case S2D_BUTTON_A:
+          button = r_char_to_sym("a");
+          break;
+        case S2D_BUTTON_B:
+          button = r_char_to_sym("b");
+          break;
+        case S2D_BUTTON_X:
+          button = r_char_to_sym("x");
+          break;
+        case S2D_BUTTON_Y:
+          button = r_char_to_sym("y");
+          break;
+        case S2D_BUTTON_BACK:
+          button = r_char_to_sym("back");
+          break;
+        case S2D_BUTTON_GUIDE:
+          button = r_char_to_sym("guide");
+          break;
+        case S2D_BUTTON_START:
+          button = r_char_to_sym("start");
+          break;
+        case S2D_BUTTON_LEFTSTICK:
+          button = r_char_to_sym("left_stick");
+          break;
+        case S2D_BUTTON_RIGHTSTICK:
+          button = r_char_to_sym("right_stick");
+          break;
+        case S2D_BUTTON_LEFTSHOULDER:
+          button = r_char_to_sym("left_shoulder");
+          break;
+        case S2D_BUTTON_RIGHTSHOULDER:
+          button = r_char_to_sym("right_shoulder");
+          break;
+        case S2D_BUTTON_DPAD_UP:
+          button = r_char_to_sym("up");
+          break;
+        case S2D_BUTTON_DPAD_DOWN:
+          button = r_char_to_sym("down");
+          break;
+        case S2D_BUTTON_DPAD_LEFT:
+          button = r_char_to_sym("left");
+          break;
+        case S2D_BUTTON_DPAD_RIGHT:
+          button = r_char_to_sym("right");
+          break;
+        case S2D_BUTTON_INVALID:
+          button = r_char_to_sym("invalid");
+          break;
+      }
       break;
   }
 
   r_funcall(
-    ruby2d_window, "controller_callback", 5, INT2NUM(e.which), type,
-    INT2NUM(e.axis), INT2NUM(e.value), INT2NUM(e.button)
+    ruby2d_window, "controller_callback", 5, INT2NUM(e.which),
+    type, axis, DBL2NUM(normalize_controller_axis(e.value)), button
   );
 }
 
