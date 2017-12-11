@@ -30,8 +30,8 @@ def run_cmd(cmd)
   system cmd
 end
 
-def run_mri_test(file)
-  print_task "Running MRI test: #{file}.rb"
+def run_int_test(file)
+  print_task "Running interpreted test: #{file}.rb"
   run_cmd "( cd test/ && ruby #{file}.rb )"
 end
 
@@ -96,10 +96,10 @@ RSpec::Core::RakeTask.new do |t|
 end
 
 namespace :test do
-  desc "Run MRI test"
-  task :mri do
+  desc "Run interpreted test"
+  task :int do
     get_args
-    run_mri_test ARGV[1]
+    run_int_test ARGV[1]
   end
 
   desc "Run native test"

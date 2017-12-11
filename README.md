@@ -33,8 +33,8 @@ Finally, run `rake` to build and install the gem locally.
 Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and manual, interactive tests to verify the correctness of visual, audio, and input functionality. Build the gem and run all automated tests using the `rake` command. Build and run an interactive test in the [`test/`](test/) directory using `rake test:<environment> <name_of_test>`, for example:
 
 ```bash
-# Run `test/testcard.rb` using the standard Ruby interpreter, MRI (or CRuby)
-rake test:mri testcard
+# Run `test/testcard.rb` using the standard Ruby interpreter, MRI (CRuby)
+rake test:int testcard
 
 # Build `test/audio.rb` natively using MRuby and run
 rake test:native audio
