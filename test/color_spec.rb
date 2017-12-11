@@ -18,12 +18,6 @@ RSpec.describe Ruby2D::Color do
       expect(Ruby2D::Color.is_valid? [1, 0, 0.0, 1.0]).to eq true
       expect(Ruby2D::Color.is_valid? [1.0, 0, 0]).to eq false
     end
-
-    it 'prevents color values that are out of range' do
-      expect(Ruby2D::Color.is_valid? [1.2, 0, 0, 0]).to eq false
-      expect(Ruby2D::Color.is_valid? [0, 0, -0.1, 0]).to eq false
-      expect(Ruby2D::Color.is_valid? [0, 0, 0, 2]).to eq false
-    end
   end
 
   describe '#new' do

@@ -84,7 +84,7 @@ module Ruby2D
       # Array of Floats from 0.0..1.0
       c.class == Array && c.length == 4 &&
       c.all? { |el|
-        el.is_a?(Numeric) && (0.0..1.0).include?(el)
+        el.is_a?(Numeric)
       }
     end
 
