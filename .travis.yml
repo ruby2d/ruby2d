@@ -1,10 +1,10 @@
 os: osx
-osx_image: xcode9.1
+osx_image: xcode9.2
 language: ruby
 before_install:
   - sw_vers
   - brew update
   - brew tap simple2d/tap
-  - brew install --HEAD simple2d
+  - brew install simple2d
 script:
   - rake
