@@ -4,6 +4,10 @@ module Ruby2D::Application
   class << self
     @@window = Ruby2D::Window.new
 
+    def window
+      @@window
+    end
+
     def get(sym)
       @@window.get(sym)
     end
