@@ -63,6 +63,14 @@ module Ruby2D
       end
     end
 
+    def width
+      @current_animation ? @animations[@current_animation][@current_frame][2] : @default[2]
+    end
+
+    def height
+      @current_animation ? @animations[@current_animation][@current_frame][3] : @default[3]
+    end
+
     private
 
     def clip(x, y, w, h)
