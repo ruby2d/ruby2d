@@ -8,9 +8,11 @@ module Ruby2D
 
     def initialize(x, y, path, z=0)
 
-      # unless File.exists? path
-      #   raise Error, "Cannot find image file `#{path}`"
-      # end
+      unless RUBY_ENGINE == 'opal'
+        unless File.exists? path
+          raise Error, "Cannot find sprite image file `#{path}`"
+        end
+      end
 
       @x, @y, @path = x, y, path
       @clip_x, @clip_y, @clip_w, @clip_h = 0, 0, 0, 0
