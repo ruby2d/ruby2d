@@ -909,6 +909,9 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
     S2D_Diagnostics(true);
   }
 
+  char *controller_mappings_path = RSTRING_PTR(r_iv_get(self, "@controller_mappings_path"));
+  S2D_LoadControllerMappingsFromFile(controller_mappings_path);
+
   // Get window attributes
   char *title = RSTRING_PTR(r_iv_get(self, "@title"));
   int width   = NUM2INT(r_iv_get(self, "@width"));
