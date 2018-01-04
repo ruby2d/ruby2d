@@ -16,6 +16,11 @@ require 'ruby2d/sprite'
 require 'ruby2d/text'
 require 'ruby2d/sound'
 require 'ruby2d/music'
+
+if RUBY_PLATFORM =~ /mingw/
+  RubyInstaller::Runtime.add_dll_directory(File.expand_path('~/../../usr/local/bin'))
+end
+
 require 'ruby2d/ruby2d'  # load native extension
 
 include Ruby2D
