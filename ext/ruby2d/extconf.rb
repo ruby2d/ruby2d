@@ -11,9 +11,9 @@ end
 
 def print_errors
   puts "
-#{"== #{"Ruby 2D Installation Errors".red} =====================================\n"}
+#{"== #{"Ruby 2D Installation Errors".red} =======================================\n"}
   #{$errors.join("\n  ")}\n
-#{"===================================================================="}"
+#{"======================================================================="}"
 end
 
 def check_s2d_version
@@ -38,8 +38,8 @@ when /darwin/
 
     # Homebrew not installed
     if `which brew`.empty?
-      $errors << "Ruby 2D uses a native library called Simple 2D." <<
-                 "On OS X, this can be installed using Homebrew.\n" <<
+      $errors << "Ruby 2D uses a native library called Simple 2D, which was not found." <<
+                 "On macOS, it can be installed using Homebrew.\n" <<
                  "First, install #{"Homebrew".bold}. See instructions at #{"http://brew.sh".bold}" <<
                  "Then, run the following:\n" <<
                  "  brew tap simple2d/tap".bold <<
@@ -49,8 +49,8 @@ when /darwin/
 
     # Homebrew installed, instruct to install Simple 2D
     else
-      $errors << "Ruby 2D uses a native library called Simple 2D." <<
-                 "Install with Homebrew using:\n" <<
+      $errors << "Ruby 2D uses a native library called Simple 2D, which was not found." <<
+                 "Install it with Homebrew using:\n" <<
                  "  brew tap simple2d/tap".bold <<
                  "  brew install simple2d".bold
       print_errors
@@ -63,9 +63,8 @@ when /linux|mingw/
 
   # Simple 2D not installed
   if `which simple2d`.empty?
-    $errors << "Ruby 2D uses a native library called Simple 2D.\n" <<
-               "To install Simple 2D, follow the instructions in the README:" <<
-               "  #{"https://github.com/simple2d/simple2d".bold}"
+    $errors << "Ruby 2D uses a native library called Simple 2D, which was not found." <<
+    "To install, follow the instructions at #{"ruby2d.com/learn".bold}"
     print_errors
     exit
   end
