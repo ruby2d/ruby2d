@@ -1,0 +1,13 @@
+install:
+  - set PATH=C:\ruby24-x64\bin;C:\msys64\usr\bin;C:\msys64\usr\local\bin;%PATH%
+  - set MSYSTEM=MINGW64
+  - bash --version
+  - wget https://raw.githubusercontent.com/simple2d/simple2d/master/bin/simple2d.sh
+  - bash simple2d.sh install -y
+  - git submodule update --init --recursive
+build: off
+before_test:
+  - ruby -v
+test_script:
+  - bundle install
+  - rake
