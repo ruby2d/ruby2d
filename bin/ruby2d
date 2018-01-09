@@ -29,7 +29,11 @@ end
   'sprite',
   'text',
   'sound',
-  'music'
+  'music',
+  'collider',
+  'collision_layer',
+  'piece',
+  'board'
 ]
 
 # Debugging command-line flag
