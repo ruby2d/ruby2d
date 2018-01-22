@@ -3,14 +3,17 @@
 module Ruby2D
   class Collider
     attr_accessor :form, :x, :y, :height, :width, :radius
+    attr_reader :active_tags, :passive_tags
 
     def initialize(opts = {})
-      @form     = opts[:form]     || nil
-      @x        = opts[:x]        || 0
-      @y        = opts[:y]        || 0
-      @height   = opts[:height]   || nil
-      @width    = opts[:width]    || nil
-      @radius   = opts[:radius]   || nil
+      @form         = opts[:form]         || nil
+      @x            = opts[:x]            || 0
+      @y            = opts[:y]            || 0
+      @height       = opts[:height]       || nil
+      @width        = opts[:width]        || nil
+      @radius       = opts[:radius]       || nil
+      @active_tags  = opts[:active_tags]  || nil
+      @passive_tags = opts[:passive_tags] || nil
     end
 
     def right
@@ -19,6 +22,24 @@ module Ruby2D
 
     def bottom
       return @y + @height
+    end
+
+    def add_active_tag(tag)
+      if @active_tags == nil then @active_tags = [] end
+      @active_tags << tag
+    end
+
+    def remove_active_tag(tag)
+      @active_tags.delete tag
+    end
+
+    def add_passive_tag(tag)
+      if @passive_tags == nil then @passive_tags = [] end
+      @passive_tags << tag
+    end
+
+    def remove_passive_tag(tag)
+      @passive_tags.delete tag
     end
   end
 

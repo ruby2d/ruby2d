@@ -3,15 +3,19 @@
 module Ruby2D
   class CollisionLayer
 
-    attr_accessor :active_pieces, :passive_pieces, :interval
+    attr_accessor :active_pieces, :passive_pieces
 
     def initialize(opts = {})
       @active_pieces  = opts[:active_pieces]  || []
       @passive_pieces = opts[:passive_pieces] || []
-      @interval       = opts[:interval]       || 1
     end
 
     def update
+      update_collider_positions
+      check_for_collisions
+    end
+
+    def update_collider_positions
       @active_pieces.each do |piece|
         piece.collider.x = piece.x
         piece.collider.y = piece.y
@@ -20,7 +24,9 @@ module Ruby2D
         piece.collider.x = piece.x
         piece.collider.y = piece.y
       end
+    end
 
+    def check_for_collisions
       @active_pieces.combination(2) do |first, second|
         collision = collision_check? first.collider, second.collider
         if collision
@@ -40,9 +46,13 @@ module Ruby2D
       end
     end
 
+    def include? piece
+      return @active_pieces.include? piece || @passive_pieces.include? piece
+    end
+
     def remove_piece piece
-      @active_pieces.delete piece
-      @passive_pieces.delete piece
+      @active_pieces.delete piece if @active_pieces.include? piece
+      @passive_pieces.delete piece if @passive_pieces.include? piece
     end
   end
 end

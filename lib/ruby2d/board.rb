@@ -15,15 +15,14 @@ module Ruby2D
 
     def add_piece(piece)
       @pieces << piece
-      if piece.active_collision_tags != nil
-        puts "Piece Active Collision: #{piece.active_collision_tags}"
-        piece.active_collision_tags.each do |tag|
+      if piece.collider.active_tags != nil
+        piece.collider.active_tags.each do |tag|
           if @collision_layers[tag] == nil then @collision_layers[tag] = CollisionLayer.new end
           @collision_layers[tag].active_pieces << piece
         end
       end
-      if piece.passive_collision_tags != nil
-        piece.passive_collision_tags.each do |tag|
+      if piece.collider.passive_tags != nil
+        piece.collider.passive_tags.each do |tag|
           if @collision_layers[tag] == nil then @collision_layers[tag] = CollisionLayer.new end
           @collision_layers[tag].passive_pieces << piece
         end
@@ -33,7 +32,7 @@ module Ruby2D
     def remove_piece(piece)
       @pieces.delete piece
       @collision_layers.each_value do |layer|
-        layer.delete piece
+        layer.remove_piece piece if layer.include? piece
       end
     end
 
@@ -47,6 +46,28 @@ module Ruby2D
         piece.renderable.x = @x_offset + piece.x
         piece.renderable.y = @y_offset + piece.y
       end
+    end
+
+    def add_active_collision_tag(tag, piece)
+      piece.collider.add_active_collision_tag tag
+      if @collision_layers[tag] == nil then @collision_layers[tag] = CollisionLayer.new end
+      @collision_layers[tag].active_pieces << piece
+    end
+
+    def remove_active_collision_tag(tag, piece)
+      piece.remove_active_collision_tag tag
+      @collision_layers[tag].active_pieces.delete piece
+    end
+
+    def add_passive_collision_tag(tag, piece)
+      piece.collider.add_passive_collision_tag tag
+      if @collision_layers[tag] == nil then @collision_layers[tag] = CollisionLayer.new end
+      @collision_layers[tag].passive_pieces << piece
+    end
+
+    def remove_passive_collision_tag(tag, piece)
+      piece.remove_passive_collision_tag tag
+      @collision_layers[tag].passive_pieces.delete piece
     end
   end
 end
