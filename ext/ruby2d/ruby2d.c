@@ -379,6 +379,14 @@ static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
 #endif
   S2D_Log(S2D_INFO, "Init sprite: %s", RSTRING_PTR(path));
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
+
+  // Get width and height from Ruby class. If set, use it, else choose the
+  // native dimensions of the sprite image.
+  R_VAL w = r_iv_get(self, "@width");
+  R_VAL h = r_iv_get(self, "@height");
+  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(spr->width));
+  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(spr->height));
+
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
   return R_NIL;
 }
@@ -392,6 +400,8 @@ static R_VAL ruby2d_sprite_ext_render(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
 #endif
+  r_funcall(self, "update", 0);
+
   S2D_Sprite *spr;
   r_data_get_struct(self, "@data", &sprite_data_type, S2D_Sprite, spr);
 
@@ -402,8 +412,8 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
     spr,
     NUM2INT(r_iv_get(self, "@clip_x")),
     NUM2INT(r_iv_get(self, "@clip_y")),
-    NUM2INT(r_iv_get(self, "@clip_w")),
-    NUM2INT(r_iv_get(self, "@clip_h"))
+    NUM2INT(r_iv_get(self, "@clip_width")),
+    NUM2INT(r_iv_get(self, "@clip_height"))
   );
 
   S2D_DrawSprite(spr);
