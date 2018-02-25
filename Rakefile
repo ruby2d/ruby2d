@@ -53,7 +53,11 @@ def run_web_test(file)
   when /mingw/
     open_cmd = "start"
   end
-  run_cmd "#{open_cmd} build/app.html"
+  Thread.new do
+    sleep 2
+    run_cmd "#{open_cmd} http://localhost:4001/build/app.html"
+  end
+  run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'"
 end
 
 def run_apple_test(device)
