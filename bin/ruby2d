@@ -60,8 +60,8 @@ def make_lib
   end
 
   lib << "
-include Ruby2D::DSL
-include Ruby2D\n"
+include Ruby2D
+extend  Ruby2D::DSL\n"
 
   File.write('build/lib.rb', lib)
 end
@@ -87,13 +87,16 @@ def build_native(rb_file)
     exit
   end
 
+  # Add debugging information to produce backtrace
+  if @debug then debug_flag = '-g' end
+
   # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
   make_lib
-  `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
+  `mrbc #{debug_flag} -Bruby2d_lib -obuild/lib.c build/lib.rb`
 
   # Read the provided Ruby source file, copy to build dir and compile to bytecode
   File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
-  `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
+  `mrbc #{debug_flag} -Bruby2d_app -obuild/src.c build/src.rb`
 
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
@@ -165,13 +168,16 @@ def build_apple(rb_file, device)
     exit
   end
 
+  # Add debugging information to produce backtrace
+  if @debug then debug_flag = '-g' end
+
   # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
   make_lib
-  `mrbc -Bruby2d_lib -obuild/lib.c build/lib.rb`
+  `mrbc #{debug_flag} -Bruby2d_lib -obuild/lib.c build/lib.rb`
 
   # Read the provided Ruby source file, copy to build dir and compile to bytecode
   File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
-  `mrbc -Bruby2d_app -obuild/src.c build/src.rb`
+  `mrbc #{debug_flag} -Bruby2d_app -obuild/src.c build/src.rb`
 
   # Copy over iOS project
   FileUtils.cp_r "#{@gem_dir}/assets/#{device}", "build"
