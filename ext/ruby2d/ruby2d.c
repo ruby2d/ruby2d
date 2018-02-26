@@ -62,8 +62,8 @@
   #define r_ary_entry(ary, pos)  mrb_ary_entry(ary, pos)
   #define r_data_wrap_struct(name, data)  mrb_obj_value(Data_Wrap_Struct(mrb, mrb->object_class, &name##_data_type, data))
   #define r_data_get_struct(self, var, mrb_type, rb_type, data)  Data_Get_Struct(mrb, r_iv_get(self, var), mrb_type, data)
-  #define r_define_module(name)  mrb_module_get(mrb, name)
-  #define r_define_class(module, name)  mrb_class_get_under(mrb, module, name)
+  #define r_define_module(name)  mrb_define_module(mrb, name)
+  #define r_define_class(module, name)  mrb_define_class_under(mrb, module, name, mrb->object_class)
   #define r_define_method(class, name, function, args)  mrb_define_method(mrb, class, name, function, args)
   #define r_args_none  (MRB_ARGS_NONE())
   #define r_args_req(n)  MRB_ARGS_REQ(n)
@@ -919,11 +919,27 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
     S2D_Diagnostics(true);
   }
 
-  // Load controller mappings, if DB file exists
-  char *controller_mappings_path = RSTRING_PTR(r_iv_get(self, "@controller_mappings_path"));
-  if (S2D_FileExists(controller_mappings_path)) {
-    S2D_LoadControllerMappingsFromFile(controller_mappings_path);
-  }
+  // Load controller mappings
+  #if !RUBY2D_IOS_TVOS && !WINDOWS
+    #include <pwd.h>
+
+    char *homedir;
+    if ((homedir = getenv("HOME")) == NULL) {
+      homedir = getpwuid(getuid())->pw_dir;
+    }
+
+    char *mappings = "/.ruby2d/controllers.txt";
+    char *full_mappings_path = malloc(strlen(homedir) + strlen(mappings) + 1);
+    strcpy(full_mappings_path, homedir); strcat(full_mappings_path, mappings);
+    printf("%s\n", full_mappings_path);
+
+    // Load controller mappings, if DB file exists
+    if (S2D_FileExists(full_mappings_path)) {
+      S2D_LoadControllerMappingsFromFile(full_mappings_path);
+    }
+
+    free(full_mappings_path);
+  #endif
 
   // Get window attributes
   char *title = RSTRING_PTR(r_iv_get(self, "@title"));

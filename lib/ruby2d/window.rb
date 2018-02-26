@@ -48,7 +48,6 @@ module Ruby2D
       }
       @update_proc = Proc.new {}
       @diagnostics = false
-      @controller_mappings_path = File.join(Dir.home, ".ruby2d", "controllers.txt")
     end
 
     def new_event_key
