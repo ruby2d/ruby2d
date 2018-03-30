@@ -16,6 +16,7 @@ Gem::Specification.new do |s|
 
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('assets/**/*') +
+            Dir.glob('resources/**/*') +
             Dir.glob('ext/**/*.{c,js,rb}')
   s.extensions = ['ext/ruby2d/extconf.rb']
   s.executables << 'ruby2d'
