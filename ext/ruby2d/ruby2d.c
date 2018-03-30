@@ -919,6 +919,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   char *title = RSTRING_PTR(r_iv_get(self, "@title"));
   int width   = NUM2INT(r_iv_get(self, "@width"));
   int height  = NUM2INT(r_iv_get(self, "@height"));
+  int fps_cap = NUM2INT(r_iv_get(self, "@fps_cap"));
   int flags   = 0;
 
   // Get window flags
@@ -951,6 +952,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
 
   window->viewport.width  = viewport_width;
   window->viewport.height = viewport_height;
+  window->fps_cap         = fps_cap;
   window->on_key          = on_key;
   window->on_mouse        = on_mouse;
   window->on_controller   = on_controller;
