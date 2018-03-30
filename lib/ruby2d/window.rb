@@ -25,9 +25,9 @@ module Ruby2D
       @fullscreen = false
       @highdpi    = false
       @frames     = 0
-      @fps_cap    = args[:fps]    || 60
+      @fps_cap    = args[:fps_cap] || 60
       @fps        = @fps_cap
-      @vsync      = args[:vsync]  || true
+      @vsync      = args[:vsync]   || true
       @mouse_x, @mouse_y = 0, 0
       @objects    = []
       @event_key  = 0
@@ -76,6 +76,7 @@ module Ruby2D
       when :highdpi;         @highdpi
       when :frames;          @frames
       when :fps;             @fps
+      when :fps_cap;         @fps_cap
       when :mouse_x;         @mouse_x
       when :mouse_y;         @mouse_y
       when :diagnostics;     @diagnostics
@@ -90,6 +91,7 @@ module Ruby2D
       end
       @width           = opts[:width]           || @width
       @height          = opts[:height]          || @height
+      @fps_cap         = opts[:fps_cap]         || @fps_cap
       @viewport_width  = opts[:viewport_width]  || @viewport_width
       @viewport_height = opts[:viewport_height] || @viewport_height
       @resizable       = opts[:resizable]       || @resizable
