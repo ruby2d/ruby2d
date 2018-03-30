@@ -4,7 +4,7 @@ module Ruby2D
   class Text
     include Renderable
 
-    DEFAULT_FONT = "#{File.expand_path "../..", File.dirname(__FILE__)}resources/fonts/IBMPlexSans-Regular.ttf"
+    DEFAULT_FONT = "#{File.expand_path "../..", File.dirname(__FILE__)}/resources/fonts/IBMPlexSans-Regular.ttf"
 
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
