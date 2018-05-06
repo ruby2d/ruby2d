@@ -1,5 +1,5 @@
 require 'rspec/core/rake_task'
-require './lib/ruby2d/version'
+require_relative 'lib/ruby2d/version'
 
 # Helpers
 

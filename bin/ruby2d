@@ -331,8 +331,6 @@ Choose an option with the #{"simulator".bold} command:
   --log <app>     Stream log for the app only, given the app name
   --log-errors    Stream log containing only error messages\n\n"
 
-# puts ARGV.inspect
-
 case ARGV[0]
 when 'build'
   if ARGV.delete '--debug' then @debug = true end

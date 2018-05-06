@@ -1,0 +1,1 @@
+require 'ruby2d'
