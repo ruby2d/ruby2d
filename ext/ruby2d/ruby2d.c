@@ -153,18 +153,6 @@ double normalize_controller_axis(int val) {
 
 
 /*
- * File#exists? for MRuby
- */
-#if MRUBY
-static R_VAL file_exists(mrb_state* mrb, R_VAL self) {
-  mrb_value path;
-  mrb_get_args(mrb, "o", &path);
-  return S2D_FileExists(RSTRING_PTR(path)) ? R_TRUE : R_FALSE;
-}
-#endif
-
-
-/*
  * Ruby2D::Triangle#ext_render
  */
 #if MRUBY
@@ -1008,10 +996,6 @@ int main() {
 
   // Load the Ruby 2D library
   mrb_load_irep(mrb, ruby2d_lib);
-
-  // Add missing MRuby classes, methods
-  R_CLASS file_class = mrb_define_class(mrb, "File", mrb->object_class);
-  mrb_define_class_method(mrb, file_class, "exists?", file_exists, r_args_req(1));
 
 #else
 /*
