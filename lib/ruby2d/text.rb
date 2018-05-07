@@ -4,6 +4,8 @@ module Ruby2D
   class Text
     include Renderable
 
+    DEFAULT_FONT = "#{File.expand_path "../..", File.dirname(__FILE__)}/resources/fonts/IBMPlexSans-Regular.ttf"
+
     attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
 
@@ -14,7 +16,7 @@ module Ruby2D
       @text = (opts[:text] || "Hello World!").to_s
       @size = opts[:size] || 20
 
-      @font = opts[:font]
+      @font = opts[:font] || DEFAULT_FONT
 
       unless RUBY_ENGINE == 'opal'
         unless File.exists? @font
