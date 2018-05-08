@@ -46,6 +46,10 @@ module Ruby2D
       @x < x and @x + @width > x and @y < y and @y + @height > y
     end
 
+    def collided_with?(rect)
+      !(@y1 > rect.y3 || @y3 < rect.y1 || @x1 > rect.x2 || @x2 < rect.x1)
+    end
+
     private
 
     def update_coords(x, y, w, h)
