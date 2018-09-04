@@ -4,8 +4,8 @@ module Ruby2D
   class Text
     include Renderable
 
-    attr_accessor :x, :y, :data
     attr_reader :text, :size, :width, :height, :font, :color
+    attr_accessor :x, :y, :rotate, :data
 
     def initialize(opts = {})
       @x = opts[:x] || 0
@@ -13,7 +13,7 @@ module Ruby2D
       @z = opts[:z] || 0
       @text = (opts[:text] || "Hello World!").to_s
       @size = opts[:size] || 20
-
+      @rotate = 0
       @font = opts[:font]
 
       unless RUBY_ENGINE == 'opal'

@@ -328,6 +328,8 @@ static R_VAL ruby2d_image_ext_render(R_VAL self) {
   if (r_test(w)) img->width  = NUM2INT(w);
   if (r_test(h)) img->height = NUM2INT(h);
 
+  S2D_RotateImage(img, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
+
   R_VAL c = r_iv_get(self, "@color");
   img->color.r = NUM2DBL(r_iv_get(c, "@r"));
   img->color.g = NUM2DBL(r_iv_get(c, "@g"));
@@ -397,6 +399,8 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
 
   R_VAL h = r_iv_get(self, "@flip_height");
   if (r_test(h)) spr->height = NUM2DBL(h);
+
+  S2D_RotateSprite(spr, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
 
   S2D_ClipSprite(
     spr,
@@ -486,6 +490,8 @@ static R_VAL ruby2d_text_ext_render(R_VAL self) {
 
   txt->x = NUM2DBL(r_iv_get(self, "@x"));
   txt->y = NUM2DBL(r_iv_get(self, "@y"));
+
+  S2D_RotateText(txt, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
 
   R_VAL c = r_iv_get(self, "@color");
   txt->color.r = NUM2DBL(r_iv_get(c, "@r"));

@@ -199,10 +199,12 @@ Line.new(
   ]
 );
 
+rotate = false
+
 # Images
-Image.new(x: 590, y: 180, path: "#{media}/image.png")
-Image.new(x: 590, y: 290, path: "#{media}/image.jpg")
-Image.new(x: 590, y: 400, path: "#{media}/image.bmp")
+img_png = Image.new(x: 590, y: 180, path: "#{media}/image.png")
+img_jpg = Image.new(x: 590, y: 290, path: "#{media}/image.jpg")
+img_bmp = Image.new(x: 590, y: 400, path: "#{media}/image.bmp")
 img_r = Image.new(x: 400, y: 200, width: 50, height: 25, path: "#{media}/colors.png")
 img_r.color = [1.0, 0.3, 0.3, 1.0]
 img_g = Image.new(x: 400, y: 225, path: "#{media}/colors.png")
@@ -213,9 +215,9 @@ img_b.width, img_b.height = 25, 25
 img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-Text.new(x: 44,  y: 202, text: "R", font: font, color: [1.0, 0.0, 0.0, 1.0])
-Text.new(x: 92,  y: 202, text: "G", font: font, color: [0.0, 1.0, 0.0, 1.0])
-Text.new(x: 144, y: 202, text: "B", font: font, color: [0.0, 0.0, 1.0, 1.0])
+txt_r = Text.new(x: 44,  y: 202, text: "R", font: font, color: [1.0, 0.0, 0.0, 1.0])
+txt_b = Text.new(x: 92,  y: 202, text: "G", font: font, color: [0.0, 1.0, 0.0, 1.0])
+txt_g = Text.new(x: 144, y: 202, text: "B", font: font, color: [0.0, 0.0, 1.0, 1.0])
 
 # Frames per second
 fps = Text.new(x: 10, y: 470, text: "", font: font)
@@ -275,6 +277,10 @@ UPDATED_TEXT_OPTIONS = "of various size".split(" ")
 
 on :key_down do |event|
   close if event.key == 'escape'
+
+  if event.key == 'r'
+    rotate = rotate ? false : true;
+  end
 end
 
 on :mouse_down do
@@ -286,6 +292,23 @@ end
 update do
   pointer.x = (get :mouse_x) - 5
   pointer.y = (get :mouse_y) - 7
+
+  if rotate
+    img_png.x = get :mouse_x
+    img_png.y = get :mouse_y
+    angle = (get :frames).to_f
+    img_png.rotate = angle
+    img_jpg.rotate = angle
+    img_bmp.rotate = angle
+    img_r.rotate = angle
+    img_g.rotate = angle
+    img_b.rotate = angle
+    spr.rotate = angle
+    txt_r.rotate = angle
+    txt_g.rotate = angle
+    txt_b.rotate = angle
+    fps.rotate = angle
+  end
 
   if flash > 0
     pointer_outline.color = [0, 1, 0, 1]
