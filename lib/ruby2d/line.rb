@@ -3,6 +3,7 @@
 module Ruby2D
   class Line
     include Renderable
+
     attr_accessor :x1, :x2, :y1, :y2, :color, :width
 
     def initialize(opts = {})

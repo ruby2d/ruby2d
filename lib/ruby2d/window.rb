@@ -148,8 +148,6 @@ module Ruby2D
     end
 
     def key_callback(type, key)
-      # puts "===", "type: #{type}", "key: #{key}"
-
       key = key.downcase
 
       # All key events

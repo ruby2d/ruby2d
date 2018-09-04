@@ -3,8 +3,8 @@
 module Ruby2D
   class Sound
 
-    attr_accessor :data
     attr_reader :path
+    attr_accessor :data
 
     def initialize(path)
 

@@ -3,6 +3,9 @@
 module Ruby2D
   class Quad
     include Renderable
+
+    attr_reader :color
+
     # Coordinates in clockwise order, starting at top left:
     # x1,y1 == top left
     # x2,y2 == top right
@@ -12,8 +15,6 @@ module Ruby2D
                   :x2, :y2, :c2,
                   :x3, :y3, :c3,
                   :x4, :y4, :c4
-
-    attr_reader :color
 
     def initialize(opts = {})
       @x1 = opts[:x1] || 0
