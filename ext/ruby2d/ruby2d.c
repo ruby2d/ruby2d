@@ -368,14 +368,10 @@ static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
   S2D_Log(S2D_INFO, "Init sprite: %s", RSTRING_PTR(path));
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
 
-  // Get width and height from Ruby class. If set, use it, else choose the
-  // native dimensions of the sprite image.
-  R_VAL w = r_iv_get(self, "@width");
-  R_VAL h = r_iv_get(self, "@height");
-  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(spr->width));
-  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(spr->height));
-
+  r_iv_set(self, "@img_width" , INT2NUM(spr->width));
+  r_iv_set(self, "@img_height", INT2NUM(spr->height));
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
+
   return R_NIL;
 }
 
@@ -393,8 +389,14 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
   S2D_Sprite *spr;
   r_data_get_struct(self, "@data", &sprite_data_type, S2D_Sprite, spr);
 
-  spr->x = NUM2DBL(r_iv_get(self, "@x"));
-  spr->y = NUM2DBL(r_iv_get(self, "@y"));
+  spr->x = NUM2DBL(r_iv_get(self, "@flip_x"));
+  spr->y = NUM2DBL(r_iv_get(self, "@flip_y"));
+
+  R_VAL w = r_iv_get(self, "@flip_width");
+  if (r_test(w)) spr->width = NUM2DBL(w);
+
+  R_VAL h = r_iv_get(self, "@flip_height");
+  if (r_test(h)) spr->height = NUM2DBL(h);
 
   S2D_ClipSprite(
     spr,

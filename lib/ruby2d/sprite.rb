@@ -15,26 +15,34 @@ module Ruby2D
         end
       end
 
-      @path = path
-      @x = opts[:x] || 0
-      @y = opts[:y] || 0
-      @z = opts[:z] || 0
-      @width  = opts[:width]  || nil
-      @height = opts[:height] || nil
-      @start_time = 0.0
-      @loop = opts[:loop] || false
-      @frame_time = opts[:time] || 300
-      @animations = opts[:animations] || {}
-      @playing = false
+      @path          = path
+      @x             = opts[:x] || 0
+      @y             = opts[:y] || 0
+      @z             = opts[:z] || 0
+      @flip_x        = @x
+      @flip_y        = @y
+      @width         = opts[:width]  || nil
+      @height        = opts[:height] || nil
+      @flip_width    = @width
+      @flip_height   = @height
+      @clip_x        = opts[:clip_x] || 0
+      @clip_y        = opts[:clip_y] || 0
+      @rotate        = 0
+      @start_time    = 0.0
+      @loop          = opts[:loop] || false
+      @frame_time    = opts[:time] || 300
+      @animations    = opts[:animations] || {}
+      @playing       = false
       @current_frame = opts[:default] || 0
-      @last_frame = 0
+      @last_frame    = 0
+      @flip          = nil
+      @done_proc     = nil
 
+      @img_width = nil; @img_height = nil  # set by `ext_init`
       ext_init(@path)
-      @clip_x = opts[:clip_x] || 0
-      @clip_y = opts[:clip_y] || 0
-      @clip_width  = opts[:clip_width]  || @width
-      @clip_height = opts[:clip_height] || @height
-      @animations[:default] = 0..(@width / @clip_width) - 1  # set default animation
+      @clip_width           = opts[:clip_width]  || @img_width
+      @clip_height          = opts[:clip_height] || @img_height
+      @animations[:default] = 0..(@img_width / @clip_width) - 1  # set default animation
 
       @defaults = {
         animation:   @animations.first[0],
@@ -50,12 +58,47 @@ module Ruby2D
       add
     end
 
-    def play(animation = nil, loop = nil)
-      if !@playing || (animation != @playing_animation && animation != nil)
+    # Set the x coordinate
+    def x=(x)
+      @x = @flip_x = x
+      if @flip == :flip_h || @flip == :flip_hv
+        @flip_x = x + @width
+      end
+    end
+
+    # Set the y coordinate
+    def y=(y)
+      @y = @flip_y = y
+      if @flip == :flip_v || @flip == :flip_hv
+        @flip_y = y + @height
+      end
+    end
+
+    # Set the width
+    def width=(width)
+      @width = @flip_width = width
+      if @flip == :flip_h || @flip == :flip_hv
+        @flip_width = -width
+      end
+    end
+
+    # Set the height
+    def height=(height)
+      @height = @flip_height = height
+      if @flip == :flip_v || @flip == :flip_hv
+        @flip_height = -height
+      end
+    end
+
+    # Play an animation
+    def play(animation = nil, loop = nil, flip = nil, &done_proc)
+      if !@playing || (animation != @playing_animation && animation != nil) || flip != @flip
 
         @playing = true
         @playing_animation = animation || :default
         frames = @animations[@playing_animation]
+        flip_sprite(flip)
+        @done_proc = done_proc
 
         case frames
         # When animation is a range, play through frames horizontally
@@ -79,11 +122,42 @@ module Ruby2D
     end
 
     # Stop the current animation and set to the default frame
-    def stop
-      @playing = false
-      @playing_animation = @defaults[:animation]
-      @current_frame = @defaults[:frame]
-      set_frame
+    def stop(animation = nil)
+      if !animation || animation == @playing_animation
+        @playing = false
+        @playing_animation = @defaults[:animation]
+        @current_frame = @defaults[:frame]
+        set_frame
+      end
+    end
+
+    # Flip the sprite
+    def flip_sprite(flip)
+
+      # A width and height must be set for the sprite for this to work
+      unless @width && @height then return end
+
+      @flip = flip
+
+      # Reset flip values
+      @flip_x      = @x
+      @flip_y      = @y
+      @flip_width  = @width
+      @flip_height = @height
+
+      case flip
+      when :flip_h   # horizontal
+        @flip_x      = @x + @width
+        @flip_width  = -@width
+      when :flip_v   # vertical
+        @flip_y      = @y + @height
+        @flip_height = -@height
+      when :flip_hv  # horizontal and vertical
+        @flip_x      = @x + @width
+        @flip_width  = -@width
+        @flip_y      = @y + @height
+        @flip_height = -@height
+      end
     end
 
     # Reset frame to defaults
@@ -107,7 +181,7 @@ module Ruby2D
         @clip_y      = f[:y]      || @defaults[:clip_y]
         @clip_width  = f[:width]  || @defaults[:clip_width]
         @clip_height = f[:height] || @defaults[:clip_height]
-        @frame_time = f[:time]    || @defaults[:frame_time]
+        @frame_time  = f[:time]   || @defaults[:frame_time]
       end
     end
 
@@ -134,7 +208,12 @@ module Ruby2D
         # Reset to the starting frame if all frames played
         if @current_frame > @last_frame
           @current_frame = @first_frame
-          unless @loop then stop end
+          unless @loop
+            # Stop animation and play block, if provided
+            stop
+            if @done_proc then @done_proc.call end
+            @done_proc = nil
+          end
         end
 
         set_frame
