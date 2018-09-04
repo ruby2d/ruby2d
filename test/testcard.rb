@@ -221,13 +221,14 @@ Text.new(x: 144, y: 202, text: "B", font: font, color: [0.0, 0.0, 1.0, 1.0])
 fps = Text.new(x: 10, y: 470, text: "", font: font)
 
 # Sprites
-s1 = Sprite.new(450, 200, "#{media}/sprite_sheet.png")
-s1.add(forwards: [
-  [  0, 0, 50, 50, 30],
-  [ 50, 0, 50, 50, 40],
-  [100, 0, 50, 50, 50],
-  [150, 0, 50, 50, 60]
-])
+spr = Sprite.new(
+  "#{media}/sprite_sheet.png",
+  x: 450, y: 200,
+  clip_width: 50,
+  time: 500,
+  loop: true
+)
+spr.play
 
 # Pointer for mouse
 pointer = Square.new(size: 10)
@@ -292,8 +293,6 @@ update do
   else
     pointer_outline.color = [0, 1, 0, 0]
   end
-
-  s1.animate(:forwards)
 
   if (get :frames) % 20 == 0
     fps.text = "FPS: #{(get :fps).round(3)}"
