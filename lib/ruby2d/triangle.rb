@@ -4,10 +4,10 @@ module Ruby2D
   class Triangle
     include Renderable
 
+    attr_reader :color
     attr_accessor :x1, :y1, :c1,
                   :x2, :y2, :c2,
                   :x3, :y3, :c3
-    attr_reader :color, :type_id
 
     def initialize(opts= {})
       @x1 = opts[:x1] || 50

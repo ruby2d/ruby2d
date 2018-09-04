@@ -3,8 +3,8 @@
 module Ruby2D
   class Music
 
-    attr_accessor :data, :loop
     attr_reader :path
+    attr_accessor :loop, :data
 
     def initialize(path)
 
