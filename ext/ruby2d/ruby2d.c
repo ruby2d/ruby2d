@@ -925,7 +925,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
 
     // Load controller mappings, if DB file exists
     if (S2D_FileExists(full_mappings_path)) {
-      S2D_LoadControllerMappingsFromFile(full_mappings_path);
+      S2D_AddControllerMappingsFromFile(full_mappings_path);
     }
 
     free(full_mappings_path);
