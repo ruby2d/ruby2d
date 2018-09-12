@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 2.0.0'
   s.add_dependency 'opal', '~> 0.11'
-  s.add_development_dependency 'rspec', '~> 3.7'
+  s.add_development_dependency 'rspec', '~> 3.8'
 
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('assets/**/*') +
