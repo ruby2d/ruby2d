@@ -3,7 +3,7 @@
 module Ruby2D
   class Window
 
-    attr_reader :objects
+    attr_reader :objects, :width, :height
     attr_accessor :mouse_x, :mouse_y, :frames, :fps
 
     EventDescriptor = Struct.new(:type, :id)

@@ -1,6 +1,10 @@
 # dsl.rb
 
 module Ruby2D::DSL
+  def window
+    Application.window
+  end
+
   def get(sym)
     Application.get(sym)
   end
