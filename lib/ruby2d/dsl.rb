@@ -1,36 +1,39 @@
 # dsl.rb
 
 module Ruby2D::DSL
+
+  Ruby2D::Window.new
+
   def get(sym)
-    Application.get(sym)
+    Window.get(sym)
   end
 
   def set(opts)
-    Application.set(opts)
+    Window.set(opts)
   end
 
   def on(event, &proc)
-    Application.on(event, &proc)
+    Window.on(event, &proc)
   end
 
   def off(event_descriptor)
-    Application.off(event_descriptor)
+    Window.off(event_descriptor)
   end
 
   def update(&proc)
-    Application.update(&proc)
+    Window.update(&proc)
   end
 
   def clear
-    Application.clear
+    Window.clear
   end
 
   def show
-    Application.show
+    Window.show
   end
 
   def close
-    Application.close
+    Window.close
   end
 
 end

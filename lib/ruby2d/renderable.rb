@@ -10,13 +10,13 @@ module Ruby2D
 
     def add
       if Module.const_defined? :DSL
-        Application.add(self)
+        Window.add(self)
       end
     end
 
     def remove
       if Module.const_defined? :DSL
-        Application.remove(self)
+        Window.remove(self)
       end
     end
 
