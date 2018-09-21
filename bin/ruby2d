@@ -21,6 +21,7 @@ end
   'dsl',
   'quad',
   'line',
+  'circle',
   'rectangle',
   'square',
   'triangle',

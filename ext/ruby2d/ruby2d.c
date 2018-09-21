@@ -284,6 +284,31 @@ static R_VAL ruby2d_line_ext_render(R_VAL self) {
 
 
 /*
+ * Ruby2D::Circle#ext_render
+ */
+#if MRUBY
+static R_VAL ruby2d_circle_ext_render(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_circle_ext_render(R_VAL self) {
+#endif
+  R_VAL c = r_iv_get(self, "@color");
+
+  S2D_DrawCircle(
+    NUM2DBL(r_iv_get(self, "@x")),
+    NUM2DBL(r_iv_get(self, "@y")),
+    NUM2DBL(r_iv_get(self, "@radius")),
+    NUM2DBL(r_iv_get(self, "@sectors")),
+    NUM2DBL(r_iv_get(c, "@r")),
+    NUM2DBL(r_iv_get(c, "@g")),
+    NUM2DBL(r_iv_get(c, "@b")),
+    NUM2DBL(r_iv_get(c, "@a"))
+  );
+
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Image#ext_init
  * Initialize image structure data
  */
@@ -1034,6 +1059,12 @@ void Init_ruby2d() {
 
   // Ruby2D::Line#ext_render
   r_define_method(ruby2d_line_class, "ext_render", ruby2d_line_ext_render, r_args_none);
+
+  // Ruby2D::Circle
+  R_CLASS ruby2d_circle_class = r_define_class(ruby2d_module, "Circle");
+
+  // Ruby2D::Circle#ext_render
+  r_define_method(ruby2d_circle_class, "ext_render", ruby2d_circle_ext_render, r_args_none);
 
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");

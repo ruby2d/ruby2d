@@ -35,7 +35,6 @@ Rectangle.new(x: 400, width: 50, height: 50, color: 'blue')
 Rectangle.new(x: 450, width: 50, height: 50, color: 'aqua')
 Rectangle.new(x: 500, width: 50, height: 50, color: 'teal')
 Rectangle.new(x: 550, width: 50, height: 50, color: 'olive')
-
 Rectangle.new(x: 150, y: 50, width: 50, height: 50, color: 'green')
 Rectangle.new(x: 200, y: 50, width: 50, height: 50, color: 'lime')
 Rectangle.new(x: 250, y: 50, width: 50, height: 50, color: 'yellow')
@@ -49,17 +48,6 @@ Rectangle.new(x: 550, y: 50, width: 50, height: 50, color: 'brown')
 # Mix of named colors and numbers
 Rectangle.new(
   x: 600,
-  width: 50,
-  height: 50,
-  color: [
-    'red',
-    'green',
-    'blue',
-    'yellow'
-  ]
-)
-Rectangle.new(
-  x: 650,
   y: 0,
   width: 50,
   height: 50,
@@ -70,8 +58,18 @@ Rectangle.new(
     'yellow'
   ]
 )
+
+# Check opacity
+opacity_square = Square.new(
+  x: 650,
+  y: 0,
+  size: 50,
+  color: ['red', 'green', 'blue', 'yellow']
+)
+
+# Fill remaining area with random colors
 Rectangle.new(x: 600, y: 50, width: 50, height: 50, color: 'random')
-Rectangle.new(x: 650, y: 50, width: 50, height: 50, color: 'random')
+Square.new(x: 650, y: 50, size: 50, color: 'random')
 
 # White to black gradient
 Rectangle.new(
@@ -199,12 +197,18 @@ Line.new(
   ]
 );
 
+# Circles
+
+Circle.new(x: 525, y: 225, radius: 25, color: [1.0, 0.2, 0.2, 1.0])
+Circle.new(x: 575, y: 225, radius: 25, sectors:  8, color: [0.2, 1.0, 0.2, 1.0])
+Circle.new(x: 575, y: 225, radius: 17, sectors: 16, color: [0, 0, 0, 0.6])
+
 rotate = false
 
 # Images
-img_png = Image.new(x: 590, y: 180, path: "#{media}/image.png")
-img_jpg = Image.new(x: 590, y: 290, path: "#{media}/image.jpg")
-img_bmp = Image.new(x: 590, y: 400, path: "#{media}/image.bmp")
+img_png = Image.new(x: 600, y: 180, path: "#{media}/image.png")
+img_jpg = Image.new(x: 600, y: 290, path: "#{media}/image.jpg")
+img_bmp = Image.new(x: 600, y: 400, path: "#{media}/image.bmp")
 img_r = Image.new(x: 400, y: 200, width: 50, height: 25, path: "#{media}/colors.png")
 img_r.color = [1.0, 0.3, 0.3, 1.0]
 img_g = Image.new(x: 400, y: 225, path: "#{media}/colors.png")
@@ -237,13 +241,6 @@ pointer = Square.new(size: 10)
 pointer_outline = Square.new(size: 18, color: [0, 1, 0, 0])
 flash = 0
 
-# Updating opacity
-opacity_square = Square.new(
-  x: 500,
-  y: 200,
-  size: 50,
-  color: ["red", "green", "blue", "yellow"]
-)
 time_start = Time.now
 
 # Text size
