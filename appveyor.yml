@@ -8,6 +8,7 @@ install:
 build: off
 before_test:
   - ruby -v
-test_script:
+  - gem install bundler
   - bundle install
+test_script:
   - rake
