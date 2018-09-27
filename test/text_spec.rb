@@ -25,8 +25,7 @@ RSpec.describe Ruby2D::Text do
   describe "#width" do
     it "is known after creation" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
-      # expect(t.width).to eq(123)
-      expect(t.width).to eq(116)
+      expect(t.width).to be_between(110, 120)
     end
 
     it "is known after updating" do
