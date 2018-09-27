@@ -9,41 +9,57 @@ module Ruby2D
 
     def initialize(path, opts = {})
 
+      # Check if sprite file exists, unless running on the web
       unless RUBY_ENGINE == 'opal'
         unless File.exists? path
           raise Error, "Cannot find sprite image file `#{path}`"
         end
       end
 
-      @path          = path
-      @x             = opts[:x] || 0
-      @y             = opts[:y] || 0
-      @z             = opts[:z] || 0
-      @flip_x        = @x
-      @flip_y        = @y
-      @width         = opts[:width]  || nil
-      @height        = opts[:height] || nil
-      @flip_width    = @width
-      @flip_height   = @height
-      @clip_x        = opts[:clip_x] || 0
-      @clip_y        = opts[:clip_y] || 0
-      @rotate        = 0
-      @start_time    = 0.0
-      @loop          = opts[:loop] || false
-      @frame_time    = opts[:time] || 300
-      @animations    = opts[:animations] || {}
-      @playing       = false
+      # Sprite image file path
+      @path = path
+
+      # Coordinates, size, and rotation of the sprite
+      @x = opts[:x] || 0
+      @y = opts[:y] || 0
+      @z = opts[:z] || 0
+      @width  = opts[:width]  || nil
+      @height = opts[:height] || nil
+      @rotate = opts[:rotate] || 0
+
+      # Flipping status, coordinates, and size, used internally
+      @flip = nil
+      @flip_x = @x
+      @flip_y = @y
+      @flip_width  = @width
+      @flip_height = @height
+
+      # Animation attributes
+      @start_time = 0.0
+      @loop = opts[:loop] || false
+      @frame_time = opts[:time] || 300
+      @animations = opts[:animations] || {}
+      @playing = false
       @current_frame = opts[:default] || 0
-      @last_frame    = 0
-      @flip          = nil
-      @done_proc     = nil
+      @last_frame = 0
+      @done_proc = nil
 
-      @img_width = nil; @img_height = nil  # set by `ext_init`
+      # The sprite image size set by the native extension `ext_init()`
+      @img_width = nil; @img_height = nil
+
+      # Initialize the sprite
       ext_init(@path)
-      @clip_width           = opts[:clip_width]  || @img_width
-      @clip_height          = opts[:clip_height] || @img_height
-      @animations[:default] = 0..(@img_width / @clip_width) - 1  # set default animation
 
+      # The clipping rectangle
+      @clip_x = opts[:clip_x] || 0
+      @clip_y = opts[:clip_y] || 0
+      @clip_width  = opts[:clip_width]  || @img_width
+      @clip_height = opts[:clip_height] || @img_height
+
+      # Set the default animation
+      @animations[:default] = 0..(@img_width / @clip_width) - 1
+
+      # Set the sprite defaults
       @defaults = {
         animation:   @animations.first[0],
         frame:       @current_frame,
@@ -55,6 +71,7 @@ module Ruby2D
         loop:        @loop
       }
 
+      # Add the sprite to the window
       add
     end
 
