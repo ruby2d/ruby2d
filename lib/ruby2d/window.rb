@@ -54,6 +54,9 @@ module Ruby2D
       # Mouse X and Y position in the window
       @mouse_x, @mouse_y = 0, 0
 
+      # Controller axis and button mappings file
+      @controller_mappings = File.expand_path('~') + "/.ruby2d/controllers.txt"
+
       # Renderable objects currently in the window, like a linear scene graph
       @objects = []
 
@@ -310,6 +313,15 @@ module Ruby2D
       when :move
         @events[:mouse_move].each do |id, e|
           e.call(MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y))
+        end
+      end
+    end
+
+    # Add controller mappings from file
+    def add_controller_mappings
+      unless RUBY_ENGINE == 'opal'
+        if File.exists? @controller_mappings
+          ext_add_controller_mappings(@controller_mappings)
         end
       end
     end

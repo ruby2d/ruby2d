@@ -927,6 +927,22 @@ static R_VAL ruby2d_window_ext_get_display_dimensions(R_VAL self) {
 
 
 /*
+ * Ruby2D::Window#ext_add_controller_mappings
+ */
+#if MRUBY
+static R_VAL ruby2d_window_ext_add_controller_mappings(mrb_state* mrb, R_VAL self) {
+  mrb_value path;
+  mrb_get_args(mrb, "o", &path);
+#else
+static R_VAL ruby2d_window_ext_add_controller_mappings(R_VAL self, R_VAL path) {
+#endif
+  S2D_Log(S2D_INFO, "Adding controller mappings from `%s`", RSTRING_PTR(path));
+  S2D_AddControllerMappingsFromFile(RSTRING_PTR(path));
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Window#ext_show
  */
 #if MRUBY
@@ -941,27 +957,8 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
     S2D_Diagnostics(true);
   }
 
-  // Load controller mappings
-  #if !RUBY2D_IOS_TVOS && !WINDOWS
-    #include <pwd.h>
-
-    char *homedir;
-    if ((homedir = getenv("HOME")) == NULL) {
-      homedir = getpwuid(getuid())->pw_dir;
-    }
-
-    char *mappings = "/.ruby2d/controllers.txt";
-    char *full_mappings_path = malloc(strlen(homedir) + strlen(mappings) + 1);
-    strcpy(full_mappings_path, homedir); strcat(full_mappings_path, mappings);
-    printf("%s\n", full_mappings_path);
-
-    // Load controller mappings, if DB file exists
-    if (S2D_FileExists(full_mappings_path)) {
-      S2D_AddControllerMappingsFromFile(full_mappings_path);
-    }
-
-    free(full_mappings_path);
-  #endif
+  // Add controller mappings from file
+  r_funcall(self, "add_controller_mappings", 0);
 
   // Get window attributes
   char *title = RSTRING_PTR(r_iv_get(self, "@title"));
@@ -1132,6 +1129,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Window#ext_get_display_dimensions
   r_define_method(ruby2d_window_class, "ext_get_display_dimensions", ruby2d_window_ext_get_display_dimensions, r_args_none);
+
+  // Ruby2D::Window#ext_add_controller_mappings
+  r_define_method(ruby2d_window_class, "ext_add_controller_mappings", ruby2d_window_ext_add_controller_mappings, r_args_req(1));
 
   // Ruby2D::Window#ext_show
   r_define_method(ruby2d_window_class, "ext_show", ruby2d_window_ext_show, r_args_none);
