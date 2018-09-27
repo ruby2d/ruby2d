@@ -1,4 +1,4 @@
-# ruby2d.rb
+# Ruby2D module and native extension loader, adds DSL
 
 require 'ruby2d/renderable'
 require 'ruby2d/exceptions'

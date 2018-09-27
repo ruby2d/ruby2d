@@ -1,4 +1,4 @@
-# triangle.rb
+# Ruby2D::Triangle
 
 module Ruby2D
   class Triangle
@@ -16,8 +16,7 @@ module Ruby2D
       @y2 = opts[:y2] || 100
       @x3 = opts[:x3] || 0
       @y3 = opts[:y3] || 100
-      @z = opts[:z] || 0
-
+      @z  = opts[:z]  || 0
       self.color = opts[:color] || 'white'
       add
     end
@@ -61,5 +60,6 @@ module Ruby2D
         @c3 = c
       end
     end
+
   end
 end

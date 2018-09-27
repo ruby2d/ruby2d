@@ -1,20 +1,21 @@
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Text do
-  describe '#new' do
+
+  describe "#new" do
     it "raises exception if font file doesn't exist" do
-      expect { Text.new(font: 'bad_font.ttf') }.to raise_error(Ruby2D::Error)
+      expect { Text.new(font: "bad_font.ttf") }.to raise_error(Ruby2D::Error)
     end
   end
 
-  describe '#text=' do
+  describe "#text=" do
     it 'maps Time to string' do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = Time.new(1, 1, 1, 1, 1, 1, 1)
       expect(t.text).to eq "0001-01-01 01:01:01 +0000"
     end
 
-    it 'maps Number to string' do
+    it "maps Number to string" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = 0
       expect(t.text).to eq "0"
@@ -24,7 +25,8 @@ RSpec.describe Ruby2D::Text do
   describe "#width" do
     it "is known after creation" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
-      expect(t.width).to eq(123)
+      # expect(t.width).to eq(123)
+      expect(t.width).to eq(116)
     end
 
     it "is known after updating" do
@@ -47,14 +49,14 @@ RSpec.describe Ruby2D::Text do
     end
   end
 
-  describe '#contains?' do
-    it "returns true if point is inside text" do
+  describe "#contains?" do
+    it "returns true if point is inside the text" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = "Hello world!"
       expect(t.contains?(t.width / 2, t.height / 2)).to be true
     end
 
-    it "returns true if point is not inside text" do
+    it "returns false if point is outside the text" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = "Hello world!"
       expect(t.contains?(  - t.width / 2,     t.height / 2)).to be false
@@ -63,4 +65,5 @@ RSpec.describe Ruby2D::Text do
       expect(t.contains?(    t.width / 2, 3 * t.height / 2)).to be false
     end
   end
+
 end

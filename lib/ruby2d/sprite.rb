@@ -1,4 +1,4 @@
-# sprite.rb
+# Ruby2D::Sprite
 
 module Ruby2D
   class Sprite

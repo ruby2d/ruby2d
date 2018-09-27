@@ -1,5 +1,8 @@
+# Ruby2D::Renderable
+
 module Ruby2D
   module Renderable
+
     attr_reader :z
 
     def z=(z)
@@ -29,7 +32,8 @@ module Ruby2D
     end
 
     def contains?(x, y)
-      raise "Not implemented yet"
+      raise Error, "\`#contains?\` not implemented for this class yet"
     end
+
   end
 end

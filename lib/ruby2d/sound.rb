@@ -1,4 +1,4 @@
-# sound.rb
+# Ruby2D::Sound
 
 module Ruby2D
   class Sound
@@ -18,6 +18,7 @@ module Ruby2D
       ext_init(path)
     end
 
+    # Play the sound
     def play
       ext_play
     end

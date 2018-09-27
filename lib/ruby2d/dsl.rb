@@ -1,4 +1,4 @@
-# dsl.rb
+# Ruby2D::DSL
 
 module Ruby2D::DSL
 

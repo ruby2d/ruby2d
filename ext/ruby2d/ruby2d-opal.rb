@@ -1,4 +1,4 @@
-# ruby2d-opal.rb
+# Web extension for Opal
 
 # Ruby 2D window
 $R2D_WINDOW = nil

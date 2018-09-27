@@ -1,4 +1,4 @@
-# circle.rb
+# Ruby2D::Circle
 
 module Ruby2D
   class Circle
@@ -8,12 +8,12 @@ module Ruby2D
     attr_accessor :x, :y, :radius, :sectors
 
     def initialize(opts = {})
-      @x         = opts[:x]       || 25
-      @y         = opts[:y]       || 25
-      @radius    = opts[:radius]  || 25
-      @sectors   = opts[:sectors] || 20
-      @z         = opts[:z]       || 0
-      self.color = opts[:color]   || 'white'
+      @x = opts[:x] || 25
+      @y = opts[:y] || 25
+      @z = opts[:z] || 0
+      @radius = opts[:radius] || 25
+      @sectors = opts[:sectors] || 20
+      self.color = opts[:color] || 'white'
       add
     end
 
@@ -24,5 +24,6 @@ module Ruby2D
     def contains?(x, y)
       Math.sqrt((x - @x)**2 + (y - @y)**2) <= @radius
     end
+
   end
 end

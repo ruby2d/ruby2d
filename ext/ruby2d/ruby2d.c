@@ -1,4 +1,4 @@
-// ruby2d.c – Native C extension for Ruby and MRuby
+// Native C extension for Ruby and MRuby
 
 // Simple 2D includes
 #if RUBY2D_IOS_TVOS
@@ -936,6 +936,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
 #endif
   ruby2d_window = self;
 
+  // Set Simple 2D diagnostics
   if (r_test(r_iv_get(self, "@diagnostics"))) {
     S2D_Diagnostics(true);
   }

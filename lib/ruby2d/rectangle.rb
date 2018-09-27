@@ -1,4 +1,4 @@
-# rectangle.rb
+# Ruby2D::Rectangle
 
 module Ruby2D
   class Rectangle < Quad
@@ -6,15 +6,13 @@ module Ruby2D
     attr_reader :x, :y, :width, :height
 
     def initialize(opts = {})
-      @x      = opts[:x]      || 0
-      @y      = opts[:y]      || 0
-      @z      = opts[:z]      || 0
-      @width  = opts[:width]  || 200
+      @x = opts[:x] || 0
+      @y = opts[:y] || 0
+      @z = opts[:z] || 0
+      @width = opts[:width] || 200
       @height = opts[:height] || 100
-
-      update_coords(@x, @y, @width, @height)
-
       self.color = opts[:color] || 'white'
+      update_coords(@x, @y, @width, @height)
       add
     end
 

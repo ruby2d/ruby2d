@@ -1,7 +1,8 @@
 require 'ruby2d'
 
-RSpec.describe Window do
-  describe 'on :bad_event' do
+RSpec.describe Ruby2D::Window do
+
+  describe "on :bad_event" do
     it "raises exception if a bad event type is given" do
       window = Ruby2D::Window.new
       expect { window.on(:bad_event) }.to raise_error(Ruby2D::Error)
@@ -130,4 +131,5 @@ RSpec.describe Window do
       end
     end
   end
+
 end

@@ -1,4 +1,4 @@
-# square.rb
+# Ruby2D::Square
 
 module Ruby2D
   class Square < Rectangle
@@ -10,18 +10,18 @@ module Ruby2D
       @y = opts[:y] || 0
       @z = opts[:z] || 0
       @width = @height = @size = opts[:size] || 100
-
       self.color = opts[:color] || 'white'
-
       update_coords(@x, @y, @size, @size)
-
       add
     end
 
+    # Set the size of the square
     def size=(s)
       self.width = self.height = @size = s
     end
 
+    # Make the inherited width and height attribute accessors private
     private :width=, :height=
+
   end
 end

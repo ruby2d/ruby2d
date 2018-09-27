@@ -2,7 +2,7 @@ require 'ruby2d'
 
 RSpec.describe Ruby2D::Circle do
 
-  describe '#new' do
+  describe "#new" do
     it "creates a white circle by default" do
       circle = Circle.new
       expect(circle.color).to   be_a(Ruby2D::Color)

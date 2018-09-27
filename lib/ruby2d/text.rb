@@ -1,4 +1,4 @@
-# text.rb
+# Ruby2D::Text
 
 module Ruby2D
   class Text
@@ -11,9 +11,9 @@ module Ruby2D
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
-      @text = (opts[:text] || "Hello World!").to_s
+      @text = (opts[:text] || "Hello Ruby!").to_s
       @size = opts[:size] || 20
-      @rotate = 0
+      @rotate = opts[:rotate] || 0
       @font = opts[:font]
 
       unless RUBY_ENGINE == 'opal'

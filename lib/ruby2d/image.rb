@@ -1,4 +1,4 @@
-# image.rb
+# Ruby2D::Image
 
 module Ruby2D
   class Image
@@ -19,10 +19,9 @@ module Ruby2D
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
-      @width  = opts[:width]  || nil
+      @width = opts[:width] || nil
       @height = opts[:height] || nil
-      @rotate = 0
-
+      @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
 
       ext_init(@path)
@@ -36,5 +35,6 @@ module Ruby2D
     def contains?(x, y)
       @x < x and @x + @width > x and @y < y and @y + @height > y
     end
+
   end
 end

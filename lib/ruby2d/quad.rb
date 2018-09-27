@@ -1,4 +1,4 @@
-# quad.rb
+# Ruby2D::Quad
 
 module Ruby2D
   class Quad
@@ -25,9 +25,7 @@ module Ruby2D
       @y3 = opts[:y3] || 100
       @x4 = opts[:x4] || 0
       @y4 = opts[:y4] || 100
-
-      @z = opts[:z] || 0
-
+      @z  = opts[:z]  || 0
       self.color = opts[:color] || 'white'
       add
     end
@@ -74,5 +72,6 @@ module Ruby2D
         @c4 = c
       end
     end
+
   end
 end

@@ -1,11 +1,12 @@
-# color.rb
+# Ruby2D::Color
 
 module Ruby2D
   class Color
+
     # Color::Set represents an array of colors
     class Set
       def initialize(colors)
-        @colors = colors.map{|c| Color.new(c)}
+        @colors = colors.map { |c| Color.new(c) }
       end
 
       def [](i)
@@ -83,31 +84,28 @@ module Ruby2D
 
       # Array of Floats from 0.0..1.0
       c.class == Array && c.length == 4 &&
-      c.all? { |el|
-        el.is_a?(Numeric)
-      }
+      c.all? { |el| el.is_a?(Numeric) }
     end
 
+    # Create a color from whatever is provided
     def self.from(input)
-      # If a valid array of colors, return a Color::Set with those colors
-      # Else return single color
+      # If a valid array of colors, return a `Color::Set` with those colors
       if input.is_a? Array and input.all? { |el| Color.is_valid? el }
         Color::Set.new(input)
+      # Otherwise, return single color
       else
         Color.new(input)
       end
     end
 
+    # Convenience methods to alias `opacity` to `@a`
     def opacity; @a end
-
-    def opacity=(opacity)
-      @a = opacity
-    end
+    def opacity=(opacity); @a = opacity end
 
     private
 
-    # TODO: Only `Number` supported in JS
     # Convert from Fixnum (0..255) to Float (0.0..1.0)
+    #   TODO: Only `Number` is supported in JS
     def to_f(a)
       b = []
       a.each do |n|

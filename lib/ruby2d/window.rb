@@ -1,4 +1,4 @@
-# Ruby 2D Window class
+# Ruby2D::Window
 # Represents a window on screen, responsible for storing renderable graphics,
 # event handlers, the update loop, showing and closing the window.
 
@@ -28,12 +28,12 @@ module Ruby2D
       @icon = nil
 
       # Window size and characteristics
-      @width      = args[:width]  || 640
-      @height     = args[:height] || 480
-      @resizable  = false
+      @width  = args[:width]  || 640
+      @height = args[:height] || 480
+      @resizable = false
       @borderless = false
       @fullscreen = false
-      @highdpi    = false
+      @highdpi = false
 
       # Size of the window's viewport (the drawable area)
       @viewport_width, @viewport_height = nil, nil
@@ -46,7 +46,7 @@ module Ruby2D
 
       # Frames per second upper limit, and the actual FPS
       @fps_cap = args[:fps_cap] || 60
-      @fps     = @fps_cap
+      @fps = @fps_cap
 
       # Vertical synchronization, set to prevent screen tearing (recommended)
       @vsync = args[:vsync] || true
