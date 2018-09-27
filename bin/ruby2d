@@ -255,7 +255,7 @@ def launch_apple(device)
       puts "No iOS app built!"
       exit
     end
-    puts `simple2d simulator --open "iPhone 8" &&
+    puts `simple2d simulator --open "iPhone XR" &&
           simple2d simulator --install "build/ios/build/Release-iphonesimulator/MyApp.app" &&
           simple2d simulator --launch "Ruby2D.MyApp"`
   when 'tvos'
@@ -263,7 +263,7 @@ def launch_apple(device)
       puts "No tvOS app built!"
       exit
     end
-    puts `simple2d simulator --open "Apple TV" &&
+    puts `simple2d simulator --open "Apple TV 4K" &&
           simple2d simulator --install "build/tvos/build/Release-appletvsimulator/MyApp.app" &&
           simple2d simulator --launch "Ruby2D.MyApp"`
   end
