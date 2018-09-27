@@ -376,7 +376,7 @@ static void free_image(mrb_state *mrb, void *p_) {
 #else
 static void free_image(S2D_Image *img) {
 #endif
-  S2D_Log(S2D_INFO, "Free image: %i, %i", img->x, img->y);
+  S2D_Log(S2D_INFO, "Free image `%s` at %i, %i", img->path, img->x, img->y);
   S2D_FreeImage(img);
 }
 
@@ -450,7 +450,7 @@ static void free_sprite(mrb_state *mrb, void *p_) {
 #else
 static void free_sprite(S2D_Sprite *spr) {
 #endif
-  S2D_Log(S2D_INFO, "Free sprite: %i, %i", spr->x, spr->y);
+  S2D_Log(S2D_INFO, "Free sprite `%s` at %i, %i", spr->path, spr->x, spr->y);
   S2D_FreeSprite(spr);
 }
 
@@ -539,7 +539,7 @@ static void free_text(mrb_state *mrb, void *p_) {
 #else
 static void free_text(S2D_Text *txt) {
 #endif
-  S2D_Log(S2D_INFO, "Free text: %s", txt->msg);
+  S2D_Log(S2D_INFO, "Free text \"%s\" with font `%s`", txt->msg, txt->font);
   S2D_FreeText(txt);
 }
 
@@ -586,7 +586,7 @@ static void free_sound(mrb_state *mrb, void *p_) {
 #else
 static void free_sound(S2D_Sound *snd) {
 #endif
-  S2D_Log(S2D_INFO, "Free sound");
+  S2D_Log(S2D_INFO, "Free sound `%s`", snd->path);
   S2D_FreeSound(snd);
 }
 
@@ -687,7 +687,7 @@ static void free_music(mrb_state *mrb, void *p_) {
 #else
 static void free_music(S2D_Music *mus) {
 #endif
-  S2D_Log(S2D_INFO, "Free music");
+  S2D_Log(S2D_INFO, "Free music `%s`", mus->path);
   S2D_FreeMusic(mus);
 }
 
