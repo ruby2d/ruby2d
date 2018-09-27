@@ -965,9 +965,14 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   int width   = NUM2INT(r_iv_get(self, "@width"));
   int height  = NUM2INT(r_iv_get(self, "@height"));
   int fps_cap = NUM2INT(r_iv_get(self, "@fps_cap"));
-  int flags   = 0;
+
+  // Get the window icon
+  char *icon = NULL;
+  R_VAL iv_icon = r_iv_get(self, "@icon");
+  if (r_test(iv_icon)) icon = RSTRING_PTR(iv_icon);
 
   // Get window flags
+  int flags = 0;
   if (r_test(r_iv_get(self, "@resizable"))) {
     flags = flags | S2D_RESIZABLE;
   }
@@ -998,6 +1003,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   window->viewport.width  = viewport_width;
   window->viewport.height = viewport_height;
   window->fps_cap         = fps_cap;
+  window->icon            = icon;
   window->on_key          = on_key;
   window->on_mouse        = on_mouse;
   window->on_controller   = on_controller;

@@ -189,6 +189,7 @@ module Ruby2D
       if Color.is_valid? opts[:background]
         @background    = Color.new(opts[:background])
       end
+      @icon            = opts[:icon]            || @icon
       @width           = opts[:width]           || @width
       @height          = opts[:height]          || @height
       @fps_cap         = opts[:fps_cap]         || @fps_cap
