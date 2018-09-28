@@ -19,7 +19,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("key_", "").to_sym
         window.key_callback(callback_event_name, "example_key")
-        expect(value).to eq 1
+        expect(value).to eq(1)
       end
 
       it "allows binding of multiple events" do
@@ -33,7 +33,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("key_", "").to_sym
         window.key_callback(callback_event_name, "example_key")
-        expect(value).to eq 3
+        expect(value).to eq(3)
       end
 
       it "returns value, which can be used to unbind event" do
@@ -45,7 +45,7 @@ RSpec.describe Ruby2D::Window do
         window.off(event_descriptor)
         callback_event_name = key_event_type.to_s.gsub("key_", "").to_sym
         window.key_callback(callback_event_name, "example_key")
-        expect(value).to eq 0
+        expect(value).to eq(0)
       end
     end
   end
@@ -60,7 +60,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("mouse_", "").to_sym
         window.mouse_callback(callback_event_name, nil, nil, 0, 0, 0, 0)
-        expect(value).to eq 1
+        expect(value).to eq(1)
       end
 
       it "allows binding of multiple events" do
@@ -74,7 +74,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("mouse_", "").to_sym
         window.mouse_callback(callback_event_name, nil, nil, 0, 0, 0, 0)
-        expect(value).to eq 3
+        expect(value).to eq(3)
       end
 
       it "returns value, which can be used to unbind event" do
@@ -86,7 +86,7 @@ RSpec.describe Ruby2D::Window do
         window.off(event_descriptor)
         callback_event_name = key_event_type.to_s.gsub("mouse_", "").to_sym
         window.mouse_callback(callback_event_name, nil, nil, 0, 0, 0, 0)
-        expect(value).to eq 0
+        expect(value).to eq(0)
       end
     end
   end
@@ -101,7 +101,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("controller_", "").to_sym
         window.controller_callback(nil, callback_event_name, nil, nil, nil)
-        expect(value).to eq 1
+        expect(value).to eq(1)
       end
 
       it "allows binding of multiple events" do
@@ -115,7 +115,7 @@ RSpec.describe Ruby2D::Window do
         end
         callback_event_name = key_event_type.to_s.gsub("controller_", "").to_sym
         window.controller_callback(nil, callback_event_name, nil, nil, nil)
-        expect(value).to eq 3
+        expect(value).to eq(3)
       end
 
       it "returns value, which can be used to unbind event" do
@@ -127,7 +127,7 @@ RSpec.describe Ruby2D::Window do
         window.off(event_descriptor)
         callback_event_name = key_event_type.to_s.gsub("controller_", "").to_sym
         window.controller_callback(nil, callback_event_name, nil, nil, nil)
-        expect(value).to eq 0
+        expect(value).to eq(0)
       end
     end
   end

@@ -12,13 +12,13 @@ RSpec.describe Ruby2D::Text do
     it 'maps Time to string' do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = Time.new(1, 1, 1, 1, 1, 1, 1)
-      expect(t.text).to eq "0001-01-01 01:01:01 +0000"
+      expect(t.text).to eq("0001-01-01 01:01:01 +0000")
     end
 
     it "maps Number to string" do
       t = Text.new(font: "test/media/bitstream_vera/vera.ttf")
       t.text = 0
-      expect(t.text).to eq "0"
+      expect(t.text).to eq("0")
     end
   end
 

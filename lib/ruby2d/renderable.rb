@@ -5,18 +5,21 @@ module Ruby2D
 
     attr_reader :z
 
+    # Set the z position (depth) of the object
     def z=(z)
       remove
       @z = z
       add
     end
 
+    # Add the object to the window
     def add
       if Module.const_defined? :DSL
         Window.add(self)
       end
     end
 
+    # Remove the object from the window
     def remove
       if Module.const_defined? :DSL
         Window.remove(self)

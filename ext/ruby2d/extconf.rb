@@ -76,6 +76,6 @@ check_s2d_version
 # Add flags
 $CFLAGS  << ' -std=c11 -I/usr/local/include'
 $LDFLAGS << ' ' << `bash simple2d --libs`
-$LDFLAGS.gsub!(/\n/, ' ')  # Remove newlines in flags, they cause problems
+$LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they cause problems
 
 create_makefile('ruby2d/ruby2d')
