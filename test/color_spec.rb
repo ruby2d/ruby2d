@@ -32,9 +32,13 @@ RSpec.describe Ruby2D::Color do
       s1.opacity = 0.5
       s2 = Square.new(color: ['red', 'green', 'blue', 'yellow'])
       s2.opacity = 0.7
-      expect(s1.opacity).to eq 0.5
-      expect(s2.opacity).to eq 0.7
+      expect(s1.opacity).to eq(0.5)
+      expect(s2.opacity).to eq(0.7)
     end
+  end
+
+  it "allows British English spelling of color" do
+    expect(Ruby2D::Colour).to eq(Ruby2D::Color)
   end
 
 end

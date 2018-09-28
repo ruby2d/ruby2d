@@ -26,7 +26,7 @@ module Ruby2D
       end
     end
 
-    attr_reader :r, :g, :b, :a
+    attr_accessor :r, :g, :b, :a
 
     # Based on clrs.cc
     @@colors = {
@@ -128,4 +128,7 @@ module Ruby2D
     end
 
   end
+
+  # Allow British English spelling of color
+  Colour = Color
 end
