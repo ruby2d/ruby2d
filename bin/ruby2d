@@ -6,6 +6,7 @@ require 'fileutils'
 class String
   def colorize(c); "\e[#{c}m#{self}\e[0m" end
   def bold;  colorize('1')    end
+  def warn;  colorize('1;33') end
   def error; colorize('1;31') end
 end
 
@@ -120,6 +121,9 @@ end
 
 # Build a web-based version of the provided Ruby application
 def build_web(rb_file)
+  puts "Warning: ".warn + "This feature is currently disabled while it's being upgraded."
+  return
+
   check_build_src_file(rb_file)
 
   # Assemble the Ruby 2D library in one `.rb` file and compile to JS
@@ -291,6 +295,7 @@ To compile and create a native executable, use:
 
 To build for the web, creating a JavaScript and HTML package, use:
   build --web <ruby_file>
+  #{"Warning:".warn} #{"This feature is currently disabled while it's being upgraded.".bold}
 
 To build an iOS or tvOS app, use the following:
   build --ios <ruby_file>

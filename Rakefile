@@ -46,6 +46,7 @@ def run_web_test(file)
   print_task "Running web test: #{file}.rb"
   run_cmd "ruby2d build --clean"
   run_cmd "ruby2d build --web test/#{file}.rb --debug"
+  return  # temporarily disable
   open_cmd = 'open'
   case RUBY_PLATFORM
   when /linux/
