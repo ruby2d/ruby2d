@@ -10,4 +10,4 @@ script:
   - rake
   - ruby2d build --native test/ci-build.rb
   - ./build/app
-  - ruby2d build --web test/ci-build.rb
+  # - ruby2d build --web test/ci-build.rb
