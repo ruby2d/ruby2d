@@ -254,6 +254,11 @@ module Ruby2D
       `S2D.StopMusic();`
     end
 
+    def ext_volume(percentage = -1)
+      vol = (percentage/100.0)*128
+      `Mix_VolumeMusic(vol);`
+    end
+
     def ext_music_fadeout(ms)
       `S2D.FadeOutMusic(ms);`
     end

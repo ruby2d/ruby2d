@@ -662,6 +662,20 @@ static R_VAL ruby2d_music_ext_stop(R_VAL self) {
   return R_NIL;
 }
 
+/*
+ * Ruby2D::Music#ext_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_music_ext_volume(mrb_state* mrb, R_VAL self) {
+  mrb_value vol;
+  mrb_get_args(mrb, "o", &vol);
+#else
+static R_VAL ruby2d_music_ext_volume(R_VAL self, R_VAL vol) {
+#endif
+  int ret_vol;
+  ret_vol = Mix_VolumeMusic(NUM2INT(vol));
+  return INT2FIX(ret_vol);
+}
 
 /*
  * Ruby2D::Music#ext_fadeout
@@ -1126,6 +1140,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_stop
   r_define_method(ruby2d_music_class, "ext_stop", ruby2d_music_ext_stop, r_args_none);
+
+  // Ruby2D::Music#ext_volume
+  r_define_method(ruby2d_music_class, "ext_volume", ruby2d_music_ext_volume, r_args_req(1));
 
   // Ruby2D::Music#ext_fadeout
   r_define_method(ruby2d_music_class, "ext_fadeout", ruby2d_music_ext_fadeout, r_args_req(1));

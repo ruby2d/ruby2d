@@ -39,6 +39,11 @@ module Ruby2D
       ext_stop
     end
 
+    # Set music volume, 0-100%. If no parameters given, return current volume.
+    def volume(percentage = -1)
+      (ext_volume(percentage)/128.0)*100
+    end
+
     # Fade out music over provided milliseconds
     def fadeout(ms)
       ext_fadeout(ms)
