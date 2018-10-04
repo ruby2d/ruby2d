@@ -74,7 +74,10 @@ end
 check_s2d_version
 
 # Add flags
-$CFLAGS  << ' -std=c11 -I/usr/local/include'
+$CFLAGS << ' -std=c11 -I/usr/local/include'
+if `cat /etc/os-release` =~ /raspbian/  # Raspberry Pi
+  $CFLAGS << ' -I/opt/vc/include'
+end
 $LDFLAGS << ' ' << `bash simple2d --libs`
 $LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they cause problems
 
