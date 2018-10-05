@@ -18,6 +18,11 @@ require 'ruby2d/text'
 require 'ruby2d/sound'
 require 'ruby2d/music'
 
+require 'ruby2d/collider'
+require 'ruby2d/piece'
+require 'ruby2d/collision_layer'
+require 'ruby2d/board'
+
 if RUBY_PLATFORM =~ /mingw/
   # When using the Windows CI AppVeyor
   if ENV['APPVEYOR']
