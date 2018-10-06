@@ -7,8 +7,8 @@ module Ruby2D
     attr_reader :path, :color
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
-    def initialize(opts = {})
-      @path = opts[:path]
+    def initialize(path, opts = {})
+      @path = path
 
       unless RUBY_ENGINE == 'opal'
         unless File.exists? @path

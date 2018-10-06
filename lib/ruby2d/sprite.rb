@@ -4,7 +4,7 @@ module Ruby2D
   class Sprite
     include Renderable
 
-    attr_reader   :x, :y, :width, :height
+    attr_reader :x, :y, :width, :height
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data
 
     def initialize(path, opts = {})
