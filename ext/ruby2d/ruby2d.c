@@ -466,6 +466,12 @@ static R_VAL ruby2d_text_ext_init(R_VAL self) {
 #endif
   S2D_Log(S2D_INFO, "Init text: %s", RSTRING_PTR(r_iv_get(self, "@text")));
 
+  // Trim the font file string to its actual length on MRuby
+  #if MRUBY
+    mrb_value s = r_iv_get(self, "@font");
+    mrb_str_resize(mrb, s, RSTRING_LEN(s));
+  #endif
+
   S2D_Text *txt = S2D_CreateText(
     RSTRING_PTR(r_iv_get(self, "@font")),
     RSTRING_PTR(r_iv_get(self, "@text")),
