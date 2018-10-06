@@ -40,22 +40,5 @@ module Ruby2D
       @x < x and @x + @width > x and @y < y and @y + @height > y
     end
 
-    private
-
-    def resolve_path(font)
-      if RUBY_PLATFORM =~ /darwin/
-        font_path = "/Library/Fonts/#{font}.ttf"
-      else
-        # Linux
-        font_path = "/usr/share/fonts/truetype/#{font}.ttf"
-      end
-
-      unless File.exists? font_path
-        raise Error, "Cannot find system font"
-      else
-        font_path
-      end
-    end
-
   end
 end
