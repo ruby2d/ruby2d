@@ -4,7 +4,7 @@ set title: "Ruby 2D — Controller", width: 600, height: 425
 set diagnostics: true
 
 # Controller outline image
-controller = Image.new(path: 'media/controller.png')
+controller = Image.new('media/controller.png')
 
 scale = 80
 

@@ -206,25 +206,25 @@ Circle.new(x: 575, y: 225, radius: 17, sectors: 16, color: [0, 0, 0, 0.6])
 rotate = false
 
 # Images
-img_png = Image.new(x: 600, y: 180, path: "#{media}/image.png")
-img_jpg = Image.new(x: 600, y: 290, path: "#{media}/image.jpg")
-img_bmp = Image.new(x: 600, y: 400, path: "#{media}/image.bmp")
-img_r = Image.new(x: 400, y: 200, width: 50, height: 25, path: "#{media}/colors.png")
+img_png = Image.new("#{media}/image.png", x: 600, y: 180)
+img_jpg = Image.new("#{media}/image.jpg", x: 600, y: 290)
+img_bmp = Image.new("#{media}/image.bmp", x: 600, y: 400)
+img_r = Image.new("#{media}/colors.png",  x: 400, y: 200, width: 50, height: 25)
 img_r.color = [1.0, 0.3, 0.3, 1.0]
-img_g = Image.new(x: 400, y: 225, path: "#{media}/colors.png")
+img_g = Image.new("#{media}/colors.png", x: 400, y: 225)
 img_g.width, img_g.height = 25, 25
 img_g.color = [0.3, 1.0, 0.3, 1.0]
-img_b = Image.new(x: 425, y: 225, path: "#{media}/colors.png")
+img_b = Image.new("#{media}/colors.png", x: 425, y: 225)
 img_b.width, img_b.height = 25, 25
 img_b.color = [0.3, 0.3, 1.0, 1.0]
 
 # Text
-txt_r = Text.new(x: 44,  y: 202, text: "R", font: font, color: [1.0, 0.0, 0.0, 1.0])
-txt_b = Text.new(x: 92,  y: 202, text: "G", font: font, color: [0.0, 1.0, 0.0, 1.0])
-txt_g = Text.new(x: 144, y: 202, text: "B", font: font, color: [0.0, 0.0, 1.0, 1.0])
+txt_r = Text.new("R", x:  44, y: 202, font: font, color: [1.0, 0.0, 0.0, 1.0])
+txt_b = Text.new("G", x:  92, y: 202, font: font, color: [0.0, 1.0, 0.0, 1.0])
+txt_g = Text.new("B", x: 144, y: 202, font: font, color: [0.0, 0.0, 1.0, 1.0])
 
 # Frames per second
-fps = Text.new(x: 10, y: 470, text: "", font: font)
+fps = Text.new("", x: 10, y: 470, font: font)
 
 # Sprites
 spr = Sprite.new(
@@ -244,24 +244,24 @@ flash = 0
 time_start = Time.now
 
 # Default font for text
-Text.new(x: 150, y: 470, text: "Default font", size: 20)
+Text.new("Default font", x: 150, y: 470, size: 20)
 
 # Text size
-created_text = Text.new(x: 10, y: 270, text: "Created text", font: font)
+created_text = Text.new("Created text", x: 10, y: 270, font: font)
 created_text_background = Rectangle.new(
   x: created_text.x - 10,
   y: created_text.y - 10,
   width: created_text.width + 20,
   height: created_text.height + 20,
-  color: "red"
+  color: 'red'
 )
 created_text.remove
 created_text.add
 
 updated_text = Text.new(
+  "Updated text",
   x: 20 + created_text_background.x2,
   y: 270,
-  text: "Updated text",
   font: font
 )
 updated_text_background = Rectangle.new(
@@ -269,7 +269,7 @@ updated_text_background = Rectangle.new(
   y: updated_text.y - 10,
   width: updated_text.width + 20,
   height: updated_text.height + 20,
-  color: "blue"
+  color: 'blue'
 )
 updated_text.remove
 updated_text.add
