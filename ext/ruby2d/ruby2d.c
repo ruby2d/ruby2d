@@ -65,6 +65,7 @@
   #define r_define_module(name)  mrb_define_module(mrb, name)
   #define r_define_class(module, name)  mrb_define_class_under(mrb, module, name, mrb->object_class)
   #define r_define_method(class, name, function, args)  mrb_define_method(mrb, class, name, function, args)
+  #define r_define_class_method(class, name, function, args)  mrb_define_class_method(mrb, class, name, function, args)
   #define r_args_none  (MRB_ARGS_NONE())
   #define r_args_req(n)  MRB_ARGS_REQ(n)
   // Helpers
@@ -87,6 +88,7 @@
   #define r_define_module(name)  rb_define_module(name)
   #define r_define_class(module, name)  rb_define_class_under(module, name, rb_cObject)
   #define r_define_method(class, name, function, args)  rb_define_method(class, name, function, args)
+  #define r_define_class_method(class, name, function, args)  rb_define_singleton_method(class, name, function, args)
   #define r_args_none  0
   #define r_args_req(n)  n
   // Helpers
@@ -1143,6 +1145,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_volume
   r_define_method(ruby2d_music_class, "ext_volume", ruby2d_music_ext_volume, r_args_req(1));
+
+  // Ruby2D::Music#self.volume
+  r_define_class_method(ruby2d_music_class, "volume", ruby2d_music_ext_volume, r_args_req(1));
 
   // Ruby2D::Music#ext_fadeout
   r_define_method(ruby2d_music_class, "ext_fadeout", ruby2d_music_ext_fadeout, r_args_req(1));
