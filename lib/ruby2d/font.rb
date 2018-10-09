@@ -40,11 +40,11 @@ module Ruby2D
       # Get the fonts directory for the current platform
       def directory
         if `uname`.include? 'Darwin'  # macOS
-            "/Library/Fonts"
+          '/Library/Fonts'
         elsif `uname`.include? 'Linux'
-            "/usr/share/fonts/truetype"
+          '/usr/share/fonts'
         elsif `uname`.include? 'MINGW'
-            "C:/Windows/Fonts"
+          'C:/Windows/Fonts'
         end
       end
 
