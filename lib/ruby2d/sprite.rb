@@ -78,7 +78,7 @@ module Ruby2D
     # Set the x coordinate
     def x=(x)
       @x = @flip_x = x
-      if @flip == :flip_h || @flip == :flip_hv
+      if @flip == :horizontal || @flip == :both
         @flip_x = x + @width
       end
     end
@@ -86,7 +86,7 @@ module Ruby2D
     # Set the y coordinate
     def y=(y)
       @y = @flip_y = y
-      if @flip == :flip_v || @flip == :flip_hv
+      if @flip == :vertical || @flip == :both
         @flip_y = y + @height
       end
     end
@@ -94,7 +94,7 @@ module Ruby2D
     # Set the width
     def width=(width)
       @width = @flip_width = width
-      if @flip == :flip_h || @flip == :flip_hv
+      if @flip == :horizontal || @flip == :both
         @flip_width = -width
       end
     end
@@ -102,13 +102,18 @@ module Ruby2D
     # Set the height
     def height=(height)
       @height = @flip_height = height
-      if @flip == :flip_v || @flip == :flip_hv
+      if @flip == :vertical || @flip == :both
         @flip_height = -height
       end
     end
 
     # Play an animation
-    def play(animation = nil, loop = nil, flip = nil, &done_proc)
+    def play(opts = {}, &done_proc)
+
+      animation = opts[:animation]
+      loop = opts[:loop]
+      flip = opts[:flip]
+
       if !@playing || (animation != @playing_animation && animation != nil) || flip != @flip
 
         @playing = true
@@ -127,11 +132,11 @@ module Ruby2D
         when Array
           @first_frame   = 0
           @current_frame = 0
-          @last_frame = frames.length - 1
+          @last_frame    = frames.length - 1
         end
 
         # Set looping
-        @loop = loop == :loop || @defaults[:loop] ? true : false
+        @loop = loop == true || @defaults[:loop] ? true : false
 
         set_frame
         restart_time
@@ -151,8 +156,12 @@ module Ruby2D
     # Flip the sprite
     def flip_sprite(flip)
 
-      # A width and height must be set for the sprite for this to work
-      unless @width && @height then return end
+      # The sprite width and height must be set for it to be flipped correctly
+      if (!@width || !@height) && flip
+        raise Error,
+         "Sprite width and height must be set in order to flip; " +
+         "occured playing animation `:#{@playing_animation}` with image `#{@path}`"
+      end
 
       @flip = flip
 
@@ -163,13 +172,13 @@ module Ruby2D
       @flip_height = @height
 
       case flip
-      when :flip_h   # horizontal
+      when :horizontal
         @flip_x      = @x + @width
         @flip_width  = -@width
-      when :flip_v   # vertical
+      when :vertical
         @flip_y      = @y + @height
         @flip_height = -@height
-      when :flip_hv  # horizontal and vertical
+      when :both     # horizontal and vertical
         @flip_x      = @x + @width
         @flip_width  = -@width
         @flip_y      = @y + @height

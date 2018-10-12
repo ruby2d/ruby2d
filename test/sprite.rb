@@ -84,7 +84,7 @@ atlas = Sprite.new(
   }
 )
 
-atlas.play :count, :loop
+atlas.play animation: :count, loop: true
 
 
 on :key_down do |e|
@@ -95,9 +95,9 @@ on :key_down do |e|
     coin1.play
     coin2.play
     boom.play
-    atlas.play :count
+    atlas.play animation: :count
   when 'b'
-    boom.play nil, nil, nil do
+    boom.play do
       puts "Boom animation finished!"
     end
   when 's'
@@ -106,33 +106,33 @@ on :key_down do |e|
     hero.stop
     atlas.stop
   when 'left'
-    hero.play :walk, :loop, :flip_h
+    hero.play animation: :walk, loop: true, flip: :horizontal
   when 'right'
-    hero.play :walk, :loop
+    hero.play animation: :walk, loop: true
   when 'up'
-    hero.play :climb, :loop
+    hero.play animation: :climb, loop: true
   when 'down'
-    hero.play :climb, :loop, :flip_v
+    hero.play animation: :climb, loop: true, flip: :vertical
   when 'h'
-    hero.play :climb, :loop, :flip_hv
+    hero.play animation: :climb, loop: true, flip: :both
   when 'c'
-    hero.play :cheer
+    hero.play animation: :cheer
   end
 end
 
 on :key_held do |e|
   case e.key
   when 'a'
-    hero.play :walk, :loop, :flip_h
+    hero.play animation: :walk, loop: true, flip: :horizontal
     hero.x -= 1
   when 'd'
-    hero.play :walk, :loop
+    hero.play animation: :walk, loop: true
     hero.x += 1
   when 'w'
-    hero.play :climb, :loop
+    hero.play animation: :climb, loop: true
     hero.y -= 1
   when 's'
-    hero.play :climb, :loop, :flip_v
+    hero.play animation: :climb, loop: true, flip: :vertical
     hero.y += 1
   when 'z'
     hero.width  = get(:mouse_x)
