@@ -253,7 +253,7 @@ module Ruby2D
     def ext_stop
       `S2D.StopMusic();`
     end
-    
+
     def ext_music_fadeout(ms)
       `S2D.FadeOutMusic(ms);`
     end
