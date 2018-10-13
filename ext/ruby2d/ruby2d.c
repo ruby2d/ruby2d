@@ -664,6 +664,7 @@ static R_VAL ruby2d_music_ext_stop(R_VAL self) {
   return R_NIL;
 }
 
+
 /*
  * Ruby2D::Music#ext_volume
  */
@@ -674,10 +675,10 @@ static R_VAL ruby2d_music_ext_volume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_volume(R_VAL self, R_VAL vol) {
 #endif
-  int ret_vol;
-  ret_vol = Mix_VolumeMusic(NUM2INT(vol));
-  return INT2FIX(ret_vol);
+  int mix_vol = (FIX2INT(vol) == -1) ? -1 : MIX_MAX_VOLUME * (FIX2INT(vol) / 100.0);
+  return INT2FIX((Mix_VolumeMusic(mix_vol) * 100.0) / MIX_MAX_VOLUME);
 }
+
 
 /*
  * Ruby2D::Music#ext_fadeout
