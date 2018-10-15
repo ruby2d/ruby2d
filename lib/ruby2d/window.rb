@@ -320,10 +320,8 @@ module Ruby2D
 
     # Add controller mappings from file
     def add_controller_mappings
-      unless RUBY_ENGINE == 'opal'
-        if File.exists? @controller_mappings
-          ext_add_controller_mappings(@controller_mappings)
-        end
+      if File.exists? @controller_mappings
+        ext_add_controller_mappings(@controller_mappings)
       end
     end
 

@@ -1,10 +1,6 @@
 require 'ruby2d'
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-else
-  media = "media"
-end
+media = "media"
 
 set width: 300, height: 200, title: "Ruby 2D — Audio"
 

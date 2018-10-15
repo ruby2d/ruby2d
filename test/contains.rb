@@ -2,13 +2,12 @@ require 'ruby2d'
 
 set title: "Ruby 2D — Contains", height: 350
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-  font = "sans-serif"
-else
-  media = "media"
-  font = "#{media}/bitstream_vera/vera.ttf"
-end
+# if web?
+#   media = "../test/media"
+#   font = "sans-serif"
+
+media = "media"
+font = "#{media}/bitstream_vera/vera.ttf"
 
 objects = []
 objects.push Square.new(x: 50, y: 50, size: 100)

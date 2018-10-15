@@ -1,12 +1,11 @@
 require 'ruby2d'
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-  font = "sans-serif"
-else
-  media = "media"
-  font = "#{media}/bitstream_vera/vera.ttf"
-end
+# if web?
+#   media = "../test/media"
+#   font = "sans-serif"
+
+media = "media"
+font = "#{media}/bitstream_vera/vera.ttf"
 
 set diagnostics: true
 

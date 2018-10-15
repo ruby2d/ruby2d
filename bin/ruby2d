@@ -128,25 +128,16 @@ def build_web(rb_file)
 
   # Assemble the Ruby 2D library in one `.rb` file and compile to JS
   make_lib
-  `opal --compile --no-opal build/lib.rb > build/lib.js`
 
   # Read the provided Ruby source file, copy to build dir, and compile to JS
-  File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
-  `opal --compile --no-opal build/src.rb > build/src.js`
-  FileUtils.cp "#{@gem_dir}/ext/ruby2d/ruby2d-opal.rb", "build/"
-  `opal --compile --no-opal build/ruby2d-opal.rb > build/ruby2d-opal.js`
 
   # Combine contents of JS source files and compiled JS into one file
-  open('build/app.js', 'w') do |f|
-    f << File.read("#{@gem_dir}/assets/simple2d.js") << "\n\n"
-    f << File.read("#{@gem_dir}/assets/opal.js") << "\n\n"
-    f << File.read("build/lib.js") << "\n\n"
-    f << File.read("build/ruby2d-opal.js") << "\n\n"
-    f << File.read("build/src.js") << "\n\n"
-  end
 
   # Copy over HTML template
   FileUtils.cp "#{@gem_dir}/assets/template.html", "build/app.html"
+
+  # Build
+  `simple2d build --web build/app.c --flags=-lmruby`
 
   # Clean up
   clean_up unless @debug
@@ -211,7 +202,6 @@ end
 def clean_up(cmd = nil)
   FileUtils.rm(
     Dir.glob('build/{src,lib}.{rb,c,js}') +
-    Dir.glob('build/ruby2d-opal.{rb,js}') +
     Dir.glob('build/app.c')
   )
   if cmd == :all

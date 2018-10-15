@@ -9,11 +9,9 @@ module Ruby2D
 
     def initialize(path, opts = {})
 
-      # Check if sprite file exists, unless running on the web
-      unless RUBY_ENGINE == 'opal'
-        unless File.exists? path
-          raise Error, "Cannot find sprite image file `#{path}`"
-        end
+      # Check if sprite file exists
+      unless File.exists? path
+        raise Error, "Cannot find sprite image file `#{path}`"
       end
 
       # Sprite image file path

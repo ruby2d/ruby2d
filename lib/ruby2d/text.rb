@@ -16,10 +16,8 @@ module Ruby2D
       @rotate = opts[:rotate] || 0
       @font = opts[:font] || Font.default
 
-      unless RUBY_ENGINE == 'opal'
-        unless File.exists? @font
-          raise Error, "Cannot find font file `#{@font}`"
-        end
+      unless File.exists? @font
+        raise Error, "Cannot find font file `#{@font}`"
       end
 
       self.color = opts[:color] || 'white'

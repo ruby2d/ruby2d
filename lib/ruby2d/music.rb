@@ -8,10 +8,8 @@ module Ruby2D
 
     def initialize(path)
 
-      unless RUBY_ENGINE == 'opal'
-        unless File.exists? path
-          raise Error, "Cannot find audio file `#{path}`"
-        end
+      unless File.exists? path
+        raise Error, "Cannot find audio file `#{path}`"
       end
 
       @path = path

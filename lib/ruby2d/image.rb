@@ -10,10 +10,8 @@ module Ruby2D
     def initialize(path, opts = {})
       @path = path
 
-      unless RUBY_ENGINE == 'opal'
-        unless File.exists? @path
-          raise Error, "Cannot find image file `#{@path}`"
-        end
+      unless File.exists? @path
+        raise Error, "Cannot find image file `#{@path}`"
       end
 
       @x = opts[:x] || 0

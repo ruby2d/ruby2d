@@ -1,10 +1,6 @@
 require 'ruby2d'
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-else
-  media = "media"
-end
+media = "media"
 
 set title: "Ruby 2D — Sprite", width: 400, height: 300
 
