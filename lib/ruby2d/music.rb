@@ -53,7 +53,7 @@ module Ruby2D
 
     # Alias instance methods to class methods
     def volume; Music.volume end
-    def volume=(v); Music.volume = v end
+    def volume=(v); Music.volume=(v) end
 
     # Fade out music over provided milliseconds
     def fadeout(ms)
