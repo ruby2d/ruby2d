@@ -1,7 +1,8 @@
 # Ruby2D module and native extension loader, adds DSL
 
-require 'ruby2d/renderable'
+require 'ruby2d/colorize'
 require 'ruby2d/exceptions'
+require 'ruby2d/renderable'
 require 'ruby2d/color'
 require 'ruby2d/window'
 require 'ruby2d/dsl'

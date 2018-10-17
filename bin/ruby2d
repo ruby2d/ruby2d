@@ -1,14 +1,7 @@
 #!/usr/bin/env ruby
+require 'ruby2d/colorize'
 require 'ruby2d/version'
 require 'fileutils'
-
-# Extending `String` to include some fancy colors
-class String
-  def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def bold;  colorize('1')    end
-  def warn;  colorize('1;33') end
-  def error; colorize('1;31') end
-end
 
 # The installed gem directory
 @gem_dir = "#{Gem::Specification.find_by_name('ruby2d').gem_dir}"

@@ -1,18 +1,10 @@
 require 'rspec/core/rake_task'
+require_relative 'lib/ruby2d/colorize'
 require_relative 'lib/ruby2d/version'
-
-# Helpers
-
-class String
-  def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def bold; colorize('1')    end
-  def blue; colorize('1;34') end
-  def red;  colorize('1;31') end
-end
 
 # Simple 2D is required for these tasks
 if `which simple2d`.empty?
-  puts "Simple 2D not found!".red
+  puts "Simple 2D not found!".error
   puts "Install before running Rake tasks."
   exit
 end
@@ -22,7 +14,7 @@ def get_args
 end
 
 def print_task(task)
-  print "\n", "==> ".blue, task.bold, "\n\n"
+  print "\n", "==> ".info, task.bold, "\n\n"
 end
 
 def run_cmd(cmd)

@@ -1,17 +1,12 @@
 require 'mkmf'
+require_relative '../../lib/ruby2d/colorize'
 
 S2D_VERSION = '1.0.1'  # Simple 2D minimum version required
 $errors = []
 
-class String
-  def colorize(c); "\e[#{c}m#{self}\e[0m" end
-  def bold; colorize('1')    end
-  def red;  colorize('1;31') end
-end
-
 def print_errors
   puts "
-#{"== #{"Ruby 2D Installation Errors".red} =======================================\n"}
+#{"== #{"Ruby 2D Installation Errors".error} =======================================\n"}
   #{$errors.join("\n  ")}\n
 #{"======================================================================="}"
 end
