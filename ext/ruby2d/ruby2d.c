@@ -65,6 +65,7 @@
   #define r_define_module(name)  mrb_define_module(mrb, name)
   #define r_define_class(module, name)  mrb_define_class_under(mrb, module, name, mrb->object_class)
   #define r_define_method(class, name, function, args)  mrb_define_method(mrb, class, name, function, args)
+  #define r_define_class_method(class, name, function, args)  mrb_define_class_method(mrb, class, name, function, args)
   #define r_args_none  (MRB_ARGS_NONE())
   #define r_args_req(n)  MRB_ARGS_REQ(n)
   // Helpers
@@ -87,6 +88,7 @@
   #define r_define_module(name)  rb_define_module(name)
   #define r_define_class(module, name)  rb_define_class_under(module, name, rb_cObject)
   #define r_define_method(class, name, function, args)  rb_define_method(class, name, function, args)
+  #define r_define_class_method(class, name, function, args)  rb_define_singleton_method(class, name, function, args)
   #define r_args_none  0
   #define r_args_req(n)  n
   // Helpers
@@ -670,6 +672,21 @@ static R_VAL ruby2d_music_ext_stop(R_VAL self) {
 
 
 /*
+ * Ruby2D::Music#ext_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_music_ext_volume(mrb_state* mrb, R_VAL self) {
+  mrb_value vol;
+  mrb_get_args(mrb, "o", &vol);
+#else
+static R_VAL ruby2d_music_ext_volume(R_VAL self, R_VAL vol) {
+#endif
+  int mix_vol = NUM2INT(vol) == -1 ? -1 : MIX_MAX_VOLUME * NUM2INT(vol) / 100.0;
+  return INT2NUM(ceil(Mix_VolumeMusic(mix_vol) * 100.0 / MIX_MAX_VOLUME));
+}
+
+
+/*
  * Ruby2D::Music#ext_fadeout
  */
 #if MRUBY
@@ -1132,6 +1149,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_stop
   r_define_method(ruby2d_music_class, "ext_stop", ruby2d_music_ext_stop, r_args_none);
+
+  // Ruby2D::Music#self.ext_volume
+  r_define_class_method(ruby2d_music_class, "ext_volume", ruby2d_music_ext_volume, r_args_req(1));
 
   // Ruby2D::Music#ext_fadeout
   r_define_method(ruby2d_music_class, "ext_fadeout", ruby2d_music_ext_fadeout, r_args_req(1));
