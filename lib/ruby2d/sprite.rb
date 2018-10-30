@@ -11,7 +11,7 @@ module Ruby2D
 
       # Check if sprite file exists, unless running on the web
       unless RUBY_ENGINE == 'opal'
-        unless File.exists? path
+        unless File.exist? path
           raise Error, "Cannot find sprite image file `#{path}`"
         end
       end

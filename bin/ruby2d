@@ -36,7 +36,7 @@ def check_build_src_file(rb_file)
   if !rb_file
     puts "Please provide a Ruby file to build"
     exit
-  elsif !File.exists? rb_file
+  elsif !File.exist? rb_file
     puts "Can't find file: #{rb_file}"
     exit
   end
@@ -155,7 +155,7 @@ def build_apple(rb_file, device)
   check_build_src_file(rb_file)
 
   # Check for Simple 2D framework,
-  unless File.exists?('/usr/local/Frameworks/Simple2D/iOS/Simple2D.framework') && File.exists?('/usr/local/Frameworks/Simple2D/tvOS/Simple2D.framework')
+  unless File.exist?('/usr/local/Frameworks/Simple2D/iOS/Simple2D.framework') && File.exist?('/usr/local/Frameworks/Simple2D/tvOS/Simple2D.framework')
     puts "#{'Error:'.error} Simple 2D iOS and tvOS frameworks not found. Install them and try again.\n"
     exit
   end
@@ -220,7 +220,7 @@ end
 
 # Launch a native app
 def launch_native
-  if !File.exists? 'build/app'
+  if !File.exist? 'build/app'
     puts "No native app built!"
     exit
   end
@@ -230,7 +230,7 @@ end
 
 # Launch a web app
 def launch_web
-  if !File.exists? 'build/app.html'
+  if !File.exist? 'build/app.html'
     puts "No web app built!"
     exit
   end
@@ -249,7 +249,7 @@ end
 def launch_apple(device)
   case device
   when 'ios'
-    if !File.exists? 'build/ios/build/Release-iphonesimulator/MyApp.app'
+    if !File.exist? 'build/ios/build/Release-iphonesimulator/MyApp.app'
       puts "No iOS app built!"
       exit
     end
@@ -257,7 +257,7 @@ def launch_apple(device)
           simple2d simulator --install "build/ios/build/Release-iphonesimulator/MyApp.app" &&
           simple2d simulator --launch "Ruby2D.MyApp"`
   when 'tvos'
-    if !File.exists? 'build/tvos/build/Release-appletvsimulator/MyApp.app'
+    if !File.exist? 'build/tvos/build/Release-appletvsimulator/MyApp.app'
       puts "No tvOS app built!"
       exit
     end

@@ -9,7 +9,7 @@ module Ruby2D
     def initialize(path)
 
       unless RUBY_ENGINE == 'opal'
-        unless File.exists? path
+        unless File.exist? path
           raise Error, "Cannot find audio file `#{path}`"
         end
       end

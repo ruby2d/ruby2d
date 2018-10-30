@@ -11,7 +11,7 @@ module Ruby2D
       @path = path
 
       unless RUBY_ENGINE == 'opal'
-        unless File.exists? @path
+        unless File.exist? @path
           raise Error, "Cannot find image file `#{@path}`"
         end
       end

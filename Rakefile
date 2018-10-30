@@ -24,7 +24,7 @@ end
 
 def run_int_test(file)
   print_task "Running interpreted test: #{file}.rb"
-  run_cmd "( cd test/ && ruby #{file}.rb )"
+  run_cmd "( cd test/ && ruby -w #{file}.rb )"
 end
 
 def run_native_test(file)

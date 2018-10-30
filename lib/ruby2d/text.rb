@@ -17,7 +17,7 @@ module Ruby2D
       @font = opts[:font] || Font.default
 
       unless RUBY_ENGINE == 'opal'
-        unless File.exists? @font
+        unless File.exist? @font
           raise Error, "Cannot find font file `#{@font}`"
         end
       end
