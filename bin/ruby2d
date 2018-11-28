@@ -20,16 +20,19 @@ Summary of commands and options:
   -v|--version  Prints the installed version\n\n"
 
 usage_build = "
-Use the #{"build".bold} command to compile or build Ruby 2D apps.
+Use the #{'build'.bold} command to compile or build Ruby 2D apps.
 
 To compile and create a native executable, use:
   build --native <ruby_file>
 
 To build for the web, creating a JavaScript and HTML package, use:
   build --web <ruby_file>
-  #{"Warning:".warn} #{"This feature is currently disabled while it's being upgraded.".bold}
+  #{'Warning:'.warn} #{"This feature is currently disabled while it's being upgraded.".bold}
 
-To build an iOS or tvOS app, use the following:
+To build a macOS app bundle, use:
+  build --macos <ruby_file>
+
+To build an iOS or tvOS app, use:
   build --ios <ruby_file>
   build --tvos <ruby_file>
 
@@ -39,11 +42,11 @@ To build for every platform supported by the current system, use:
 To clean up the build directory, use:
   build --clean
 
-Add the #{"--debug".bold} option to print debugging info
+Add the #{'--debug'.bold} option to print debugging info
 and keep all intermediate files generated.\n\n"
 
 usage_launch = "
-Use the #{"launch".bold} command to run a Ruby 2D app that has been built.
+Use the #{'launch'.bold} command to run a Ruby 2D app that has been built.
 Choose one of the following options to select the kind of app to run:
 
   --native
@@ -52,7 +55,7 @@ Choose one of the following options to select the kind of app to run:
   --tvos\n\n"
 
 usage_simulator = "
-Choose an option with the #{"simulator".bold} command:
+Choose an option with the #{'simulator'.bold} command:
 
   --list      List available devices
   --booted    Show currently booted devices
@@ -82,15 +85,17 @@ when 'build'
     build_native(ARGV[2])
   when '--web'
     build_web(ARGV[2])
+  when '--macos'
+    build_macos(ARGV[2])
   when '--ios'
-    build_apple(ARGV[2], 'ios')
+    build_ios_tvos(ARGV[2], 'ios')
   when '--tvos'
-    build_apple(ARGV[2], 'tvos')
+    build_ios_tvos(ARGV[2], 'tvos')
   when '--all'
     build_native(ARGV[2])
     build_web(ARGV[2])
-    build_apple(ARGV[2], 'ios')
-    build_apple(ARGV[2], 'tvos')
+    build_ios_tvos(ARGV[2], 'ios')
+    build_ios_tvos(ARGV[2], 'tvos')
   when '--clean'
     clean_up(:all)
   else
