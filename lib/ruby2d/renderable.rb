@@ -42,9 +42,9 @@ module Ruby2D
     def colour; self.color end
     def colour=(c); self.color = c end
 
-    # Add a contains method stub
+    # Check if given point is within a rectangle, by default (unless overridden)
     def contains?(x, y)
-      raise Error, "\`#contains?\` not implemented for this class yet"
+      @x <= x and @x + @width >= x and @y <= y and @y + @height >= y
     end
 
   end
