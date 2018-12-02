@@ -7,13 +7,9 @@ module Ruby2D
     attr_accessor :loop, :data
 
     def initialize(path)
-
-      unless RUBY_ENGINE == 'opal'
-        unless File.exist? path
-          raise Error, "Cannot find audio file `#{path}`"
-        end
+      unless File.exist? path
+        raise Error, "Cannot find audio file `#{path}`"
       end
-
       @path = path
       @loop = false
       ext_init(path)

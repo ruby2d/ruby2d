@@ -7,13 +7,9 @@ module Ruby2D
     attr_accessor :data
 
     def initialize(path)
-
-      unless RUBY_ENGINE == 'opal'
-        unless File.exist? path
-          raise Error, "Cannot find audio file `#{path}`"
-        end
+      unless File.exist? path
+        raise Error, "Cannot find audio file `#{path}`"
       end
-
       @path = path
       ext_init(path)
     end
