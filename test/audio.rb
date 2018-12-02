@@ -1,15 +1,9 @@
 require 'ruby2d'
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-else
-  media = "media"
-end
-
 set width: 300, height: 200, title: "Ruby 2D — Audio"
 
-snd = Sound.new("#{media}/sound.wav")
-mus = Music.new("#{media}/music.wav")
+snd = Sound.new('media/sound.wav')
+mus = Music.new('media/music.wav')
 
 volume_bar = Rectangle.new(color: 'green', width: 300, height: 50)
 

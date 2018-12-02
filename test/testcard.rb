@@ -1,16 +1,10 @@
 require 'ruby2d'
 
-if RUBY_ENGINE == 'opal'
-  media = "../test/media"
-  font = "sans-serif"
-else
-  media = "media"
-  font = "#{media}/bitstream_vera/vera.ttf"
-end
-
 set diagnostics: true
 
 set width: 700, height: 500, title: "Ruby 2D — Test Card"
+
+font = 'media/bitstream_vera/vera.ttf'
 
 # Read window attributes
 puts "=== Window Attributes ===
@@ -206,15 +200,15 @@ Circle.new(x: 575, y: 225, radius: 17, sectors: 16, color: [0, 0, 0, 0.6])
 rotate = false
 
 # Images
-img_png = Image.new("#{media}/image.png", x: 600, y: 180)
-img_jpg = Image.new("#{media}/image.jpg", x: 600, y: 290)
-img_bmp = Image.new("#{media}/image.bmp", x: 600, y: 400)
-img_r = Image.new("#{media}/colors.png",  x: 400, y: 200, width: 50, height: 25)
+img_png = Image.new('media/image.png', x: 600, y: 180)
+img_jpg = Image.new('media/image.jpg', x: 600, y: 290)
+img_bmp = Image.new('media/image.bmp', x: 600, y: 400)
+img_r = Image.new('media/colors.png',  x: 400, y: 200, width: 50, height: 25)
 img_r.color = [1.0, 0.3, 0.3, 1.0]
-img_g = Image.new("#{media}/colors.png", x: 400, y: 225)
+img_g = Image.new('media/colors.png', x: 400, y: 225)
 img_g.width, img_g.height = 25, 25
 img_g.color = [0.3, 1.0, 0.3, 1.0]
-img_b = Image.new("#{media}/colors.png", x: 425, y: 225)
+img_b = Image.new('media/colors.png', x: 425, y: 225)
 img_b.width, img_b.height = 25, 25
 img_b.color = [0.3, 0.3, 1.0, 1.0]
 
@@ -228,7 +222,7 @@ fps = Text.new("", x: 10, y: 470, font: font)
 
 # Sprites
 spr = Sprite.new(
-  "#{media}/sprite_sheet.png",
+  'media/sprite_sheet.png',
   x: 450, y: 200,
   clip_width: 50,
   time: 500,

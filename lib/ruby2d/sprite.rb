@@ -8,12 +8,8 @@ module Ruby2D
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data
 
     def initialize(path, opts = {})
-
-      # Check if sprite file exists, unless running on the web
-      unless RUBY_ENGINE == 'opal'
-        unless File.exist? path
-          raise Error, "Cannot find sprite image file `#{path}`"
-        end
+      unless File.exist? path
+        raise Error, "Cannot find sprite image file `#{path}`"
       end
 
       # Sprite image file path
