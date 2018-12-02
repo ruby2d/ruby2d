@@ -44,7 +44,7 @@ module Ruby2D
 
     # Check if given point is within a rectangle, by default (unless overridden)
     def contains?(x, y)
-      @x <= x and @x + @width >= x and @y <= y and @y + @height >= y
+      x > @x && x < (@x + @width) && y > @y && y < (@y + @height)
     end
 
   end

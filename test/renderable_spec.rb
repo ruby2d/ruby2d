@@ -64,21 +64,51 @@ RSpec.describe Ruby2D::Renderable do
   end
 
   describe "#contains?" do
-    rectangle = Rectangle.new(x: 0, y: 0, width: 50, height: 50)
+    square = Square.new(x: 1, y: 1, size: 2)
+
+    # Grid looks like this, 2x2 square at point (1, 1):
+    #
+    #   0  1  2  3  4
+    # 0 +--+--+--+--+
+    #   |  |  |  |  |
+    # 1 +--+--+--+--+
+    #   |  |XX|XX|  |
+    # 2 +--+--+--+--+
+    #   |  |XX|XX|  |
+    # 3 +--+--+--+--+
+    #   |  |  |  |  |
+    # 4 +--+--+--+--+
 
     it "returns true if point is inside the rectangle" do
-      expect(rectangle.contains?( 0,  0)).to be true
-      expect(rectangle.contains?(50,  0)).to be true
-      expect(rectangle.contains?(50, 50)).to be true
-      expect(rectangle.contains?( 0, 50)).to be true
-      expect(rectangle.contains?(25, 25)).to be true
+      expect(square.contains?(1, 1)).to be true
+      expect(square.contains?(2, 1)).to be true
+      expect(square.contains?(3, 1)).to be true
+      expect(square.contains?(1, 2)).to be true
+      expect(square.contains?(2, 2)).to be true
+      expect(square.contains?(3, 2)).to be true
+      expect(square.contains?(1, 3)).to be true
+      expect(square.contains?(2, 3)).to be true
+      expect(square.contains?(3, 3)).to be true
     end
 
     it "returns false if point is outside the rectangle" do
-      expect(rectangle.contains?(-1,  0)).to be false
-      expect(rectangle.contains?(0,  -1)).to be false
-      expect(rectangle.contains?(51, 50)).to be false
-      expect(rectangle.contains?(50, 51)).to be false
+      # Clockwise around the square
+      expect(square.contains?(0, 0)).to be false
+      expect(square.contains?(1, 0)).to be false
+      expect(square.contains?(2, 0)).to be false
+      expect(square.contains?(3, 0)).to be false
+      expect(square.contains?(4, 0)).to be false
+      expect(square.contains?(4, 1)).to be false
+      expect(square.contains?(4, 2)).to be false
+      expect(square.contains?(4, 3)).to be false
+      expect(square.contains?(4, 4)).to be false
+      expect(square.contains?(3, 4)).to be false
+      expect(square.contains?(2, 4)).to be false
+      expect(square.contains?(1, 4)).to be false
+      expect(square.contains?(0, 4)).to be false
+      expect(square.contains?(0, 3)).to be false
+      expect(square.contains?(0, 2)).to be false
+      expect(square.contains?(0, 1)).to be false
     end
   end
 
