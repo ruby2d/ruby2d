@@ -53,27 +53,21 @@ RSpec.describe Ruby2D::Quad do
   end
 
   describe "#contains?" do
+    quad = Quad.new(
+      x1: -25, y1:   0,
+      x2:   0, y2: -25,
+      x3:  25, y3:   0,
+      x4:   0, y4:  25
+    )
+
     it "returns true if point is inside the quad" do
-      quad = Quad.new(
-        x1: -25, y1:   0,
-        x2:   0, y2: -25,
-        x3:  25, y3:   0,
-        x4:   0, y4:  25
-      )
-      expect(quad.contains?(0, 0)).to be true
+      expect(quad.contains?(0 ,  0)).to be true
+      expect(quad.contains?(25,  0)).to be true
     end
 
-    it "returns true if point is outside the quad" do
-      quad = Quad.new(
-        x1: -25, y1:   0,
-        x2:   0, y2: -25,
-        x3:  25, y3:   0,
-        x4:   0, y4:  25
-      )
-      expect(quad.contains?( 20,  20)).to be false
-      expect(quad.contains?(-20,  20)).to be false
-      expect(quad.contains?( 20, -20)).to be false
-      expect(quad.contains?(-20, -20)).to be false
+    it "returns false if point is outside the quad" do
+      expect(quad.contains?(-26,  0)).to be false
+      expect(quad.contains?(  0, 26)).to be false
     end
   end
 
