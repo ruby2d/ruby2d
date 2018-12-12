@@ -40,10 +40,6 @@ module Ruby2D
       update_coords(@x, @y, @width, h)
     end
 
-    def contains?(x, y)
-      @x < x and @x + @width > x and @y < y and @y + @height > y
-    end
-
     private
 
     def update_coords(x, y, w, h)

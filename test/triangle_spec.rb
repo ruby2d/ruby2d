@@ -52,24 +52,21 @@ RSpec.describe Ruby2D::Triangle do
   end
 
   describe "#contains?" do
+    triangle = Triangle.new(
+      x1:   0, y1:   0,
+      x2:   0, y2: 100,
+      x3: 100, y3:   0
+    )
+
     it "returns true if point is inside the triangle" do
-      triangle = Triangle.new(
-        x1:   0, y1:   0,
-        x2:   0, y2: 100,
-        x3: 100, y3:   0
-      )
+      expect(triangle.contains?( 0,  0)).to be true
       expect(triangle.contains?(25, 25)).to be true
     end
 
     it "returns false if point is outside the triangle" do
-      triangle = Triangle.new(
-        x1:   0, y1:   0,
-        x2:   0, y2: 100,
-        x3: 100, y3:   0
-      )
       expect(triangle.contains?( 25, -25)).to be false
       expect(triangle.contains?(-25,  25)).to be false
-      expect(triangle.contains?(100, 100)).to be false
+      expect(triangle.contains?(100,   1)).to be false
     end
   end
 

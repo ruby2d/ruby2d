@@ -8,19 +8,4 @@ RSpec.describe Ruby2D::Image do
     end
   end
 
-  describe "#contains?" do
-    it "returns true if point is inside the image" do
-      image = Image.new("test/media/image.bmp")
-      expect(image.contains?(50, 50)).to be true
-    end
-
-    it "returns true if point is outside the image" do
-      image = Image.new("test/media/image.bmp")
-      expect(image.contains?(-50, 50)).to be false
-      expect(image.contains?(50, -50)).to be false
-      expect(image.contains?(50, 150)).to be false
-      expect(image.contains?(150, 50)).to be false
-    end
-  end
-
 end

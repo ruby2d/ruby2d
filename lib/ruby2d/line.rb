@@ -32,9 +32,9 @@ module Ruby2D
     # the width. For reference:
     #   https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
     def contains?(x, y)
-      points_distance(x1, y1, x, y) < length and
-      points_distance(x2, y2, x, y) < length and
-      (((@y2 - @y1) * x - (@x2 - @x1) * y + @x2 * @y1 - @y2 * @x1).abs / length) < 0.5 * @width
+      points_distance(x1, y1, x, y) <= length &&
+      points_distance(x2, y2, x, y) <= length &&
+      (((@y2 - @y1) * x - (@x2 - @x1) * y + @x2 * @y1 - @y2 * @x1).abs / length) <= 0.5 * @width
     end
 
     private

@@ -27,9 +27,5 @@ module Ruby2D
       @color = Color.new(c)
     end
 
-    def contains?(x, y)
-      @x < x and @x + @width > x and @y < y and @y + @height > y
-    end
-
   end
 end

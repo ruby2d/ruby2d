@@ -63,4 +63,53 @@ RSpec.describe Ruby2D::Renderable do
     expect(quad.a).to eq(0.6)
   end
 
+  describe "#contains?" do
+    square = Square.new(x: 1, y: 1, size: 2)
+
+    # Grid looks like this, 2x2 square at point (1, 1):
+    #
+    #   0  1  2  3  4
+    # 0 +--+--+--+--+
+    #   |  |  |  |  |
+    # 1 +--+--+--+--+
+    #   |  |XX|XX|  |
+    # 2 +--+--+--+--+
+    #   |  |XX|XX|  |
+    # 3 +--+--+--+--+
+    #   |  |  |  |  |
+    # 4 +--+--+--+--+
+
+    it "returns true if point is inside the rectangle" do
+      expect(square.contains?(1, 1)).to be true
+      expect(square.contains?(2, 1)).to be true
+      expect(square.contains?(3, 1)).to be true
+      expect(square.contains?(1, 2)).to be true
+      expect(square.contains?(2, 2)).to be true
+      expect(square.contains?(3, 2)).to be true
+      expect(square.contains?(1, 3)).to be true
+      expect(square.contains?(2, 3)).to be true
+      expect(square.contains?(3, 3)).to be true
+    end
+
+    it "returns false if point is outside the rectangle" do
+      # Clockwise around the square
+      expect(square.contains?(0, 0)).to be false
+      expect(square.contains?(1, 0)).to be false
+      expect(square.contains?(2, 0)).to be false
+      expect(square.contains?(3, 0)).to be false
+      expect(square.contains?(4, 0)).to be false
+      expect(square.contains?(4, 1)).to be false
+      expect(square.contains?(4, 2)).to be false
+      expect(square.contains?(4, 3)).to be false
+      expect(square.contains?(4, 4)).to be false
+      expect(square.contains?(3, 4)).to be false
+      expect(square.contains?(2, 4)).to be false
+      expect(square.contains?(1, 4)).to be false
+      expect(square.contains?(0, 4)).to be false
+      expect(square.contains?(0, 3)).to be false
+      expect(square.contains?(0, 2)).to be false
+      expect(square.contains?(0, 1)).to be false
+    end
+  end
+
 end
