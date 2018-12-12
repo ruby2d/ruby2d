@@ -85,6 +85,9 @@ module Ruby2D
 
       # Whether diagnostic messages should be printed
       @diagnostics = false
+
+      # Console mode, enabled at command line
+      @console = $ruby2d_console_mode || false
     end
 
     # Class methods for convenient access to properties
@@ -354,6 +357,25 @@ module Ruby2D
     # Update callback method, called by the native and web extentions
     def update_callback
       @update_proc.call
+
+      # Accept and eval commands if in console mode
+      if @console
+        if STDIN.ready?
+          cmd = STDIN.gets
+          begin
+            res = eval(cmd, TOPLEVEL_BINDING)
+            STDOUT.puts "=> #{res.inspect}"
+            STDOUT.flush
+          rescue SyntaxError => se
+            STDOUT.puts se
+            STDOUT.flush
+          rescue Exception => e
+            STDOUT.puts e
+            STDOUT.flush
+          end
+        end
+      end
+
     end
 
     # Show the window
