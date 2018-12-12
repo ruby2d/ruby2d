@@ -48,6 +48,13 @@ module Ruby2D
       questioned_area <= self_area
     end
 
+
+    def self.draw(x, y, c)
+      ext_draw(x, y, c)
+    end
+
+
+
     private
 
     def triangle_area(x1, y1, x2, y2, x3, y3)

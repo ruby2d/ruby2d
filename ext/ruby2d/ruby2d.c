@@ -251,6 +251,54 @@ static R_VAL ruby2d_quad_ext_render(R_VAL self) {
 }
 
 
+
+/*
+ * Ruby2D::Quad#ext_draw
+ */
+#if MRUBY
+static R_VAL ruby2d_quad_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value x, y, c;
+  mrb_get_args(mrb, "o", &x);
+  mrb_get_args(mrb, "o", &y);
+  mrb_get_args(mrb, "o", &c);
+#else
+static R_VAL ruby2d_quad_ext_draw(R_VAL self, R_VAL x, R_VAL y, R_VAL c) {
+#endif
+
+  S2D_DrawQuad(
+    NUM2DBL(x),
+    NUM2DBL(y),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    1.0,
+
+    NUM2DBL(x) + 10,
+    NUM2DBL(y),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    1.0,
+
+    NUM2DBL(x) + 10,
+    NUM2DBL(y) + 10,
+    NUM2DBL(c),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    1.0,
+
+    NUM2DBL(x),
+    NUM2DBL(y) + 10,
+    NUM2DBL(c),
+    NUM2DBL(c),
+    NUM2DBL(c),
+    1.0
+  );
+
+  return R_NIL;
+}
+
+
 /*
  * Ruby2D::Line#ext_render
  */
@@ -953,6 +1001,9 @@ static void render() {
     R_VAL el = r_ary_entry(objects, i);
     r_funcall(el, "ext_render", 0);
   }
+
+  // Call render proc, `window.render`
+  r_funcall(ruby2d_window, "render_callback", 0);
 }
 
 
@@ -1136,6 +1187,12 @@ void Init_ruby2d() {
 
   // Ruby2D::Quad#ext_render
   r_define_method(ruby2d_quad_class, "ext_render", ruby2d_quad_ext_render, r_args_none);
+
+  // Ruby2D::Quad#self.ext_draw
+  r_define_class_method(ruby2d_quad_class, "ext_draw", ruby2d_quad_ext_draw, r_args_req(3));
+
+  // // Ruby2D::Square
+  // R_CLASS ruby2d_square_class = r_define_class(ruby2d_module, "Square");
 
   // Ruby2D::Line
   R_CLASS ruby2d_line_class = r_define_class(ruby2d_module, "Line");
