@@ -66,6 +66,8 @@ module Ruby2D
           end
         when Array
           @r, @g, @b, @a = [c[0], c[1], c[2], c[3]]
+        when Color
+          @r, @g, @b, @a = [c.r, c.g, c.b, c.a]
         end
       end
     end
@@ -90,6 +92,7 @@ module Ruby2D
 
     # Check if the color is valid
     def self.is_valid?(c)
+      c.is_a?(Color)   ||  # color object
       @@colors.key?(c) ||  # keyword
       self.is_hex?(c)  ||  # hexadecimal value
 

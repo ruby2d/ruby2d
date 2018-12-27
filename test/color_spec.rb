@@ -24,6 +24,17 @@ RSpec.describe Ruby2D::Color do
     it "raises error on bad color" do
       expect { Ruby2D::Color.new 42 }.to raise_error Ruby2D::Error
     end
+
+    it "accepts an existing color object" do
+      expect { Ruby2D::Color.new(Ruby2D::Color.new('red')) }.to_not raise_error Ruby2D::Error
+    end
+
+    it "assigns rgba from an existing color" do
+      c1 = Ruby2D::Color.new([20, 60, 80, 100])
+      c2 = Ruby2D::Color.new(c1)
+
+      expect([c2.r, c2.g, c2.b, c2.a]).to eq([20, 60, 80, 100])
+    end
   end
 
   describe "#opacity" do
