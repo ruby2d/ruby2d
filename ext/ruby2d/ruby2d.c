@@ -155,6 +155,21 @@ double normalize_controller_axis(int val) {
 
 
 /*
+ * Ruby2D#self.ext_screenshot
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_screenshot(mrb_state* mrb, R_VAL self) {
+  mrb_value path;
+  mrb_get_args(mrb, "o", &path);
+#else
+static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
+#endif
+  S2D_Screenshot(window, RSTRING_PTR(path));
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Triangle#ext_render
  */
 #if MRUBY
@@ -1182,6 +1197,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Window#ext_show
   r_define_method(ruby2d_window_class, "ext_show", ruby2d_window_ext_show, r_args_none);
+
+  // Ruby2D::Window#ext_screenshot
+  r_define_method(ruby2d_window_class, "ext_screenshot", ruby2d_ext_screenshot, r_args_req(1));
 
   // Ruby2D::Window#ext_close
   r_define_method(ruby2d_window_class, "ext_close", ruby2d_window_ext_close, r_args_none);

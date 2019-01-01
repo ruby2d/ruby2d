@@ -4,8 +4,8 @@ module Ruby2D::DSL
 
   Ruby2D::Window.new
 
-  def get(sym)
-    Window.get(sym)
+  def get(sym, opts = nil)
+    Window.get(sym, opts)
   end
 
   def set(opts)
