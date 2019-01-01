@@ -275,6 +275,14 @@ on :key_down do |event|
   if event.key == 'r'
     rotate = rotate ? false : true;
   end
+
+  if event.key == 's'
+    puts "Taking screenshots..."
+    get :screenshot
+    get :screenshot, './screenshot-get.png'
+    Window.screenshot
+    Window.screenshot './screenshot-window.png'
+  end
 end
 
 on :mouse_down do

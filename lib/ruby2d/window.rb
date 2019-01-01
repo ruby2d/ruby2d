@@ -111,9 +111,10 @@ module Ruby2D
       def mouse_x;         get(:mouse_x)         end
       def mouse_y;         get(:mouse_y)         end
       def diagnostics;     get(:diagnostics)     end
+      def screenshot(opts = nil); get(:screenshot, opts) end
 
-      def get(sym)
-        @@window.get(sym)
+      def get(sym, opts = nil)
+        @@window.get(sym, opts)
       end
 
       def set(opts)
@@ -156,7 +157,7 @@ module Ruby2D
     # Public instance methods
 
     # Retrieve an attribute of the window
-    def get(sym)
+    def get(sym, opts = nil)
       case sym
       when :window;          self
       when :title;           @title
@@ -182,6 +183,7 @@ module Ruby2D
       when :mouse_x;         @mouse_x
       when :mouse_y;         @mouse_y
       when :diagnostics;     @diagnostics
+      when :screenshot;      screenshot(opts)
       end
     end
 
@@ -381,6 +383,20 @@ module Ruby2D
     # Show the window
     def show
       ext_show
+    end
+
+    # Take screenshot
+    def screenshot(path)
+      if path
+        ext_screenshot(path)
+      else
+        if RUBY_ENGINE == 'ruby'
+          time = Time.now.utc.strftime '%Y-%m-%d--%H-%M-%S'
+        else
+          time = Time.now.utc.to_i
+        end
+        ext_screenshot("./screenshot-#{time}.png")
+      end
     end
 
     # Close the window
