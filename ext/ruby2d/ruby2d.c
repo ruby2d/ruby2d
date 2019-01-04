@@ -155,6 +155,18 @@ double normalize_controller_axis(int val) {
 
 
 /*
+ * Ruby2D#self.ext_base_path
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_base_path(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_ext_base_path(R_VAL self) {
+#endif
+  return r_str_new(SDL_GetBasePath());
+}
+
+
+/*
  * Ruby2D#self.ext_screenshot
  */
 #if MRUBY
@@ -1101,6 +1113,9 @@ void Init_ruby2d() {
 
   // Ruby2D
   R_CLASS ruby2d_module = r_define_module("Ruby2D");
+
+  // Ruby2D#self.ext_base_path
+  r_define_class_method(ruby2d_module, "ext_base_path", ruby2d_ext_base_path, r_args_none);
 
   // Ruby2D::Triangle
   R_CLASS ruby2d_triangle_class = r_define_class(ruby2d_module, "Triangle");

@@ -7,8 +7,9 @@ require 'fileutils'
 
 # The Ruby 2D library files
 @lib_files = [
-  'renderable',
+  'colorize',
   'exceptions',
+  'renderable',
   'color',
   'window',
   'dsl',
@@ -23,7 +24,8 @@ require 'fileutils'
   'font',
   'text',
   'sound',
-  'music'
+  'music',
+  '../ruby2d'
 ]
 
 
@@ -45,14 +47,10 @@ def make_lib
 
   lib_dir = "#{@gem_dir}/lib/ruby2d/"
 
-  lib = ""
+  lib = ''
   @lib_files.each do |f|
     lib << File.read("#{lib_dir + f}.rb") + "\n\n"
   end
-
-  lib << "
-include Ruby2D
-extend  Ruby2D::DSL\n"
 
   File.write('build/lib.rb', lib)
 end
