@@ -4,7 +4,7 @@ module Ruby2D
   class Line
     include Renderable
 
-    attr_accessor :x1, :x2, :y1, :y2, :color, :width
+    attr_accessor :x1, :x2, :y1, :y2
 
     def initialize(opts = {})
       @x1 = opts[:x1] || 0
@@ -14,11 +14,12 @@ module Ruby2D
       @width = opts[:width] || 2
       @z = opts[:z] || 0
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 
     def color=(c)
-      @color = Color.from(c)
+      @color = Color.set(c)
       update_color(@color)
     end
 

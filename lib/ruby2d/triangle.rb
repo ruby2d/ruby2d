@@ -4,7 +4,6 @@ module Ruby2D
   class Triangle
     include Renderable
 
-    attr_reader :color
     attr_accessor :x1, :y1, :c1,
                   :x2, :y2, :c2,
                   :x3, :y3, :c3
@@ -18,11 +17,12 @@ module Ruby2D
       @y3 = opts[:y3] || 100
       @z  = opts[:z]  || 0
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 
     def color=(c)
-      @color = Color.from(c)
+      @color = Color.set(c)
       update_color(@color)
     end
 

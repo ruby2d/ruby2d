@@ -4,7 +4,7 @@ module Ruby2D
   class Image
     include Renderable
 
-    attr_reader :path, :color
+    attr_reader :path
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
     def initialize(path, opts = {})
@@ -19,12 +19,9 @@ module Ruby2D
       @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       ext_init(@path)
       add
-    end
-
-    def color=(c)
-      @color = Color.new(c)
     end
 
   end

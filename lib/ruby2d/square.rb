@@ -11,6 +11,7 @@ module Ruby2D
       @z = opts[:z] || 0
       @width = @height = @size = opts[:size] || 100
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       update_coords(@x, @y, @size, @size)
       add
     end
