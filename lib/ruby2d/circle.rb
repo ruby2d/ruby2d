@@ -4,8 +4,7 @@ module Ruby2D
   class Circle
     include Renderable
 
-    attr_reader :color
-    attr_accessor :x, :y, :radius, :sectors
+    attr_accessor :radius, :sectors
 
     def initialize(opts = {})
       @x = opts[:x] || 25
@@ -14,11 +13,8 @@ module Ruby2D
       @radius = opts[:radius] || 25
       @sectors = opts[:sectors] || 20
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       add
-    end
-
-    def color=(c)
-      @color = Color.from(c)
     end
 
     def contains?(x, y)

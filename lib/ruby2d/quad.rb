@@ -4,8 +4,6 @@ module Ruby2D
   class Quad
     include Renderable
 
-    attr_reader :color
-
     # Coordinates in clockwise order, starting at top left:
     # x1,y1 == top left
     # x2,y2 == top right
@@ -27,11 +25,12 @@ module Ruby2D
       @y4 = opts[:y4] || 100
       @z  = opts[:z]  || 0
       self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 
     def color=(c)
-      @color = Color.from(c)
+      @color = Color.set(c)
       update_color(@color)
     end
 

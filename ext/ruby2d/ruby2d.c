@@ -444,6 +444,12 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
 
   S2D_RotateSprite(spr, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
 
+  R_VAL c = r_iv_get(self, "@color");
+  spr->color.r = NUM2DBL(r_iv_get(c, "@r"));
+  spr->color.g = NUM2DBL(r_iv_get(c, "@g"));
+  spr->color.b = NUM2DBL(r_iv_get(c, "@b"));
+  spr->color.a = NUM2DBL(r_iv_get(c, "@a"));
+
   S2D_ClipSprite(
     spr,
     NUM2INT(r_iv_get(self, "@clip_x")),

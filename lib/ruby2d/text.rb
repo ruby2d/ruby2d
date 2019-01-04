@@ -4,7 +4,7 @@ module Ruby2D
   class Text
     include Renderable
 
-    attr_reader :text, :size, :width, :height, :font, :color
+    attr_reader :text, :size, :font
     attr_accessor :x, :y, :rotate, :data
 
     def initialize(text, opts = {})
@@ -14,11 +14,12 @@ module Ruby2D
       @text = text.to_s
       @size = opts[:size] || 20
       @rotate = opts[:rotate] || 0
+      self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
       @font = opts[:font] || Font.default
       unless File.exist? @font
         raise Error, "Cannot find font file `#{@font}`"
       end
-      self.color = opts[:color] || 'white'
       ext_init
       add
     end
@@ -26,10 +27,6 @@ module Ruby2D
     def text=(msg)
       @text = msg.to_s
       ext_set(@text)
-    end
-
-    def color=(c)
-      @color = Color.new(c)
     end
 
   end

@@ -4,7 +4,6 @@ module Ruby2D
   class Sprite
     include Renderable
 
-    attr_reader :x, :y, :width, :height
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data
 
     def initialize(path, opts = {})
@@ -22,6 +21,8 @@ module Ruby2D
       @width  = opts[:width]  || nil
       @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
+      self.color = opts[:color] || 'white'
+      self.opacity = opts[:opacity] if opts[:opacity]
 
       # Flipping status, coordinates, and size, used internally
       @flip = nil
