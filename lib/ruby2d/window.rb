@@ -208,7 +208,10 @@ module Ruby2D
       @borderless      = opts[:borderless]      || @borderless
       @fullscreen      = opts[:fullscreen]      || @fullscreen
       @highdpi         = opts[:highdpi]         || @highdpi
-      @diagnostics     = opts[:diagnostics]     || @diagnostics
+      unless opts[:diagnostics].nil?
+        @diagnostics = opts[:diagnostics]
+        ext_diagnostics(@diagnostics)
+      end
     end
 
     # Add an object to the window

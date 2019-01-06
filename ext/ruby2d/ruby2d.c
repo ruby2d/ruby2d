@@ -964,6 +964,22 @@ static void render() {
 
 
 /*
+ * Ruby2D::Window#ext_diagnostics
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_diagnostics(mrb_state* mrb, R_VAL self) {
+  mrb_value enable;
+  mrb_get_args(mrb, "o", &enable);
+#else
+static R_VAL ruby2d_ext_diagnostics(R_VAL self, R_VAL enable) {
+#endif
+  // Set Simple 2D diagnostics
+  S2D_Diagnostics(r_test(enable));
+  return R_TRUE;
+}
+
+
+/*
  * Ruby2D::Window#ext_get_display_dimensions
  */
 #if MRUBY
@@ -1004,11 +1020,6 @@ static R_VAL ruby2d_window_ext_show(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_window_ext_show(R_VAL self) {
 #endif
   ruby2d_window = self;
-
-  // Set Simple 2D diagnostics
-  if (r_test(r_iv_get(self, "@diagnostics"))) {
-    S2D_Diagnostics(true);
-  }
 
   // Add controller mappings from file
   r_funcall(self, "add_controller_mappings", 0);
@@ -1214,6 +1225,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
+
+  // Ruby2D::Window#ext_diagnostics
+  r_define_method(ruby2d_window_class, "ext_diagnostics", ruby2d_ext_diagnostics, r_args_req(1));
 
   // Ruby2D::Window#ext_get_display_dimensions
   r_define_method(ruby2d_window_class, "ext_get_display_dimensions", ruby2d_window_ext_get_display_dimensions, r_args_none);
