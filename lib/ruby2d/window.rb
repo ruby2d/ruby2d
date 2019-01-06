@@ -87,7 +87,11 @@ module Ruby2D
       @diagnostics = false
 
       # Console mode, enabled at command line
-      @console = $ruby2d_console_mode || false
+      if RUBY_ENGINE == 'ruby'
+        @console = defined?($ruby2d_console_mode) ? true : false
+      else
+        @console = false
+      end
     end
 
     # Class methods for convenient access to properties
