@@ -167,26 +167,6 @@ static R_VAL ruby2d_ext_base_path(R_VAL self) {
 
 
 /*
- * Ruby2D#self.ext_screenshot
- */
-#if MRUBY
-static R_VAL ruby2d_ext_screenshot(mrb_state* mrb, R_VAL self) {
-  mrb_value path;
-  mrb_get_args(mrb, "o", &path);
-#else
-static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
-#endif
-  if (window) {
-    S2D_Screenshot(window, RSTRING_PTR(path));
-    return path;
-  } else {
-    S2D_Log(S2D_WARN, "Cannot take screenshot before window is shown");
-    return R_FALSE;
-  }
-}
-
-
-/*
  * Ruby2D::Triangle#ext_render
  */
 #if MRUBY
@@ -1085,6 +1065,26 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
 
   atexit(free_window);
   return R_NIL;
+}
+
+
+/*
+ * Ruby2D::Window#ext_screenshot
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_screenshot(mrb_state* mrb, R_VAL self) {
+  mrb_value path;
+  mrb_get_args(mrb, "o", &path);
+#else
+static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
+#endif
+  if (window) {
+    S2D_Screenshot(window, RSTRING_PTR(path));
+    return path;
+  } else {
+    S2D_Log(S2D_WARN, "Cannot take screenshot before window is shown");
+    return R_FALSE;
+  }
 }
 
 
