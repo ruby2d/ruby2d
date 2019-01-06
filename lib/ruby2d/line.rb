@@ -4,15 +4,15 @@ module Ruby2D
   class Line
     include Renderable
 
-    attr_accessor :x1, :x2, :y1, :y2
+    attr_accessor :x1, :x2, :y1, :y2, :width
 
     def initialize(opts = {})
       @x1 = opts[:x1] || 0
       @y1 = opts[:y1] || 0
       @x2 = opts[:x2] || 100
       @y2 = opts[:y2] || 100
-      @width = opts[:width] || 2
       @z = opts[:z] || 0
+      @width = opts[:width] || 2
       self.color = opts[:color] || 'white'
       self.opacity = opts[:opacity] if opts[:opacity]
       add
@@ -53,7 +53,7 @@ module Ruby2D
           @c3 = c[2]
           @c4 = c[3]
         else
-          raise ArgumentError, "Lines require 4 colors, one for each vertex. #{c.length} were given."
+          raise ArgumentError, "`#{self.class}` requires 4 colors, one for each vertex. #{c.length} were given."
         end
       else
         @c1 = c

@@ -26,9 +26,8 @@ module Ruby2D
       update_color(@color)
     end
 
-    # Point is inside a triangle if
-    # the area of 3 triangles, constructed from triangle sides and that point
-    # is equal to the area of triangle.
+    # A point is inside a triangle if the area of 3 triangles, constructed from
+    # triangle sides and the given point, is equal to the area of triangle.
     def contains?(x, y)
       self_area = triangle_area(@x1, @y1, @x2, @y2, @x3, @y3)
       questioned_area =
@@ -52,7 +51,7 @@ module Ruby2D
           @c2 = c[1]
           @c3 = c[2]
         else
-          raise ArgumentError, "Triangles require 3 colors, one for each vertex. #{c.length} were given."
+          raise ArgumentError, "`#{self.class}` requires 3 colors, one for each vertex. #{c.length} were given."
         end
       else
         @c1 = c

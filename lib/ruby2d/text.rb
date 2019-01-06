@@ -4,8 +4,8 @@ module Ruby2D
   class Text
     include Renderable
 
-    attr_reader :text, :size, :font
-    attr_accessor :x, :y, :rotate, :data
+    attr_reader :text, :font
+    attr_accessor :x, :y, :size, :rotate, :data
 
     def initialize(text, opts = {})
       @x = opts[:x] || 0

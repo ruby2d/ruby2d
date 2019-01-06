@@ -6,12 +6,12 @@ module Ruby2D
     attr_reader :path
     attr_accessor :loop, :data
 
-    def initialize(path)
+    def initialize(path, opts = {})
       unless File.exist? path
         raise Error, "Cannot find audio file `#{path}`"
       end
       @path = path
-      @loop = false
+      @loop = opts[:loop] || false
       unless ext_init(@path)
         raise Error, "Music `#{@path}` cannot be created"
       end

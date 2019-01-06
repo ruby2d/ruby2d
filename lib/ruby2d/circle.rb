@@ -4,7 +4,7 @@ module Ruby2D
   class Circle
     include Renderable
 
-    attr_accessor :radius, :sectors
+    attr_accessor :x, :y, :radius, :sectors
 
     def initialize(opts = {})
       @x = opts[:x] || 25

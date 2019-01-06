@@ -62,7 +62,7 @@ module Ruby2D
           @c3 = c[2]
           @c4 = c[3]
         else
-          raise ArgumentError, "Quads require 4 colors, one for each vertex. #{c.length} were given."
+          raise ArgumentError, "`#{self.class}` requires 4 colors, one for each vertex. #{c.length} were given."
         end
       else
         @c1 = c
