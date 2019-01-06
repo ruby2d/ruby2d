@@ -176,8 +176,13 @@ static R_VAL ruby2d_ext_screenshot(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
 #endif
-  S2D_Screenshot(window, RSTRING_PTR(path));
-  return R_NIL;
+  if (window) {
+    S2D_Screenshot(window, RSTRING_PTR(path));
+    return path;
+  } else {
+    S2D_Log(S2D_WARN, "Cannot take screenshot before window is shown");
+    return R_FALSE;
+  }
 }
 
 

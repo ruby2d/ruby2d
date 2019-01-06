@@ -9,4 +9,8 @@ RSpec.describe Ruby2D::Window do
     expect(Window.width).to eq(200)
   end
 
+  it "does not allow screenshots until shown" do
+    expect(Window.screenshot).to be false
+  end
+
 end
