@@ -45,7 +45,9 @@ module Ruby2D
       @img_width = nil; @img_height = nil
 
       # Initialize the sprite
-      ext_init(@path)
+      unless ext_init(@path)
+        raise Error, "Sprite image `#{@path}` cannot be created"
+      end
 
       # The clipping rectangle
       @clip_x = opts[:clip_x] || 0

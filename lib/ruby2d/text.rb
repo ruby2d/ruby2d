@@ -20,7 +20,9 @@ module Ruby2D
       unless File.exist? @font
         raise Error, "Cannot find font file `#{@font}`"
       end
-      ext_init
+      unless ext_init
+        raise Error, "Text `#{@text}` cannot be created"
+      end
       add
     end
 

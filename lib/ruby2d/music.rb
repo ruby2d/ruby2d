@@ -12,7 +12,9 @@ module Ruby2D
       end
       @path = path
       @loop = false
-      ext_init(path)
+      unless ext_init(@path)
+        raise Error, "Music `#{@path}` cannot be created"
+      end
     end
 
     # Play the music

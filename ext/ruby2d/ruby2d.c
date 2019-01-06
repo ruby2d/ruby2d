@@ -333,8 +333,8 @@ static R_VAL ruby2d_image_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_image_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Log(S2D_INFO, "Init image: %s", RSTRING_PTR(path));
   S2D_Image *img = S2D_CreateImage(RSTRING_PTR(path));
+  if (!img) return R_FALSE;
 
   // Get width and height from Ruby class. If set, use it, else choose the
   // native dimensions of the image.
@@ -342,9 +342,9 @@ static R_VAL ruby2d_image_ext_init(R_VAL self, R_VAL path) {
   R_VAL h = r_iv_get(self, "@height");
   r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(img->width));
   r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(img->height));
-
   r_iv_set(self, "@data", r_data_wrap_struct(image, img));
-  return R_NIL;
+
+  return R_TRUE;
 }
 
 
@@ -390,7 +390,6 @@ static void free_image(mrb_state *mrb, void *p_) {
 #else
 static void free_image(S2D_Image *img) {
 #endif
-  S2D_Log(S2D_INFO, "Free image `%s` at %i, %i", img->path, img->x, img->y);
   S2D_FreeImage(img);
 }
 
@@ -406,14 +405,14 @@ static R_VAL ruby2d_sprite_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Log(S2D_INFO, "Init sprite: %s", RSTRING_PTR(path));
   S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
+  if (!spr) return R_FALSE;
 
   r_iv_set(self, "@img_width" , INT2NUM(spr->width));
   r_iv_set(self, "@img_height", INT2NUM(spr->height));
   r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
 
-  return R_NIL;
+  return R_TRUE;
 }
 
 
@@ -470,7 +469,6 @@ static void free_sprite(mrb_state *mrb, void *p_) {
 #else
 static void free_sprite(S2D_Sprite *spr) {
 #endif
-  S2D_Log(S2D_INFO, "Free sprite `%s` at %i, %i", spr->path, spr->x, spr->y);
   S2D_FreeSprite(spr);
 }
 
@@ -484,8 +482,6 @@ static R_VAL ruby2d_text_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_text_ext_init(R_VAL self) {
 #endif
-  S2D_Log(S2D_INFO, "Init text: %s", RSTRING_PTR(r_iv_get(self, "@text")));
-
   // Trim the font file string to its actual length on MRuby
   #if MRUBY
     mrb_value s = r_iv_get(self, "@font");
@@ -497,12 +493,13 @@ static R_VAL ruby2d_text_ext_init(R_VAL self) {
     RSTRING_PTR(r_iv_get(self, "@text")),
     NUM2DBL(r_iv_get(self, "@size"))
   );
+  if (!txt) return R_FALSE;
 
   r_iv_set(self, "@width", INT2NUM(txt->width));
   r_iv_set(self, "@height", INT2NUM(txt->height));
-
   r_iv_set(self, "@data", r_data_wrap_struct(text, txt));
-  return R_NIL;
+
+  return R_TRUE;
 }
 
 
@@ -565,7 +562,6 @@ static void free_text(mrb_state *mrb, void *p_) {
 #else
 static void free_text(S2D_Text *txt) {
 #endif
-  S2D_Log(S2D_INFO, "Free text \"%s\" with font `%s`", txt->msg, txt->font);
   S2D_FreeText(txt);
 }
 
@@ -581,10 +577,10 @@ static R_VAL ruby2d_sound_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Log(S2D_INFO, "Init sound: %s", RSTRING_PTR(path));
   S2D_Sound *snd = S2D_CreateSound(RSTRING_PTR(path));
+  if (!snd) return R_FALSE;
   r_iv_set(self, "@data", r_data_wrap_struct(sound, snd));
-  return R_NIL;
+  return R_TRUE;
 }
 
 
@@ -612,7 +608,6 @@ static void free_sound(mrb_state *mrb, void *p_) {
 #else
 static void free_sound(S2D_Sound *snd) {
 #endif
-  S2D_Log(S2D_INFO, "Free sound `%s`", snd->path);
   S2D_FreeSound(snd);
 }
 
@@ -628,10 +623,10 @@ static R_VAL ruby2d_music_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Log(S2D_INFO, "Init music: %s", RSTRING_PTR(path));
   S2D_Music *mus = S2D_CreateMusic(RSTRING_PTR(path));
+  if (!mus) return R_FALSE;
   r_iv_set(self, "@data", r_data_wrap_struct(music, mus));
-  return R_NIL;
+  return R_TRUE;
 }
 
 
@@ -740,7 +735,6 @@ static void free_music(mrb_state *mrb, void *p_) {
 #else
 static void free_music(S2D_Music *mus) {
 #endif
-  S2D_Log(S2D_INFO, "Free music `%s`", mus->path);
   S2D_FreeMusic(mus);
 }
 

@@ -11,7 +11,9 @@ module Ruby2D
         raise Error, "Cannot find audio file `#{path}`"
       end
       @path = path
-      ext_init(path)
+      unless ext_init(@path)
+        raise Error, "Sound `#{@path}` cannot be created"
+      end
     end
 
     # Play the sound
