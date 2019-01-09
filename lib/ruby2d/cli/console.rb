@@ -31,19 +31,24 @@ loop do
     exit
   end
 
-  # Skip if command is an empty string
-  unless cmd.empty?
+  begin
+    # Skip if command is an empty string
+    unless cmd.empty?
 
-    # Send command to the Ruby file
-    stdin.puts cmd
+      # Send command to the Ruby file
+      stdin.puts cmd
 
-    # Read and print output from the Ruby file
-    puts stdout.gets
-    while stdout.ready? do
+      # Read and print output from the Ruby file
       puts stdout.gets
+      while stdout.ready? do
+        puts stdout.gets
+      end
     end
-  end
 
-  # Advance to next line
-  line += 1
+    # Advance to next line
+    line += 1
+  rescue Errno::EPIPE
+    puts "Can't connect to 2d application. See http://www.ruby2d.com/learn/console/#common-issues for more info"
+    exit 1
+  end
 end
