@@ -1,6 +1,6 @@
 # Welcome to Ruby 2D!
 
-[![Gem](https://img.shields.io/gem/v/ruby2d.svg)](https://rubygems.org/gems/ruby2d) [![Build Status](https://travis-ci.org/ruby2d/ruby2d.svg?branch=master)](https://travis-ci.org/ruby2d/ruby2d) [![Gitter](https://badges.gitter.im/ruby2d/ruby2d.svg)](https://gitter.im/ruby2d/ruby2d)
+[![Gem](https://img.shields.io/gem/v/ruby2d.svg)](https://rubygems.org/gems/ruby2d) [![Build Status](https://travis-ci.com/ruby2d/ruby2d.svg?branch=master)](https://travis-ci.com/ruby2d/ruby2d) [![Gitter](https://badges.gitter.im/ruby2d/ruby2d.svg)](https://gitter.im/ruby2d/ruby2d)
 
 This is the [Ruby 2D gem](https://rubygems.org/gems/ruby2d). Check out the [Ruby 2D website](http://www.ruby2d.com) to learn how to get started building 2D apps in Ruby.
 

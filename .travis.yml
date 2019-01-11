@@ -2,6 +2,7 @@ os: osx
 osx_image: xcode10.1
 language: ruby
 before_install:
+  - brew update
   - brew tap simple2d/tap
   - brew install simple2d mruby
 script:
