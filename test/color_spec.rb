@@ -26,7 +26,7 @@ RSpec.describe Ruby2D::Color do
     end
 
     it "accepts an existing color object" do
-      expect { Ruby2D::Color.new(Ruby2D::Color.new('red')) }.to_not raise_error Ruby2D::Error
+      expect { Ruby2D::Color.new(Ruby2D::Color.new('red')) }.to_not raise_error
     end
 
     it "assigns rgba from an existing color" do

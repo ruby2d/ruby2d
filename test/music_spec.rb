@@ -2,33 +2,42 @@ require 'ruby2d'
 
 RSpec.describe Ruby2D::Music do
 
+  # On AppVeyor:
+  #   Error: (Mix_OpenAudio) WASAPI can't find requested audio endpoint: Element not found.
+
   describe "#new" do
     it "raises exception if audio file doesn't exist" do
-      expect { Music.new('bad_music.mp3') }.to raise_error(Ruby2D::Error)
+      expect { Music.new('no_music_here.mp3') }.to raise_error(Ruby2D::Error)
     end
 
-    it "creates music with options" do
-      mus = Music.new('test/media/music.mp3', loop: true)
-      expect(mus.path).to eq('test/media/music.mp3')
-      expect(mus.loop).to be true
+    unless ENV['APPVEYOR']
+      it "creates music with options" do
+        mus = Music.new('test/media/music.mp3', loop: true)
+        expect(mus.path).to eq('test/media/music.mp3')
+        expect(mus.loop).to be true
+      end
     end
   end
 
   describe "attributes" do
-    it "can be set and read" do
-      mus = Music.new('test/media/music.mp3')
-      expect(mus.loop).to be false
-      mus.loop = true
-      expect(mus.loop).to be true
+    unless ENV['APPVEYOR']
+      it "can be set and read" do
+        mus = Music.new('test/media/music.mp3')
+        expect(mus.loop).to be false
+        mus.loop = true
+        expect(mus.loop).to be true
+      end
     end
   end
 
   describe "#volume" do
-    it "sets the volume on music instances" do
-      mus = Music.new('test/media/music.mp3')
-      expect(mus.volume).to eq(100)
-      mus.volume = 68
-      expect(mus.volume).to eq(68)
+    unless ENV['APPVEYOR']
+      it "sets the volume on music instances" do
+        mus = Music.new('test/media/music.mp3')
+        expect(mus.volume).to eq(100)
+        mus.volume = 68
+        expect(mus.volume).to eq(68)
+      end
     end
 
     it "sets the volume using class methods" do
