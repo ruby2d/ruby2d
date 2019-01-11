@@ -7,7 +7,7 @@ RSpec.describe Ruby2D::Sound do
       expect { Sound.new("no_sound_here.wav") }.to raise_error(Ruby2D::Error)
     end
 
-    unless ENV['APPVEYOR']
+    unless ENV['CI']  # audio cannot be opened on CI; see `music_spec.rb`
       it "creates sound" do
         snd = Sound.new('test/media/sound.wav')
         expect(snd.path).to eq('test/media/sound.wav')

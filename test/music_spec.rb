@@ -2,15 +2,18 @@ require 'ruby2d'
 
 RSpec.describe Ruby2D::Music do
 
-  # On AppVeyor:
-  #   Error: (Mix_OpenAudio) WASAPI can't find requested audio endpoint: Element not found.
+  # Audio cannot be opened on CI
+  # On macOS:
+  #   Mix_GetError: CoreAudio error (AudioDeviceGetProperty (kAudioDevicePropertyDeviceIsAlive)): 560947818
+  # On Windows:
+  #   Mix_GetError: WASAPI can't find requested audio endpoint: Element not found.
 
   describe "#new" do
     it "raises exception if audio file doesn't exist" do
       expect { Music.new('no_music_here.mp3') }.to raise_error(Ruby2D::Error)
     end
 
-    unless ENV['APPVEYOR']
+    unless ENV['CI']
       it "creates music with options" do
         mus = Music.new('test/media/music.mp3', loop: true)
         expect(mus.path).to eq('test/media/music.mp3')
@@ -20,7 +23,7 @@ RSpec.describe Ruby2D::Music do
   end
 
   describe "attributes" do
-    unless ENV['APPVEYOR']
+    unless ENV['CI']
       it "can be set and read" do
         mus = Music.new('test/media/music.mp3')
         expect(mus.loop).to be false
@@ -31,7 +34,7 @@ RSpec.describe Ruby2D::Music do
   end
 
   describe "#volume" do
-    unless ENV['APPVEYOR']
+    unless ENV['CI']
       it "sets the volume on music instances" do
         mus = Music.new('test/media/music.mp3')
         expect(mus.volume).to eq(100)
