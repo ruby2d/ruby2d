@@ -8,7 +8,14 @@ RSpec.describe Ruby2D::Sound do
     end
 
     unless ENV['CI']  # audio cannot be opened on CI; see `music_spec.rb`
-      it "creates sound" do
+      it "creates sound in various formats" do
+        Sound.new('test/media/music.wav')
+        Sound.new('test/media/music.mp3')
+        Sound.new('test/media/music.ogg')
+        Sound.new('test/media/music.flac')
+      end
+
+      it "creates sound and sets the media path" do
         snd = Sound.new('test/media/sound.wav')
         expect(snd.path).to eq('test/media/sound.wav')
       end
