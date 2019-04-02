@@ -3,6 +3,12 @@ require 'ruby2d'
 RSpec.describe Ruby2D::Image do
 
   describe "#new" do
+    it "creates images in various formats" do
+      Image.new('test/media/image.bmp')
+      Image.new('test/media/image.jpg')
+      Image.new('test/media/image.png')
+    end
+
     it "raises exception if image file doesn't exist" do
       expect { Image.new('bad_image.png') }.to raise_error(Ruby2D::Error)
     end

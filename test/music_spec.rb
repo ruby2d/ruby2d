@@ -14,6 +14,13 @@ RSpec.describe Ruby2D::Music do
     end
 
     unless ENV['CI']
+      it "creates music in various formats" do
+        Music.new('test/media/music.wav')
+        Music.new('test/media/music.mp3')
+        Music.new('test/media/music.ogg')
+        Music.new('test/media/music.flac')
+      end
+
       it "creates music with options" do
         mus = Music.new('test/media/music.mp3', loop: true)
         expect(mus.path).to eq('test/media/music.mp3')

@@ -2,13 +2,6 @@ require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/colorize'
 require_relative 'lib/ruby2d/version'
 
-# Simple 2D is required for these tasks
-if `which simple2d`.empty?
-  puts "Simple 2D not found!".error
-  puts "Install before running Rake tasks."
-  exit
-end
-
 def get_args
   ARGV.each { |a| task a.to_sym do ; end }
 end

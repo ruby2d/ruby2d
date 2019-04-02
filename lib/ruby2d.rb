@@ -21,13 +21,7 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/music'
 
   if RUBY_PLATFORM =~ /mingw/
-    # When using the Windows CI AppVeyor
-    if ENV['APPVEYOR']
-      s2d_dll_path = 'C:\msys64\usr\local\bin'
-    # When in a standard MinGW shell
-    else
-      s2d_dll_path = '~/../../usr/local/bin'
-    end
+    s2d_dll_path = Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
     RubyInstaller::Runtime.add_dll_directory(File.expand_path(s2d_dll_path))
   end
 
