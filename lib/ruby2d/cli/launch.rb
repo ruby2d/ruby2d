@@ -35,7 +35,7 @@ def launch_apple(device)
       puts "No iOS app built!"
       exit
     end
-    puts `simple2d simulator --open "iPhone XR" &&
+    puts `simple2d simulator --open "iPhone X" &&
           simple2d simulator --install "build/ios/build/Release-iphonesimulator/MyApp.app" &&
           simple2d simulator --launch "Ruby2D.MyApp"`
   when 'tvos'
