@@ -56,6 +56,12 @@ end
 
 task default: 'all'
 
+desc "Run default tasks using user-installed libraries"
+task :dev do
+  $libs = '-- libs'
+  Rake::Task['all'].invoke
+end
+
 desc "Uninstall gem"
 task :uninstall do
   print_task "Uninstalling"
@@ -71,7 +77,7 @@ end
 desc "Install gem"
 task :install do
   print_task "Installing"
-  run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose"
+  run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose #{$libs}"
 end
 
 desc "Update submodules"
