@@ -12,6 +12,8 @@ when /linux/
   if `cat /etc/os-release` =~ /raspbian/
     $platform = :linux_rpi
   end
+when /bsd/
+  $platform = :bsd
 when /mingw/
   $platform = :windows
 else
@@ -41,32 +43,38 @@ def add_flags(type, flags)
 end
 
 
-# Check SDL libraries on Linux
-def check_sdl_linux
+# Check for SDL libraries
+def check_sdl
   unless have_library('SDL2') && have_library('SDL2_image') && have_library('SDL2_mixer') && have_library('SDL2_ttf')
 
     $errors << "Couldn't find packages needed by Ruby 2D."
 
-    # Fedora and CentOS
-    if system('which yum')
-      $errors << "Install the following packages using `yum` (or `dnf`) and try again:\n" <<
-      "  SDL2-devel SDL2_image-devel SDL2_mixer-devel SDL2_ttf-devel".bold
+    case $platform
+    when :linux, :linux_rpi
+      # Fedora and CentOS
+      if system('which yum')
+        $errors << "Install the following packages using `yum` (or `dnf`) and try again:\n" <<
+        "  SDL2-devel SDL2_image-devel SDL2_mixer-devel SDL2_ttf-devel".bold
 
-    # Arch
-    elsif system('which pacman')
-      $errors << "Install the following packages using `pacman` and try again:\n" <<
+      # Arch
+      elsif system('which pacman')
+        $errors << "Install the following packages using `pacman` and try again:\n" <<
+        "  sdl2 sdl2_image sdl2_mixer sdl2_ttf".bold
+
+      # openSUSE
+      elsif system('which zypper')
+        $errors << "Install the following packages using `zypper` and try again:\n" <<
+        "  libSDL2-devel libSDL2_image-devel libSDL2_mixer-devel libSDL2_ttf-devel".bold
+
+      # Ubuntu, Debian, and Mint
+      # `apt` must be last because openSUSE has it aliased to `zypper`
+      elsif system('which apt')
+        $errors << "Install the following packages using `apt` and try again:\n" <<
+        "  libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev".bold
+      end
+    when :bsd
+      $errors << "Install the following packages using `pkg` and try again:\n" <<
       "  sdl2 sdl2_image sdl2_mixer sdl2_ttf".bold
-
-    # openSUSE
-    elsif system('which zypper')
-      $errors << "Install the following packages using `zypper` and try again:\n" <<
-      "  libSDL2-devel libSDL2_image-devel libSDL2_mixer-devel libSDL2_ttf-devel".bold
-
-    # Ubuntu, Debian, and Mint
-    # `apt` must be last because openSUSE has it aliased to `zypper`
-    elsif system('which apt')
-      $errors << "Install the following packages using `apt` and try again:\n" <<
-      "  libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev".bold
     end
 
     $errors << "" << "See #{"ruby2d.com".bold} for additional help."
