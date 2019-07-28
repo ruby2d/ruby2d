@@ -20,7 +20,7 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/sound'
   require 'ruby2d/music'
 
-  if RUBY_PLATFORM =~ /mingw/
+  if defined?(RubyInstaller)
     s2d_dll_path = Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
     RubyInstaller::Runtime.add_dll_directory(File.expand_path(s2d_dll_path))
   end
