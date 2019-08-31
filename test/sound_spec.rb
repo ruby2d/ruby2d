@@ -21,6 +21,40 @@ RSpec.describe Ruby2D::Sound do
       end
     end
   end
+  describe "#volume" do
+    unless ENV['CI']
+      it "sets the volume on sound instances" do
+        snd = Sound.new('test/media/music.wav')
+        expect(snd.volume).to eq(100)
+        snd.volume = 68
+        expect(snd.volume).to eq(68)
+      end
+
+      it "sets volume to 0 or 100 if outside of range" do
+        snd = Sound.new('test/media/music.wav')
+        snd.volume = 234
+        expect(snd.volume).to eq(100)
+        snd.volume = -312
+        expect(snd.volume).to eq(0)
+        snd.volume = -1
+        expect(snd.volume).to eq(0)
+      end
+
+      it "sets the mix volume using class methods" do
+        Sound.mix_volume = 27
+        expect(Sound.mix_volume).to eq(27)
+      end
+
+      it "sets mix volume to 0 or 100 if outside of range" do
+        Sound.mix_volume = 234
+        expect(Sound.mix_volume).to eq(100)
+        Sound.mix_volume = -312
+        expect(Sound.mix_volume).to eq(0)
+        Sound.mix_volume = -1
+        expect(Sound.mix_volume).to eq(0)
+      end
+    end
+  end
 
   describe '#length' do
     unless ENV['CI']
