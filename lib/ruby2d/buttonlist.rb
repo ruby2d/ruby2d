@@ -177,18 +177,4 @@ class ButtonList
   end
 
 end
-
-on :mouse_down do |event|
-  if event.button == :left
-    ButtonList.buttonLists.each do |buttonList|
-      buttonList.options.each do |name, button|
-        if button.shown && button.enabled
-          if event.x.between?(button.x-button.size,button.x+button.size) && event.y.between?(button.y-button.size,button.y+button.size)
-            buttonList.toggle(button)
-          end
-        end
-      end
-    end
-  end
-end
 end

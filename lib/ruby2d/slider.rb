@@ -157,22 +157,4 @@ class Slider
     setValue(@value)
   end
 end
-
-on :mouse do |event|
-  if event.button == :left && event.type == :down
-    @dragging = true
-  end
-  if event.button == :left && event.type == :up
-    @dragging = false
-  end
-  if @dragging == true
-    Slider.sliders.each do |slider|
-      if slider.shown && slider.enabled
-        if event.y.between?(slider.y-slider.size,slider.y+slider.size)
-          slider.moveKnob(event.x)
-        end
-      end
-    end
-  end
-end
 end
