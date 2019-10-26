@@ -433,7 +433,7 @@ module Ruby2D
     end
 
     #Slider
-    Window.on :mouse do |event|
+    @@window.on :mouse do |event|
       if event.button == :left && event.type == :down
         @dragging = true
       end
@@ -452,7 +452,7 @@ module Ruby2D
     end
 
     #ButtonList
-    Window.on :mouse_down do |event|
+    @@window.on :mouse_down do |event|
       if event.button == :left
         ButtonList.buttonLists.each do |buttonList|
           buttonList.options.each do |id , button|
