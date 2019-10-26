@@ -304,6 +304,37 @@ module Ruby2D
       # All mouse events
       @events[:mouse].each do |id, e|
         e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
+
+        #Slider
+          if e.button == :left && e.type == :down
+            @dragging = true
+          end
+          if e.button == :left && e.type == :up
+            @dragging = false
+          end
+          if @dragging == true
+            Slider.sliders.each do |slider|
+              if slider.shown && slider.enabled
+                if e.y.between?(slider.y-slider.size,slider.y+slider.size)
+                  slider.moveKnob(e.x)
+                end
+              end
+            end
+          end
+
+        #ButtonList
+          if e.button == :left
+            ButtonList.buttonLists.each do |buttonList|
+              buttonList.options.each do |id , button|
+                if button.shown && button.enabled
+                  if e.x.between?(button.x-button.size,button.x+button.size) && e.y.between?(button.y-button.size,button.y+button.size)
+                    buttonList.toggle(button)
+                  end
+                end
+              end
+            end
+          end
+
       end
 
       case type
