@@ -302,35 +302,9 @@ module Ruby2D
     # Mouse callback method, called by the native and web extentions
     def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
       # All mouse events
-      #Slider
-        if button == :left && type == :down
-          @dragging = true
-        end
-        if button == :left && type == :up
-          @dragging = false
-        end
-        if @dragging == true
-          Slider.sliders.each do |slider|
-            if slider.shown && slider.enabled
-              if y.between?(slider.y-slider.size,slider.y+slider.size)
-                slider.moveKnob(x)
-              end
-            end
-          end
-        end
 
-      #ButtonList
-        if button == :left
-          ButtonList.buttonLists.each do |buttonList|
-            buttonList.options.each do |id , button|
-              if button.shown && button.enabled
-                if x.between?(button.x-button.size,button.x+button.size) && y.between?(button.y-button.size,button.y+button.size)
-                  buttonList.toggle(button)
-                end
-              end
-            end
-          end
-        end
+      #IO handler
+      ioMouseHandler(type, button, direction, x, y, delta_x, delta_y)
 
       @events[:mouse].each do |id, e|
         e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
@@ -365,6 +339,39 @@ module Ruby2D
     def add_controller_mappings
       if File.exist? @controller_mappings
         ext_add_controller_mappings(@controller_mappings)
+      end
+    end
+
+    #Overides on all mouse events to automatically control IO Elements
+    def ioMouseHandler(type, button, direction, x, y, delta_x, delta_y)
+    #Slider
+      if button == :left && type == :down
+        @dragging = true
+      end
+      if button == :left && type == :up
+        @dragging = false
+      end
+      if @dragging == true
+        Slider.sliders.each do |slider|
+          if slider.shown && slider.enabled
+            if y.between?(slider.y-slider.size,slider.y+slider.size)
+              slider.moveKnob(x)
+            end
+          end
+        end
+      end
+
+    #ButtonList
+      if button == :left
+        ButtonList.buttonLists.each do |buttonList|
+          buttonList.options.each do |id , button|
+            if button.shown && button.enabled
+              if x.between?(button.x-button.size,button.x+button.size) && y.between?(button.y-button.size,button.y+button.size)
+                buttonList.toggle(button)
+              end
+            end
+          end
+        end
       end
     end
 
