@@ -59,8 +59,8 @@ module Ruby2D
         end
       end
 
-      # Get the fonts directories for the current platform
-      def directories
+      # Get the fonts directory for the current platform
+      def directory
         macos_font_path   = '/Library/Fonts'
         linux_font_path   = '/usr/share/fonts'
         windows_font_path = 'C:/Windows/Fonts'
