@@ -26,7 +26,7 @@ Next, install dependencies:
 - Install the native graphics library [Simple 2D](https://github.com/simple2d/simple2d) by following the instructions in its README.
 - Install [MRuby](http://mruby.org) in order to build Ruby 2D apps natively. On macOS using [Homebrew](https://brew.sh), run `brew install mruby`. On Ubuntu, use `sudo apt install mruby libmruby-dev`
 
-Finally, run `rake` to build and install the gem locally.
+Finally, run `rake` to build and install the gem locally. Use `rake dev` to build referencing user-installed libraries (e.g. Simple 2D and SDL).
 
 ## Tests
 

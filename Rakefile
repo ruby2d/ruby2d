@@ -58,6 +58,7 @@ task default: 'all'
 
 desc "Run default tasks using user-installed libraries"
 task :dev do
+  puts 'Building using user-installed libraries'.info
   $libs = '-- libs'
   Rake::Task['all'].invoke
 end
