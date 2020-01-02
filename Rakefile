@@ -1,5 +1,5 @@
 require 'rspec/core/rake_task'
-require_relative 'lib/ruby2d/colorize'
+require_relative 'lib/ruby2d/cli/colorize'
 require_relative 'lib/ruby2d/version'
 
 def get_args

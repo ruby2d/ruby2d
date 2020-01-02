@@ -1,7 +1,7 @@
 # Ruby2D module and native extension loader, adds DSL
 
 unless RUBY_ENGINE == 'mruby'
-  require 'ruby2d/colorize'
+  require 'ruby2d/cli/colorize'
   require 'ruby2d/exceptions'
   require 'ruby2d/renderable'
   require 'ruby2d/color'

@@ -1,5 +1,5 @@
 require 'mkmf'
-require_relative '../../lib/ruby2d/colorize'
+require_relative '../../lib/ruby2d/cli/colorize'
 
 S2D_VERSION = '1.1.0'  # Simple 2D minimum version required
 $errors = []  # Holds errors
