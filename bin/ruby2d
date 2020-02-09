@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require 'ruby2d/colorize'
+require 'ruby2d/cli/colorize'
 require 'ruby2d/version'
 
 # Debugging command-line flag

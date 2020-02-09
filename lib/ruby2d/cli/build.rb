@@ -7,7 +7,7 @@ require 'fileutils'
 
 # The Ruby 2D library files
 @lib_files = [
-  'colorize',
+  'cli/colorize',
   'exceptions',
   'renderable',
   'color',
