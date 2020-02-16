@@ -69,11 +69,16 @@ In order to achieve such simplicity, a lot has to happen under the hood. Whether
 
 - **Comprehensively test your change.** Unlike other Ruby libraries, not everything here can be easily covered with unit tests alone. We also need to make sure things look and sound right, inputs work as expected, and behavior is consistent across all platforms Ruby 2D supports.
 
+## Updating Ruby 2D
+
+1. Update the [assets](https://github.com/ruby2d/assets) repo, follow the instructions in the README
+2. Run `rake update` to update the submodules
+3. Update the Simple 2D minimum version required in [`extconf.rb`](ext/ruby2d/extconf.rb)
+
 ## Preparing a release
 
-1. Update the Simple 2D minimum version required in [`extconf.rb`](ext/ruby2d/extconf.rb)
-2. Run tests on all supported platforms
-3. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
-4. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`, and write a little release note
-5. Run `rake` to build the gem, then push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
-6. 🎉
+1. Run tests on all supported platforms
+2. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
+3. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`, and write a little release note
+4. Run `rake` to build the gem, then push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
+5. 🎉
