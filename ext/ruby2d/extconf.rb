@@ -15,6 +15,8 @@ when /linux/
   end
 when /mingw/
   $platform = :windows
+when /openbsd/
+  $platform = :openbsd
 else
   $platform = nil
 end
