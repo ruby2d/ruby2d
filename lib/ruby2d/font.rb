@@ -63,11 +63,12 @@ module Ruby2D
           end
         # If MRuby
         else
-          if `uname`.include? 'Darwin'  # macOS
+          uname = `uname`
+          if uname.include? 'Darwin' # macOS
             macos_font_path
-          elsif `uname`.include? 'Linux'
+          elsif uname.include? 'Linux'
             linux_font_path
-          elsif `uname`.include? 'MINGW'
+          elsif uname.include? 'MINGW'
             windows_font_path
           end
         end
