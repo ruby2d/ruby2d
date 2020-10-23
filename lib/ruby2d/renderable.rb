@@ -32,8 +32,8 @@ module Ruby2D
     end
 
     # Allow British English spelling of color
-    def colour; self.color end
-    def colour=(c); self.color = c end
+    alias_method :colour, :color
+    alias_method :colour=, :color=
 
     # Allow shortcuts for setting color values
     def r; self.color.r end
