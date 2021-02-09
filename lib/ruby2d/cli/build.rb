@@ -96,7 +96,7 @@ def build_native(rb_file)
   end
 
   # Compile to a native executable
-  `cc build/app.c -lmruby \`simple2d --libs\` -o build/app`
+  `cc build/app.c -lmruby -o build/app`
 
   # Clean up
   clean_up unless @debug
@@ -162,12 +162,6 @@ end
 def build_ios_tvos(rb_file, device)
   check_build_src_file(rb_file)
 
-  # Check for Simple 2D framework,
-  unless File.exist?('/usr/local/Frameworks/Simple2D/iOS/Simple2D.framework') && File.exist?('/usr/local/Frameworks/Simple2D/tvOS/Simple2D.framework')
-    puts "#{'Error:'.error} Simple 2D iOS and tvOS frameworks not found. Install them and try again.\n"
-    exit
-  end
-
   # Check if MRuby exists; if not, quit
   if `which mruby`.empty?
     puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
@@ -197,6 +191,7 @@ def build_ios_tvos(rb_file, device)
     f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
   end
 
+  # TODO: Need add this functionality to the gem
   # Build the Xcode project
   `simple2d build --#{device} build/#{device}/MyApp.xcodeproj`
 

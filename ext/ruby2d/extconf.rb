@@ -1,7 +1,6 @@
 require 'mkmf'
 require_relative '../../lib/ruby2d/cli/colorize'
 
-S2D_VERSION = '1.2.0'  # Simple 2D minimum version required
 $errors = []  # Holds errors
 
 # Set the OS platform
@@ -28,27 +27,6 @@ def print_errors
 #{"== #{"Ruby 2D Installation Errors".error} =======================================\n"}
   #{$errors.join("\n  ")}\n
 #{"======================================================================"}"
-end
-
-
-# Check that Simple 2D is installed and meets minimum version requirements
-def check_s2d
-
-  # Simple 2D not installed
-  if `which simple2d`.empty?
-    $errors << "Ruby 2D uses a native library called Simple 2D, which was not found." <<
-               "To install, follow the instructions at #{"ruby2d.com".bold}"
-    print_errors; exit
-
-  # Simple 2D installed, checking version
-  else
-    unless Gem::Version.new(`bash simple2d --version`) >= Gem::Version.new(S2D_VERSION)
-      $errors << "Simple 2D needs to be updated for this version of Ruby 2D." <<
-                 "Run the following, then try reinstalling this gem:\n" <<
-                 "  simple2d update".bold
-      print_errors; exit
-    end
-  end
 end
 
 
@@ -106,14 +84,11 @@ def set_rpi_flags
 end
 
 
-# Use the Simple 2D, SDL, and other libraries installed by the user (not those bundled with the gem)
+# Use SDL and other libraries installed by the user (not those bundled with the gem)
 def use_usr_libs
-  check_s2d
-
   # Add flags
   set_rpi_flags
   add_flags(:c, '-I/usr/local/include')
-  add_flags(:ld, `bash simple2d --libs`)
 end
 
 
@@ -134,7 +109,6 @@ else
     add_flags(:c, '-I../../assets/include')
     ldir = "#{Dir.pwd}/../../assets/macos/lib"
 
-    add_flags(:ld, "#{ldir}/libsimple2d.a")
     add_flags(:ld, "#{ldir}/libSDL2.a #{ldir}/libSDL2_image.a #{ldir}/libSDL2_mixer.a #{ldir}/libSDL2_ttf.a")
     add_flags(:ld, "#{ldir}/libjpeg.a #{ldir}/libpng16.a #{ldir}/libtiff.a #{ldir}/libwebp.a")
     add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libogg.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a")
@@ -143,18 +117,14 @@ else
 
   when :linux, :linux_rpi
     check_sdl_linux
-    simple2d_dir = "#{Dir.pwd}/../../assets/linux/simple2d"
-
-    `(cd #{simple2d_dir} && make)`
 
     set_rpi_flags
-    add_flags(:c, "-I#{simple2d_dir}/include")
-    add_flags(:ld, "#{simple2d_dir}/build/libsimple2d.a -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
+    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
     if $platform == :linux then add_flags(:ld, '-lGL') end
 
   when :windows
     add_flags(:c, '-I../../assets/include')
-    add_flags(:ld, '-L../../assets/mingw/lib -lsimple2d -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf')
+    add_flags(:ld, '-L../../assets/mingw/lib -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf')
     add_flags(:ld, '-lmingw32 -lopengl32 -lglew32')
 
   # If can't detect the platform, use libraries installed by the user
@@ -165,5 +135,5 @@ end
 
 $LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they can cause problems
 
-# Create the Makefile
+# Create Makefile
 create_makefile('ruby2d/ruby2d')
