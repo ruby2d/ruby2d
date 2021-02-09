@@ -3,4 +3,4 @@
 	url = https://github.com/simple2d/test_media.git
 [submodule "assets"]
 	path = assets
-	url = https://github.com/ruby2d/assets
+	url = https://github.com/ruby2d/assets.git
