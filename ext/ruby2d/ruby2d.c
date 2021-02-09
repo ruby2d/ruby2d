@@ -1,10 +1,9 @@
 // Native C extension for Ruby and MRuby
 
-// Simple 2D includes
+// Ruby 2D includes
 #if RUBY2D_IOS_TVOS
-  #include <Simple2D/simple2d.h>
 #else
-  #include <simple2d.h>
+  #include <ruby2d.h>
 #endif
 
 // Ruby includes
@@ -100,11 +99,11 @@
   static mrb_state *mrb;
 #endif
 
-// Ruby 2D window
+// Ruby 2D interpreter window
 static R_VAL ruby2d_window;
 
-// Simple 2D window
-static S2D_Window *window;
+// Ruby 2D native window
+static R2D_Window *window;
 
 
 // Method signatures and structures for Ruby 2D classes
@@ -130,19 +129,19 @@ static S2D_Window *window;
     "music", free_music
   };
 #else
-  static void free_image(S2D_Image *img);
-  static void free_sprite(S2D_Sprite *spr);
-  static void free_text(S2D_Text *txt);
-  static void free_sound(S2D_Sound *snd);
-  static void free_music(S2D_Music *mus);
+  static void free_image(R2D_Image *img);
+  static void free_sprite(R2D_Sprite *spr);
+  static void free_text(R2D_Text *txt);
+  static void free_sound(R2D_Sound *snd);
+  static void free_music(R2D_Music *mus);
 #endif
 
 
 /*
- * Function pointer to free the Simple 2D window
+ * Function pointer to free the Ruby 2D native window
  */
 static void free_window() {
-  S2D_FreeWindow(window);
+  R2D_FreeWindow(window);
 }
 
 
@@ -178,7 +177,7 @@ static R_VAL ruby2d_triangle_ext_render(R_VAL self) {
   R_VAL c2 = r_iv_get(self, "@c2");
   R_VAL c3 = r_iv_get(self, "@c3");
 
-  S2D_DrawTriangle(
+  R2D_DrawTriangle(
     NUM2DBL(r_iv_get(self, "@x1")),
     NUM2DBL(r_iv_get(self, "@y1")),
     NUM2DBL(r_iv_get(c1, "@r")),
@@ -218,7 +217,7 @@ static R_VAL ruby2d_quad_ext_render(R_VAL self) {
   R_VAL c3 = r_iv_get(self, "@c3");
   R_VAL c4 = r_iv_get(self, "@c4");
 
-  S2D_DrawQuad(
+  R2D_DrawQuad(
     NUM2DBL(r_iv_get(self, "@x1")),
     NUM2DBL(r_iv_get(self, "@y1")),
     NUM2DBL(r_iv_get(c1, "@r")),
@@ -265,7 +264,7 @@ static R_VAL ruby2d_line_ext_render(R_VAL self) {
   R_VAL c3 = r_iv_get(self, "@c3");
   R_VAL c4 = r_iv_get(self, "@c4");
 
-  S2D_DrawLine(
+  R2D_DrawLine(
     NUM2DBL(r_iv_get(self, "@x1")),
     NUM2DBL(r_iv_get(self, "@y1")),
     NUM2DBL(r_iv_get(self, "@x2")),
@@ -307,7 +306,7 @@ static R_VAL ruby2d_circle_ext_render(R_VAL self) {
 #endif
   R_VAL c = r_iv_get(self, "@color");
 
-  S2D_DrawCircle(
+  R2D_DrawCircle(
     NUM2DBL(r_iv_get(self, "@x")),
     NUM2DBL(r_iv_get(self, "@y")),
     NUM2DBL(r_iv_get(self, "@radius")),
@@ -333,7 +332,7 @@ static R_VAL ruby2d_image_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_image_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Image *img = S2D_CreateImage(RSTRING_PTR(path));
+  R2D_Image *img = R2D_CreateImage(RSTRING_PTR(path));
   if (!img) return R_FALSE;
 
   // Get width and height from Ruby class. If set, use it, else choose the
@@ -356,8 +355,8 @@ static R_VAL ruby2d_image_ext_render(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_image_ext_render(R_VAL self) {
 #endif
-  S2D_Image *img;
-  r_data_get_struct(self, "@data", &image_data_type, S2D_Image, img);
+  R2D_Image *img;
+  r_data_get_struct(self, "@data", &image_data_type, R2D_Image, img);
 
   img->x = NUM2DBL(r_iv_get(self, "@x"));
   img->y = NUM2DBL(r_iv_get(self, "@y"));
@@ -367,7 +366,7 @@ static R_VAL ruby2d_image_ext_render(R_VAL self) {
   if (r_test(w)) img->width  = NUM2INT(w);
   if (r_test(h)) img->height = NUM2INT(h);
 
-  S2D_RotateImage(img, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
+  R2D_RotateImage(img, NUM2DBL(r_iv_get(self, "@rotate")), R2D_CENTER);
 
   R_VAL c = r_iv_get(self, "@color");
   img->color.r = NUM2DBL(r_iv_get(c, "@r"));
@@ -375,7 +374,7 @@ static R_VAL ruby2d_image_ext_render(R_VAL self) {
   img->color.b = NUM2DBL(r_iv_get(c, "@b"));
   img->color.a = NUM2DBL(r_iv_get(c, "@a"));
 
-  S2D_DrawImage(img);
+  R2D_DrawImage(img);
 
   return R_NIL;
 }
@@ -386,11 +385,11 @@ static R_VAL ruby2d_image_ext_render(R_VAL self) {
  */
 #if MRUBY
 static void free_image(mrb_state *mrb, void *p_) {
-  S2D_Image *img = (S2D_Image *)p_;
+  R2D_Image *img = (R2D_Image *)p_;
 #else
-static void free_image(S2D_Image *img) {
+static void free_image(R2D_Image *img) {
 #endif
-  S2D_FreeImage(img);
+  R2D_FreeImage(img);
 }
 
 
@@ -405,7 +404,7 @@ static R_VAL ruby2d_sprite_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Sprite *spr = S2D_CreateSprite(RSTRING_PTR(path));
+  R2D_Sprite *spr = R2D_CreateSprite(RSTRING_PTR(path));
   if (!spr) return R_FALSE;
 
   r_iv_set(self, "@img_width" , INT2NUM(spr->width));
@@ -426,8 +425,8 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
 #endif
   r_funcall(self, "update", 0);
 
-  S2D_Sprite *spr;
-  r_data_get_struct(self, "@data", &sprite_data_type, S2D_Sprite, spr);
+  R2D_Sprite *spr;
+  r_data_get_struct(self, "@data", &sprite_data_type, R2D_Sprite, spr);
 
   spr->x = NUM2DBL(r_iv_get(self, "@flip_x"));
   spr->y = NUM2DBL(r_iv_get(self, "@flip_y"));
@@ -438,7 +437,7 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
   R_VAL h = r_iv_get(self, "@flip_height");
   if (r_test(h)) spr->height = NUM2DBL(h);
 
-  S2D_RotateSprite(spr, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
+  R2D_RotateSprite(spr, NUM2DBL(r_iv_get(self, "@rotate")), R2D_CENTER);
 
   R_VAL c = r_iv_get(self, "@color");
   spr->color.r = NUM2DBL(r_iv_get(c, "@r"));
@@ -446,7 +445,7 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
   spr->color.b = NUM2DBL(r_iv_get(c, "@b"));
   spr->color.a = NUM2DBL(r_iv_get(c, "@a"));
 
-  S2D_ClipSprite(
+  R2D_ClipSprite(
     spr,
     NUM2INT(r_iv_get(self, "@clip_x")),
     NUM2INT(r_iv_get(self, "@clip_y")),
@@ -454,7 +453,7 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
     NUM2INT(r_iv_get(self, "@clip_height"))
   );
 
-  S2D_DrawSprite(spr);
+  R2D_DrawSprite(spr);
 
   return R_NIL;
 }
@@ -465,11 +464,11 @@ static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
  */
 #if MRUBY
 static void free_sprite(mrb_state *mrb, void *p_) {
-  S2D_Sprite *spr = (S2D_Sprite *)p_;
+  R2D_Sprite *spr = (R2D_Sprite *)p_;
 #else
-static void free_sprite(S2D_Sprite *spr) {
+static void free_sprite(R2D_Sprite *spr) {
 #endif
-  S2D_FreeSprite(spr);
+  R2D_FreeSprite(spr);
 }
 
 
@@ -488,7 +487,7 @@ static R_VAL ruby2d_text_ext_init(R_VAL self) {
     mrb_str_resize(mrb, s, RSTRING_LEN(s));
   #endif
 
-  S2D_Text *txt = S2D_CreateText(
+  R2D_Text *txt = R2D_CreateText(
     RSTRING_PTR(r_iv_get(self, "@font")),
     RSTRING_PTR(r_iv_get(self, "@text")),
     NUM2DBL(r_iv_get(self, "@size"))
@@ -513,10 +512,10 @@ static R_VAL ruby2d_text_ext_set(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_text_ext_set(R_VAL self, R_VAL text) {
 #endif
-  S2D_Text *txt;
-  r_data_get_struct(self, "@data", &text_data_type, S2D_Text, txt);
+  R2D_Text *txt;
+  r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
 
-  S2D_SetText(txt, RSTRING_PTR(text));
+  R2D_SetText(txt, RSTRING_PTR(text));
 
   r_iv_set(self, "@width", INT2NUM(txt->width));
   r_iv_set(self, "@height", INT2NUM(txt->height));
@@ -533,13 +532,13 @@ static R_VAL ruby2d_text_ext_render(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_text_ext_render(R_VAL self) {
 #endif
-  S2D_Text *txt;
-  r_data_get_struct(self, "@data", &text_data_type, S2D_Text, txt);
+  R2D_Text *txt;
+  r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
 
   txt->x = NUM2DBL(r_iv_get(self, "@x"));
   txt->y = NUM2DBL(r_iv_get(self, "@y"));
 
-  S2D_RotateText(txt, NUM2DBL(r_iv_get(self, "@rotate")), S2D_CENTER);
+  R2D_RotateText(txt, NUM2DBL(r_iv_get(self, "@rotate")), R2D_CENTER);
 
   R_VAL c = r_iv_get(self, "@color");
   txt->color.r = NUM2DBL(r_iv_get(c, "@r"));
@@ -547,7 +546,7 @@ static R_VAL ruby2d_text_ext_render(R_VAL self) {
   txt->color.b = NUM2DBL(r_iv_get(c, "@b"));
   txt->color.a = NUM2DBL(r_iv_get(c, "@a"));
 
-  S2D_DrawText(txt);
+  R2D_DrawText(txt);
 
   return R_NIL;
 }
@@ -558,11 +557,11 @@ static R_VAL ruby2d_text_ext_render(R_VAL self) {
  */
 #if MRUBY
 static void free_text(mrb_state *mrb, void *p_) {
-  S2D_Text *txt = (S2D_Text *)p_;
+  R2D_Text *txt = (R2D_Text *)p_;
 #else
-static void free_text(S2D_Text *txt) {
+static void free_text(R2D_Text *txt) {
 #endif
-  S2D_FreeText(txt);
+  R2D_FreeText(txt);
 }
 
 
@@ -577,7 +576,7 @@ static R_VAL ruby2d_sound_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Sound *snd = S2D_CreateSound(RSTRING_PTR(path));
+  R2D_Sound *snd = R2D_CreateSound(RSTRING_PTR(path));
   if (!snd) return R_FALSE;
   r_iv_set(self, "@data", r_data_wrap_struct(sound, snd));
   return R_TRUE;
@@ -592,9 +591,9 @@ static R_VAL ruby2d_sound_ext_play(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_play(R_VAL self) {
 #endif
-  S2D_Sound *snd;
-  r_data_get_struct(self, "@data", &sound_data_type, S2D_Sound, snd);
-  S2D_PlaySound(snd);
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  R2D_PlaySound(snd);
   return R_NIL;
 }
 
@@ -604,11 +603,11 @@ static R_VAL ruby2d_sound_ext_play(R_VAL self) {
  */
 #if MRUBY
 static void free_sound(mrb_state *mrb, void *p_) {
-  S2D_Sound *snd = (S2D_Sound *)p_;
+  R2D_Sound *snd = (R2D_Sound *)p_;
 #else
-static void free_sound(S2D_Sound *snd) {
+static void free_sound(R2D_Sound *snd) {
 #endif
-  S2D_FreeSound(snd);
+  R2D_FreeSound(snd);
 }
 
 
@@ -623,7 +622,7 @@ static R_VAL ruby2d_music_ext_init(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_init(R_VAL self, R_VAL path) {
 #endif
-  S2D_Music *mus = S2D_CreateMusic(RSTRING_PTR(path));
+  R2D_Music *mus = R2D_CreateMusic(RSTRING_PTR(path));
   if (!mus) return R_FALSE;
   r_iv_set(self, "@data", r_data_wrap_struct(music, mus));
   return R_TRUE;
@@ -638,9 +637,9 @@ static R_VAL ruby2d_music_ext_play(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_play(R_VAL self) {
 #endif
-  S2D_Music *mus;
-  r_data_get_struct(self, "@data", &music_data_type, S2D_Music, mus);
-  S2D_PlayMusic(mus, r_test(r_iv_get(self, "@loop")));
+  R2D_Music *mus;
+  r_data_get_struct(self, "@data", &music_data_type, R2D_Music, mus);
+  R2D_PlayMusic(mus, r_test(r_iv_get(self, "@loop")));
   return R_NIL;
 }
 
@@ -653,7 +652,7 @@ static R_VAL ruby2d_music_ext_pause(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_pause(R_VAL self) {
 #endif
-  S2D_PauseMusic();
+  R2D_PauseMusic();
   return R_NIL;
 }
 
@@ -666,7 +665,7 @@ static R_VAL ruby2d_music_ext_resume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_resume(R_VAL self) {
 #endif
-  S2D_ResumeMusic();
+  R2D_ResumeMusic();
   return R_NIL;
 }
 
@@ -679,7 +678,7 @@ static R_VAL ruby2d_music_ext_stop(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_stop(R_VAL self) {
 #endif
-  S2D_StopMusic();
+  R2D_StopMusic();
   return R_NIL;
 }
 
@@ -692,7 +691,7 @@ static R_VAL ruby2d_music_ext_get_volume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_get_volume(R_VAL self) {
 #endif
-  return INT2NUM(S2D_GetMusicVolume());
+  return INT2NUM(R2D_GetMusicVolume());
 }
 
 
@@ -706,7 +705,7 @@ static R_VAL ruby2d_music_ext_set_volume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_set_volume(R_VAL self, R_VAL volume) {
 #endif
-  S2D_SetMusicVolume(NUM2INT(volume));
+  R2D_SetMusicVolume(NUM2INT(volume));
   return R_NIL;
 }
 
@@ -721,7 +720,7 @@ static R_VAL ruby2d_music_ext_fadeout(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_music_ext_fadeout(R_VAL self, R_VAL ms) {
 #endif
-  S2D_FadeOutMusic(NUM2INT(ms));
+  R2D_FadeOutMusic(NUM2INT(ms));
   return R_NIL;
 }
 
@@ -731,29 +730,29 @@ static R_VAL ruby2d_music_ext_fadeout(R_VAL self, R_VAL ms) {
  */
 #if MRUBY
 static void free_music(mrb_state *mrb, void *p_) {
-  S2D_Music *mus = (S2D_Music *)p_;
+  R2D_Music *mus = (R2D_Music *)p_;
 #else
-static void free_music(S2D_Music *mus) {
+static void free_music(R2D_Music *mus) {
 #endif
-  S2D_FreeMusic(mus);
+  R2D_FreeMusic(mus);
 }
 
 
 /*
- * Simple 2D `on_key` input callback function
+ * Ruby 2D native `on_key` input callback function
  */
-static void on_key(S2D_Event e) {
+static void on_key(R2D_Event e) {
 
   R_VAL type;
 
   switch (e.type) {
-    case S2D_KEY_DOWN:
+    case R2D_KEY_DOWN:
       type = r_char_to_sym("down");
       break;
-    case S2D_KEY_HELD:
+    case R2D_KEY_HELD:
       type = r_char_to_sym("held");
       break;
-    case S2D_KEY_UP:
+    case R2D_KEY_UP:
       type = r_char_to_sym("up");
       break;
   }
@@ -763,48 +762,48 @@ static void on_key(S2D_Event e) {
 
 
 /*
- * Simple 2D `on_mouse` input callback function
+ * Ruby 2D native `on_mouse` input callback function
  */
-void on_mouse(S2D_Event e) {
+void on_mouse(R2D_Event e) {
 
   R_VAL type = R_NIL; R_VAL button = R_NIL; R_VAL direction = R_NIL;
 
   switch (e.type) {
-    case S2D_MOUSE_DOWN:
+    case R2D_MOUSE_DOWN:
       // type, button, x, y
       type = r_char_to_sym("down");
       break;
-    case S2D_MOUSE_UP:
+    case R2D_MOUSE_UP:
       // type, button, x, y
       type = r_char_to_sym("up");
       break;
-    case S2D_MOUSE_SCROLL:
+    case R2D_MOUSE_SCROLL:
       // type, direction, delta_x, delta_y
       type = r_char_to_sym("scroll");
-      direction = e.direction == S2D_MOUSE_SCROLL_NORMAL ?
+      direction = e.direction == R2D_MOUSE_SCROLL_NORMAL ?
         r_char_to_sym("normal") : r_char_to_sym("inverted");
       break;
-    case S2D_MOUSE_MOVE:
+    case R2D_MOUSE_MOVE:
       // type, x, y, delta_x, delta_y
       type = r_char_to_sym("move");
       break;
   }
 
-  if (e.type == S2D_MOUSE_DOWN || e.type == S2D_MOUSE_UP) {
+  if (e.type == R2D_MOUSE_DOWN || e.type == R2D_MOUSE_UP) {
     switch (e.button) {
-      case S2D_MOUSE_LEFT:
+      case R2D_MOUSE_LEFT:
         button = r_char_to_sym("left");
         break;
-      case S2D_MOUSE_MIDDLE:
+      case R2D_MOUSE_MIDDLE:
         button = r_char_to_sym("middle");
         break;
-      case S2D_MOUSE_RIGHT:
+      case R2D_MOUSE_RIGHT:
         button = r_char_to_sym("right");
         break;
-      case S2D_MOUSE_X1:
+      case R2D_MOUSE_X1:
         button = r_char_to_sym("x1");
         break;
-      case S2D_MOUSE_X2:
+      case R2D_MOUSE_X2:
         button = r_char_to_sym("x2");
         break;
     }
@@ -818,88 +817,88 @@ void on_mouse(S2D_Event e) {
 
 
 /*
- * Simple 2D `on_controller` input callback function
+ * Ruby 2D native `on_controller` input callback function
  */
-static void on_controller(S2D_Event e) {
+static void on_controller(R2D_Event e) {
 
   R_VAL type = R_NIL; R_VAL axis = R_NIL; R_VAL button = R_NIL;
 
   switch (e.type) {
-    case S2D_AXIS:
+    case R2D_AXIS:
       type = r_char_to_sym("axis");
       switch (e.axis) {
-        case S2D_AXIS_LEFTX:
+        case R2D_AXIS_LEFTX:
           axis = r_char_to_sym("left_x");
           break;
-        case S2D_AXIS_LEFTY:
+        case R2D_AXIS_LEFTY:
           axis = r_char_to_sym("left_y");
           break;
-        case S2D_AXIS_RIGHTX:
+        case R2D_AXIS_RIGHTX:
           axis = r_char_to_sym("right_x");
           break;
-        case S2D_AXIS_RIGHTY:
+        case R2D_AXIS_RIGHTY:
           axis = r_char_to_sym("right_y");
           break;
-        case S2D_AXIS_TRIGGERLEFT:
+        case R2D_AXIS_TRIGGERLEFT:
           axis = r_char_to_sym("trigger_left");
           break;
-        case S2D_AXIS_TRIGGERRIGHT:
+        case R2D_AXIS_TRIGGERRIGHT:
           axis = r_char_to_sym("trigger_right");
           break;
-        case S2D_AXIS_INVALID:
+        case R2D_AXIS_INVALID:
           axis = r_char_to_sym("invalid");
           break;
       }
       break;
-    case S2D_BUTTON_DOWN: case S2D_BUTTON_UP:
-      type = e.type == S2D_BUTTON_DOWN ? r_char_to_sym("button_down") : r_char_to_sym("button_up");
+    case R2D_BUTTON_DOWN: case R2D_BUTTON_UP:
+      type = e.type == R2D_BUTTON_DOWN ? r_char_to_sym("button_down") : r_char_to_sym("button_up");
       switch (e.button) {
-        case S2D_BUTTON_A:
+        case R2D_BUTTON_A:
           button = r_char_to_sym("a");
           break;
-        case S2D_BUTTON_B:
+        case R2D_BUTTON_B:
           button = r_char_to_sym("b");
           break;
-        case S2D_BUTTON_X:
+        case R2D_BUTTON_X:
           button = r_char_to_sym("x");
           break;
-        case S2D_BUTTON_Y:
+        case R2D_BUTTON_Y:
           button = r_char_to_sym("y");
           break;
-        case S2D_BUTTON_BACK:
+        case R2D_BUTTON_BACK:
           button = r_char_to_sym("back");
           break;
-        case S2D_BUTTON_GUIDE:
+        case R2D_BUTTON_GUIDE:
           button = r_char_to_sym("guide");
           break;
-        case S2D_BUTTON_START:
+        case R2D_BUTTON_START:
           button = r_char_to_sym("start");
           break;
-        case S2D_BUTTON_LEFTSTICK:
+        case R2D_BUTTON_LEFTSTICK:
           button = r_char_to_sym("left_stick");
           break;
-        case S2D_BUTTON_RIGHTSTICK:
+        case R2D_BUTTON_RIGHTSTICK:
           button = r_char_to_sym("right_stick");
           break;
-        case S2D_BUTTON_LEFTSHOULDER:
+        case R2D_BUTTON_LEFTSHOULDER:
           button = r_char_to_sym("left_shoulder");
           break;
-        case S2D_BUTTON_RIGHTSHOULDER:
+        case R2D_BUTTON_RIGHTSHOULDER:
           button = r_char_to_sym("right_shoulder");
           break;
-        case S2D_BUTTON_DPAD_UP:
+        case R2D_BUTTON_DPAD_UP:
           button = r_char_to_sym("up");
           break;
-        case S2D_BUTTON_DPAD_DOWN:
+        case R2D_BUTTON_DPAD_DOWN:
           button = r_char_to_sym("down");
           break;
-        case S2D_BUTTON_DPAD_LEFT:
+        case R2D_BUTTON_DPAD_LEFT:
           button = r_char_to_sym("left");
           break;
-        case S2D_BUTTON_DPAD_RIGHT:
+        case R2D_BUTTON_DPAD_RIGHT:
           button = r_char_to_sym("right");
           break;
-        case S2D_BUTTON_INVALID:
+        case R2D_BUTTON_INVALID:
           button = r_char_to_sym("invalid");
           break;
       }
@@ -914,7 +913,7 @@ static void on_controller(S2D_Event e) {
 
 
 /*
- * Simple 2D `update` callback function
+ * Ruby 2D native `update` callback function
  */
 static void update() {
 
@@ -934,7 +933,7 @@ static void update() {
 
 
 /*
- * Simple 2D `render` callback function
+ * Ruby 2D native `render` callback function
  */
 static void render() {
 
@@ -967,8 +966,8 @@ static R_VAL ruby2d_ext_diagnostics(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_ext_diagnostics(R_VAL self, R_VAL enable) {
 #endif
-  // Set Simple 2D diagnostics
-  S2D_Diagnostics(r_test(enable));
+  // Set Ruby 2D native diagnostics
+  R2D_Diagnostics(r_test(enable));
   return R_TRUE;
 }
 
@@ -982,7 +981,7 @@ static R_VAL ruby2d_window_ext_get_display_dimensions(mrb_state* mrb, R_VAL self
 static R_VAL ruby2d_window_ext_get_display_dimensions(R_VAL self) {
 #endif
   int w; int h;
-  S2D_GetDisplayDimensions(&w, &h);
+  R2D_GetDisplayDimensions(&w, &h);
   r_iv_set(self, "@display_width" , INT2NUM(w));
   r_iv_set(self, "@display_height", INT2NUM(h));
   return R_NIL;
@@ -999,8 +998,8 @@ static R_VAL ruby2d_window_ext_add_controller_mappings(mrb_state* mrb, R_VAL sel
 #else
 static R_VAL ruby2d_window_ext_add_controller_mappings(R_VAL self, R_VAL path) {
 #endif
-  S2D_Log(S2D_INFO, "Adding controller mappings from `%s`", RSTRING_PTR(path));
-  S2D_AddControllerMappingsFromFile(RSTRING_PTR(path));
+  R2D_Log(R2D_INFO, "Adding controller mappings from `%s`", RSTRING_PTR(path));
+  R2D_AddControllerMappingsFromFile(RSTRING_PTR(path));
   return R_NIL;
 }
 
@@ -1032,16 +1031,16 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   // Get window flags
   int flags = 0;
   if (r_test(r_iv_get(self, "@resizable"))) {
-    flags = flags | S2D_RESIZABLE;
+    flags = flags | R2D_RESIZABLE;
   }
   if (r_test(r_iv_get(self, "@borderless"))) {
-    flags = flags | S2D_BORDERLESS;
+    flags = flags | R2D_BORDERLESS;
   }
   if (r_test(r_iv_get(self, "@fullscreen"))) {
-    flags = flags | S2D_FULLSCREEN;
+    flags = flags | R2D_FULLSCREEN;
   }
   if (r_test(r_iv_get(self, "@highdpi"))) {
-    flags = flags | S2D_HIGHDPI;
+    flags = flags | R2D_HIGHDPI;
   }
 
   // Check viewport size and set
@@ -1054,7 +1053,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
 
   // Create and show window
 
-  window = S2D_CreateWindow(
+  window = R2D_CreateWindow(
     title, width, height, update, render, flags
   );
 
@@ -1066,7 +1065,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   window->on_mouse        = on_mouse;
   window->on_controller   = on_controller;
 
-  S2D_Show(window);
+  R2D_Show(window);
 
   atexit(free_window);
   return R_NIL;
@@ -1084,7 +1083,7 @@ static R_VAL ruby2d_ext_screenshot(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
 #endif
   if (window) {
-    S2D_Screenshot(window, RSTRING_PTR(path));
+    R2D_Screenshot(window, RSTRING_PTR(path));
     return path;
   } else {
     return R_FALSE;
@@ -1096,7 +1095,7 @@ static R_VAL ruby2d_ext_screenshot(R_VAL self, R_VAL path) {
  * Ruby2D::Window#ext_close
  */
 static R_VAL ruby2d_window_ext_close() {
-  S2D_Close(window);
+  R2D_Close(window);
   return R_NIL;
 }
 

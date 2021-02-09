@@ -115,6 +115,7 @@ when 'launch'
   else
     puts usage_launch
   end
+# TODO: Need add this functionality to the gem
 when 'simulator'
   case ARGV[1]
   when '--list'

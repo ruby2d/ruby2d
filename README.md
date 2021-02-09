@@ -23,10 +23,9 @@ Update these submodules at any time using `git submodule update --remote` or the
 
 Next, install dependencies:
 - With [Bundler](http://bundler.io), run `bundle install` to get the required development gems.
-- Install the native graphics library [Simple 2D](https://github.com/simple2d/simple2d) by following the instructions in its README.
 - Install [MRuby](http://mruby.org) in order to build Ruby 2D apps natively. On macOS using [Homebrew](https://brew.sh), run `brew install mruby`. On Ubuntu, use `sudo apt install mruby libmruby-dev`
 
-Finally, run `rake` to build and install the gem locally. Use `rake dev` to build referencing user-installed libraries (e.g. Simple 2D and SDL).
+Finally, run `rake` to build and install the gem locally. Use `rake dev` to build referencing user-installed libraries (e.g. SDL).
 
 ## Tests
 
@@ -73,7 +72,6 @@ In order to achieve such simplicity, a lot has to happen under the hood. Whether
 
 1. Update the [assets](https://github.com/ruby2d/assets) repo, follow the instructions in the README
 2. Run `rake update` to update the submodules
-3. Update the Simple 2D minimum version required in [`extconf.rb`](ext/ruby2d/extconf.rb)
 
 ## Preparing a release
 
