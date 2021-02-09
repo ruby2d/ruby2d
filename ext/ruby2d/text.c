@@ -49,7 +49,7 @@ R2D_Text *R2D_CreateText(const char *font, const char *msg, int size) {
   txt->texture_id = 0;
 
   // Save the width and height of the text
-  TTF_SizeText(txt->font_data, txt->msg, &txt->width, &txt->height);
+  TTF_SizeUTF8(txt->font_data, txt->msg, &txt->width, &txt->height);
 
   return txt;
 }
@@ -61,7 +61,7 @@ R2D_Text *R2D_CreateText(const char *font, const char *msg, int size) {
 void R2D_SetText(R2D_Text *txt, const char *msg, ...) {
   if (!txt) return;
 
-  // `msg` cannot be an empty string or NULL for TTF_SizeText
+  // `msg` cannot be an empty string or NULL for TTF_SizeUTF8
   if (msg == NULL || strlen(msg) == 0) msg = " ";
 
   // Format and store new text string
@@ -72,7 +72,7 @@ void R2D_SetText(R2D_Text *txt, const char *msg, ...) {
   va_end(args);
 
   // Save the width and height of the text
-  TTF_SizeText(txt->font_data, txt->msg, &txt->width, &txt->height);
+  TTF_SizeUTF8(txt->font_data, txt->msg, &txt->width, &txt->height);
 
   // Delete the current texture so a new one can be generated
   R2D_GL_FreeTexture(&txt->texture_id);
@@ -102,9 +102,9 @@ void R2D_DrawText(R2D_Text *txt) {
 
   if (txt->texture_id == 0) {
     SDL_Color color = { 255, 255, 255 };
-    txt->surface = TTF_RenderText_Blended(txt->font_data, txt->msg, color);
+    txt->surface = TTF_RenderUTF8_Blended(txt->font_data, txt->msg, color);
     if (!txt->surface) {
-      R2D_Error("TTF_RenderText_Blended", TTF_GetError());
+      R2D_Error("TTF_RenderUTF8_Blended", TTF_GetError());
       return;
     }
     R2D_GL_CreateTexture(&txt->texture_id, GL_RGBA,
