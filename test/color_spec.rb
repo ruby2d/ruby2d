@@ -50,6 +50,9 @@ RSpec.describe Ruby2D::Color do
 
   it "allows British English spelling of color" do
     expect(Ruby2D::Colour).to eq(Ruby2D::Color)
+    expect(Square.new.color.class).to eq(Ruby2D::Colour)
+    expect(Square.new.colour.class).to eq(Ruby2D::Color)
+    expect(Square.new.colour.class).to eq(Ruby2D::Colour)
   end
 
 end
