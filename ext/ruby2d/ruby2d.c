@@ -265,7 +265,7 @@ static R_VAL ruby2d_quad_ext_draw(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_quad_ext_draw(R_VAL self, R_VAL x, R_VAL y, R_VAL c) {
 #endif
 
-  S2D_DrawQuad(
+  R2D_DrawQuad(
     NUM2DBL(x),
     NUM2DBL(y),
     NUM2DBL(c),
