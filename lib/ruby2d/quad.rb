@@ -48,14 +48,25 @@ module Ruby2D
       questioned_area <= self_area
     end
 
-
-    def self.draw(x, y, c)
-      ext_draw(x, y, c)
+    def self.draw(opts = {})
+      ext_draw([
+        opts[:x1], opts[:y1], opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
+        opts[:x2], opts[:y2], opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
+        opts[:x3], opts[:y3], opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
+        opts[:x4], opts[:y4], opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
+      ])
     end
 
-
-
     private
+
+    def render
+      self.class.ext_draw([
+        @x1, @y1, @c1.r, @c1.g, @c1.b, @c1.a,
+        @x2, @y2, @c2.r, @c2.g, @c2.b, @c2.a,
+        @x3, @y3, @c3.r, @c3.g, @c3.b, @c3.a,
+        @x4, @y4, @c4.r, @c4.g, @c4.b, @c4.a
+      ])
+    end
 
     def triangle_area(x1, y1, x2, y2, x3, y3)
       (x1*y2 + x2*y3 + x3*y1 - x3*y2 - x1*y3 - x2*y1).abs / 2

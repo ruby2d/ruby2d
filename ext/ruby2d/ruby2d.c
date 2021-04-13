@@ -166,133 +166,130 @@ static R_VAL ruby2d_ext_base_path(R_VAL self) {
 
 
 /*
- * Ruby2D::Triangle#ext_render
+ * Ruby2D::Pixel#self.ext_draw
  */
 #if MRUBY
-static R_VAL ruby2d_triangle_ext_render(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_pixel_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_triangle_ext_render(R_VAL self) {
+static R_VAL ruby2d_pixel_ext_draw(R_VAL self, R_VAL a) {
 #endif
-  R_VAL c1 = r_iv_get(self, "@c1");
-  R_VAL c2 = r_iv_get(self, "@c2");
-  R_VAL c3 = r_iv_get(self, "@c3");
-
-  R2D_DrawTriangle(
-    NUM2DBL(r_iv_get(self, "@x1")),
-    NUM2DBL(r_iv_get(self, "@y1")),
-    NUM2DBL(r_iv_get(c1, "@r")),
-    NUM2DBL(r_iv_get(c1, "@g")),
-    NUM2DBL(r_iv_get(c1, "@b")),
-    NUM2DBL(r_iv_get(c1, "@a")),
-
-    NUM2DBL(r_iv_get(self, "@x2")),
-    NUM2DBL(r_iv_get(self, "@y2")),
-    NUM2DBL(r_iv_get(c2, "@r")),
-    NUM2DBL(r_iv_get(c2, "@g")),
-    NUM2DBL(r_iv_get(c2, "@b")),
-    NUM2DBL(r_iv_get(c2, "@a")),
-
-    NUM2DBL(r_iv_get(self, "@x3")),
-    NUM2DBL(r_iv_get(self, "@y3")),
-    NUM2DBL(r_iv_get(c3, "@r")),
-    NUM2DBL(r_iv_get(c3, "@g")),
-    NUM2DBL(r_iv_get(c3, "@b")),
-    NUM2DBL(r_iv_get(c3, "@a"))
-  );
-
-  return R_NIL;
-}
-
-
-/*
- * Ruby2D::Quad#ext_render
- */
-#if MRUBY
-static R_VAL ruby2d_quad_ext_render(mrb_state* mrb, R_VAL self) {
-#else
-static R_VAL ruby2d_quad_ext_render(R_VAL self) {
-#endif
-  R_VAL c1 = r_iv_get(self, "@c1");
-  R_VAL c2 = r_iv_get(self, "@c2");
-  R_VAL c3 = r_iv_get(self, "@c3");
-  R_VAL c4 = r_iv_get(self, "@c4");
+  // `a` is the array representing the pixel
 
   R2D_DrawQuad(
-    NUM2DBL(r_iv_get(self, "@x1")),
-    NUM2DBL(r_iv_get(self, "@y1")),
-    NUM2DBL(r_iv_get(c1, "@r")),
-    NUM2DBL(r_iv_get(c1, "@g")),
-    NUM2DBL(r_iv_get(c1, "@b")),
-    NUM2DBL(r_iv_get(c1, "@a")),
+    NUM2DBL(r_ary_entry(a,  0)),  // x1
+    NUM2DBL(r_ary_entry(a,  1)),  // y1
+    NUM2DBL(r_ary_entry(a,  8)),  // color
+    NUM2DBL(r_ary_entry(a,  9)),  // color
+    NUM2DBL(r_ary_entry(a, 10)),  // color
+    NUM2DBL(r_ary_entry(a, 11)),  // color
 
-    NUM2DBL(r_iv_get(self, "@x2")),
-    NUM2DBL(r_iv_get(self, "@y2")),
-    NUM2DBL(r_iv_get(c2, "@r")),
-    NUM2DBL(r_iv_get(c2, "@g")),
-    NUM2DBL(r_iv_get(c2, "@b")),
-    NUM2DBL(r_iv_get(c2, "@a")),
+    NUM2DBL(r_ary_entry(a,  2)),  // x2
+    NUM2DBL(r_ary_entry(a,  3)),  // y2
+    NUM2DBL(r_ary_entry(a,  8)),  // color
+    NUM2DBL(r_ary_entry(a,  9)),  // color
+    NUM2DBL(r_ary_entry(a, 10)),  // color
+    NUM2DBL(r_ary_entry(a, 11)),  // color
 
-    NUM2DBL(r_iv_get(self, "@x3")),
-    NUM2DBL(r_iv_get(self, "@y3")),
-    NUM2DBL(r_iv_get(c3, "@r")),
-    NUM2DBL(r_iv_get(c3, "@g")),
-    NUM2DBL(r_iv_get(c3, "@b")),
-    NUM2DBL(r_iv_get(c3, "@a")),
+    NUM2DBL(r_ary_entry(a,  4)),  // x3
+    NUM2DBL(r_ary_entry(a,  5)),  // y3
+    NUM2DBL(r_ary_entry(a,  8)),  // color
+    NUM2DBL(r_ary_entry(a,  9)),  // color
+    NUM2DBL(r_ary_entry(a, 10)),  // color
+    NUM2DBL(r_ary_entry(a, 11)),  // color
 
-    NUM2DBL(r_iv_get(self, "@x4")),
-    NUM2DBL(r_iv_get(self, "@y4")),
-    NUM2DBL(r_iv_get(c4, "@r")),
-    NUM2DBL(r_iv_get(c4, "@g")),
-    NUM2DBL(r_iv_get(c4, "@b")),
-    NUM2DBL(r_iv_get(c4, "@a"))
+    NUM2DBL(r_ary_entry(a,  6)),  // x4
+    NUM2DBL(r_ary_entry(a,  7)),  // y4
+    NUM2DBL(r_ary_entry(a,  8)),  // color
+    NUM2DBL(r_ary_entry(a,  9)),  // color
+    NUM2DBL(r_ary_entry(a, 10)),  // color
+    NUM2DBL(r_ary_entry(a, 11))   // color
   );
 
   return R_NIL;
 }
 
 
+/*
+ * Ruby2D::Triangle#self.ext_draw
+ */
+#if MRUBY
+static R_VAL ruby2d_triangle_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_triangle_ext_draw(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the triangle
+
+  R2D_DrawTriangle(
+    NUM2DBL(r_ary_entry(a,  0)),  // x1
+    NUM2DBL(r_ary_entry(a,  1)),  // y1
+    NUM2DBL(r_ary_entry(a,  2)),  // c1 red
+    NUM2DBL(r_ary_entry(a,  3)),  // c1 green
+    NUM2DBL(r_ary_entry(a,  4)),  // c1 blue
+    NUM2DBL(r_ary_entry(a,  5)),  // c1 alpha
+
+    NUM2DBL(r_ary_entry(a,  6)),  // x2
+    NUM2DBL(r_ary_entry(a,  7)),  // y2
+    NUM2DBL(r_ary_entry(a,  8)),  // c2 red
+    NUM2DBL(r_ary_entry(a,  9)),  // c2 green
+    NUM2DBL(r_ary_entry(a, 10)),  // c2 blue
+    NUM2DBL(r_ary_entry(a, 11)),  // c2 alpha
+
+    NUM2DBL(r_ary_entry(a, 12)),  // x3
+    NUM2DBL(r_ary_entry(a, 13)),  // y3
+    NUM2DBL(r_ary_entry(a, 14)),  // c3 red
+    NUM2DBL(r_ary_entry(a, 15)),  // c3 green
+    NUM2DBL(r_ary_entry(a, 16)),  // c3 blue
+    NUM2DBL(r_ary_entry(a, 17))  // c3 alpha
+  );
+
+  return R_NIL;
+}
+
 
 /*
- * Ruby2D::Quad#ext_draw
+ * Ruby2D::Quad#self.ext_draw
  */
 #if MRUBY
 static R_VAL ruby2d_quad_ext_draw(mrb_state* mrb, R_VAL self) {
-  mrb_value x, y, c;
-  mrb_get_args(mrb, "o", &x);
-  mrb_get_args(mrb, "o", &y);
-  mrb_get_args(mrb, "o", &c);
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_quad_ext_draw(R_VAL self, R_VAL x, R_VAL y, R_VAL c) {
+static R_VAL ruby2d_quad_ext_draw(R_VAL self, R_VAL a) {
 #endif
+  // `a` is the array representing the quad
 
   R2D_DrawQuad(
-    NUM2DBL(x),
-    NUM2DBL(y),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    1.0,
+    NUM2DBL(r_ary_entry(a,  0)),  // x1
+    NUM2DBL(r_ary_entry(a,  1)),  // y1
+    NUM2DBL(r_ary_entry(a,  2)),  // c1 red
+    NUM2DBL(r_ary_entry(a,  3)),  // c1 green
+    NUM2DBL(r_ary_entry(a,  4)),  // c1 blue
+    NUM2DBL(r_ary_entry(a,  5)),  // c1 alpha
 
-    NUM2DBL(x) + 10,
-    NUM2DBL(y),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    1.0,
+    NUM2DBL(r_ary_entry(a,  6)),  // x2
+    NUM2DBL(r_ary_entry(a,  7)),  // y2
+    NUM2DBL(r_ary_entry(a,  8)),  // c2 red
+    NUM2DBL(r_ary_entry(a,  9)),  // c2 green
+    NUM2DBL(r_ary_entry(a, 10)),  // c2 blue
+    NUM2DBL(r_ary_entry(a, 11)),  // c2 alpha
 
-    NUM2DBL(x) + 10,
-    NUM2DBL(y) + 10,
-    NUM2DBL(c),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    1.0,
+    NUM2DBL(r_ary_entry(a, 12)),  // x3
+    NUM2DBL(r_ary_entry(a, 13)),  // y3
+    NUM2DBL(r_ary_entry(a, 14)),  // c3 red
+    NUM2DBL(r_ary_entry(a, 15)),  // c3 green
+    NUM2DBL(r_ary_entry(a, 16)),  // c3 blue
+    NUM2DBL(r_ary_entry(a, 17)),  // c3 alpha
 
-    NUM2DBL(x),
-    NUM2DBL(y) + 10,
-    NUM2DBL(c),
-    NUM2DBL(c),
-    NUM2DBL(c),
-    1.0
+    NUM2DBL(r_ary_entry(a, 18)),  // x4
+    NUM2DBL(r_ary_entry(a, 19)),  // y4
+    NUM2DBL(r_ary_entry(a, 20)),  // c4 red
+    NUM2DBL(r_ary_entry(a, 21)),  // c4 green
+    NUM2DBL(r_ary_entry(a, 22)),  // c4 blue
+    NUM2DBL(r_ary_entry(a, 23))   // c4 alpha
   );
 
   return R_NIL;
@@ -300,44 +297,43 @@ static R_VAL ruby2d_quad_ext_draw(R_VAL self, R_VAL x, R_VAL y, R_VAL c) {
 
 
 /*
- * Ruby2D::Line#ext_render
+ * Ruby2D::Line#self.ext_draw
  */
 #if MRUBY
-static R_VAL ruby2d_line_ext_render(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_line_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_line_ext_render(R_VAL self) {
+static R_VAL ruby2d_line_ext_draw(R_VAL self, R_VAL a) {
 #endif
-  R_VAL c1 = r_iv_get(self, "@c1");
-  R_VAL c2 = r_iv_get(self, "@c2");
-  R_VAL c3 = r_iv_get(self, "@c3");
-  R_VAL c4 = r_iv_get(self, "@c4");
+  // `a` is the array representing the line
 
   R2D_DrawLine(
-    NUM2DBL(r_iv_get(self, "@x1")),
-    NUM2DBL(r_iv_get(self, "@y1")),
-    NUM2DBL(r_iv_get(self, "@x2")),
-    NUM2DBL(r_iv_get(self, "@y2")),
-    NUM2DBL(r_iv_get(self, "@width")),
+    NUM2DBL(r_ary_entry(a,  0)),  // x1
+    NUM2DBL(r_ary_entry(a,  1)),  // y1
+    NUM2DBL(r_ary_entry(a,  2)),  // x2
+    NUM2DBL(r_ary_entry(a,  3)),  // y2
+    NUM2DBL(r_ary_entry(a,  4)),  // width
 
-    NUM2DBL(r_iv_get(c1, "@r")),
-    NUM2DBL(r_iv_get(c1, "@g")),
-    NUM2DBL(r_iv_get(c1, "@b")),
-    NUM2DBL(r_iv_get(c1, "@a")),
+    NUM2DBL(r_ary_entry(a,  5)),  // c1 red
+    NUM2DBL(r_ary_entry(a,  6)),  // c1 green
+    NUM2DBL(r_ary_entry(a,  7)),  // c1 blue
+    NUM2DBL(r_ary_entry(a,  8)),  // c1 alpha
 
-    NUM2DBL(r_iv_get(c2, "@r")),
-    NUM2DBL(r_iv_get(c2, "@g")),
-    NUM2DBL(r_iv_get(c2, "@b")),
-    NUM2DBL(r_iv_get(c2, "@a")),
+    NUM2DBL(r_ary_entry(a,  9)),  // c2 red
+    NUM2DBL(r_ary_entry(a, 10)),  // c2 green
+    NUM2DBL(r_ary_entry(a, 11)),  // c2 blue
+    NUM2DBL(r_ary_entry(a, 12)),  // c2 alpha
 
-    NUM2DBL(r_iv_get(c3, "@r")),
-    NUM2DBL(r_iv_get(c3, "@g")),
-    NUM2DBL(r_iv_get(c3, "@b")),
-    NUM2DBL(r_iv_get(c3, "@a")),
+    NUM2DBL(r_ary_entry(a, 13)),  // c3 red
+    NUM2DBL(r_ary_entry(a, 14)),  // c3 green
+    NUM2DBL(r_ary_entry(a, 15)),  // c3 blue
+    NUM2DBL(r_ary_entry(a, 16)),  // c3 alpha
 
-    NUM2DBL(r_iv_get(c4, "@r")),
-    NUM2DBL(r_iv_get(c4, "@g")),
-    NUM2DBL(r_iv_get(c4, "@b")),
-    NUM2DBL(r_iv_get(c4, "@a"))
+    NUM2DBL(r_ary_entry(a, 17)),  // c4 red
+    NUM2DBL(r_ary_entry(a, 18)),  // c4 green
+    NUM2DBL(r_ary_entry(a, 19)),  // c4 blue
+    NUM2DBL(r_ary_entry(a, 20))   // c4 alpha
   );
 
   return R_NIL;
@@ -345,24 +341,26 @@ static R_VAL ruby2d_line_ext_render(R_VAL self) {
 
 
 /*
- * Ruby2D::Circle#ext_render
+ * Ruby2D::Circle#self.ext_draw
  */
 #if MRUBY
-static R_VAL ruby2d_circle_ext_render(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_circle_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_circle_ext_render(R_VAL self) {
+static R_VAL ruby2d_circle_ext_draw(R_VAL self, R_VAL a) {
 #endif
-  R_VAL c = r_iv_get(self, "@color");
+  // `a` is the array representing the circle
 
   R2D_DrawCircle(
-    NUM2DBL(r_iv_get(self, "@x")),
-    NUM2DBL(r_iv_get(self, "@y")),
-    NUM2DBL(r_iv_get(self, "@radius")),
-    NUM2DBL(r_iv_get(self, "@sectors")),
-    NUM2DBL(r_iv_get(c, "@r")),
-    NUM2DBL(r_iv_get(c, "@g")),
-    NUM2DBL(r_iv_get(c, "@b")),
-    NUM2DBL(r_iv_get(c, "@a"))
+    NUM2DBL(r_ary_entry(a, 0)),  // x
+    NUM2DBL(r_ary_entry(a, 1)),  // y
+    NUM2DBL(r_ary_entry(a, 2)),  // radius
+    NUM2DBL(r_ary_entry(a, 3)),  // sectors
+    NUM2DBL(r_ary_entry(a, 4)),  // red
+    NUM2DBL(r_ary_entry(a, 5)),  // green
+    NUM2DBL(r_ary_entry(a, 6)),  // blue
+    NUM2DBL(r_ary_entry(a, 7))   // alpha
   );
 
   return R_NIL;
@@ -999,7 +997,7 @@ static void render() {
   // Switch on each object type
   for (int i = 0; i < num_objects; ++i) {
     R_VAL el = r_ary_entry(objects, i);
-    r_funcall(el, "ext_render", 0);
+    r_funcall(el, "render", 0);
   }
 
   // Call render proc, `window.render`
@@ -1176,35 +1174,35 @@ void Init_ruby2d() {
   // Ruby2D#self.ext_base_path
   r_define_class_method(ruby2d_module, "ext_base_path", ruby2d_ext_base_path, r_args_none);
 
+  // Ruby2D::Pixel
+  R_CLASS ruby2d_pixel_class = r_define_class(ruby2d_module, "Pixel");
+
+  // Ruby2D::Pixel#self.ext_draw
+  r_define_class_method(ruby2d_pixel_class, "ext_draw", ruby2d_pixel_ext_draw, r_args_req(1));
+
   // Ruby2D::Triangle
   R_CLASS ruby2d_triangle_class = r_define_class(ruby2d_module, "Triangle");
 
-  // Ruby2D::Triangle#ext_render
-  r_define_method(ruby2d_triangle_class, "ext_render", ruby2d_triangle_ext_render, r_args_none);
+  // Ruby2D::Triangle#self.ext_draw
+  r_define_class_method(ruby2d_triangle_class, "ext_draw", ruby2d_triangle_ext_draw, r_args_req(1));
 
   // Ruby2D::Quad
   R_CLASS ruby2d_quad_class = r_define_class(ruby2d_module, "Quad");
 
-  // Ruby2D::Quad#ext_render
-  r_define_method(ruby2d_quad_class, "ext_render", ruby2d_quad_ext_render, r_args_none);
-
   // Ruby2D::Quad#self.ext_draw
-  r_define_class_method(ruby2d_quad_class, "ext_draw", ruby2d_quad_ext_draw, r_args_req(3));
-
-  // // Ruby2D::Square
-  // R_CLASS ruby2d_square_class = r_define_class(ruby2d_module, "Square");
+  r_define_class_method(ruby2d_quad_class, "ext_draw", ruby2d_quad_ext_draw, r_args_req(1));
 
   // Ruby2D::Line
   R_CLASS ruby2d_line_class = r_define_class(ruby2d_module, "Line");
 
-  // Ruby2D::Line#ext_render
-  r_define_method(ruby2d_line_class, "ext_render", ruby2d_line_ext_render, r_args_none);
+  // Ruby2D::Line#self.ext_draw
+  r_define_class_method(ruby2d_line_class, "ext_draw", ruby2d_line_ext_draw, r_args_req(1));
 
   // Ruby2D::Circle
   R_CLASS ruby2d_circle_class = r_define_class(ruby2d_module, "Circle");
 
-  // Ruby2D::Circle#ext_render
-  r_define_method(ruby2d_circle_class, "ext_render", ruby2d_circle_ext_render, r_args_none);
+  // Ruby2D::Circle#self.ext_draw
+  r_define_class_method(ruby2d_circle_class, "ext_draw", ruby2d_circle_ext_draw, r_args_req(1));
 
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
