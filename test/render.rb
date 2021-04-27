@@ -1,15 +1,12 @@
 require 'ruby2d'
 
-# set width: 1280, height: 770
-
-
 Quad.new(x3: 125, x4: 25)
 Rectangle.new(y: 125)
 Square.new(y: 250)
 Line.new(x1: 5, y1: 375, x2: 95, y2: 475, width: 5)
 Triangle.new(x1: 325, y1: 0, x2: 375, y2: 100, x3: 275, y3: 100)
 Circle.new(x: 400, y: 175)
-
+img = Image.new('media/image.png', x: 250, y: 250)
 
 render do
 
@@ -71,6 +68,9 @@ render do
     x: 525, y: 175, radius: 50, sectors: 30,
     color: [0.8, 0.3, 0.7, 0.8]
   )
+
+  img.draw(x: 375, y: 250)
+  img.draw(x: 500, y: 250, width: 90, height: 110, rotate: 10, color: [0.8, 0.5, 0.4, 0.7])
 
 end
 
