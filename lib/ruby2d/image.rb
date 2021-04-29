@@ -23,7 +23,7 @@ module Ruby2D
       unless ext_init(@path)
         raise Error, "Image `#{@path}` cannot be created"
       end
-      add
+      unless opts[:show] == false then add end
     end
 
     def draw(opts = {})

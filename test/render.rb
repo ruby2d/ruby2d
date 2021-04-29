@@ -7,6 +7,16 @@ Line.new(x1: 5, y1: 375, x2: 95, y2: 475, width: 5)
 Triangle.new(x1: 325, y1: 0, x2: 375, y2: 100, x3: 275, y3: 100)
 Circle.new(x: 400, y: 175)
 img = Image.new('media/image.png', x: 250, y: 250)
+txt = Text.new('Hello', x: 250, y: 375)
+spr = Sprite.new(
+  'media/coin.png',
+  x: 500,
+  y: 250,
+  width: 84,
+  clip_width: 84,
+  time: 300,
+  loop: true
+).play
 
 render do
 
@@ -69,8 +79,11 @@ render do
     color: [0.8, 0.3, 0.7, 0.8]
   )
 
-  img.draw(x: 375, y: 250)
-  img.draw(x: 500, y: 250, width: 90, height: 110, rotate: 10, color: [0.8, 0.5, 0.4, 0.7])
+  img.draw(x: 375, y: 250, width: 90, height: 110, rotate: 10, color: [0.8, 0.5, 0.4, 0.7])
+
+  txt.draw(x: 375, y: 375, rotate: 10, color: [0.8, 0.5, 0.4, 0.7])
+
+  spr.draw(x: 500, y: 350, width: 50, height: 90, rotate: 10, clip_x: 0, clip_y: 0, clip_width: 84, clip_height: 90, color: [0.8, 0.5, 0.4, 0.7])
 
 end
 

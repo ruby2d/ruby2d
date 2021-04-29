@@ -1,18 +1,6 @@
 require 'ruby2d'
 
-set width: 1280, height: 770
-
-# # 9,600 objects, Runs at 11 fps (30 with VBO)
-# 128.times do |i|
-#   75.times do |j|
-#     Square.new(x: i*10, y: j*10 + 20, size: 10, color: 'random')
-#   end
-# end
-
-# # Runs at 27 fps and takes about 6 seconds to start up
-# 10000.times do
-#   Quad.new(x1: 50, y1: 50)
-# end
+set width: 1000, height: 500
 
 fps = Text.new 'fps'
 
@@ -22,17 +10,12 @@ end
 
 render do
 
-  # 9,600 objects, runs at 60 fps
-  128.times do |i|
-    75.times do |j|
-      Quad.draw(i*10, j*10 + 20, rand)
+  # 31,250 squares drawn at ~38 fps
+  250.times do |i|
+    125.times do |j|
+      Pixel.draw(x: i*4, y: j*4 + 26, size: 4, color: [rand, rand, rand, 1.0])
     end
   end
-
-  # # Runs at 60 fps, max objects before dip
-  # 50000.times do
-  #   Quad.draw(50, 50, 1)
-  # end
 
 end
 

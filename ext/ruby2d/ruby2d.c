@@ -464,45 +464,45 @@ static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
 
 
 /*
- * Ruby2D::Sprite#ext_render
+ * Ruby2D::Sprite#ext_draw
  */
 #if MRUBY
-static R_VAL ruby2d_sprite_ext_render(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_sprite_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_sprite_ext_render(R_VAL self) {
+static R_VAL ruby2d_sprite_ext_draw(R_VAL self, R_VAL a) {
 #endif
-  r_funcall(self, "update", 0);
+  // `a` is the array representing the sprite
 
   R2D_Sprite *spr;
-  r_data_get_struct(self, "@data", &sprite_data_type, R2D_Sprite, spr);
+  r_data_get_struct(r_ary_entry(a, 0), "@data", &sprite_data_type, R2D_Sprite, spr);
 
-  spr->x = NUM2DBL(r_iv_get(self, "@flip_x"));
-  spr->y = NUM2DBL(r_iv_get(self, "@flip_y"));
+  spr->x = NUM2DBL(r_ary_entry(a, 1));
+  spr->y = NUM2DBL(r_ary_entry(a, 2));
 
-  R_VAL w = r_iv_get(self, "@flip_width");
+  R_VAL w = r_ary_entry(a, 3);
   if (r_test(w)) spr->width = NUM2DBL(w);
 
-  R_VAL h = r_iv_get(self, "@flip_height");
+  R_VAL h = r_ary_entry(a, 4);
   if (r_test(h)) spr->height = NUM2DBL(h);
 
-  R2D_RotateSprite(spr, NUM2DBL(r_iv_get(self, "@rotate")), R2D_CENTER);
-
-  R_VAL c = r_iv_get(self, "@color");
-  spr->color.r = NUM2DBL(r_iv_get(c, "@r"));
-  spr->color.g = NUM2DBL(r_iv_get(c, "@g"));
-  spr->color.b = NUM2DBL(r_iv_get(c, "@b"));
-  spr->color.a = NUM2DBL(r_iv_get(c, "@a"));
+  R2D_RotateSprite(spr, NUM2DBL(r_ary_entry(a, 5)), R2D_CENTER);
 
   R2D_ClipSprite(
     spr,
-    NUM2INT(r_iv_get(self, "@clip_x")),
-    NUM2INT(r_iv_get(self, "@clip_y")),
-    NUM2INT(r_iv_get(self, "@clip_width")),
-    NUM2INT(r_iv_get(self, "@clip_height"))
+    NUM2INT(r_ary_entry(a, 6)),
+    NUM2INT(r_ary_entry(a, 7)),
+    NUM2INT(r_ary_entry(a, 8)),
+    NUM2INT(r_ary_entry(a, 9))
   );
 
-  R2D_DrawSprite(spr);
+  spr->color.r = NUM2DBL(r_ary_entry(a, 10));
+  spr->color.g = NUM2DBL(r_ary_entry(a, 11));
+  spr->color.b = NUM2DBL(r_ary_entry(a, 12));
+  spr->color.a = NUM2DBL(r_ary_entry(a, 13));
 
+  R2D_DrawSprite(spr);
   return R_NIL;
 }
 
@@ -573,29 +573,31 @@ static R_VAL ruby2d_text_ext_set(R_VAL self, R_VAL text) {
 
 
 /*
- * Ruby2D::Text#ext_render
+ * Ruby2D::Text#self.ext_draw
  */
 #if MRUBY
-static R_VAL ruby2d_text_ext_render(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_text_ext_draw(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_text_ext_render(R_VAL self) {
+static R_VAL ruby2d_text_ext_draw(R_VAL self, R_VAL a) {
 #endif
+  // `a` is the array representing the text
+
   R2D_Text *txt;
-  r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
+  r_data_get_struct(r_ary_entry(a, 0), "@data", &text_data_type, R2D_Text, txt);
 
-  txt->x = NUM2DBL(r_iv_get(self, "@x"));
-  txt->y = NUM2DBL(r_iv_get(self, "@y"));
+  txt->x = NUM2DBL(r_ary_entry(a, 1));
+  txt->y = NUM2DBL(r_ary_entry(a, 2));
 
-  R2D_RotateText(txt, NUM2DBL(r_iv_get(self, "@rotate")), R2D_CENTER);
+  R2D_RotateText(txt, NUM2DBL(r_ary_entry(a, 3)), R2D_CENTER);
 
-  R_VAL c = r_iv_get(self, "@color");
-  txt->color.r = NUM2DBL(r_iv_get(c, "@r"));
-  txt->color.g = NUM2DBL(r_iv_get(c, "@g"));
-  txt->color.b = NUM2DBL(r_iv_get(c, "@b"));
-  txt->color.a = NUM2DBL(r_iv_get(c, "@a"));
+  txt->color.r = NUM2DBL(r_ary_entry(a, 4));
+  txt->color.g = NUM2DBL(r_ary_entry(a, 5));
+  txt->color.b = NUM2DBL(r_ary_entry(a, 6));
+  txt->color.a = NUM2DBL(r_ary_entry(a, 7));
 
   R2D_DrawText(txt);
-
   return R_NIL;
 }
 
@@ -999,7 +1001,7 @@ static void render() {
   // Switch on each object type
   for (int i = 0; i < num_objects; ++i) {
     R_VAL el = r_ary_entry(objects, i);
-    r_funcall(el, "render", 0);
+    r_funcall(el, "render", 0);  // call the object's `render` function
   }
 
   // Call render proc, `window.render`
@@ -1221,8 +1223,8 @@ void Init_ruby2d() {
   // Ruby2D::Sprite#ext_init
   r_define_method(ruby2d_sprite_class, "ext_init", ruby2d_sprite_ext_init, r_args_req(1));
 
-  // Ruby2D::Sprite#ext_render
-  r_define_method(ruby2d_sprite_class, "ext_render", ruby2d_sprite_ext_render, r_args_none);
+  // Ruby2D::Sprite#self.ext_draw
+  r_define_class_method(ruby2d_sprite_class, "ext_draw", ruby2d_sprite_ext_draw, r_args_req(1));
 
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
@@ -1233,8 +1235,8 @@ void Init_ruby2d() {
   // Ruby2D::Text#ext_set
   r_define_method(ruby2d_text_class, "ext_set", ruby2d_text_ext_set, r_args_req(1));
 
-  // Ruby2D::Text#ext_render
-  r_define_method(ruby2d_text_class, "ext_render", ruby2d_text_ext_render, r_args_none);
+  // Ruby2D::Text#self.ext_draw
+  r_define_class_method(ruby2d_text_class, "ext_draw", ruby2d_text_ext_draw, r_args_req(1));
 
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
