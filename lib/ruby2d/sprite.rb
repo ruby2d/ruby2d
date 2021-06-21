@@ -42,7 +42,7 @@ module Ruby2D
       @last_frame = 0
       @done_proc = nil
 
-      # The sprite image size set by the native extension `ext_init()`
+      # The sprite image size set by the native extension `ext_init`
       @img_width = nil; @img_height = nil
 
       # Initialize the sprite
@@ -72,7 +72,7 @@ module Ruby2D
       }
 
       # Add the sprite to the window
-      add
+      unless opts[:show] == false then add end
     end
 
     # Set the x coordinate
@@ -141,6 +141,7 @@ module Ruby2D
         set_frame
         restart_time
       end
+      self
     end
 
     # Stop the current animation and set to the default frame
@@ -221,7 +222,7 @@ module Ruby2D
       @start_time = Time.now.to_f
     end
 
-    # Update the sprite animation, called by `Sprite#ext_render`
+    # Update the sprite animation, called by `render`
     def update
       if @playing
 
@@ -245,6 +246,37 @@ module Ruby2D
         set_frame
       end
     end
+
+    def draw(opts = {})
+      opts[:width] = opts[:width] || @flip_width
+      opts[:height] = opts[:height] || @flip_height
+      opts[:rotate] = opts[:rotate] || @rotate
+      opts[:clip_x] = opts[:clip_x] || @clip_x
+      opts[:clip_y] = opts[:clip_y] || @clip_y
+      opts[:clip_width] = opts[:clip_width] || @clip_width
+      opts[:clip_height] = opts[:clip_height] || @clip_height
+      unless opts[:color]
+        opts[:color] = [1.0, 1.0, 1.0, 1.0]
+      end
+
+      self.class.ext_draw([
+        self, opts[:x], opts[:y], opts[:width], opts[:height], opts[:rotate],
+        opts[:clip_x], opts[:clip_y], opts[:clip_width], opts[:height],
+        opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
+      ])
+    end
+
+    private
+
+    def render
+      update
+      self.class.ext_draw([
+        self, @flip_x, @flip_y, @flip_width, @flip_height, @rotate,
+        @clip_x, @clip_y, @clip_width, @clip_height,
+        @color.r, @color.g, @color.b, @color.a
+      ])
+    end
+
 
   end
 end

@@ -39,6 +39,15 @@ module Ruby2D
       update_coords(@x, @y, @width, h)
     end
 
+    def self.draw(opts = {})
+      ext_draw([
+        opts[:x]               , opts[:y]                , opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
+        opts[:x] + opts[:width], opts[:y]                , opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
+        opts[:x] + opts[:width], opts[:y] + opts[:height], opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
+        opts[:x]               , opts[:y] + opts[:height], opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
+      ])
+    end
+
     private
 
     def update_coords(x, y, w, h)
@@ -46,10 +55,10 @@ module Ruby2D
       @y1 = y
       @x2 = x + w
       @y2 = y
-      @x4 = x
-      @y4 = y + h
       @x3 = x + w
       @y3 = y + h
+      @x4 = x
+      @y4 = y + h
     end
 
   end

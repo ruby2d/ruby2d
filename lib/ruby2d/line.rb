@@ -38,7 +38,27 @@ module Ruby2D
       (((@y2 - @y1) * x - (@x2 - @x1) * y + @x2 * @y1 - @y2 * @x1).abs / length) <= 0.5 * @width
     end
 
+    def self.draw(opts = {})
+      ext_draw([
+        opts[:x1], opts[:y1], opts[:x2], opts[:y2], opts[:width],
+        opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
+        opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
+        opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
+        opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
+      ])
+    end
+
     private
+
+    def render
+      self.class.ext_draw([
+        @x1, @y1, @x2, @y2, @width,
+        @c1.r, @c1.g, @c1.b, @c1.a,
+        @c2.r, @c2.g, @c2.b, @c2.a,
+        @c3.r, @c3.g, @c3.b, @c3.a,
+        @c4.r, @c4.g, @c4.b, @c4.a
+      ])
+    end
 
     # Calculate the distance between two points
     def points_distance(x1, y1, x2, y2)
