@@ -83,6 +83,9 @@ module Ruby2D
       # The window update block
       @update_proc = Proc.new {}
 
+      # The window render block
+      @render_proc = Proc.new {}
+
       # Whether diagnostic messages should be printed
       @diagnostics = false
 
@@ -147,6 +150,10 @@ module Ruby2D
 
       def update(&proc)
         @@window.update(&proc)
+      end
+
+      def render(&proc)
+        @@window.render(&proc)
       end
 
       def show
@@ -245,9 +252,15 @@ module Ruby2D
       @objects.clear
     end
 
-    # Set an update callback
+    # Set the update callback
     def update(&proc)
       @update_proc = proc
+      true
+    end
+
+    # Set the render callback
+    def render(&proc)
+      @render_proc = proc
       true
     end
 
@@ -385,6 +398,11 @@ module Ruby2D
         end
       end
 
+    end
+
+    # Render callback method, called by the native and web extentions
+    def render_callback
+      @render_proc.call
     end
 
     # Show the window

@@ -24,6 +24,10 @@ module Ruby2D::DSL
     Window.update(&proc)
   end
 
+  def render(&proc)
+    Window.render(&proc)
+  end
+
   def clear
     Window.clear
   end

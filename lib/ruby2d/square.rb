@@ -21,6 +21,15 @@ module Ruby2D
       self.width = self.height = @size = s
     end
 
+    def self.draw(opts = {})
+      ext_draw([
+        opts[:x]              , opts[:y]              , opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
+        opts[:x] + opts[:size], opts[:y]              , opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
+        opts[:x] + opts[:size], opts[:y] + opts[:size], opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
+        opts[:x]              , opts[:y] + opts[:size], opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
+      ])
+    end
+
     # Make the inherited width and height attribute accessors private
     private :width=, :height=
 
