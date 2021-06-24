@@ -15,9 +15,6 @@ module Ruby2D
 
     def initialize(args = {})
 
-      # This window instance, stored so it can be called by the class methods
-      @@window = self
-
       # Title of the window
       @title = args[:title]  || "Ruby 2D"
 
@@ -121,47 +118,47 @@ module Ruby2D
       def screenshot(opts = nil); get(:screenshot, opts) end
 
       def get(sym, opts = nil)
-        @@window.get(sym, opts)
+        $ruby2d_dsl_window.get(sym, opts)
       end
 
       def set(opts)
-        @@window.set(opts)
+        $ruby2d_dsl_window.set(opts)
       end
 
       def on(event, &proc)
-        @@window.on(event, &proc)
+        $ruby2d_dsl_window.on(event, &proc)
       end
 
       def off(event_descriptor)
-        @@window.off(event_descriptor)
+        $ruby2d_dsl_window.off(event_descriptor)
       end
 
       def add(o)
-        @@window.add(o)
+        $ruby2d_dsl_window.add(o)
       end
 
       def remove(o)
-        @@window.remove(o)
+        $ruby2d_dsl_window.remove(o)
       end
 
       def clear
-        @@window.clear
+        $ruby2d_dsl_window.clear
       end
 
       def update(&proc)
-        @@window.update(&proc)
+        $ruby2d_dsl_window.update(&proc)
       end
 
       def render(&proc)
-        @@window.render(&proc)
+        $ruby2d_dsl_window.render(&proc)
       end
 
       def show
-        @@window.show
+        $ruby2d_dsl_window.show
       end
 
       def close
-        @@window.close
+        $ruby2d_dsl_window.close
       end
     end
 
@@ -378,6 +375,10 @@ module Ruby2D
 
     # Update callback method, called by the native and web extentions
     def update_callback
+      if method(:update).parameters.empty?
+        update
+      end
+
       @update_proc.call
 
       # Accept and eval commands if in console mode
