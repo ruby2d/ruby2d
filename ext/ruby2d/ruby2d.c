@@ -649,6 +649,16 @@ static R_VAL ruby2d_sound_ext_play(R_VAL self) {
 
 
 /*
+ * Ruby2D::Sound#ext_length
+ */
+static R_VAL ruby2d_sound_ext_length(R_VAL self) {
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  return INT2NUM(R2D_GetSoundLength(snd));
+}
+
+
+/*
  * Free sound structure attached to Ruby 2D `Sound` class
  */
 #if MRUBY
@@ -772,6 +782,16 @@ static R_VAL ruby2d_music_ext_fadeout(R_VAL self, R_VAL ms) {
 #endif
   R2D_FadeOutMusic(NUM2INT(ms));
   return R_NIL;
+}
+
+
+/*
+ * Ruby2D::Music#ext_length
+ */
+static R_VAL ruby2d_music_ext_length(R_VAL self) {
+  R2D_Music *ms;
+  r_data_get_struct(self, "@data", &music_data_type, R2D_Sound, ms);
+  return INT2NUM(R2D_GetMusicLength(ms));
 }
 
 
@@ -1247,6 +1267,9 @@ void Init_ruby2d() {
   // Ruby2D::Sound#ext_play
   r_define_method(ruby2d_sound_class, "ext_play", ruby2d_sound_ext_play, r_args_none);
 
+  // Ruby2D::Sound#ext_length
+  r_define_method(ruby2d_sound_class, "ext_length", ruby2d_sound_ext_length, r_args_none);
+
   // Ruby2D::Music
   R_CLASS ruby2d_music_class = r_define_class(ruby2d_module, "Music");
 
@@ -1273,6 +1296,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_fadeout
   r_define_method(ruby2d_music_class, "ext_fadeout", ruby2d_music_ext_fadeout, r_args_req(1));
+
+  // Ruby2D::Music#ext_length
+  r_define_method(ruby2d_music_class, "ext_length", ruby2d_music_ext_length, r_args_none);
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

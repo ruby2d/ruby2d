@@ -47,6 +47,31 @@ void R2D_PlaySound(R2D_Sound *snd) {
 
 
 /*
+ * Get the sound's length in seconds
+ */
+int R2D_GetSoundLength(R2D_Sound *snd) {
+  float points = 0;
+  float frames = 0;
+  int frequency = 0;
+  int format = 0;
+  int channels = 0;
+
+  // Populate the frequency, format and channel variables
+  if (!Mix_QuerySpec(&frequency, &format, &channels)) return -1; // Querying audio deails failed
+  if (!snd) return -1;
+
+  // points = bytes / samplesize
+  points = (snd->data->alen / ((format & 0xFF) / 8));
+
+  // frames = sample points / channels
+  frames = (points / channels);
+
+  // frames / frequency is seconds of audio
+  return ceil(frames / frequency);
+}
+
+
+/*
  * Get the sound's volume
  */
 int R2D_GetSoundVolume(R2D_Sound *snd) {
