@@ -113,7 +113,7 @@ else
     add_flags(:ld, "#{ldir}/libjpeg.a #{ldir}/libpng16.a #{ldir}/libtiff.a #{ldir}/libwebp.a")
     add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libogg.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a")
     add_flags(:ld, "#{ldir}/libfreetype.a")
-    add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,ForceFeedback")
+    add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
 
   when :linux, :linux_rpi
     check_sdl_linux
