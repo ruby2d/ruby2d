@@ -65,4 +65,13 @@ RSpec.describe Ruby2D::Music do
     end
   end
 
+  describe '#length' do
+    it "returns the length of the music track in seconds" do
+      expect(Music.new('test/media/music.wav').length).to eq(8)
+      expect(Music.new('test/media/music.mp3').length).to eq(8)
+      expect(Music.new('test/media/music.ogg').length).to eq(8)
+      expect(Music.new('test/media/music.flac').length).to eq(8)
+    end
+  end
+
 end
