@@ -53,7 +53,7 @@ int R2D_GetSoundLength(R2D_Sound *snd) {
   float points = 0;
   float frames = 0;
   int frequency = 0;
-  int format = 0;
+  Uint16 format = 0;
   int channels = 0;
 
   // Populate the frequency, format and channel variables
