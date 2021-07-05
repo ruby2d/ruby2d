@@ -790,7 +790,7 @@ static R_VAL ruby2d_music_ext_fadeout(R_VAL self, R_VAL ms) {
  */
 static R_VAL ruby2d_music_ext_length(R_VAL self) {
   R2D_Music *ms;
-  r_data_get_struct(self, "@data", &music_data_type, R2D_Sound, ms);
+  r_data_get_struct(self, "@data", &music_data_type, R2D_Music, ms);
   return INT2NUM(R2D_GetMusicLength(ms));
 }
 
