@@ -6,9 +6,9 @@ module Ruby2D
   class Window
 
     # Event structures
-    EventDescriptor = Struct.new(:type, :id)
-    MouseEvent = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
-    KeyEvent   = Struct.new(:type, :key)
+    EventDescriptor       = Struct.new(:type, :id)
+    MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
+    KeyEvent              = Struct.new(:type, :key)
     ControllerEvent       = Struct.new(:which, :type, :axis, :value, :button)
     ControllerAxisEvent   = Struct.new(:which, :axis, :value)
     ControllerButtonEvent = Struct.new(:which, :button)
@@ -16,7 +16,7 @@ module Ruby2D
     def initialize(args = {})
 
       # Title of the window
-      @title = args[:title]  || "Ruby 2D"
+      @title = args[:title] || "Ruby 2D"
 
       # Window background color
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
@@ -48,14 +48,36 @@ module Ruby2D
       # Vertical synchronization, set to prevent screen tearing (recommended)
       @vsync = args[:vsync] || true
 
+      # Renderable objects currently in the window, like a linear scene graph
+      @objects = []
+
       # Mouse X and Y position in the window
       @mouse_x, @mouse_y = 0, 0
 
       # Controller axis and button mappings file
       @controller_mappings = File.expand_path('~') + "/.ruby2d/controllers.txt"
 
-      # Renderable objects currently in the window, like a linear scene graph
-      @objects = []
+      # Event stores for class pattern
+      @keys_down = []
+      @keys_held = []
+      @keys_up   = []
+      @mouse_buttons_down = []
+      @mouse_buttons_up   = []
+      @mouse_scroll_event     = false
+      @mouse_scroll_direction = nil
+      @mouse_scroll_delta_x   = 0
+      @mouse_scroll_delta_y   = 0
+      @mouse_move_event   = false
+      @mouse_move_delta_x = 0
+      @mouse_move_delta_y = 0
+      @controller_id = nil
+      @controller_axes_moved   = []
+      @controller_axis_left_x  = 0
+      @controller_axis_left_y  = 0
+      @controller_axis_right_x = 0
+      @controller_axis_right_y = 0
+      @controller_buttons_down = []
+      @controller_buttons_up   = []
 
       # Unique ID for the input event being registered
       @event_key = 0
@@ -82,6 +104,11 @@ module Ruby2D
 
       # The window render block
       @render_proc = Proc.new {}
+
+      # Detect if window is being used through the DSL or as a class instance
+      unless method(:update).parameters.empty? || method(:render).parameters.empty?
+        @using_dsl = true
+      end
 
       # Whether diagnostic messages should be printed
       @diagnostics = false
@@ -281,6 +308,36 @@ module Ruby2D
       @events[event_descriptor.type].delete(event_descriptor.id)
     end
 
+    # Key down event method for class pattern
+    def key_down(key)
+      if @keys_down.include? key
+        @keys_down.delete key
+        true
+      else
+        false
+      end
+    end
+
+    # Key held event method for class pattern
+    def key_held(key)
+      if @keys_held.include? key
+        @keys_held.delete key
+        true
+      else
+        false
+      end
+    end
+
+    # Key up event method for class pattern
+    def key_up(key)
+      if @keys_up.include? key
+        @keys_up.delete key
+        true
+      else
+        false
+      end
+    end
+
     # Key callback method, called by the native and web extentions
     def key_callback(type, key)
       key = key.downcase
@@ -293,19 +350,77 @@ module Ruby2D
       case type
       # When key is pressed, fired once
       when :down
+        # For class pattern
+        unless @keys_down.include? key
+          @keys_down << key
+        end
+
+        # Call event handler
         @events[:key_down].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
       # When key is being held down, fired every frame
       when :held
+        # For class pattern
+        unless @keys_held.include? key
+          @keys_held << key
+        end
+
+        # Call event handler
         @events[:key_held].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
       # When key released, fired once
       when :up
+        # For class pattern
+        unless @keys_up.include? key
+          @keys_up << key
+        end
+
+        # Call event handler
         @events[:key_up].each do |id, e|
           e.call(KeyEvent.new(type, key))
         end
+      end
+    end
+
+    # Mouse down event method for class pattern
+    def mouse_down(btn)
+      if @mouse_buttons_down.include? btn
+        @mouse_buttons_down.delete btn
+        true
+      else
+        false
+      end
+    end
+
+    # Mouse up event method for class pattern
+    def mouse_up(btn)
+      if @mouse_buttons_up.include? btn
+        @mouse_buttons_up.delete btn
+        true
+      else
+        false
+      end
+    end
+
+    # Mouse scroll event method for class pattern
+    def mouse_scroll
+      if @mouse_scroll_event
+        @mouse_scroll_event = false
+        true
+      else
+        false
+      end
+    end
+
+    # Mouse move event method for class pattern
+    def mouse_move
+      if @mouse_move_event
+        @mouse_move_event = false
+        true
+      else
+        false
       end
     end
 
@@ -319,21 +434,46 @@ module Ruby2D
       case type
       # When mouse button pressed
       when :down
+        # For class pattern
+        unless @mouse_buttons_down.include? button
+          @mouse_buttons_down << button
+        end
+
+        # Call event handler
         @events[:mouse_down].each do |id, e|
           e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
         end
       # When mouse button released
       when :up
+        # For class pattern
+        unless @mouse_buttons_up.include? button
+          @mouse_buttons_up << button
+        end
+
+        # Call event handler
         @events[:mouse_up].each do |id, e|
           e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
         end
       # When mouse motion / movement
       when :scroll
+        # For class pattern
+        @mouse_scroll_event     = true
+        @mouse_scroll_direction = direction
+        @mouse_scroll_delta_x   = delta_x
+        @mouse_scroll_delta_y   = delta_y
+
+        # Call event handler
         @events[:mouse_scroll].each do |id, e|
           e.call(MouseEvent.new(type, nil, direction, nil, nil, delta_x, delta_y))
         end
       # When mouse scrolling, wheel or trackpad
       when :move
+        # For class pattern
+        @mouse_move_event    = true
+        @mouse_move_delta_x  = delta_x
+        @mouse_move_delta_y  = delta_y
+
+        # Call event handler
         @events[:mouse_move].each do |id, e|
           e.call(MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y))
         end
@@ -347,6 +487,36 @@ module Ruby2D
       end
     end
 
+    # Controller axis event method for class pattern
+    def controller_axis(axis)
+      if @controller_axes_moved.include? axis
+        @controller_axes_moved.delete axis
+        true
+      else
+        false
+      end
+    end
+
+    # Controller button down event method for class pattern
+    def controller_button_down(btn)
+      if @controller_buttons_down.include? btn
+        @controller_buttons_down.delete btn
+        true
+      else
+        false
+      end
+    end
+
+    # Controller button up event method for class pattern
+    def controller_button_up(btn)
+      if @controller_buttons_up.include? btn
+        @controller_buttons_up.delete btn
+        true
+      else
+        false
+      end
+    end
+
     # Controller callback method, called by the native and web extentions
     def controller_callback(which, type, axis, value, button)
       # All controller events
@@ -357,16 +527,51 @@ module Ruby2D
       case type
       # When controller axis motion, like analog sticks
       when :axis
+
+        # For class pattern
+
+        @controller_id = which
+
+        case axis
+        when :left_x
+          @controller_left_x = value
+        when :left_y
+          @controller_left_y = value
+        when :right_x
+          @controller_right_x = value
+        when :right_y
+          @controller_right_y = value
+        end
+
+        unless @controller_axes_moved.include? axis
+          @controller_axes_moved << axis
+        end
+
+        # Call event handler
         @events[:controller_axis].each do |id, e|
           e.call(ControllerAxisEvent.new(which, axis, value))
         end
       # When controller button is pressed
       when :button_down
+        # For class pattern
+        @controller_id = which
+        unless @controller_buttons_down.include? button
+          @controller_buttons_down << button
+        end
+
+        # Call event handler
         @events[:controller_button_down].each do |id, e|
           e.call(ControllerButtonEvent.new(which, button))
         end
       # When controller button is released
       when :button_up
+        # For class pattern
+        @controller_id = which
+        unless @controller_buttons_up.include? button
+          @controller_buttons_up << button
+        end
+
+        # Call event handler
         @events[:controller_button_up].each do |id, e|
           e.call(ControllerButtonEvent.new(which, button))
         end
@@ -375,7 +580,7 @@ module Ruby2D
 
     # Update callback method, called by the native and web extentions
     def update_callback
-      if method(:update).parameters.empty?
+      unless @using_dsl
         update
       end
 
@@ -403,6 +608,10 @@ module Ruby2D
 
     # Render callback method, called by the native and web extentions
     def render_callback
+      unless @using_dsl
+        render
+      end
+
       @render_proc.call
     end
 
