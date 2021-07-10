@@ -2,42 +2,45 @@
 
 module Ruby2D::DSL
 
-  Ruby2D::Window.new
+  @window = Ruby2D::Window.new
+
+  def self.window; @window end
+  def self.window=(w); @window = w end
 
   def get(sym, opts = nil)
-    Window.get(sym, opts)
+    DSL.window.get(sym, opts)
   end
 
   def set(opts)
-    Window.set(opts)
+    DSL.window.set(opts)
   end
 
   def on(event, &proc)
-    Window.on(event, &proc)
+    DSL.window.on(event, &proc)
   end
 
   def off(event_descriptor)
-    Window.off(event_descriptor)
+    DSL.window.off(event_descriptor)
   end
 
   def update(&proc)
-    Window.update(&proc)
+    DSL.window.update(&proc)
   end
 
   def render(&proc)
-    Window.render(&proc)
+    DSL.window.render(&proc)
   end
 
   def clear
-    Window.clear
+    DSL.window.clear
   end
 
   def show
-    Window.show
+    DSL.window.show
   end
 
   def close
-    Window.close
+    DSL.window.close
   end
 
 end
