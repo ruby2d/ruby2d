@@ -14,16 +14,12 @@ module Ruby2D
 
     # Add the object to the window
     def add
-      if Module.const_defined? :DSL
-        Window.add(self)
-      end
+      Window.add(self)
     end
 
     # Remove the object from the window
     def remove
-      if Module.const_defined? :DSL
-        Window.remove(self)
-      end
+      Window.remove(self)
     end
 
     # Set the color value
