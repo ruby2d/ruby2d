@@ -341,6 +341,7 @@ typedef struct {
 typedef struct {
   const char *path;
   Mix_Music *data;
+  int length; // Length of music track
 } R2D_Music;
 
 // Ruby 2D Functions ///////////////////////////////////////////////////////////
@@ -537,6 +538,11 @@ R2D_Sound *R2D_CreateSound(const char *path);
 void R2D_PlaySound(R2D_Sound *snd);
 
 /*
+ * Get the sound's length
+ */
+int R2D_GetSoundLength(R2D_Sound *snd);
+
+/*
  * Get the sound's volume
  */
 int R2D_GetSoundVolume(R2D_Sound *snd);
@@ -602,6 +608,11 @@ void R2D_SetMusicVolume(int volume);
  * Fade out the playing music
  */
 void R2D_FadeOutMusic(int ms);
+
+/*
+ * Get the length of the music in seconds
+ */
+int R2D_GetMusicLength(R2D_Music *mus);
 
 /*
  * Free the music

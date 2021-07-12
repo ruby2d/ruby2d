@@ -58,5 +58,10 @@ module Ruby2D
       ext_fadeout(ms)
     end
 
+    # Returns the length in seconds
+    def length
+      ext_length
+    end
+
   end
 end

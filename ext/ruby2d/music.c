@@ -33,6 +33,11 @@ R2D_Music *R2D_CreateMusic(const char *path) {
   // Initialize values
   mus->path = path;
 
+  // Calculate the length of music by creating a temporary R2D_Sound object
+  R2D_Sound *snd = R2D_CreateSound(path);
+  mus->length = R2D_GetSoundLength(snd);
+  R2D_FreeSound(snd);
+
   return mus;
 }
 
@@ -101,6 +106,14 @@ void R2D_SetMusicVolume(int volume) {
  */
 void R2D_FadeOutMusic(int ms) {
   Mix_FadeOutMusic(ms);
+}
+
+
+/*
+ * Get the length of the music in seconds
+ */
+int R2D_GetMusicLength(R2D_Music *mus) {
+  return mus->length;
 }
 
 
