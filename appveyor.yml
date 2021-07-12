@@ -5,6 +5,7 @@ install:
   - git submodule update --init --recursive
 build: off
 before_test:
+  - echo %APPVEYOR_BUILD_WORKER_IMAGE%
   - ruby -v
   - bundle install
 test_script:
