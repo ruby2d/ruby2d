@@ -1,5 +1,6 @@
+image: Visual Studio 2019
 install:
-  - set PATH=C:\ruby27-x64\bin;C:\msys64\usr\bin;C:\msys64\usr\local\bin;%PATH%
+  - set PATH=C:\Ruby27-x64\bin;C:\msys64\usr\bin;C:\msys64\usr\local\bin;%PATH%
   - set MSYSTEM=MINGW64
   - bash --version
   - git submodule update --init --recursive
