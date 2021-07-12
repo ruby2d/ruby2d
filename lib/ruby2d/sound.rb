@@ -21,5 +21,10 @@ module Ruby2D
       ext_play
     end
 
+    # Returns the length in seconds
+    def length
+      ext_length
+    end
+
   end
 end
