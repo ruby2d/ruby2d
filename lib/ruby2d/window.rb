@@ -51,6 +51,9 @@ module Ruby2D
       # Renderable objects currently in the window, like a linear scene graph
       @objects = []
 
+      # Entities currently in the window
+      @entities = []
+
       # Mouse X and Y position in the window
       @mouse_x, @mouse_y = 0, 0
 
@@ -250,6 +253,8 @@ module Ruby2D
       case o
       when nil
         raise Error, "Cannot add '#{o.class}' to window!"
+      when Entity
+        @entities.push(o)
       when Array
         o.each { |x| add_object(x) }
       else
@@ -263,8 +268,9 @@ module Ruby2D
         raise Error, "Cannot remove '#{o.class}' from window!"
       end
 
-      if i = @objects.index(o)
-        @objects.delete_at(i)
+      collection = o.class.ancestors.include?(Ruby2D::Entity) ? @entities : @objects
+      if i = collection.index(o)
+        collection.delete_at(i)
         true
       else
         false
@@ -274,6 +280,7 @@ module Ruby2D
     # Clear all objects from the window
     def clear
       @objects.clear
+      @entities.clear
     end
 
     # Set the update callback
@@ -586,6 +593,11 @@ module Ruby2D
 
       @update_proc.call
 
+      # Run update method on all entities
+      @entities.each do |e|
+        e.update
+      end
+
       # Accept and eval commands if in console mode
       if @console
         if STDIN.ready?
@@ -613,6 +625,11 @@ module Ruby2D
       end
 
       @render_proc.call
+
+      # Run render method on all entities
+      @entities.each do |e|
+        e.render
+      end
     end
 
     # Show the window
