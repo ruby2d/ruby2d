@@ -1,5 +1,5 @@
 install:
-  - set PATH=C:\ruby25-x64\bin;C:\msys64\usr\bin;C:\msys64\usr\local\bin;%PATH%
+  - set PATH=C:\ruby30-x64\bin;C:\msys64\usr\bin;C:\msys64\usr\local\bin;%PATH%
   - set MSYSTEM=MINGW64
   - bash --version
   - git submodule update --init --recursive
