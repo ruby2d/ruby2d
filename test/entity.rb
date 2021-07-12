@@ -20,13 +20,17 @@ end
 
 player = Player.new
 
+
+# Using DSL
+
 player.add
 
 show
 
-=begin
-# Using DSL
 
+# Using class pattern
+
+=begin
 class GameWindow < Ruby2D::Window
   def initialize
     super
@@ -44,5 +48,4 @@ game_window = GameWindow.new
 game_window.add(player)
 
 game_window.show
-
 =end
