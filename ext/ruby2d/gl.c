@@ -365,7 +365,6 @@ void R2D_GL_DrawTriangle(GLfloat x1, GLfloat y1,
  */
 void R2D_GL_DrawImage(R2D_Image *img) {
   #if GLES
-    R2D_GLES_DrawImage(img);
   #else
     if (R2D_GL2) {
       R2D_GL2_DrawImage(img);
@@ -373,6 +372,15 @@ void R2D_GL_DrawImage(R2D_Image *img) {
       R2D_GL3_DrawImage(img);
     }
   #endif
+}
+
+/*
+ * Draw a tile
+ */
+void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tx1, int ty1, int tx2,
+  int ty2, int tx3, int ty3, int tx4, int ty4) {
+  // FIXME: Need to draw in openGL ES, 1.2 and 1.3 :)
+  R2D_GL3_DrawTile(img, x, y, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4);
 }
 
 

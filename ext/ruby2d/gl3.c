@@ -319,6 +319,20 @@ void R2D_GL3_DrawImage(R2D_Image *img) {
 
 
 /*
+ * Draw image
+ */
+void R2D_GL3_DrawTile(R2D_Image *img, int x, int y, int tx1, int ty1, int tx2,
+int ty2, int tx3, int ty3, int tx4, int ty4) {
+  R2D_GL3_DrawTexture(
+    x, y, img->width, img->height,
+    img->rotate, img->rx, img->ry,
+    img->color.r, img->color.g, img->color.b, img->color.a,
+    tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
+    img->texture_id
+  );
+}
+
+/*
  * Draw sprite
  */
 void R2D_GL3_DrawSprite(R2D_Sprite *spr) {

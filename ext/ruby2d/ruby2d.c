@@ -807,6 +807,40 @@ static void free_music(R2D_Music *mus) {
   R2D_FreeMusic(mus);
 }
 
+static R_VAL ruby2d_tileset_ext_init(R_VAL self, R_VAL path) {
+  R2D_Image *img = R2D_CreateImage(RSTRING_PTR(path));
+  if (!img) return R_FALSE;
+
+  // Get width and height from Ruby class. If set, use it, else choose the
+  // native dimensions of the image.
+  R_VAL w = r_iv_get(self, "@width");
+  R_VAL h = r_iv_get(self, "@height");
+  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(img->width));
+  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(img->height));
+  r_iv_set(self, "@data", r_data_wrap_struct(image, img));
+
+  return R_TRUE;
+}
+
+static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
+  // `a` is the array representing the tileset
+
+  R2D_Image *img;
+  r_data_get_struct(r_ary_entry(a, 0), "@data", &image_data_type, R2D_Image, img);
+
+  int tw = INT2NUM(r_ary_entry(a, 1));
+  int th = INT2NUM(r_ary_entry(a, 2));
+  int padding = INT2NUM(r_ary_entry(a, 3));
+  int spacing = INT2NUM(r_ary_entry(a, 4));
+  int tx = INT2NUM(r_ary_entry(a, 5));
+  int ty = INT2NUM(r_ary_entry(a, 6));
+  int x = INT2NUM(r_ary_entry(a, 7));
+  int y = INT2NUM(r_ary_entry(a, 8));
+
+  R2D_DrawTile(img, tw, th, padding, spacing, tx, ty, x, y);
+  return R_NIL;
+}
+
 
 /*
  * Ruby 2D native `on_key` input callback function
@@ -1299,6 +1333,15 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_length
   r_define_method(ruby2d_music_class, "ext_length", ruby2d_music_ext_length, r_args_none);
+
+  // Ruby2D::Tileset
+  R_CLASS ruby2d_tileset_class = r_define_class(ruby2d_module, "Tileset");
+
+  // Ruby2D::Tileset#ext_init
+  r_define_method(ruby2d_tileset_class, "ext_init", ruby2d_tileset_ext_init, r_args_req(1));
+
+  // Ruby2D::Tileset#self.ext_draw
+  r_define_class_method(ruby2d_tileset_class, "ext_draw", ruby2d_tileset_ext_draw, r_args_req(1));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

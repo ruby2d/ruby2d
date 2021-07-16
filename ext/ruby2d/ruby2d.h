@@ -619,6 +619,8 @@ int R2D_GetMusicLength(R2D_Music *mus);
  */
 void R2D_FreeMusic(R2D_Music *mus);
 
+void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
+
 // Input ///////////////////////////////////////////////////////////////////////
 
 /*
@@ -716,6 +718,8 @@ void R2D_GL_DrawTriangle(
 void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawText(R2D_Text *txt);
+void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tx1, int ty1, int tx2,
+  int ty2, int tx3, int ty3, int tx4, int ty4);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
 void R2D_GL_FlushBuffers();
@@ -756,6 +760,9 @@ void R2D_GL_FlushBuffers();
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
   void R2D_GL2_DrawImage(R2D_Image *img);
   void R2D_GL3_DrawImage(R2D_Image *img);
+  void R2D_GL3_DrawTile(R2D_Image *img, int x, int y, 
+    int tx1, int ty1, int tx2, int ty2, int tx3,
+    int ty3, int tx4, int ty4);
   void R2D_GL2_DrawSprite(R2D_Sprite *spr);
   void R2D_GL3_DrawSprite(R2D_Sprite *spr);
   void R2D_GL2_DrawText(R2D_Text *txt);

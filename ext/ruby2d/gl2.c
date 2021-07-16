@@ -115,7 +115,6 @@ void R2D_GL2_DrawImage(R2D_Image *img) {
   );
 }
 
-
 /*
  * Draw sprite
  */
