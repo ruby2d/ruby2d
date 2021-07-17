@@ -828,14 +828,14 @@ static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
   R2D_Image *img;
   r_data_get_struct(r_ary_entry(a, 0), "@data", &image_data_type, R2D_Image, img);
 
-  int tw = INT2NUM(r_ary_entry(a, 1));
-  int th = INT2NUM(r_ary_entry(a, 2));
-  int padding = INT2NUM(r_ary_entry(a, 3));
-  int spacing = INT2NUM(r_ary_entry(a, 4));
-  int tx = INT2NUM(r_ary_entry(a, 5));
-  int ty = INT2NUM(r_ary_entry(a, 6));
-  int x = INT2NUM(r_ary_entry(a, 7));
-  int y = INT2NUM(r_ary_entry(a, 8));
+  int tw = NUM2INT(r_ary_entry(a, 1));
+  int th = NUM2INT(r_ary_entry(a, 2));
+  int padding = NUM2INT(r_ary_entry(a, 3));
+  int spacing = NUM2INT(r_ary_entry(a, 4));
+  int tx = NUM2INT(r_ary_entry(a, 5));
+  int ty = NUM2INT(r_ary_entry(a, 6));
+  int x = NUM2INT(r_ary_entry(a, 7));
+  int y = NUM2INT(r_ary_entry(a, 8));
 
   R2D_DrawTile(img, tw, th, padding, spacing, tx, ty, x, y);
   return R_NIL;

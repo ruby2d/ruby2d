@@ -1,13 +1,22 @@
 require 'ruby2d'
 
-tileset = Tileset.new('test/media/texture_atlas.png', tile_width: 32, tile_height: 32, padding: 0, spacing: 0)
+set background: 'white'
 
-tileset.define_tile('water-1', 1, 1)
+tileset = Tileset.new('test/media/texture_atlas.png', tile_width: 36, tile_height: 45, padding: 2, spacing: 0)
 
-tileset.set_tile('water-1', [
-  {x: 40,  y: 100},
-  {x: 80,  y: 100},
-  {x: 120, y: 100}
+tileset.define_tile('num-1', 0, 0)
+tileset.define_tile('num-2', 1, 1)
+
+tileset.set_tile('num-1', [
+  {x: 0,  y: 0},
+  {x: 100,  y: 100},
+  {x: 40, y: 320}
+])
+
+tileset.set_tile('num-2', [
+  {x: 300,  y: 0},
+  {x: 400,  y: 100},
+  {x: 500, y: 320}
 ])
 
 # image = Image.new('test/media/texture_atlas.png', x: 10, y: 20)

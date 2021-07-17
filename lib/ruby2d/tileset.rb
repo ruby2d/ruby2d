@@ -31,12 +31,12 @@ module Ruby2D
     def set_tile(name, coordinates)
       tile = @tiles.fetch(name)
 
-      coordinates.each do |coordinates|
+      coordinates.each do |coordinate|
         @to_draw.push({
           tile_x: tile.fetch(:x), 
           tile_y: tile.fetch(:y), 
-          x: coordinates.fetch(:x),
-          y: coordinates.fetch(:y)
+          x: coordinate.fetch(:x),
+          y: coordinate.fetch(:y)
         })
       end
     end
@@ -45,6 +45,7 @@ module Ruby2D
   private
 
   def render
+
     @to_draw.each do |tile|
       self.class.ext_draw(
         [
