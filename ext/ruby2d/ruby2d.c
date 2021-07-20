@@ -807,6 +807,10 @@ static void free_music(R2D_Music *mus) {
   R2D_FreeMusic(mus);
 }
 
+/*
+ * Ruby2D::Tileset#ext_init
+ * Initialize tileset data
+ */
 static R_VAL ruby2d_tileset_ext_init(R_VAL self, R_VAL path) {
   R2D_Image *img = R2D_CreateImage(RSTRING_PTR(path));
   if (!img) return R_FALSE;
@@ -822,6 +826,10 @@ static R_VAL ruby2d_tileset_ext_init(R_VAL self, R_VAL path) {
   return R_TRUE;
 }
 
+/*
+ * Ruby2D::Sprite#ext_draw
+ * Draws a single tile, will be called once per individual tile to draw
+ */
 static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
   // `a` is the array representing the tileset
 

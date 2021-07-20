@@ -1,4 +1,4 @@
-# Ruby2D::Text
+# Ruby2D::Tileset
 
 module Ruby2D
   class Tileset

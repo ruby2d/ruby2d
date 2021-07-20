@@ -3,7 +3,7 @@
 #include "ruby2d.h"
 
 /*
- * Draw an image
+ * Draw a tile
  */
 void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y) {
   if (!img) return;
