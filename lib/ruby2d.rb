@@ -17,11 +17,11 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/pixel'
   require 'ruby2d/image'
   require 'ruby2d/sprite'
+  require 'ruby2d/tileset'
   require 'ruby2d/font'
   require 'ruby2d/text'
   require 'ruby2d/sound'
   require 'ruby2d/music'
-  require 'ruby2d/tileset'
 
   if defined?(RubyInstaller)
     s2d_dll_path = Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
