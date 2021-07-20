@@ -365,6 +365,7 @@ void R2D_GL_DrawTriangle(GLfloat x1, GLfloat y1,
  */
 void R2D_GL_DrawImage(R2D_Image *img) {
   #if GLES
+    R2D_GLES_DrawImage(img);
   #else
     if (R2D_GL2) {
       R2D_GL2_DrawImage(img);
