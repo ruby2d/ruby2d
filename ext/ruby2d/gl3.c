@@ -319,7 +319,7 @@ void R2D_GL3_DrawImage(R2D_Image *img) {
 
 
 /*
- * Draw image
+ * Draw a tile
  */
 void R2D_GL3_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
 GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
