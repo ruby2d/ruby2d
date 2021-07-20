@@ -9,9 +9,8 @@ module Ruby2D
         raise Error, "Cannot find tileset image file `#{path}`"
       end
       @path = path
-      # FIXME: Need a better name (than to_draw) it's tiles to draw, rather than the tile definitions at @tiles
-      @to_draw = []
-      @tiles = {}
+      @tiles = []
+      @defined_tiles = {}
       @padding = opts[:padding] || 0
       @spacing = opts[:spacing] || 0
       @tile_width = opts[:tile_width]
@@ -25,14 +24,14 @@ module Ruby2D
     end
 
     def define_tile(name, x, y)
-      @tiles[name] = { x: x, y: y }
+      @defined_tiles[name] = { x: x, y: y }
     end
 
     def set_tile(name, coordinates)
-      tile = @tiles.fetch(name)
+      tile = @defined_tiles.fetch(name)
 
       coordinates.each do |coordinate|
-        @to_draw.push({
+        @tiles.push({
           tile_x: tile.fetch(:x), 
           tile_y: tile.fetch(:y), 
           x: coordinate.fetch(:x),
@@ -40,13 +39,16 @@ module Ruby2D
         })
       end
     end
+
+    def clear_tiles
+      @tiles = []
+    end
   end
 
   private
 
   def render
-
-    @to_draw.each do |tile|
+    @tiles.each do |tile|
       self.class.ext_draw(
         [
           self, @tile_width, @tile_height, @padding, @spacing,

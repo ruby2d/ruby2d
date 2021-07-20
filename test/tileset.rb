@@ -2,7 +2,6 @@ require 'ruby2d'
 
 set background: 'white'
 
-
 TILE_WIDTH = 36
 TILE_HEIGHT = 45
 
@@ -32,5 +31,6 @@ tileset.set_tile('num-3', [
   {x: TILE_WIDTH * 1, y: TILE_HEIGHT * 0},
   {x: TILE_WIDTH * 2, y: TILE_HEIGHT * 1},
 ])
+
 
 show
