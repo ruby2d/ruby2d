@@ -521,6 +521,50 @@ static void free_sprite(R2D_Sprite *spr) {
 
 
 /*
+ * Ruby2D::Tileset#ext_init
+ * Initialize tileset data
+ */
+static R_VAL ruby2d_tileset_ext_init(R_VAL self, R_VAL path) {
+  R2D_Image *img = R2D_CreateImage(RSTRING_PTR(path));
+  if (!img) return R_FALSE;
+
+  // Get width and height from Ruby class. If set, use it, else choose the
+  // native dimensions of the image.
+  R_VAL w = r_iv_get(self, "@width");
+  R_VAL h = r_iv_get(self, "@height");
+  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(img->width));
+  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(img->height));
+  r_iv_set(self, "@data", r_data_wrap_struct(image, img));
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Tileset#ext_draw
+ * Draws a single tile, will be called once per individual tile to draw
+ */
+static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
+  // `a` is the array representing the tileset
+
+  R2D_Image *img;
+  r_data_get_struct(r_ary_entry(a, 0), "@data", &image_data_type, R2D_Image, img);
+
+  int tw = NUM2INT(r_ary_entry(a, 1));
+  int th = NUM2INT(r_ary_entry(a, 2));
+  int padding = NUM2INT(r_ary_entry(a, 3));
+  int spacing = NUM2INT(r_ary_entry(a, 4));
+  int tx = NUM2INT(r_ary_entry(a, 5));
+  int ty = NUM2INT(r_ary_entry(a, 6));
+  int x = NUM2INT(r_ary_entry(a, 7));
+  int y = NUM2INT(r_ary_entry(a, 8));
+
+  R2D_DrawTile(img, tw, th, padding, spacing, tx, ty, x, y);
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Text#ext_init
  * Initialize text structure data
  */
@@ -1245,6 +1289,15 @@ void Init_ruby2d() {
 
   // Ruby2D::Sprite#self.ext_draw
   r_define_class_method(ruby2d_sprite_class, "ext_draw", ruby2d_sprite_ext_draw, r_args_req(1));
+
+  // Ruby2D::Tileset
+  R_CLASS ruby2d_tileset_class = r_define_class(ruby2d_module, "Tileset");
+
+  // Ruby2D::Tileset#ext_init
+  r_define_method(ruby2d_tileset_class, "ext_init", ruby2d_tileset_ext_init, r_args_req(1));
+
+  // Ruby2D::Tileset#self.ext_draw
+  r_define_class_method(ruby2d_tileset_class, "ext_draw", ruby2d_tileset_ext_draw, r_args_req(1));
 
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");

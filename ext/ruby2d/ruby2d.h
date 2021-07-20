@@ -498,6 +498,13 @@ void R2D_DrawSprite(R2D_Sprite *spr);
  */
 void R2D_FreeSprite(R2D_Sprite *spr);
 
+// Tile ////////////////////////////////////////////////////////////////////////
+
+/*
+ * Draw a tile
+ */
+void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
+
 // Text ////////////////////////////////////////////////////////////////////////
 
 /*
@@ -715,6 +722,8 @@ void R2D_GL_DrawTriangle(
   GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
 void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
+void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
+  GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
 void R2D_GL_DrawText(R2D_Text *txt);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
@@ -734,6 +743,10 @@ void R2D_GL_FlushBuffers();
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
   void R2D_GLES_DrawImage(R2D_Image *img);
   void R2D_GLES_DrawSprite(R2D_Sprite *spr);
+    void R2D_GLES_DrawTile(R2D_Image *img, int x, int y,
+    int tw, int th,
+    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
+    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
   void R2D_GLES_DrawText(R2D_Text *txt);
 #else
   int R2D_GL2_Init();
@@ -758,6 +771,14 @@ void R2D_GL_FlushBuffers();
   void R2D_GL3_DrawImage(R2D_Image *img);
   void R2D_GL2_DrawSprite(R2D_Sprite *spr);
   void R2D_GL3_DrawSprite(R2D_Sprite *spr);
+  void R2D_GL2_DrawTile(R2D_Image *img, int x, int y,
+    int tw, int th,
+    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
+    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
+  void R2D_GL3_DrawTile(R2D_Image *img, int x, int y,
+    int tw, int th,
+    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
+    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
   void R2D_GL2_DrawText(R2D_Text *txt);
   void R2D_GL3_DrawText(R2D_Text *txt);
   void R2D_GL3_FlushBuffers();
