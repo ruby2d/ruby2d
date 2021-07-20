@@ -46,6 +46,12 @@ module Ruby2D
   end
 
   def draw(opts = {})
+    render(opts)
+  end
+
+  private
+
+  def render(opts = {})
     opts[:tile_width] = opts[:tile_width] || @tile_width
     opts[:tile_height] = opts[:tile_height] || @tile_height
     opts[:padding] = opts[:padding] || @padding
@@ -55,19 +61,6 @@ module Ruby2D
       self.class.ext_draw(
         [
           self, opts[:tile_width], opts[:tile_height], opts[:padding], opts[:spacing],
-          tile.fetch(:tile_x), tile.fetch(:tile_y), tile.fetch(:x),
-          tile.fetch(:y)
-        ])
-    end
-  end
-
-  private
-
-  def render
-    @tiles.each do |tile|
-      self.class.ext_draw(
-        [
-          self, @tile_width, @tile_height, @padding, @spacing,
           tile.fetch(:tile_x), tile.fetch(:tile_y), tile.fetch(:x),
           tile.fetch(:y)
         ])
