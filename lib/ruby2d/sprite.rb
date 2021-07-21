@@ -261,7 +261,7 @@ module Ruby2D
 
       self.class.ext_draw([
         self, opts[:x], opts[:y], opts[:width], opts[:height], opts[:rotate],
-        opts[:clip_x], opts[:clip_y], opts[:clip_width], opts[:height],
+        opts[:clip_x], opts[:clip_y], opts[:clip_width], opts[:clip_height],
         opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
       ])
     end
