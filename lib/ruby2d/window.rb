@@ -317,32 +317,17 @@ module Ruby2D
 
     # Key down event method for class pattern
     def key_down(key)
-      if @keys_down.include? key
-        @keys_down.delete key
-        true
-      else
-        false
-      end
+      @keys_down.include?(key) ? true : false
     end
 
     # Key held event method for class pattern
     def key_held(key)
-      if @keys_held.include? key
-        @keys_held.delete key
-        true
-      else
-        false
-      end
+      @keys_held.include?(key) ? true : false
     end
 
     # Key up event method for class pattern
     def key_up(key)
-      if @keys_up.include? key
-        @keys_up.delete key
-        true
-      else
-        false
-      end
+      @keys_up.include?(key) ? true : false
     end
 
     # Key callback method, called by the native and web extentions
@@ -393,42 +378,22 @@ module Ruby2D
 
     # Mouse down event method for class pattern
     def mouse_down(btn)
-      if @mouse_buttons_down.include? btn
-        @mouse_buttons_down.delete btn
-        true
-      else
-        false
-      end
+      @mouse_buttons_down.include?(btn) ? true : false
     end
 
     # Mouse up event method for class pattern
     def mouse_up(btn)
-      if @mouse_buttons_up.include? btn
-        @mouse_buttons_up.delete btn
-        true
-      else
-        false
-      end
+      @mouse_buttons_up.include?(btn) ? true : false
     end
 
     # Mouse scroll event method for class pattern
     def mouse_scroll
-      if @mouse_scroll_event
-        @mouse_scroll_event = false
-        true
-      else
-        false
-      end
+      @mouse_scroll_event
     end
 
     # Mouse move event method for class pattern
     def mouse_move
-      if @mouse_move_event
-        @mouse_move_event = false
-        true
-      else
-        false
-      end
+      @mouse_move_event
     end
 
     # Mouse callback method, called by the native and web extentions
@@ -496,32 +461,17 @@ module Ruby2D
 
     # Controller axis event method for class pattern
     def controller_axis(axis)
-      if @controller_axes_moved.include? axis
-        @controller_axes_moved.delete axis
-        true
-      else
-        false
-      end
+      @controller_axes_moved.include?(axis) ? true : false
     end
 
     # Controller button down event method for class pattern
     def controller_button_down(btn)
-      if @controller_buttons_down.include? btn
-        @controller_buttons_down.delete btn
-        true
-      else
-        false
-      end
+      @controller_buttons_down.include?(btn) ? true : false
     end
 
     # Controller button up event method for class pattern
     def controller_button_up(btn)
-      if @controller_buttons_up.include? btn
-        @controller_buttons_up.delete btn
-        true
-      else
-        false
-      end
+      @controller_buttons_up.include?(btn) ? true : false
     end
 
     # Controller callback method, called by the native and web extentions
@@ -539,19 +489,19 @@ module Ruby2D
 
         @controller_id = which
 
-        case axis
-        when :left_x
-          @controller_left_x = value
-        when :left_y
-          @controller_left_y = value
-        when :right_x
-          @controller_right_x = value
-        when :right_y
-          @controller_right_y = value
-        end
-
         unless @controller_axes_moved.include? axis
           @controller_axes_moved << axis
+        end
+
+        case axis
+        when :left_x
+          @controller_axis_left_x = value
+        when :left_y
+          @controller_axis_left_y = value
+        when :right_x
+          @controller_axis_right_x = value
+        when :right_y
+          @controller_axis_right_y = value
         end
 
         # Call event handler
@@ -616,6 +566,17 @@ module Ruby2D
         end
       end
 
+      # Clear inputs
+      @keys_down.clear
+      @keys_held.clear
+      @keys_up.clear
+      @mouse_buttons_down.clear
+      @mouse_buttons_up.clear
+      @mouse_scroll_event = false
+      @mouse_move_event = false
+      @controller_axes_moved.clear
+      @controller_buttons_down.clear
+      @controller_buttons_up.clear
     end
 
     # Render callback method, called by the native and web extentions
