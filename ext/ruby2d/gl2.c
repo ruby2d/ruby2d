@@ -144,18 +144,4 @@ GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
   );
 }
 
-
-/*
- * Draw text
- */
-void R2D_GL2_DrawText(R2D_Text *txt) {
-  R2D_GL2_DrawTexture(
-    txt->x, txt->y, txt->width, txt->height,
-    txt->rotate, txt->rx, txt->ry,
-    txt->color.r, txt->color.g, txt->color.b, txt->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    txt->texture_id
-  );
-}
-
 #endif

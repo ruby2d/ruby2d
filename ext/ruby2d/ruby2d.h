@@ -522,10 +522,6 @@ void R2D_SetText(R2D_Text *txt, const char *msg, ...);
  */
 void R2D_RotateText(R2D_Text *txt, GLfloat angle, int position);
 
-/*
- * Draw text
- */
-void R2D_DrawText(R2D_Text *txt);
 
 /*
  * Free the text
@@ -724,7 +720,7 @@ void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
   GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-void R2D_GL_DrawText(R2D_Text *txt);
+void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
 void R2D_GL_FlushBuffers();
@@ -747,7 +743,6 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GLES_DrawText(R2D_Text *txt);
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -779,8 +774,6 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GL2_DrawText(R2D_Text *txt);
-  void R2D_GL3_DrawText(R2D_Text *txt);
   void R2D_GL3_FlushBuffers();
 #endif
 

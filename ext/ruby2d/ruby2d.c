@@ -134,6 +134,7 @@ static R2D_Window *window;
   static void free_text(R2D_Text *txt);
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
+  static void free_font(TTF_Font *font);
 #endif
 
 
@@ -594,6 +595,44 @@ static R_VAL ruby2d_text_ext_init(R_VAL self) {
 }
 
 
+static R_VAL ruby2d_text_ext_load_texture(R_VAL self, R_VAL font, R_VAL message) {
+  R2D_Init();
+
+  TTF_Font *font_data;
+  Data_Get_Struct(font, TTF_Font, font_data);
+  const char *newMessage = RSTRING_PTR(message);
+  int width;
+  int height;
+  GLuint texture_id = 0;
+  VALUE result;
+  result = rb_ary_new2(3);
+
+  if (newMessage == NULL || strlen(newMessage) == 0) newMessage = " ";
+
+  TTF_SizeUTF8(font_data, newMessage, &width, &height);
+
+  SDL_Color color = {255, 255, 255};
+  SDL_Surface *surface = TTF_RenderUTF8_Blended(font_data, newMessage, color);
+  if (!surface)
+  {
+    R2D_Error("TTF_RenderUTF8_Blended", TTF_GetError());
+    return R_NIL;
+  }
+
+  R2D_GL_CreateTexture(&texture_id, GL_RGBA,
+                       width, height,
+                       surface->pixels, GL_NEAREST);
+  SDL_FreeSurface(surface);
+
+  rb_ary_push(result, UINT2NUM(texture_id));
+  rb_ary_push(result, INT2NUM(width));
+  rb_ary_push(result, INT2NUM(height));
+
+  return result;
+}
+// 
+
+
 /*
  * Ruby2D::Text#ext_set
  */
@@ -612,36 +651,6 @@ static R_VAL ruby2d_text_ext_set(R_VAL self, R_VAL text) {
   r_iv_set(self, "@width", INT2NUM(txt->width));
   r_iv_set(self, "@height", INT2NUM(txt->height));
 
-  return R_NIL;
-}
-
-
-/*
- * Ruby2D::Text#self.ext_draw
- */
-#if MRUBY
-static R_VAL ruby2d_text_ext_draw(mrb_state* mrb, R_VAL self) {
-  mrb_value a;
-  mrb_get_args(mrb, "o", &a);
-#else
-static R_VAL ruby2d_text_ext_draw(R_VAL self, R_VAL a) {
-#endif
-  // `a` is the array representing the text
-
-  R2D_Text *txt;
-  r_data_get_struct(r_ary_entry(a, 0), "@data", &text_data_type, R2D_Text, txt);
-
-  txt->x = NUM2DBL(r_ary_entry(a, 1));
-  txt->y = NUM2DBL(r_ary_entry(a, 2));
-
-  R2D_RotateText(txt, NUM2DBL(r_ary_entry(a, 3)), R2D_CENTER);
-
-  txt->color.r = NUM2DBL(r_ary_entry(a, 4));
-  txt->color.g = NUM2DBL(r_ary_entry(a, 5));
-  txt->color.b = NUM2DBL(r_ary_entry(a, 6));
-  txt->color.a = NUM2DBL(r_ary_entry(a, 7));
-
-  R2D_DrawText(txt);
   return R_NIL;
 }
 
@@ -836,6 +845,49 @@ static R_VAL ruby2d_music_ext_length(R_VAL self) {
   R2D_Music *ms;
   r_data_get_struct(self, "@data", &music_data_type, R2D_Music, ms);
   return INT2NUM(R2D_GetMusicLength(ms));
+}
+
+// FIXME: This should be moved out of here once it's working
+static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size) {
+  const char* font = RSTRING_PTR(path);
+
+  // TODO: Figure out if we need to do this !!!!
+
+ // Check if font file exists
+  if (!R2D_FileExists(font)) {
+    R2D_Error("R2D_CreateText", "Font file `%s` not found", font); // FIXME: should have correct method name here
+    return R_NIL;
+  }
+
+  TTF_Font *font_data = TTF_OpenFont(font, NUM2INT(size));
+
+  if (!font_data) {
+    R2D_Error("TTF_OpenFont", TTF_GetError());
+    return R_NIL;
+  }
+
+  return r_data_wrap_struct(font, font_data);
+}
+
+
+/*
+ * Ruby2D::Texture#ext_draw
+ */
+static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL rubyVertices, R_VAL texture_id) {
+  GLfloat vertices[32];
+
+  for(int i = 0; i < 32; i++) { vertices[i] = NUM2DBL(r_ary_entry(rubyVertices, i)); }
+  
+  R2D_GL_DrawTexture(vertices, NUM2INT(texture_id));
+
+  return R_NIL;
+}
+
+/*
+ * Free font structure attached to Ruby 2D `Font` class
+ */
+static void free_font(TTF_Font *font) {
+  free(font);
 }
 
 
@@ -1305,11 +1357,11 @@ void Init_ruby2d() {
   // Ruby2D::Text#ext_init
   r_define_method(ruby2d_text_class, "ext_init", ruby2d_text_ext_init, r_args_none);
 
+  // Ruby2D::Text#ext_load_texture
+  r_define_method(ruby2d_text_class, "ext_load_texture", ruby2d_text_ext_load_texture, r_args_req(2));
+
   // Ruby2D::Text#ext_set
   r_define_method(ruby2d_text_class, "ext_set", ruby2d_text_ext_set, r_args_req(1));
-
-  // Ruby2D::Text#self.ext_draw
-  r_define_class_method(ruby2d_text_class, "ext_draw", ruby2d_text_ext_draw, r_args_req(1));
 
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
@@ -1352,6 +1404,18 @@ void Init_ruby2d() {
 
   // Ruby2D::Music#ext_length
   r_define_method(ruby2d_music_class, "ext_length", ruby2d_music_ext_length, r_args_none);
+
+  // Ruby2D::Font
+  R_CLASS ruby2d_font_class = r_define_class(ruby2d_module, "Font");
+
+  // Ruby2D::Font#ext_load
+  r_define_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
+
+  // Ruby2D::Texture
+  R_CLASS ruby2d_texture_class = r_define_class(ruby2d_module, "Texture");
+
+  // Ruby2D::Texture#ext_draw
+  r_define_method(ruby2d_texture_class, "ext_draw", ruby2d_texture_ext_draw, r_args_req(2));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

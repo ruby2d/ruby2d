@@ -410,22 +410,6 @@ void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, 
 
 
 /*
- * Draw text
- */
-void R2D_GL_DrawText(R2D_Text *txt) {
-  #if GLES
-    R2D_GLES_DrawText(txt);
-  #else
-    if (R2D_GL2) {
-      R2D_GL2_DrawText(txt);
-    } else {
-      R2D_GL3_DrawText(txt);
-    }
-  #endif
-}
-
-
-/*
  * Render and flush OpenGL buffers
  */
 void R2D_GL_FlushBuffers() {

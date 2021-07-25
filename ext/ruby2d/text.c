@@ -95,29 +95,6 @@ void R2D_RotateText(R2D_Text *txt, GLfloat angle, int position) {
 
 
 /*
- * Draw text
- */
-void R2D_DrawText(R2D_Text *txt) {
-  if (!txt) return;
-
-  if (txt->texture_id == 0) {
-    SDL_Color color = { 255, 255, 255 };
-    txt->surface = TTF_RenderUTF8_Blended(txt->font_data, txt->msg, color);
-    if (!txt->surface) {
-      R2D_Error("TTF_RenderUTF8_Blended", TTF_GetError());
-      return;
-    }
-    R2D_GL_CreateTexture(&txt->texture_id, GL_RGBA,
-                         txt->width, txt->height,
-                         txt->surface->pixels, GL_NEAREST);
-    SDL_FreeSurface(txt->surface);
-  }
-
-  R2D_GL_DrawText(txt);
-}
-
-
-/*
  * Free the text
  */
 void R2D_FreeText(R2D_Text *txt) {

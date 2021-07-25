@@ -304,6 +304,27 @@ static void R2D_GL3_DrawTexture(int x, int y, int w, int h,
 }
 
 
+// TODO: Create 3 versions, one for each of the different openGL implmentations we have :)
+void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id) {
+  // Currently, textures are not buffered, so we have to flush all buffers so
+  // textures get rendered in the correct Z order
+  R2D_GL3_FlushBuffers();
+
+  // Use the texture shader program
+  glUseProgram(texShaderProgram);
+
+  // Bind the texture using the provided ID
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+
+  // Create and Initialize the vertex data and array indices
+  glBufferData(GL_ARRAY_BUFFER, 32, vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+  // Render the textured quad
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+
+
 /*
  * Draw image
  */
@@ -343,20 +364,6 @@ GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
     img->color.r, img->color.g, img->color.b, img->color.a,
     tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
     img->texture_id
-  );
-}
-
-
-/*
- * Draw text
- */
-void R2D_GL3_DrawText(R2D_Text *txt) {
-  R2D_GL3_DrawTexture(
-    txt->x, txt->y, txt->width, txt->height,
-    txt->rotate, txt->rx, txt->ry,
-    txt->color.r, txt->color.g, txt->color.b, txt->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    txt->texture_id
   );
 }
 

@@ -25,6 +25,7 @@ require 'fileutils'
   'text',
   'sound',
   'music',
+  'texture',
   '../ruby2d'
 ]
 
