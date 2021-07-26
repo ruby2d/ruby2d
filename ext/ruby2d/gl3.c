@@ -317,7 +317,7 @@ void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id) {
   glBindTexture(GL_TEXTURE_2D, texture_id);
 
   // Create and Initialize the vertex data and array indices
-  glBufferData(GL_ARRAY_BUFFER, 32, vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, 32 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
   // Render the textured quad

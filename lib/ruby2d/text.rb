@@ -62,30 +62,28 @@ module Ruby2D
 
       # TODO: move this to a vertex calculator class
       x1 = @x
-      y1 = @y
       x2 = @x + @texture.width
-      y2 = @y
       x3 = @x + @texture.width
-      y3 = @y + @texture.height
       x4 = @x
+      y1 = @y
+      y2 = @y
+      y3 = @y + @texture.height
       y4 = @y + @texture.height
-      tx1 = 0
-      ty1 = 0
-      tx2 = 1
-      ty2 = 0
-      tx3 = 1
-      ty3 = 1
-      tx4 = 0
-      ty4 = 1
+      tx1 = 0.0
+      ty1 = 0.0
+      tx2 = 1.0
+      ty2 = 0.0
+      tx3 = 1.0
+      ty3 = 1.0
+      tx4 = 0.0
+      ty4 = 1.0
 
       # TODO: add rotation processing before outputing vertices :)
       @texture.ext_draw([
-        x1, y1, x2, y2, x3, y3, x4, y4, 
-        tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
-        @color.r, @color.g, @color.b, @color.a,
-        @color.r, @color.g, @color.b, @color.a,
-        @color.r, @color.g, @color.b, @color.a,
-        @color.r, @color.g, @color.b, @color.a],
+        x1, y1, @color.r, @color.g, @color.b, @color.a, tx1, ty1,
+        x2, y2, @color.r, @color.g, @color.b, @color.a, tx2, ty2,
+        x3, y3, @color.r, @color.g, @color.b, @color.a, tx3, ty3,
+        x4, y4, @color.r, @color.g, @color.b, @color.a, tx4, ty4],
         @texture.texture_id
       )
     end

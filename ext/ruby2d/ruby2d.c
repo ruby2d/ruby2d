@@ -849,9 +849,10 @@ static R_VAL ruby2d_music_ext_length(R_VAL self) {
 
 // FIXME: This should be moved out of here once it's working
 static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size) {
+  R2D_Init();
+
   const char* font = RSTRING_PTR(path);
 
-  // TODO: Figure out if we need to do this !!!!
 
  // Check if font file exists
   if (!R2D_FileExists(font)) {
