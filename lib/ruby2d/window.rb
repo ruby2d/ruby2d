@@ -317,17 +317,17 @@ module Ruby2D
 
     # Key down event method for class pattern
     def key_down(key)
-      @keys_down.include?(key) ? true : false
+      @keys_down.include? key
     end
 
     # Key held event method for class pattern
     def key_held(key)
-      @keys_held.include?(key) ? true : false
+      @keys_held.include? key
     end
 
     # Key up event method for class pattern
     def key_up(key)
-      @keys_up.include?(key) ? true : false
+      @keys_up.include? key
     end
 
     # Key callback method, called by the native and web extentions
@@ -343,8 +343,10 @@ module Ruby2D
       # When key is pressed, fired once
       when :down
         # For class pattern
-        unless @keys_down.include? key
-          @keys_down << key
+        unless @using_dsl
+          unless @keys_down.include? key
+            @keys_down << key
+          end
         end
 
         # Call event handler
@@ -354,8 +356,10 @@ module Ruby2D
       # When key is being held down, fired every frame
       when :held
         # For class pattern
-        unless @keys_held.include? key
-          @keys_held << key
+        unless @using_dsl
+          unless @keys_held.include? key
+            @keys_held << key
+          end
         end
 
         # Call event handler
@@ -365,8 +369,10 @@ module Ruby2D
       # When key released, fired once
       when :up
         # For class pattern
-        unless @keys_up.include? key
-          @keys_up << key
+        unless @using_dsl
+          unless @keys_up.include? key
+            @keys_up << key
+          end
         end
 
         # Call event handler
@@ -378,12 +384,12 @@ module Ruby2D
 
     # Mouse down event method for class pattern
     def mouse_down(btn)
-      @mouse_buttons_down.include?(btn) ? true : false
+      @mouse_buttons_down.include? btn
     end
 
     # Mouse up event method for class pattern
     def mouse_up(btn)
-      @mouse_buttons_up.include?(btn) ? true : false
+      @mouse_buttons_up.include? btn
     end
 
     # Mouse scroll event method for class pattern
@@ -407,8 +413,10 @@ module Ruby2D
       # When mouse button pressed
       when :down
         # For class pattern
-        unless @mouse_buttons_down.include? button
-          @mouse_buttons_down << button
+        unless @using_dsl
+          unless @mouse_buttons_down.include? button
+            @mouse_buttons_down << button
+          end
         end
 
         # Call event handler
@@ -418,8 +426,10 @@ module Ruby2D
       # When mouse button released
       when :up
         # For class pattern
-        unless @mouse_buttons_up.include? button
-          @mouse_buttons_up << button
+        unless @using_dsl
+          unless @mouse_buttons_up.include? button
+            @mouse_buttons_up << button
+          end
         end
 
         # Call event handler
@@ -429,10 +439,12 @@ module Ruby2D
       # When mouse motion / movement
       when :scroll
         # For class pattern
-        @mouse_scroll_event     = true
-        @mouse_scroll_direction = direction
-        @mouse_scroll_delta_x   = delta_x
-        @mouse_scroll_delta_y   = delta_y
+        unless @using_dsl
+          @mouse_scroll_event     = true
+          @mouse_scroll_direction = direction
+          @mouse_scroll_delta_x   = delta_x
+          @mouse_scroll_delta_y   = delta_y
+        end
 
         # Call event handler
         @events[:mouse_scroll].each do |id, e|
@@ -441,9 +453,11 @@ module Ruby2D
       # When mouse scrolling, wheel or trackpad
       when :move
         # For class pattern
-        @mouse_move_event    = true
-        @mouse_move_delta_x  = delta_x
-        @mouse_move_delta_y  = delta_y
+        unless @using_dsl
+          @mouse_move_event   = true
+          @mouse_move_delta_x = delta_x
+          @mouse_move_delta_y = delta_y
+        end
 
         # Call event handler
         @events[:mouse_move].each do |id, e|
@@ -461,17 +475,17 @@ module Ruby2D
 
     # Controller axis event method for class pattern
     def controller_axis(axis)
-      @controller_axes_moved.include?(axis) ? true : false
+      @controller_axes_moved.include? axis
     end
 
     # Controller button down event method for class pattern
     def controller_button_down(btn)
-      @controller_buttons_down.include?(btn) ? true : false
+      @controller_buttons_down.include? btn
     end
 
     # Controller button up event method for class pattern
     def controller_button_up(btn)
-      @controller_buttons_up.include?(btn) ? true : false
+      @controller_buttons_up.include? btn
     end
 
     # Controller callback method, called by the native and web extentions
@@ -486,22 +500,23 @@ module Ruby2D
       when :axis
 
         # For class pattern
+        unless @using_dsl
+          @controller_id = which
 
-        @controller_id = which
+          unless @controller_axes_moved.include? axis
+            @controller_axes_moved << axis
+          end
 
-        unless @controller_axes_moved.include? axis
-          @controller_axes_moved << axis
-        end
-
-        case axis
-        when :left_x
-          @controller_axis_left_x = value
-        when :left_y
-          @controller_axis_left_y = value
-        when :right_x
-          @controller_axis_right_x = value
-        when :right_y
-          @controller_axis_right_y = value
+          case axis
+          when :left_x
+            @controller_axis_left_x = value
+          when :left_y
+            @controller_axis_left_y = value
+          when :right_x
+            @controller_axis_right_x = value
+          when :right_y
+            @controller_axis_right_y = value
+          end
         end
 
         # Call event handler
@@ -511,9 +526,11 @@ module Ruby2D
       # When controller button is pressed
       when :button_down
         # For class pattern
-        @controller_id = which
-        unless @controller_buttons_down.include? button
-          @controller_buttons_down << button
+        unless @using_dsl
+          @controller_id = which
+          unless @controller_buttons_down.include? button
+            @controller_buttons_down << button
+          end
         end
 
         # Call event handler
@@ -523,9 +540,11 @@ module Ruby2D
       # When controller button is released
       when :button_up
         # For class pattern
-        @controller_id = which
-        unless @controller_buttons_up.include? button
-          @controller_buttons_up << button
+        unless @using_dsl
+          @controller_id = which
+          unless @controller_buttons_up.include? button
+            @controller_buttons_up << button
+          end
         end
 
         # Call event handler
@@ -566,17 +585,19 @@ module Ruby2D
         end
       end
 
-      # Clear inputs
-      @keys_down.clear
-      @keys_held.clear
-      @keys_up.clear
-      @mouse_buttons_down.clear
-      @mouse_buttons_up.clear
-      @mouse_scroll_event = false
-      @mouse_move_event = false
-      @controller_axes_moved.clear
-      @controller_buttons_down.clear
-      @controller_buttons_up.clear
+      # Clear inputs if using class pattern
+      unless @using_dsl
+        @keys_down.clear
+        @keys_held.clear
+        @keys_up.clear
+        @mouse_buttons_down.clear
+        @mouse_buttons_up.clear
+        @mouse_scroll_event = false
+        @mouse_move_event = false
+        @controller_axes_moved.clear
+        @controller_buttons_down.clear
+        @controller_buttons_up.clear
+      end
     end
 
     # Render callback method, called by the native and web extentions
