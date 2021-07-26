@@ -46,6 +46,8 @@ module Ruby2D
 
     # FIXME: This does not seem to be rotating currently
     def rotate(x, y)
+      return [x, y] if @rotate == 0
+
       rx = x + (@width / 2.0)
       ry = y + (@height / 2.0)
 
@@ -68,7 +70,7 @@ module Ruby2D
       x = xnew + rx;
       y = ynew + ry;
 
-      return [x, y]
+      [x, y]
     end
   end
 end
