@@ -702,11 +702,11 @@ int R2D_FreeWindow(R2D_Window *window);
 // Ruby 2D OpenGL Functions ////////////////////////////////////////////////////
 
 int R2D_GL_Init(R2D_Window *window);
-void R2D_GL_PrintError(char *error);
+void R2D_GL_PrintError(const char *error);
 void R2D_GL_PrintContextInfo(R2D_Window *window);
 void R2D_GL_StoreContextInfo(R2D_Window *window);
-GLuint R2D_GL_LoadShader(GLenum type, const GLchar *shaderSrc, char *shaderName);
-int R2D_GL_CheckLinked(GLuint program, char *name);
+GLuint R2D_GL_LoadShader(GLenum type, const GLchar *shaderSrc, const char *shaderName);
+int R2D_GL_CheckLinked(GLuint program, const char *name);
 void R2D_GL_GetViewportScale(R2D_Window *window, int *w, int *h, double *scale);
 void R2D_GL_SetViewport(R2D_Window *window);
 void R2D_GL_CreateTexture(
