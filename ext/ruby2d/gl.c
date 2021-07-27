@@ -20,7 +20,7 @@ static GLfloat orthoMatrix[16] =
 /*
  * Prints current GL error
  */
-void R2D_GL_PrintError(char *error) {
+void R2D_GL_PrintError(const char *error) {
   R2D_Log(R2D_ERROR, "%s (%d)", error, glGetError());
 }
 
@@ -69,7 +69,7 @@ void R2D_GL_StoreContextInfo(R2D_Window *window) {
  * Creates a shader object, loads shader string, and compiles.
  * Returns 0 if shader could not be compiled.
  */
-GLuint R2D_GL_LoadShader(GLenum type, const GLchar *shaderSrc, char *shaderName) {
+GLuint R2D_GL_LoadShader(GLenum type, const GLchar *shaderSrc, const char *shaderName) {
 
   // Create the shader object
   GLuint shader = glCreateShader(type);
@@ -111,7 +111,7 @@ GLuint R2D_GL_LoadShader(GLenum type, const GLchar *shaderSrc, char *shaderName)
 /*
  * Check if shader program was linked
  */
-int R2D_GL_CheckLinked(GLuint program, char *name) {
+int R2D_GL_CheckLinked(GLuint program, const char *name) {
 
   GLint linked;
   glGetProgramiv(program, GL_LINK_STATUS, &linked);
