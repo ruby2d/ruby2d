@@ -565,7 +565,7 @@ static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
 
 
 
-static R_VAL ruby2d_text_ext_load_texture(R_VAL self, R_VAL font, R_VAL message) {
+static R_VAL ruby2d_texture_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
   R2D_Init();
 
   TTF_Font *font_data;
@@ -1314,9 +1314,6 @@ void Init_ruby2d() {
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
 
-  // Ruby2D::Text#ext_load_texture
-  r_define_method(ruby2d_text_class, "ext_load_texture", ruby2d_text_ext_load_texture, r_args_req(2));
-
   // Ruby2D::Text#ext_set
   r_define_method(ruby2d_text_class, "ext_set", ruby2d_text_ext_set, r_args_req(1));
 
@@ -1373,6 +1370,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Texture#ext_draw
   r_define_method(ruby2d_texture_class, "ext_draw", ruby2d_texture_ext_draw, r_args_req(2));
+
+  // Ruby2D::Texture#ext_load_text
+  r_define_class_method(ruby2d_texture_class, "ext_load_text", ruby2d_texture_ext_load_text, r_args_req(2));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
