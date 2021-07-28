@@ -131,7 +131,6 @@ static R2D_Window *window;
 #else
   static void free_image(R2D_Image *img);
   static void free_sprite(R2D_Sprite *spr);
-  static void free_text(R2D_Text *txt);
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
@@ -565,35 +564,6 @@ static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
 }
 
 
-/*
- * Ruby2D::Text#ext_init
- * Initialize text structure data
- */
-#if MRUBY
-static R_VAL ruby2d_text_ext_init(mrb_state* mrb, R_VAL self) {
-#else
-static R_VAL ruby2d_text_ext_init(R_VAL self) {
-#endif
-  // Trim the font file string to its actual length on MRuby
-  #if MRUBY
-    mrb_value s = r_iv_get(self, "@font");
-    mrb_str_resize(mrb, s, RSTRING_LEN(s));
-  #endif
-
-  R2D_Text *txt = R2D_CreateText(
-    RSTRING_PTR(r_iv_get(self, "@font")),
-    RSTRING_PTR(r_iv_get(self, "@text")),
-    NUM2DBL(r_iv_get(self, "@size"))
-  );
-  if (!txt) return R_FALSE;
-
-  r_iv_set(self, "@width", INT2NUM(txt->width));
-  r_iv_set(self, "@height", INT2NUM(txt->height));
-  r_iv_set(self, "@data", r_data_wrap_struct(text, txt));
-
-  return R_TRUE;
-}
-
 
 static R_VAL ruby2d_text_ext_load_texture(R_VAL self, R_VAL font, R_VAL message) {
   R2D_Init();
@@ -643,28 +613,17 @@ static R_VAL ruby2d_text_ext_set(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_text_ext_set(R_VAL self, R_VAL text) {
 #endif
-  R2D_Text *txt;
-  r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
+  // TODO: Implement this with new text!
+  // Maybe this can just be done in ruby, we will need to delete the old texture
+  // R2D_Text *txt;
+  // r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
 
-  R2D_SetText(txt, RSTRING_PTR(text));
+  // R2D_SetText(txt, RSTRING_PTR(text));
 
-  r_iv_set(self, "@width", INT2NUM(txt->width));
-  r_iv_set(self, "@height", INT2NUM(txt->height));
+  // r_iv_set(self, "@width", INT2NUM(txt->width));
+  // r_iv_set(self, "@height", INT2NUM(txt->height));
 
   return R_NIL;
-}
-
-
-/*
- * Free text structure attached to Ruby 2D `Text` class
- */
-#if MRUBY
-static void free_text(mrb_state *mrb, void *p_) {
-  R2D_Text *txt = (R2D_Text *)p_;
-#else
-static void free_text(R2D_Text *txt) {
-#endif
-  R2D_FreeText(txt);
 }
 
 
@@ -1354,9 +1313,6 @@ void Init_ruby2d() {
 
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
-
-  // Ruby2D::Text#ext_init
-  r_define_method(ruby2d_text_class, "ext_init", ruby2d_text_ext_init, r_args_none);
 
   // Ruby2D::Text#ext_load_texture
   r_define_method(ruby2d_text_class, "ext_load_texture", ruby2d_text_ext_load_texture, r_args_req(2));

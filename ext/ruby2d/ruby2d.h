@@ -314,22 +314,6 @@ typedef struct {
   GLfloat ty4;
 } R2D_Sprite;
 
-// R2D_Text
-typedef struct {
-  const char *font;
-  SDL_Surface *surface;
-  GLuint texture_id;
-  TTF_Font *font_data;
-  R2D_Color color;
-  char *msg;
-  int x;
-  int y;
-  int width;
-  int height;
-  GLfloat rotate;  // Rotation angle in degrees
-  GLfloat rx;      // X coordinate to be rotated around
-  GLfloat ry;      // Y coordinate to be rotated around
-} R2D_Text;
 
 // R2D_Sound
 typedef struct {
@@ -506,27 +490,6 @@ void R2D_FreeSprite(R2D_Sprite *spr);
 void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
 
 // Text ////////////////////////////////////////////////////////////////////////
-
-/*
- * Create text, given a font file path, the message, and size
- */
-R2D_Text *R2D_CreateText(const char *font, const char *msg, int size);
-
-/*
-* Set the text message
-*/
-void R2D_SetText(R2D_Text *txt, const char *msg, ...);
-
-/*
- * Rotate text
- */
-void R2D_RotateText(R2D_Text *txt, GLfloat angle, int position);
-
-
-/*
- * Free the text
- */
-void R2D_FreeText(R2D_Text *txt);
 
 // Sound ///////////////////////////////////////////////////////////////////////
 
