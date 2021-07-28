@@ -25,7 +25,7 @@ RSpec.describe Ruby2D::Circle do
       expect(circle.radius).to eq(40)
       expect(circle.sectors).to eq(50)
       expect(circle.color.r).to eq(2/3.0)
-      expect(circle.opacity).to eq(0.5)
+      expect(circle.color.opacity).to eq(0.5)
     end
   end
 
@@ -38,7 +38,7 @@ RSpec.describe Ruby2D::Circle do
       circle.radius = 40
       circle.sectors = 50
       circle.color = 'gray'
-      circle.opacity = 0.5
+      circle.color.opacity = 0.5
 
       expect(circle.x).to eq(10)
       expect(circle.y).to eq(20)
@@ -46,7 +46,7 @@ RSpec.describe Ruby2D::Circle do
       expect(circle.radius).to eq(40)
       expect(circle.sectors).to eq(50)
       expect(circle.color.r).to eq(2/3.0)
-      expect(circle.opacity).to eq(0.5)
+      expect(circle.color.opacity).to eq(0.5)
     end
   end
 

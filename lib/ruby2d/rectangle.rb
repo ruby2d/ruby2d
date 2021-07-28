@@ -10,7 +10,7 @@ module Ruby2D
       @width = opts[:width] || 200
       @height = opts[:height] || 100
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       update_coords(@x, @y, @width, @height)
       add
     end

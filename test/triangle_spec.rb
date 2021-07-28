@@ -26,7 +26,7 @@ RSpec.describe Ruby2D::Triangle do
       expect(triangle.y3).to eq(60)
       expect(triangle.z).to eq(70)
       expect(triangle.color.r).to eq(2/3.0)
-      expect(triangle.opacity).to eq(0.5)
+      expect(triangle.color.opacity).to eq(0.5)
     end
 
     it "creates a new triangle with one color via string" do
@@ -79,7 +79,7 @@ RSpec.describe Ruby2D::Triangle do
       triangle.y3 = 60
       triangle.z = 70
       triangle.color = 'gray'
-      triangle.opacity = 0.5
+      triangle.color.opacity = 0.5
 
       expect(triangle.x1).to eq(10)
       expect(triangle.y1).to eq(20)
@@ -89,7 +89,7 @@ RSpec.describe Ruby2D::Triangle do
       expect(triangle.y3).to eq(60)
       expect(triangle.z).to eq(70)
       expect(triangle.color.r).to eq(2/3.0)
-      expect(triangle.opacity).to eq(0.5)
+      expect(triangle.color.opacity).to eq(0.5)
     end
   end
 

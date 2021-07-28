@@ -38,7 +38,7 @@ RSpec.describe Ruby2D::Image do
       expect(img.height).to eq(50)
       expect(img.rotate).to eq(60)
       expect(img.color.r).to eq(2/3.0)
-      expect(img.opacity).to eq(0.5)
+      expect(img.color.opacity).to eq(0.5)
     end
   end
 
@@ -52,7 +52,7 @@ RSpec.describe Ruby2D::Image do
       img.height = 50
       img.rotate = 60
       img.color = 'gray'
-      img.opacity = 0.5
+      img.color.opacity = 0.5
 
       expect(img.x).to eq(10)
       expect(img.y).to eq(20)
@@ -61,7 +61,7 @@ RSpec.describe Ruby2D::Image do
       expect(img.height).to eq(50)
       expect(img.rotate).to eq(60)
       expect(img.color.r).to eq(2/3.0)
-      expect(img.opacity).to eq(0.5)
+      expect(img.color.opacity).to eq(0.5)
     end
   end
 

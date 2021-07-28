@@ -25,7 +25,7 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.width).to eq(40)
       expect(rectangle.height).to eq(50)
       expect(rectangle.color.r).to eq(2/3.0)
-      expect(rectangle.opacity).to eq(0.5)
+      expect(rectangle.color.opacity).to eq(0.5)
     end
 
     it "creates a new rectangle with one color via string" do
@@ -77,7 +77,7 @@ RSpec.describe Ruby2D::Rectangle do
       rectangle.width = 40
       rectangle.height = 50
       rectangle.color = 'gray'
-      rectangle.opacity = 0.5
+      rectangle.color.opacity = 0.5
 
       expect(rectangle.x).to eq(10)
       expect(rectangle.y).to eq(20)
@@ -85,7 +85,7 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.width).to eq(40)
       expect(rectangle.height).to eq(50)
       expect(rectangle.color.r).to eq(2/3.0)
-      expect(rectangle.opacity).to eq(0.5)
+      expect(rectangle.color.opacity).to eq(0.5)
     end
   end
 

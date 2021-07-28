@@ -25,7 +25,7 @@ module Ruby2D
       @y4 = opts[:y4] || 100
       @z  = opts[:z]  || 0
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 

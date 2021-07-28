@@ -32,7 +32,7 @@ RSpec.describe Ruby2D::Sprite do
       expect(spr.height).to eq(50)
       expect(spr.rotate).to eq(60)
       expect(spr.color.r).to eq(2/3.0)
-      expect(spr.opacity).to eq(0.5)
+      expect(spr.color.opacity).to eq(0.5)
     end
   end
 
@@ -46,7 +46,7 @@ RSpec.describe Ruby2D::Sprite do
       spr.height = 50
       spr.rotate = 60
       spr.color = 'gray'
-      spr.opacity = 0.5
+      spr.color.opacity = 0.5
 
       expect(spr.x).to eq(10)
       expect(spr.y).to eq(20)
@@ -55,7 +55,7 @@ RSpec.describe Ruby2D::Sprite do
       expect(spr.height).to eq(50)
       expect(spr.rotate).to eq(60)
       expect(spr.color.r).to eq(2/3.0)
-      expect(spr.opacity).to eq(0.5)
+      expect(spr.color.opacity).to eq(0.5)
     end
   end
 

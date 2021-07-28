@@ -26,7 +26,7 @@ RSpec.describe Ruby2D::Square do
       expect(square.width).to eq(40)
       expect(square.height).to eq(40)
       expect(square.color.r).to eq(2/3.0)
-      expect(square.opacity).to eq(0.5)
+      expect(square.color.opacity).to eq(0.5)
     end
 
     it "creates a new square with one color via string" do
@@ -77,14 +77,14 @@ RSpec.describe Ruby2D::Square do
       square.z = 30
       square.size = 40
       square.color = 'gray'
-      square.opacity = 0.5
+      square.color.opacity = 0.5
 
       expect(square.x).to eq(10)
       expect(square.y).to eq(20)
       expect(square.z).to eq(30)
       expect(square.size).to eq(40)
       expect(square.color.r).to eq(2/3.0)
-      expect(square.opacity).to eq(0.5)
+      expect(square.color.opacity).to eq(0.5)
     end
   end
 

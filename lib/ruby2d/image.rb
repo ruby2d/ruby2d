@@ -19,7 +19,7 @@ module Ruby2D
       @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       unless ext_init(@path)
         raise Error, "Image `#{@path}` cannot be created"
       end

@@ -26,7 +26,7 @@ RSpec.describe Ruby2D::Line do
       expect(line.width).to eq(60)
       expect(line.length).to be_within(0.0001).of(28.2843)
       expect(line.color.r).to eq(2/3.0)
-      expect(line.opacity).to eq(0.5)
+      expect(line.color.opacity).to eq(0.5)
     end
 
     it "creates a new line with one color via string" do
@@ -79,7 +79,7 @@ RSpec.describe Ruby2D::Line do
       line.z = 50
       line.width = 60
       line.color = 'gray'
-      line.opacity = 0.5
+      line.color.opacity = 0.5
 
       expect(line.x1).to eq(10)
       expect(line.y1).to eq(20)
@@ -89,7 +89,7 @@ RSpec.describe Ruby2D::Line do
       expect(line.width).to eq(60)
       expect(line.length).to be_within(0.0001).of(28.2843)
       expect(line.color.r).to eq(2/3.0)
-      expect(line.opacity).to eq(0.5)
+      expect(line.color.opacity).to eq(0.5)
     end
   end
 
