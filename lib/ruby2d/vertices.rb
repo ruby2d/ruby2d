@@ -44,12 +44,11 @@ module Ruby2D
 
     private
 
-    # FIXME: This does not seem to be rotating currently
     def rotate(x, y)
       return [x, y] if @rotate == 0
 
-      rx = x + (@width / 2.0)
-      ry = y + (@height / 2.0)
+      rx = @x + (@width / 2.0)
+      ry = @y + (@height / 2.0)
 
       # Convert from degrees to radians
       angle = @rotate * Math::PI / 180.0
