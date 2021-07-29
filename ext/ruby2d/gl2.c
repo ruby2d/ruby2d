@@ -101,6 +101,25 @@ static void R2D_GL2_DrawTexture(int x, int y, int w, int h,
   glDisable(GL_TEXTURE_2D);
 }
 
+/*
+ * Draw a texture (New method with vertices pre-calculated)
+ */
+void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
+  glEnable(GL_TEXTURE_2D);
+
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+
+  glBegin(GL_QUADS);
+    glColor4f(color[0], color[1], color[2], color[3]);
+    glTexCoord2f(texture_coordinates[0], texture_coordinates[1]); glVertex2f(coordinates[0], coordinates[1]);
+    glTexCoord2f(texture_coordinates[2], texture_coordinates[3]); glVertex2f(coordinates[2], coordinates[3]);
+    glTexCoord2f(texture_coordinates[4], texture_coordinates[5]); glVertex2f(coordinates[4], coordinates[5]);
+    glTexCoord2f(texture_coordinates[6], texture_coordinates[7]); glVertex2f(coordinates[6], coordinates[7]);
+  glEnd();
+
+  glDisable(GL_TEXTURE_2D);
+};
+
 
 /*
  * Draw image

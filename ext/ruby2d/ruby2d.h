@@ -683,7 +683,7 @@ void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
   GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id);
+void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
 void R2D_GL_FlushBuffers();
@@ -706,6 +706,7 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
+  void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -737,6 +738,8 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
+  void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
   void R2D_GL3_FlushBuffers();
 #endif
 

@@ -833,12 +833,16 @@ static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size) {
 /*
  * Ruby2D::Texture#ext_draw
  */
-static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL rubyVertices, R_VAL texture_id) {
-  GLfloat vertices[32];
+static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL ruby_coordinates, R_VAL ruby_texture_coordinates, R_VAL ruby_color, R_VAL texture_id) {
+  GLfloat coordinates[8];
+  GLfloat texture_coordinates[8];
+  GLfloat color[4];
 
-  for(int i = 0; i < 32; i++) { vertices[i] = NUM2DBL(r_ary_entry(rubyVertices, i)); }
+  for(int i = 0; i < 8; i++) { coordinates[i] = NUM2DBL(r_ary_entry(ruby_coordinates, i)); }
+  for(int i = 0; i < 8; i++) { texture_coordinates[i] = NUM2DBL(r_ary_entry(ruby_texture_coordinates, i)); }
+  for(int i = 0; i < 4; i++) { color[i] = NUM2DBL(r_ary_entry(ruby_color, i)); }
   
-  R2D_GL_DrawTexture(vertices, NUM2INT(texture_id));
+  R2D_GL_DrawTexture(coordinates, texture_coordinates, color, NUM2INT(texture_id));
 
   return R_NIL;
 }
@@ -1369,7 +1373,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_texture_class = r_define_class(ruby2d_module, "Texture");
 
   // Ruby2D::Texture#ext_draw
-  r_define_method(ruby2d_texture_class, "ext_draw", ruby2d_texture_ext_draw, r_args_req(2));
+  r_define_method(ruby2d_texture_class, "ext_draw", ruby2d_texture_ext_draw, r_args_req(4));
 
   // Ruby2D::Texture#ext_load_text
   r_define_class_method(ruby2d_texture_class, "ext_load_text", ruby2d_texture_ext_load_text, r_args_req(2));

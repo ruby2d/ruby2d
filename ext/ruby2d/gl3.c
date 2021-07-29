@@ -304,8 +304,10 @@ static void R2D_GL3_DrawTexture(int x, int y, int w, int h,
 }
 
 
-// TODO: Create 3 versions, one for each of the different openGL implmentations we have :)
-void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id) {
+/*
+ * Draw a texture (New method with vertices pre-calculated)
+ */
+void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   // Currently, textures are not buffered, so we have to flush all buffers so
   // textures get rendered in the correct Z order
   R2D_GL3_FlushBuffers();
@@ -315,6 +317,13 @@ void R2D_GL_DrawTexture(GLfloat vertices[], int texture_id) {
 
   // Bind the texture using the provided ID
   glBindTexture(GL_TEXTURE_2D, texture_id);
+
+  GLfloat vertices[32] = {
+    coordinates[0], coordinates[1], color[0], color[1], color[2], color[3], texture_coordinates[0], texture_coordinates[1],
+    coordinates[2], coordinates[3], color[0], color[1], color[2], color[3], texture_coordinates[2], texture_coordinates[3],
+    coordinates[4], coordinates[5], color[0], color[1], color[2], color[3], texture_coordinates[4], texture_coordinates[5],
+    coordinates[6], coordinates[7], color[0], color[1], color[2], color[3], texture_coordinates[6], texture_coordinates[7],
+  };
 
   // Create and Initialize the vertex data and array indices
   glBufferData(GL_ARRAY_BUFFER, 32 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);

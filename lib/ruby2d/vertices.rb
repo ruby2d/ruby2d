@@ -1,45 +1,34 @@
 # Ruby2D::Vertices
 
 # This class generates a vertices array which are passed to the openGL rendering code.
-# The vertices array is split up into 4 groups of 8 values, a group for each corner of the texture to be drawn
-#
-# The values for each corner are: x, y, red, green, blue, alpha, texture x and texture y.
-#
-# x: the x position to draw the texture on the window
-# y: the y position to draw the texture on the window
-# red: the color to apply to the texture (from 0.0 - 1.0)
-# green: the green component of the color to apply to the texture (from 0.0 - 1.0)
-# blue: the blue component of color to apply to the texture (from 0.0 - 1.0)
-# alpha: the transparency component of the color to apply to the texture (from 0.0 - 1.0)
-# texture x: the point of the texture to read from, scaled from 0.0 - 1.0, 0 represents left, 1 represents right
-# texture y: the point of the texture to read from, scaled from 0.0 - 1.0, 0 represents bottom, 1 represents top
+# The vertices array is split up into 4 groups (1 - top left, 2 - top right, 3 - bottom right, 4 - bottom left)
 
 module Ruby2D
   class Vertices
-    def initialize(x, y, width, height, color, rotate)
+    def initialize(x, y, width, height, rotate)
       @x = x
       @y = y
       @width = width
       @height = height
-      @r = color.r
-      @g = color.g
-      @b = color.b
-      @a = color.a
       @rotate = rotate
     end
 
-    def to_a
-      x1, y1 = rotate(@x,          @y);           tx1 = 0.0; ty1 = 0.0
-      x2, y2 = rotate(@x + @width, @y);           tx2 = 1.0; ty2 = 0.0
-      x3, y3 = rotate(@x + @width, @y + @height); tx3 = 1.0; ty3 = 1.0
-      x4, y4 = rotate(@x,          @y + @height); tx4 = 0.0; ty4 = 1.0
+    def coordinates
+      x1, y1 = rotate(@x,          @y);           # Top left
+      x2, y2 = rotate(@x + @width, @y);           # Top right
+      x3, y3 = rotate(@x + @width, @y + @height); # Bottom right
+      x4, y4 = rotate(@x,          @y + @height); # Bottom left
 
-      [
-        x1, y1, @r, @g, @b, @a, tx1, ty1, # Top left
-        x2, y2, @r, @g, @b, @a, tx2, ty2, # Top right
-        x3, y3, @r, @g, @b, @a, tx3, ty3, # Bottom right
-        x4, y4, @r, @g, @b, @a, tx4, ty4  # Bottom left
-      ]
+      [ x1, y1, x2, y2, x3, y3, x4, y4 ]
+    end
+
+    def texture_coordinates
+      tx1 = 0.0; ty1 = 0.0 # Top left
+      tx2 = 1.0; ty2 = 0.0 # Top right
+      tx3 = 1.0; ty3 = 1.0 # Bottom right
+      tx4 = 0.0; ty4 = 1.0 # Bottom left
+
+      [ tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4 ]
     end
 
     private

@@ -54,9 +54,11 @@ module Ruby2D
         @texture = Texture.load_text(@font, @text)
       end
 
+      vertices = Vertices.new(x, y, @texture.width, @texture.height, rotate)
+      color = [color.r, color.g, color.b, color.a]
+
       @texture.ext_draw(
-        Vertices.new(x, y, @texture.width, @texture.height, color, rotate).to_a,
-        @texture.texture_id
+        vertices.coordinates, vertices.texture_coordinates, color, @texture.texture_id
       )
     end
   end
