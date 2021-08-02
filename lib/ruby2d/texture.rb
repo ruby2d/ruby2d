@@ -11,10 +11,6 @@ module Ruby2D
         @texture_id = 0
       end
 
-      def self.load_text(font, text)
-        Texture.new(*ext_load_text(font.ttf_font, text))
-      end
-
       def draw(coordinates, texture_coordinates, color)
         if @texture_id == 0
           @texture_id = ext_create(@pixel_data, @width, @height)

@@ -565,8 +565,10 @@ static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
 }
 
 
-
-static R_VAL ruby2d_texture_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
+/*
+ * Ruby2D::Text#ext_load_text
+ */
+static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
   R2D_Init();
 
   TTF_Font *font_data;
@@ -602,29 +604,6 @@ static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL widt
                        surface->pixels, GL_NEAREST);
 
   return INT2NUM(texture_id);
-}
-
-/*
- * Ruby2D::Text#ext_set
- */
-#if MRUBY
-static R_VAL ruby2d_text_ext_set(mrb_state* mrb, R_VAL self) {
-  mrb_value text;
-  mrb_get_args(mrb, "o", &text);
-#else
-static R_VAL ruby2d_text_ext_set(R_VAL self, R_VAL text) {
-#endif
-  // TODO: Implement this with new text!
-  // Maybe this can just be done in ruby, we will need to delete the old texture
-  // R2D_Text *txt;
-  // r_data_get_struct(self, "@data", &text_data_type, R2D_Text, txt);
-
-  // R2D_SetText(txt, RSTRING_PTR(text));
-
-  // r_iv_set(self, "@width", INT2NUM(txt->width));
-  // r_iv_set(self, "@height", INT2NUM(txt->height));
-
-  return R_NIL;
 }
 
 
@@ -1326,8 +1305,8 @@ void Init_ruby2d() {
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
 
-  // Ruby2D::Text#ext_set
-  r_define_method(ruby2d_text_class, "ext_set", ruby2d_text_ext_set, r_args_req(1));
+  // Ruby2D::Text#ext_load_text
+  r_define_method(ruby2d_text_class, "ext_load_text", ruby2d_text_ext_load_text, r_args_req(2));
 
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
@@ -1385,9 +1364,6 @@ void Init_ruby2d() {
 
   // Ruby2D::Texture#ext_create
   r_define_method(ruby2d_texture_class, "ext_create", ruby2d_texture_ext_create, r_args_req(3));
-
-  // Ruby2D::Texture#ext_load_text
-  r_define_class_method(ruby2d_texture_class, "ext_load_text", ruby2d_texture_ext_load_text, r_args_req(2));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

@@ -18,7 +18,7 @@ module Ruby2D
       self.opacity = opts[:opacity] if opts[:opacity]
       @font_path = opts[:font] || Font.default
       @font = Font.load(@font_path, @size)
-      @texture = Texture.load_text(@font, @text)
+      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
       @width = @texture.width
       @height = @texture.height
 
@@ -35,7 +35,7 @@ module Ruby2D
 
     def text=(msg)
       @text = msg.to_s
-      @texture = Texture.load_text(@font, @text)
+      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
       @width = @texture.width
       @height = @texture.height
     end
