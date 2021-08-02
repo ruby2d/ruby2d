@@ -21,6 +21,7 @@ module Ruby2D
 
       unless opts[:show] == false then add end
 
+      # TODO: Get dimensions
     end
 
     # Here to keep API compatibility
@@ -33,7 +34,9 @@ module Ruby2D
 
     def text=(msg)
       @text = msg.to_s
-      ext_set(@text)
+      # TODO: Get dimensions
+      @texture = nil
+      # ext_set(@text)
     end
 
     def draw(opts = {})
@@ -49,10 +52,8 @@ module Ruby2D
 
     def render(x: @x, y: @y, color: @color, rotate: @rotate)
       # TODO: If the width or height changes (maybe due to font size), we'll need to re-generate the texture :)
-      unless defined?(@texture)
-        # TODO: Texture may also need to store the surface object from the C extension (I think so we can free() it)
-        @texture = Texture.load_text(@font, @text)
-      end
+      # TODO: Texture may also need to store the surface object from the C extension (I think so we can free() it)
+      @texture ||= Texture.load_text(@font, @text)
 
       vertices = Vertices.new(x, y, @texture.width, @texture.height, rotate)
       color = [color.r, color.g, color.b, color.a]
