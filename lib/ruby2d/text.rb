@@ -18,10 +18,11 @@ module Ruby2D
       self.opacity = opts[:opacity] if opts[:opacity]
       @font_path = opts[:font] || Font.default
       @font = Font.load(@font_path, @size)
+      @texture = Texture.load_text(@font, @text)
+      @width = @texture.width
+      @height = @texture.height
 
       unless opts[:show] == false then add end
-
-      # TODO: Get dimensions
     end
 
     # Here to keep API compatibility
@@ -34,9 +35,9 @@ module Ruby2D
 
     def text=(msg)
       @text = msg.to_s
-      # TODO: Get dimensions
-      @texture = nil
-      # ext_set(@text)
+      @texture = Texture.load_text(@font, @text)
+      @width = @texture.width
+      @height = @texture.height
     end
 
     def draw(opts = {})
@@ -51,15 +52,10 @@ module Ruby2D
     private
 
     def render(x: @x, y: @y, color: @color, rotate: @rotate)
-      # TODO: If the width or height changes (maybe due to font size), we'll need to re-generate the texture :)
-      # TODO: Texture may also need to store the surface object from the C extension (I think so we can free() it)
-      @texture ||= Texture.load_text(@font, @text)
-
       vertices = Vertices.new(x, y, @texture.width, @texture.height, rotate)
-      color = [color.r, color.g, color.b, color.a]
 
-      @texture.ext_draw(
-        vertices.coordinates, vertices.texture_coordinates, color, @texture.texture_id
+      @texture.draw(
+        vertices.coordinates, vertices.texture_coordinates, color
       )
     end
   end

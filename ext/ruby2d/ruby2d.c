@@ -134,6 +134,7 @@ static R2D_Window *window;
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
+  static void free_surface(SDL_Surface *font);
 #endif
 
 
@@ -571,15 +572,9 @@ static R_VAL ruby2d_texture_ext_load_text(R_VAL self, R_VAL font, R_VAL message)
   TTF_Font *font_data;
   Data_Get_Struct(font, TTF_Font, font_data);
   const char *newMessage = RSTRING_PTR(message);
-  int width;
-  int height;
-  GLuint texture_id = 0;
-  VALUE result;
-  result = rb_ary_new2(3);
+  VALUE result = rb_ary_new2(3);
 
   if (newMessage == NULL || strlen(newMessage) == 0) newMessage = " ";
-
-  TTF_SizeUTF8(font_data, newMessage, &width, &height);
 
   SDL_Color color = {255, 255, 255};
   SDL_Surface *surface = TTF_RenderUTF8_Blended(font_data, newMessage, color);
@@ -589,19 +584,25 @@ static R_VAL ruby2d_texture_ext_load_text(R_VAL self, R_VAL font, R_VAL message)
     return R_NIL;
   }
 
-  R2D_GL_CreateTexture(&texture_id, GL_RGBA,
-                       width, height,
-                       surface->pixels, GL_NEAREST);
-  SDL_FreeSurface(surface);
-
-  rb_ary_push(result, UINT2NUM(texture_id));
-  rb_ary_push(result, INT2NUM(width));
-  rb_ary_push(result, INT2NUM(height));
+  rb_ary_push(result, r_data_wrap_struct(surface, surface));
+  rb_ary_push(result, INT2NUM(surface->w));
+  rb_ary_push(result, INT2NUM(surface->h));
 
   return result;
 }
-// 
 
+
+static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL width, R_VAL height) {
+  GLuint texture_id = 0;
+  SDL_Surface *surface;
+  Data_Get_Struct(rubySurface, SDL_Surface, surface);
+
+  R2D_GL_CreateTexture(&texture_id, GL_RGBA,
+                       NUM2INT(width), NUM2INT(height),
+                       surface->pixels, GL_NEAREST);
+
+  return INT2NUM(texture_id);
+}
 
 /*
  * Ruby2D::Text#ext_set
@@ -852,6 +853,13 @@ static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL ruby_coordinates, R_VAL r
  */
 static void free_font(TTF_Font *font) {
   free(font);
+}
+
+/*
+ * Free font structure attached to Ruby 2D `Surface` class
+ */
+static void free_surface(SDL_Surface *surface) {
+  SDL_FreeSurface(surface);
 }
 
 
@@ -1374,6 +1382,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Texture#ext_draw
   r_define_method(ruby2d_texture_class, "ext_draw", ruby2d_texture_ext_draw, r_args_req(4));
+
+  // Ruby2D::Texture#ext_create
+  r_define_method(ruby2d_texture_class, "ext_create", ruby2d_texture_ext_create, r_args_req(3));
 
   // Ruby2D::Texture#ext_load_text
   r_define_class_method(ruby2d_texture_class, "ext_load_text", ruby2d_texture_ext_load_text, r_args_req(2));
