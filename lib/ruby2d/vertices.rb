@@ -11,6 +11,8 @@ module Ruby2D
       @width = width
       @height = height
       @rotate = rotate
+      @rx = @x + (@width / 2.0)
+      @ry = @y + (@height / 2.0)
     end
 
     def coordinates
@@ -36,9 +38,6 @@ module Ruby2D
     def rotate(x, y)
       return [x, y] if @rotate == 0
 
-      rx = @x + (@width / 2.0)
-      ry = @y + (@height / 2.0)
-
       # Convert from degrees to radians
       angle = @rotate * Math::PI / 180.0
 
@@ -47,16 +46,16 @@ module Ruby2D
       ca = Math.cos(angle)
 
       # Translate point to origin
-      x -= rx
-      y -= ry
+      x -= @rx
+      y -= @ry
 
       # Rotate point
       xnew = x * ca - y * sa;
       ynew = x * sa + y * ca;
 
       # Translate point back
-      x = xnew + rx;
-      y = ynew + ry;
+      x = xnew + @rx;
+      y = ynew + @ry;
 
       [x, y]
     end
