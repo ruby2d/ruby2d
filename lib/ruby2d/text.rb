@@ -4,8 +4,8 @@ module Ruby2D
   class Text
     include Renderable
 
-    attr_reader :text
-    attr_accessor :x, :y, :size, :rotate, :data
+    attr_reader :text, :size
+    attr_accessor :x, :y, :rotate, :data
 
     def initialize(text, opts = {})
       @x = opts[:x] || 0
@@ -17,10 +17,8 @@ module Ruby2D
       self.color = opts[:color] || 'white'
       self.opacity = opts[:opacity] if opts[:opacity]
       @font_path = opts[:font] || Font.default
-      @font = Font.load(@font_path, @size)
-      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
-      @width = @texture.width
-      @height = @texture.height
+      create_font
+      create_texture
 
       unless opts[:show] == false then add end
     end
@@ -35,9 +33,13 @@ module Ruby2D
 
     def text=(msg)
       @text = msg.to_s
-      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
-      @width = @texture.width
-      @height = @texture.height
+      create_texture
+    end
+
+    def size=(size)
+      @size = size
+      create_font
+      create_texture
     end
 
     def draw(opts = {})
@@ -57,6 +59,16 @@ module Ruby2D
       @texture.draw(
         vertices.coordinates, vertices.texture_coordinates, color
       )
+    end
+
+    def create_font
+      @font = Font.load(@font_path, @size)
+    end
+
+    def create_texture
+      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
+      @width = @texture.width
+      @height = @texture.height
     end
   end
 end
