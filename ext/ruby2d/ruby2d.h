@@ -489,8 +489,18 @@ void R2D_FreeSprite(R2D_Sprite *spr);
  */
 void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
 
+// Font ////////////////////////////////////////////////////////////////////////
+
+/*
+ * Create a TTF_Font object given a path to a font and a size
+ */
+TTF_Font *R2D_FontCreateTTFFont(const char *path, int size);
+
 // Text ////////////////////////////////////////////////////////////////////////
 
+/*
+ * Create a SDL_Surface that contains the pixel data to render text, given a font and message
+ */
 SDL_Surface *R2D_TextCreateSurface(TTF_Font *font, const char *message);
 
 // Sound ///////////////////////////////////////////////////////////////////////

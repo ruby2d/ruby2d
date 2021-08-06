@@ -777,27 +777,18 @@ static R_VAL ruby2d_music_ext_length(R_VAL self) {
   return INT2NUM(R2D_GetMusicLength(ms));
 }
 
-// FIXME: This should be moved out of here once it's working
+/*
+ * Ruby2D::Font#ext_load
+ */
 static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size) {
   R2D_Init();
 
-  const char* font = RSTRING_PTR(path);
-
-
- // Check if font file exists
-  if (!R2D_FileExists(font)) {
-    R2D_Error("R2D_CreateText", "Font file `%s` not found", font); // FIXME: should have correct method name here
+  TTF_Font *font = R2D_FontCreateTTFFont(RSTRING_PTR(path), NUM2INT(size));
+  if (!font) {
     return R_NIL;
   }
 
-  TTF_Font *font_data = TTF_OpenFont(font, NUM2INT(size));
-
-  if (!font_data) {
-    R2D_Error("TTF_OpenFont", TTF_GetError());
-    return R_NIL;
-  }
-
-  return r_data_wrap_struct(font, font_data);
+  return r_data_wrap_struct(font, font);
 }
 
 
