@@ -828,14 +828,14 @@ static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL ruby_coordinates, R_VAL r
 }
 
 /*
- * Free font structure attached to Ruby 2D `Font` class
+ * Free font structure stored in the Ruby 2D `Font` class
  */
 static void free_font(TTF_Font *font) {
-  free(font);
+  TTF_CloseFont(font);
 }
 
 /*
- * Free font structure attached to Ruby 2D `Surface` class
+ * Free surface structure used within the Ruby 2D `Texture` class
  */
 static void free_surface(SDL_Surface *surface) {
   SDL_FreeSurface(surface);
