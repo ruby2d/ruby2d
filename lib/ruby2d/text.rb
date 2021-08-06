@@ -23,10 +23,7 @@ module Ruby2D
       unless opts[:show] == false then add end
     end
 
-    # Here to keep API compatibility
-    # TODO: revisit if this is neccessary or not
-    # I think it would be useful as you can clone text objects this way by using `font: another_text.font` in your
-    # constructor
+    # Returns the path of the font as a string
     def font
       @font_path
     end
