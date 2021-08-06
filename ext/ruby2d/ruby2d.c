@@ -116,10 +116,6 @@ static R2D_Window *window;
   static const struct mrb_data_type sprite_data_type = {
     "sprite", free_sprite
   };
-  static void free_text(mrb_state *mrb, void *p_);
-  static const struct mrb_data_type text_data_type = {
-    "text", free_text
-  };
   static void free_sound(mrb_state *mrb, void *p_);
   static const struct mrb_data_type sound_data_type = {
     "sound", free_sound
@@ -571,19 +567,14 @@ static R_VAL ruby2d_tileset_ext_draw(R_VAL self, R_VAL a) {
 static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
   R2D_Init();
 
-  TTF_Font *font_data;
-  Data_Get_Struct(font, TTF_Font, font_data);
-  const char *newMessage = RSTRING_PTR(message);
   VALUE result = rb_ary_new2(3);
 
-  if (newMessage == NULL || strlen(newMessage) == 0) newMessage = " ";
+  TTF_Font *ttf_font;
+  Data_Get_Struct(font, TTF_Font, ttf_font);
 
-  SDL_Color color = {255, 255, 255};
-  SDL_Surface *surface = TTF_RenderUTF8_Blended(font_data, newMessage, color);
-  if (!surface)
-  {
-    R2D_Error("TTF_RenderUTF8_Blended", TTF_GetError());
-    return R_NIL;
+  SDL_Surface *surface = R2D_TextCreateSurface(ttf_font, RSTRING_PTR(message));
+  if (!surface) {
+    return result;
   }
 
   rb_ary_push(result, r_data_wrap_struct(surface, surface));
