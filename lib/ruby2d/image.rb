@@ -15,14 +15,18 @@ module Ruby2D
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
-      @width = opts[:width] || nil
-      @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
       self.color.opacity = opts[:opacity] if opts[:opacity]
-      unless ext_init(@path)
-        raise Error, "Image `#{@path}` cannot be created"
-      end
+
+      @texture = Texture.new(*ext_load_image(@path))
+      @width = opts[:width] || @texture.width
+      @height = opts[:height] || @texture.height
+
+      # FIXME: Do we need to raise this somehow if ext_load_image fails ?
+      # unless ext_init(@path)
+      #   raise Error, "Image `#{@path}` cannot be created"
+      # end
       unless opts[:show] == false then add end
     end
 
@@ -34,20 +38,17 @@ module Ruby2D
         opts[:color] = [1.0, 1.0, 1.0, 1.0]
       end
 
-      self.class.ext_draw([
-        self, opts[:x], opts[:y], opts[:width], opts[:height], opts[:rotate],
-        opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
-      ])
+      render(x: opts[:x], y: opts[:y], width: opts[:width], height: opts[:height], color: Color.new(opts[:color]), rotate: opts[:rotate])
     end
 
     private
 
-    def render
-      self.class.ext_draw([
-        self, @x, @y, @width, @height, @rotate,
-        @color.r, @color.g, @color.b, @color.a
-      ])
-    end
+    def render(x: @x, y: @y, width: @width, height: @height, color: @color, rotate: @rotate)
+      vertices = Vertices.new(x, y, width, height, rotate)
 
+      @texture.draw(
+        vertices.coordinates, vertices.texture_coordinates, color
+      )
+    end
   end
 end

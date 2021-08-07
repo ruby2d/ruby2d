@@ -365,6 +365,41 @@ static R_VAL ruby2d_circle_ext_draw(R_VAL self, R_VAL a) {
 
 
 /*
+ * Ruby2D::Image#ext_load_image
+ * Create an SDL surface from an image path, return the surface, width, and height
+ */
+static R_VAL ruby2d_image_ext_load_image(R_VAL self, R_VAL rubyPath) {
+  R2D_Init();
+
+  const char* path = RSTRING_PTR(rubyPath);
+  VALUE result = rb_ary_new2(3);
+
+  // Check if image file exists
+  if (!R2D_FileExists(path)) {
+    R2D_Error("R2D_CreateImage", "Image file `%s` not found", path);
+    return result;
+  }
+
+  // Load image from file as SDL_Surface
+  SDL_Surface *surface = IMG_Load(path);
+
+  int bits_per_color = surface->format->Amask == 0 ?
+    surface->format->BitsPerPixel / 3 :
+    surface->format->BitsPerPixel / 4;
+
+  if (bits_per_color < 8) {
+    R2D_Log(R2D_WARN, "`%s` has less than 8 bits per color and will likely not render correctly", path, bits_per_color);
+  }
+
+  rb_ary_push(result, r_data_wrap_struct(surface, surface));
+  rb_ary_push(result, INT2NUM(surface->w));
+  rb_ary_push(result, INT2NUM(surface->h));
+
+  return result;
+}
+
+
+/*
  * Ruby2D::Image#ext_init
  * Initialize image structure data
  */
@@ -590,6 +625,8 @@ static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL widt
   SDL_Surface *surface;
   Data_Get_Struct(rubySurface, SDL_Surface, surface);
 
+  // FIXME: Currently the image format is GL_RGBA hard coded, we will need to detect this as it'll depend on the
+  // surface!
   R2D_GL_CreateTexture(&texture_id, GL_RGBA,
                        NUM2INT(width), NUM2INT(height),
                        surface->pixels, GL_NEAREST);
@@ -1312,6 +1349,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
+
+  // Ruby2D::Image#ext_load_image
+  r_define_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
 
   // Ruby2D::Image#ext_init
   r_define_method(ruby2d_image_class, "ext_init", ruby2d_image_ext_init, r_args_req(1));

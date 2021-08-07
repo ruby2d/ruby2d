@@ -51,7 +51,7 @@ module Ruby2D
     private
 
     def render(x: @x, y: @y, color: @color, rotate: @rotate)
-      vertices = Vertices.new(x, y, @texture.width, @texture.height, rotate)
+      vertices = Vertices.new(x, y, @width, @height, rotate)
 
       @texture.draw(
         vertices.coordinates, vertices.texture_coordinates, color
