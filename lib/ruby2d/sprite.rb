@@ -23,7 +23,7 @@ module Ruby2D
       @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
 
       # Flipping status, coordinates, and size, used internally
       @flip = nil

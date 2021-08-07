@@ -36,7 +36,7 @@ RSpec.describe Ruby2D::Text do
       expect(txt.size).to eq(40)
       expect(txt.rotate).to eq(50)
       expect(txt.color.r).to eq(2/3.0)
-      expect(txt.opacity).to eq(0.5)
+      expect(txt.color.opacity).to eq(0.5)
     end
   end
 
@@ -49,7 +49,7 @@ RSpec.describe Ruby2D::Text do
       txt.size = 40
       txt.rotate = 50
       txt.color = 'gray'
-      txt.opacity = 0.5
+      txt.color.opacity = 0.5
 
       expect(txt.x).to eq(10)
       expect(txt.y).to eq(20)
@@ -57,7 +57,7 @@ RSpec.describe Ruby2D::Text do
       expect(txt.size).to eq(40)
       expect(txt.rotate).to eq(50)
       expect(txt.color.r).to eq(2/3.0)
-      expect(txt.opacity).to eq(0.5)
+      expect(txt.color.opacity).to eq(0.5)
     end
   end
 

@@ -14,7 +14,7 @@ module Ruby2D
       @z = opts[:z] || 0
       @width = opts[:width] || 2
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 

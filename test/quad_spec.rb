@@ -32,7 +32,7 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.y4).to eq(80)
       expect(quad.z).to eq(90)
       expect(quad.color.r).to eq(2/3.0)
-      expect(quad.opacity).to eq(0.5)
+      expect(quad.color.opacity).to eq(0.5)
     end
 
     it "creates a new quad with one color via string" do
@@ -88,7 +88,7 @@ RSpec.describe Ruby2D::Quad do
       quad.y4 = 80
       quad.z = 90
       quad.color = 'gray'
-      quad.opacity = 0.5
+      quad.color.opacity = 0.5
 
       expect(quad.x1).to eq(10)
       expect(quad.y1).to eq(20)
@@ -100,7 +100,7 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.y4).to eq(80)
       expect(quad.z).to eq(90)
       expect(quad.color.r).to eq(2/3.0)
-      expect(quad.opacity).to eq(0.5)
+      expect(quad.color.opacity).to eq(0.5)
     end
   end
 

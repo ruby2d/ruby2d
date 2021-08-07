@@ -40,11 +40,11 @@ RSpec.describe Ruby2D::Color do
   describe "#opacity" do
     it "sets and returns the opacity" do
       s1 = Square.new
-      s1.opacity = 0.5
+      s1.color.opacity = 0.5
       s2 = Square.new(color: ['red', 'green', 'blue', 'yellow'])
-      s2.opacity = 0.7
-      expect(s1.opacity).to eq(0.5)
-      expect(s2.opacity).to eq(0.7)
+      s2.color.opacity = 0.7
+      expect(s1.color.opacity).to eq(0.5)
+      expect(s2.color.opacity).to eq(0.7)
     end
   end
 

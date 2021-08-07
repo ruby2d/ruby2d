@@ -30,15 +30,6 @@ RSpec.describe Ruby2D::Renderable do
     expect(shape.color.g).to eq(0.2)
     expect(shape.color.b).to eq(0.3)
     expect(shape.color.a).to eq(0.4)
-
-    shape.r = 0.5
-    shape.g = 0.6
-    shape.b = 0.7
-    shape.a = 0.8
-    expect(shape.r).to eq(0.5)
-    expect(shape.g).to eq(0.6)
-    expect(shape.b).to eq(0.7)
-    expect(shape.a).to eq(0.8)
   end
 
   it "allows British English spelling of color (colour)" do
@@ -65,10 +56,6 @@ RSpec.describe Ruby2D::Renderable do
     expect(shape.color.g).to eq(0.8)
     expect(shape.color.b).to eq(0.7)
     expect(shape.color.a).to eq(0.6)
-    expect(shape.r).to eq(0.9)
-    expect(shape.g).to eq(0.8)
-    expect(shape.b).to eq(0.7)
-    expect(shape.a).to eq(0.6)
   end
 
   describe "#contains?" do

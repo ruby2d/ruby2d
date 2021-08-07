@@ -13,7 +13,7 @@ module Ruby2D
       @radius = opts[:radius] || 50
       @sectors = opts[:sectors] || 30
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       add
     end
 
