@@ -97,38 +97,6 @@ R2D_Image *R2D_CreateImage(const char *path) {
 
 
 /*
- * Rotate an image
- */
-void R2D_RotateImage(R2D_Image *img, GLfloat angle, int position) {
-
-  R2D_GL_Point p = R2D_GetRectRotationPoint(
-    img->x, img->y, img->width, img->height, position
-  );
-
-  img->rotate = angle;
-  img->rx = p.x;
-  img->ry = p.y;
-}
-
-
-/*
- * Draw an image
- */
-void R2D_DrawImage(R2D_Image *img) {
-  if (!img) return;
-
-  if (img->texture_id == 0) {
-    R2D_GL_CreateTexture(&img->texture_id, img->format,
-                         img->orig_width, img->orig_height,
-                         img->surface->pixels, GL_NEAREST);
-    SDL_FreeSurface(img->surface);
-  }
-
-  R2D_GL_DrawImage(img);
-}
-
-
-/*
  * Free an image
  */
 void R2D_FreeImage(R2D_Image *img) {

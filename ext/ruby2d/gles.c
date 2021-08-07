@@ -307,19 +307,6 @@ void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 }
 
-/*
- * Draw image
- */
-void R2D_GLES_DrawImage(R2D_Image *img) {
-  R2D_GLES_DrawTexture(
-    img->x, img->y, img->width, img->height,
-    img->rotate, img->rx, img->ry,
-    img->color.r, img->color.g, img->color.b, img->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    img->texture_id
-  );
-}
-
 
 /*
  * Draw sprite
