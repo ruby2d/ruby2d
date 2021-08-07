@@ -661,8 +661,8 @@ static R_VAL ruby2d_sound_ext_get_volume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_get_volume(R_VAL self) {
 #endif
-  S2D_Sound *snd;
-  r_data_get_struct(self, "@data", &sound_data_type, S2D_Sound, snd);
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
   return INT2NUM(ceil(Mix_VolumeChunk(snd->data, -1) * (100.0 / MIX_MAX_VOLUME)));
 }
 
@@ -676,9 +676,9 @@ static R_VAL ruby2d_sound_ext_set_volume(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_sound_ext_set_volume(R_VAL self, R_VAL volume) {
 #endif
-  S2D_Sound *snd;
-  r_data_get_struct(self, "@data", &sound_data_type, S2D_Sound, snd);
-  Mix_VolumeChunk(snd->data, NUM2INT(volume));
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  Mix_VolumeChunk(snd->data, (NUM2INT(volume) / 100.0) * MIX_MAX_VOLUME);
   return R_NIL;
 }
 
