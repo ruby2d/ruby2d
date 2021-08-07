@@ -64,6 +64,7 @@ module Ruby2D
         macos_font_path   = '/Library/Fonts'
         linux_font_path   = '/usr/share/fonts'
         windows_font_path = 'C:/Windows/Fonts'
+        openbsd_font_path = '/usr/X11R6/lib/X11/fonts'
 
         # If MRI and/or non-Bash shell (like cmd.exe)
         if Object.const_defined? :RUBY_PLATFORM
@@ -74,16 +75,20 @@ module Ruby2D
             linux_font_path
           when /mingw/
             windows_font_path
+          when /openbsd/
+            openbsd_font_path
           end
         # If MRuby
         else
           uname = `uname`
-          if uname.include? 'Darwin' # macOS
+          if uname.include? 'Darwin'  # macOS
             macos_font_path
           elsif uname.include? 'Linux'
             linux_font_path
           elsif uname.include? 'MINGW'
             windows_font_path
+          elsif uname.include? 'OpenBSD'
+            openbsd_font_path
           end
         end
       end
