@@ -314,22 +314,6 @@ typedef struct {
   GLfloat ty4;
 } R2D_Sprite;
 
-// R2D_Text
-typedef struct {
-  const char *font;
-  SDL_Surface *surface;
-  GLuint texture_id;
-  TTF_Font *font_data;
-  R2D_Color color;
-  char *msg;
-  int x;
-  int y;
-  int width;
-  int height;
-  GLfloat rotate;  // Rotation angle in degrees
-  GLfloat rx;      // X coordinate to be rotated around
-  GLfloat ry;      // Y coordinate to be rotated around
-} R2D_Text;
 
 // R2D_Sound
 typedef struct {
@@ -505,32 +489,19 @@ void R2D_FreeSprite(R2D_Sprite *spr);
  */
 void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
 
+// Font ////////////////////////////////////////////////////////////////////////
+
+/*
+ * Create a TTF_Font object given a path to a font and a size
+ */
+TTF_Font *R2D_FontCreateTTFFont(const char *path, int size);
+
 // Text ////////////////////////////////////////////////////////////////////////
 
 /*
- * Create text, given a font file path, the message, and size
+ * Create a SDL_Surface that contains the pixel data to render text, given a font and message
  */
-R2D_Text *R2D_CreateText(const char *font, const char *msg, int size);
-
-/*
-* Set the text message
-*/
-void R2D_SetText(R2D_Text *txt, const char *msg, ...);
-
-/*
- * Rotate text
- */
-void R2D_RotateText(R2D_Text *txt, GLfloat angle, int position);
-
-/*
- * Draw text
- */
-void R2D_DrawText(R2D_Text *txt);
-
-/*
- * Free the text
- */
-void R2D_FreeText(R2D_Text *txt);
+SDL_Surface *R2D_TextCreateSurface(TTF_Font *font, const char *message);
 
 // Sound ///////////////////////////////////////////////////////////////////////
 
@@ -724,7 +695,7 @@ void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
   GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-void R2D_GL_DrawText(R2D_Text *txt);
+void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
 void R2D_GL_FlushBuffers();
@@ -747,7 +718,7 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GLES_DrawText(R2D_Text *txt);
+  void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -779,8 +750,8 @@ void R2D_GL_FlushBuffers();
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
     GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GL2_DrawText(R2D_Text *txt);
-  void R2D_GL3_DrawText(R2D_Text *txt);
+  void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
   void R2D_GL3_FlushBuffers();
 #endif
 

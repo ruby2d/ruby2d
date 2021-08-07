@@ -263,6 +263,49 @@ static void R2D_GLES_DrawTexture(int x, int y, int w, int h,
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 }
 
+/*
+ * Draw a texture (New method with vertices pre-calculated)
+ */
+void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  GLfloat vertices[] =
+  //  x, y coords | x, y texture coords
+  {
+    coordinates[0], coordinates[1], 0.f, texture_coordinates[0], texture_coordinates[1],
+    coordinates[2], coordinates[3], 0.f, texture_coordinates[2], texture_coordinates[3],
+    coordinates[4], coordinates[5], 0.f, texture_coordinates[4], texture_coordinates[5],
+    coordinates[6], coordinates[7], 0.f, texture_coordinates[6], texture_coordinates[7] };
+
+  GLfloat colors[] =
+    { color[0], color[1], color[2], color[3],
+    color[0], color[1], color[2], color[3],
+    color[0], color[1], color[2], color[3],
+    color[0], color[1], color[2], color[3] };
+
+  glUseProgram(texShaderProgram);
+
+  // Load the vertex position
+  glVertexAttribPointer(texPositionLocation, 3, GL_FLOAT, GL_FALSE,
+                        5 * sizeof(GLfloat), vertices);
+  glEnableVertexAttribArray(texPositionLocation);
+
+  // Load the colors
+  glVertexAttribPointer(texColorLocation, 4, GL_FLOAT, GL_FALSE, 0, colors);
+  glEnableVertexAttribArray(texColorLocation);
+
+  // Load the texture coordinate
+  glVertexAttribPointer(texCoordLocation, 2, GL_FLOAT, GL_FALSE,
+                        5 * sizeof(GLfloat), &vertices[3]);
+  glEnableVertexAttribArray(texCoordLocation);
+
+  // Bind the texture
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+
+  // Set the sampler texture unit to 0
+  glUniform1i(samplerLocation, 0);
+
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
+}
 
 /*
  * Draw image
@@ -303,20 +346,6 @@ GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
     img->color.r, img->color.g, img->color.b, img->color.a,
     tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
     img->texture_id
-  );
-}
-
-
-/*
- * Draw text
- */
-void R2D_GLES_DrawText(R2D_Text *txt) {
-  R2D_GLES_DrawTexture(
-    txt->x, txt->y, txt->width, txt->height,
-    txt->rotate, txt->rx, txt->ry,
-    txt->color.r, txt->color.g, txt->color.b, txt->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    txt->texture_id
   );
 }
 

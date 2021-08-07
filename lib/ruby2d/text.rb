@@ -4,8 +4,8 @@ module Ruby2D
   class Text
     include Renderable
 
-    attr_reader :text, :font
-    attr_accessor :x, :y, :size, :rotate, :data
+    attr_reader :text, :size
+    attr_accessor :x, :y, :rotate, :data
 
     def initialize(text, opts = {})
       @x = opts[:x] || 0
@@ -16,19 +16,27 @@ module Ruby2D
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
       self.opacity = opts[:opacity] if opts[:opacity]
-      @font = opts[:font] || Font.default
-      unless File.exist? @font
-        raise Error, "Cannot find font file `#{@font}`"
-      end
-      unless ext_init
-        raise Error, "Text `#{@text}` cannot be created"
-      end
+      @font_path = opts[:font] || Font.default
+      create_font
+      create_texture
+
       unless opts[:show] == false then add end
+    end
+
+    # Returns the path of the font as a string
+    def font
+      @font_path
     end
 
     def text=(msg)
       @text = msg.to_s
-      ext_set(@text)
+      create_texture
+    end
+
+    def size=(size)
+      @size = size
+      create_font
+      create_texture
     end
 
     def draw(opts = {})
@@ -37,20 +45,27 @@ module Ruby2D
         opts[:color] = [1.0, 1.0, 1.0, 1.0]
       end
 
-      self.class.ext_draw([
-        self, opts[:x], opts[:y], opts[:rotate],
-        opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
-      ])
+      render(x: opts[:x], y: opts[:y], color: Color.new(opts[:color]), rotate: opts[:rotate])
     end
 
     private
 
-    def render
-      self.class.ext_draw([
-        self, @x, @y, @rotate,
-        @color.r, @color.g, @color.b, @color.a
-      ])
+    def render(x: @x, y: @y, color: @color, rotate: @rotate)
+      vertices = Vertices.new(x, y, @texture.width, @texture.height, rotate)
+
+      @texture.draw(
+        vertices.coordinates, vertices.texture_coordinates, color
+      )
     end
 
+    def create_font
+      @font = Font.load(@font_path, @size)
+    end
+
+    def create_texture
+      @texture = Texture.new(*ext_load_text(@font.ttf_font, @text))
+      @width = @texture.width
+      @height = @texture.height
+    end
   end
 end

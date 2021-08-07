@@ -61,6 +61,18 @@ RSpec.describe Ruby2D::Text do
     end
   end
 
+  describe '#size=' do
+    it "re-renders the text with new dimensions" do
+      txt = Text.new('hello', size: 10)
+      original_width = txt.width
+      original_height = txt.height
+
+      txt.size = 20
+      expect(txt.width).to be > original_width
+      expect(txt.height).to be > original_width
+    end
+  end
+
   describe "#text=" do
     it "maps Time to string" do
       txt = Text.new('hello', font: 'test/media/bitstream_vera/vera.ttf')

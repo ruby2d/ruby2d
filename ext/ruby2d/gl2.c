@@ -101,6 +101,25 @@ static void R2D_GL2_DrawTexture(int x, int y, int w, int h,
   glDisable(GL_TEXTURE_2D);
 }
 
+/*
+ * Draw a texture (New method with vertices pre-calculated)
+ */
+void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
+  glEnable(GL_TEXTURE_2D);
+
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+
+  glBegin(GL_QUADS);
+    glColor4f(color[0], color[1], color[2], color[3]);
+    glTexCoord2f(texture_coordinates[0], texture_coordinates[1]); glVertex2f(coordinates[0], coordinates[1]);
+    glTexCoord2f(texture_coordinates[2], texture_coordinates[3]); glVertex2f(coordinates[2], coordinates[3]);
+    glTexCoord2f(texture_coordinates[4], texture_coordinates[5]); glVertex2f(coordinates[4], coordinates[5]);
+    glTexCoord2f(texture_coordinates[6], texture_coordinates[7]); glVertex2f(coordinates[6], coordinates[7]);
+  glEnd();
+
+  glDisable(GL_TEXTURE_2D);
+};
+
 
 /*
  * Draw image
@@ -141,20 +160,6 @@ GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
     img->color.r, img->color.g, img->color.b, img->color.a,
     tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
     img->texture_id
-  );
-}
-
-
-/*
- * Draw text
- */
-void R2D_GL2_DrawText(R2D_Text *txt) {
-  R2D_GL2_DrawTexture(
-    txt->x, txt->y, txt->width, txt->height,
-    txt->rotate, txt->rx, txt->ry,
-    txt->color.r, txt->color.g, txt->color.b, txt->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    txt->texture_id
   );
 }
 

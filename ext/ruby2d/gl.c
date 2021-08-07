@@ -408,18 +408,17 @@ void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, 
   #endif
 }
 
-
 /*
- * Draw text
+ * Draw a texture
  */
-void R2D_GL_DrawText(R2D_Text *txt) {
+void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   #if GLES
-    R2D_GLES_DrawText(txt);
+    R2D_GLES_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
   #else
     if (R2D_GL2) {
-      R2D_GL2_DrawText(txt);
+      R2D_GL2_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
     } else {
-      R2D_GL3_DrawText(txt);
+      R2D_GL3_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
     }
   #endif
 }
