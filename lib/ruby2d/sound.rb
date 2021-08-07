@@ -26,5 +26,30 @@ module Ruby2D
       ext_length
     end
 
+    # Get the volume of the sound
+    def volume
+      ext_get_volume
+    end
+
+    # Set the volume of the sound
+    def volume=(v)
+      # Clamp value to between 0-100
+      if v < 0 then v = 0 end
+      if v > 100 then v = 100 end
+      ext_set_volume(v)
+    end
+
+    # Get the volume of the sound mixer
+    def self.mix_volume
+      ext_get_mix_volume
+    end
+
+    # Set the volume of the sound mixer
+    def self.mix_volume=(v)
+      # Clamp value to between 0-100
+      if v < 0 then v = 0 end
+      if v > 100 then v = 100 end
+      ext_set_mix_volume(v)
+    end
   end
 end

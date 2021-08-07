@@ -653,6 +653,59 @@ static void free_sound(R2D_Sound *snd) {
   R2D_FreeSound(snd);
 }
 
+/*
+ * Ruby2D::Sound#ext_get_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_sound_ext_get_volume(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_sound_ext_get_volume(R_VAL self) {
+#endif
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  return INT2NUM(ceil(Mix_VolumeChunk(snd->data, -1) * (100.0 / MIX_MAX_VOLUME)));
+}
+
+/*
+ * Ruby2D::Music#ext_set_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_sound_ext_set_volume(mrb_state* mrb, R_VAL self) {
+  mrb_value volume;
+  mrb_get_args(mrb, "o", &volume);
+#else
+static R_VAL ruby2d_sound_ext_set_volume(R_VAL self, R_VAL volume) {
+#endif
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  Mix_VolumeChunk(snd->data, (NUM2INT(volume) / 100.0) * MIX_MAX_VOLUME);
+  return R_NIL;
+}
+
+/*
+ * Ruby2D::Sound#ext_get_mix_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_sound_ext_get_mix_volume(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_sound_ext_get_mix_volume(R_VAL self) {
+#endif
+  return INT2NUM(ceil(Mix_Volume(-1, -1) * (100.0 / MIX_MAX_VOLUME)));
+}
+
+/*
+ * Ruby2D::Music#ext_set_mix_volume
+ */
+#if MRUBY
+static R_VAL ruby2d_sound_ext_set_mix_volume(mrb_state* mrb, R_VAL self) {
+  mrb_value volume;
+  mrb_get_args(mrb, "o", &volume);
+#else
+static R_VAL ruby2d_sound_ext_set_mix_volume(R_VAL self, R_VAL volume) {
+#endif
+  Mix_Volume(-1, (NUM2INT(volume) / 100.0) * MIX_MAX_VOLUME);
+  return R_NIL;
+}
 
 /*
  * Ruby2D::Music#ext_init
@@ -1298,6 +1351,18 @@ void Init_ruby2d() {
 
   // Ruby2D::Sound#ext_play
   r_define_method(ruby2d_sound_class, "ext_play", ruby2d_sound_ext_play, r_args_none);
+  
+  // Ruby2D::Sound#ext_get_volume
+  r_define_method(ruby2d_sound_class, "ext_get_volume", ruby2d_sound_ext_get_volume, r_args_none);
+  
+  // Ruby2D::Sound#ext_set_volume
+  r_define_method(ruby2d_sound_class, "ext_set_volume", ruby2d_sound_ext_set_volume, r_args_req(1));
+  
+  // Ruby2D::Sound#self.ext_get_mix_volume
+  r_define_class_method(ruby2d_sound_class, "ext_get_mix_volume", ruby2d_sound_ext_get_mix_volume, r_args_none);
+  
+  // Ruby2D::Sound#self.ext_set_mix_volume
+  r_define_class_method(ruby2d_sound_class, "ext_set_mix_volume", ruby2d_sound_ext_set_mix_volume, r_args_req(1));
 
   // Ruby2D::Sound#ext_length
   r_define_method(ruby2d_sound_class, "ext_length", ruby2d_sound_ext_length, r_args_none);
