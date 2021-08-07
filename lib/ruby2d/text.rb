@@ -15,7 +15,7 @@ module Ruby2D
       @size = opts[:size] || 20
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
-      self.opacity = opts[:opacity] if opts[:opacity]
+      self.color.opacity = opts[:opacity] if opts[:opacity]
       @font_path = opts[:font] || Font.default
       create_font
       create_texture
