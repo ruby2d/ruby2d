@@ -123,8 +123,8 @@ else
     add_flags(:ld, "#{ldir}/libfreetype.a")
     add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
 
-  when :linux, :linux_rpi
-    check_sdl_linux
+  when :linux, :linux_rpi, :bsd
+    check_sdl
 
     set_rpi_flags
     add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
