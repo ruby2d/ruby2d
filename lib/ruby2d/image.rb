@@ -23,10 +23,6 @@ module Ruby2D
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
 
-      # FIXME: Do we need to raise this somehow if ext_load_image fails ?
-      # unless ext_init(@path)
-      #   raise Error, "Image `#{@path}` cannot be created"
-      # end
       unless opts[:show] == false then add end
     end
 
