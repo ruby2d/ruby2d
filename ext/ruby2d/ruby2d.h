@@ -440,6 +440,16 @@ void R2D_DrawCircle(
  */
 R2D_Image *R2D_CreateImage(const char *path);
 
+/*
+ * Create a surface with image pixel data, given a file path
+ */
+SDL_Surface *R2D_CreateImageSurface(const char *path);
+
+/*
+ * Convert images to RGB format if they are in a different (BGR for example) format.
+ */
+void R2D_ImageConvertToRGB(SDL_Surface *surface);
+
 
 /*
  * Free an image

@@ -61,17 +61,44 @@ R2D_Image *R2D_CreateImage(const char *path) {
     img->format = GL_RGBA;
   }
 
-  // Flip image bits if BGA
+  R2D_ImageConvertToRGB(img->surface);
 
-  Uint32 r = img->surface->format->Rmask;
-  Uint32 g = img->surface->format->Gmask;
-  Uint32 a = img->surface->format->Amask;
+  return img;
+}
+
+SDL_Surface *R2D_CreateImageSurface(const char *path) {
+  R2D_Init();
+
+  // Check if image file exists
+  if (!R2D_FileExists(path)) {
+    R2D_Error("R2D_CreateImageSurface", "Image file `%s` not found", path);
+    return NULL;
+  }
+
+  // Load image from file as SDL_Surface
+  SDL_Surface *surface = IMG_Load(path);
+
+  int bits_per_color = surface->format->Amask == 0 ?
+    surface->format->BitsPerPixel / 3 :
+    surface->format->BitsPerPixel / 4;
+
+  if (bits_per_color < 8) {
+    R2D_Log(R2D_WARN, "`%s` has less than 8 bits per color and will likely not render correctly", path, bits_per_color);
+  }
+
+  return surface;
+}
+
+void R2D_ImageConvertToRGB(SDL_Surface *surface) {
+  Uint32 r = surface->format->Rmask;
+  Uint32 g = surface->format->Gmask;
+  Uint32 a = surface->format->Amask;
 
   if (r&0xFF000000 || r&0xFF0000) {
-    char *p = (char *)img->surface->pixels;
-    int bpp = img->surface->format->BytesPerPixel;
-    int w = img->surface->w;
-    int h = img->surface->h;
+    char *p = (char *)surface->pixels;
+    int bpp = surface->format->BytesPerPixel;
+    int w = surface->w;
+    int h = surface->h;
     char tmp;
     for (int i = 0; i < bpp * w * h; i += bpp) {
       if (a&0xFF) {
@@ -91,8 +118,6 @@ R2D_Image *R2D_CreateImage(const char *path) {
       }
     }
   }
-
-  return img;
 }
 
 
