@@ -7,7 +7,7 @@ module Ruby2D
     attr_reader :ttf_font
 
     def initialize(path, size)
-      @ttf_font = ext_load(path, size)
+      @ttf_font = Font.ext_load(path, size)
     end
 
     class << self

@@ -5,14 +5,27 @@
 
 module Ruby2D
   class Vertices
-    def initialize(x, y, width, height, rotate)
+    def initialize(x, y, width, height, rotate, crop: nil, flip: nil)
+      @flip = flip
       @x = x
       @y = y
-      @width = width
-      @height = height
+      @width = width.to_f
+      @height = height.to_f
+
+      if @flip == :horizontal || @flip == :both
+        @x = @x + @width
+        @width = -@width
+      end
+
+      if @flip == :vertical || @flip == :both
+        @y = y + @height
+        @height = -@height
+      end
+
       @rotate = rotate
       @rx = @x + (@width / 2.0)
       @ry = @y + (@height / 2.0)
+      @crop = crop
     end
 
     def coordinates
@@ -25,10 +38,17 @@ module Ruby2D
     end
 
     def texture_coordinates
-      tx1 = 0.0; ty1 = 0.0 # Top left
-      tx2 = 1.0; ty2 = 0.0 # Top right
-      tx3 = 1.0; ty3 = 1.0 # Bottom right
-      tx4 = 0.0; ty4 = 1.0 # Bottom left
+      if @crop.nil?
+        tx1 = 0.0; ty1 = 0.0 # Top left
+        tx2 = 1.0; ty2 = 0.0 # Top right
+        tx3 = 1.0; ty3 = 1.0 # Bottom right
+        tx4 = 0.0; ty4 = 1.0 # Bottom left
+      else
+        tx1 = @crop[:x] / @crop[:image_width].to_f; ty1 = @crop[:y] / @crop[:image_height].to_f # Top left
+        tx2 = tx1 + (@crop[:width] / @crop[:image_width].to_f); ty2 = ty1    # Top right
+        tx3 = tx2; ty3 = ty1 + (@crop[:height] / @crop[:image_height].to_f)   # Botttom right
+        tx4 = tx1; ty4 = ty3                                # Bottom left
+      end
 
       [ tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4 ]
     end

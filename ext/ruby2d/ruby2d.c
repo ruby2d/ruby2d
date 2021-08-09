@@ -1279,7 +1279,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
 
   // Ruby2D::Image#ext_load_image
-  r_define_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
+  r_define_class_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
 
   // Ruby2D::Sprite
   R_CLASS ruby2d_sprite_class = r_define_class(ruby2d_module, "Sprite");
@@ -1303,7 +1303,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
 
   // Ruby2D::Text#ext_load_text
-  r_define_method(ruby2d_text_class, "ext_load_text", ruby2d_text_ext_load_text, r_args_req(2));
+  r_define_class_method(ruby2d_text_class, "ext_load_text", ruby2d_text_ext_load_text, r_args_req(2));
 
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
@@ -1363,7 +1363,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_font_class = r_define_class(ruby2d_module, "Font");
 
   // Ruby2D::Font#ext_load
-  r_define_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
+  r_define_class_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
 
   // Ruby2D::Texture
   R_CLASS ruby2d_texture_class = r_define_class(ruby2d_module, "Texture");
