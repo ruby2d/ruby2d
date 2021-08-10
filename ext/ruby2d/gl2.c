@@ -122,20 +122,6 @@ void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[]
 
 
 /*
- * Draw image
- */
-void R2D_GL2_DrawImage(R2D_Image *img) {
-  R2D_GL2_DrawTexture(
-    img->x, img->y, img->width, img->height,
-    img->rotate, img->rx, img->ry,
-    img->color.r, img->color.g, img->color.b, img->color.a,
-    0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 0.f, 1.f,
-    img->texture_id
-  );
-}
-
-
-/*
  * Draw sprite
  */
 void R2D_GL2_DrawSprite(R2D_Sprite *spr) {

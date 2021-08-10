@@ -441,14 +441,15 @@ void R2D_DrawCircle(
 R2D_Image *R2D_CreateImage(const char *path);
 
 /*
- * Rotate an image
+ * Create a surface with image pixel data, given a file path
  */
-void R2D_RotateImage(R2D_Image *img, GLfloat angle, int position);
+SDL_Surface *R2D_CreateImageSurface(const char *path);
 
 /*
- * Draw an image
+ * Convert images to RGB format if they are in a different (BGR for example) format.
  */
-void R2D_DrawImage(R2D_Image *img);
+void R2D_ImageConvertToRGB(SDL_Surface *surface);
+
 
 /*
  * Free an image
@@ -691,7 +692,6 @@ void R2D_GL_DrawTriangle(
   GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
   GLfloat x3, GLfloat y3,
   GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-void R2D_GL_DrawImage(R2D_Image *img);
 void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
   GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
@@ -712,7 +712,6 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-  void R2D_GLES_DrawImage(R2D_Image *img);
   void R2D_GLES_DrawSprite(R2D_Sprite *spr);
     void R2D_GLES_DrawTile(R2D_Image *img, int x, int y,
     int tw, int th,
@@ -738,8 +737,6 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-  void R2D_GL2_DrawImage(R2D_Image *img);
-  void R2D_GL3_DrawImage(R2D_Image *img);
   void R2D_GL2_DrawSprite(R2D_Sprite *spr);
   void R2D_GL3_DrawSprite(R2D_Sprite *spr);
   void R2D_GL2_DrawTile(R2D_Image *img, int x, int y,

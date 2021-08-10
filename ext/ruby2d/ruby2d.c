@@ -365,63 +365,22 @@ static R_VAL ruby2d_circle_ext_draw(R_VAL self, R_VAL a) {
 
 
 /*
- * Ruby2D::Image#ext_init
- * Initialize image structure data
+ * Ruby2D::Image#ext_load_image
+ * Create an SDL surface from an image path, return the surface, width, and height
  */
-#if MRUBY
-static R_VAL ruby2d_image_ext_init(mrb_state* mrb, R_VAL self) {
-  mrb_value path;
-  mrb_get_args(mrb, "o", &path);
-#else
-static R_VAL ruby2d_image_ext_init(R_VAL self, R_VAL path) {
-#endif
-  R2D_Image *img = R2D_CreateImage(RSTRING_PTR(path));
-  if (!img) return R_FALSE;
+static R_VAL ruby2d_image_ext_load_image(R_VAL self, R_VAL path) {
+  R2D_Init();
 
-  // Get width and height from Ruby class. If set, use it, else choose the
-  // native dimensions of the image.
-  R_VAL w = r_iv_get(self, "@width");
-  R_VAL h = r_iv_get(self, "@height");
-  r_iv_set(self, "@width" , r_test(w) ? w : INT2NUM(img->width));
-  r_iv_set(self, "@height", r_test(h) ? h : INT2NUM(img->height));
-  r_iv_set(self, "@data", r_data_wrap_struct(image, img));
+  VALUE result = rb_ary_new2(3);
 
-  return R_TRUE;
-}
+  SDL_Surface *surface = R2D_CreateImageSurface(RSTRING_PTR(path));
+  R2D_ImageConvertToRGB(surface);
 
+  rb_ary_push(result, r_data_wrap_struct(surface, surface));
+  rb_ary_push(result, INT2NUM(surface->w));
+  rb_ary_push(result, INT2NUM(surface->h));
 
-/*
- * Ruby2D::Image#self.ext_draw
- */
-#if MRUBY
-static R_VAL ruby2d_image_ext_draw(mrb_state* mrb, R_VAL self) {
-  mrb_value a;
-  mrb_get_args(mrb, "o", &a);
-#else
-static R_VAL ruby2d_image_ext_draw(R_VAL self, R_VAL a) {
-#endif
-  // `a` is the array representing the image
-
-  R2D_Image *img;
-  r_data_get_struct(r_ary_entry(a, 0), "@data", &image_data_type, R2D_Image, img);
-
-  img->x = NUM2DBL(r_ary_entry(a, 1));
-  img->y = NUM2DBL(r_ary_entry(a, 2));
-
-  R_VAL w = r_ary_entry(a, 3);
-  R_VAL h = r_ary_entry(a, 4);
-  if (r_test(w)) img->width  = NUM2INT(w);
-  if (r_test(h)) img->height = NUM2INT(h);
-
-  R2D_RotateImage(img, NUM2DBL(r_ary_entry(a, 5)), R2D_CENTER);
-
-  img->color.r = NUM2DBL(r_ary_entry(a, 6));
-  img->color.g = NUM2DBL(r_ary_entry(a, 7));
-  img->color.b = NUM2DBL(r_ary_entry(a, 8));
-  img->color.a = NUM2DBL(r_ary_entry(a, 9));
-
-  R2D_DrawImage(img);
-  return R_NIL;
+  return result;
 }
 
 
@@ -590,7 +549,13 @@ static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL widt
   SDL_Surface *surface;
   Data_Get_Struct(rubySurface, SDL_Surface, surface);
 
-  R2D_GL_CreateTexture(&texture_id, GL_RGBA,
+  // Detect image mode
+  GLint format = GL_RGB;
+  if (surface->format->BytesPerPixel == 4) {
+    format = GL_RGBA;
+  }
+
+  R2D_GL_CreateTexture(&texture_id, format,
                        NUM2INT(width), NUM2INT(height),
                        surface->pixels, GL_NEAREST);
 
@@ -1313,11 +1278,8 @@ void Init_ruby2d() {
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
 
-  // Ruby2D::Image#ext_init
-  r_define_method(ruby2d_image_class, "ext_init", ruby2d_image_ext_init, r_args_req(1));
-
-  // Ruby2D::Image#self.ext_draw
-  r_define_class_method(ruby2d_image_class, "ext_draw", ruby2d_image_ext_draw, r_args_req(1));
+  // Ruby2D::Image#ext_load_image
+  r_define_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
 
   // Ruby2D::Sprite
   R_CLASS ruby2d_sprite_class = r_define_class(ruby2d_module, "Sprite");
