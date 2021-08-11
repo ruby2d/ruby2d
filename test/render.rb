@@ -1,5 +1,9 @@
 require 'ruby2d'
 
+
+set icon: 'media/colors.png'
+
+
 Quad.new(x3: 125, x4: 25)
 Rectangle.new(y: 125)
 Square.new(y: 250)
