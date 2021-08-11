@@ -22,7 +22,7 @@ module Ruby2D
       unless opts[:show] == false then add end
     end
 
-    def define_tile(name, x, y, rotate = 0, flip = nil)
+    def define_tile(name, x, y, rotate: 0, flip: nil)
       @defined_tiles[name] = { x: x, y: y , rotate: rotate, flip: flip }
     end
 
