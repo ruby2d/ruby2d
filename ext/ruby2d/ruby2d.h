@@ -290,30 +290,6 @@ typedef struct {
   GLfloat ry;      // Y coordinate to be rotated around
 } R2D_Image;
 
-// R2D_Sprite
-typedef struct {
-  const char *path;
-  R2D_Image *img;
-  R2D_Color color;
-  int x;
-  int y;
-  int width;
-  int height;
-  int clip_width;
-  int clip_height;
-  GLfloat rotate;  // Rotation angle in degrees
-  GLfloat rx;      // X coordinate to be rotated around
-  GLfloat ry;      // Y coordinate to be rotated around
-  GLfloat tx1;
-  GLfloat ty1;
-  GLfloat tx2;
-  GLfloat ty2;
-  GLfloat tx3;
-  GLfloat ty3;
-  GLfloat tx4;
-  GLfloat ty4;
-} R2D_Sprite;
-
 
 // R2D_Sound
 typedef struct {
@@ -456,32 +432,6 @@ void R2D_ImageConvertToRGB(SDL_Surface *surface);
  */
 void R2D_FreeImage(R2D_Image *img);
 
-// Sprite //////////////////////////////////////////////////////////////////////
-
-/*
- * Create a sprite, given an image file path
- */
-R2D_Sprite *R2D_CreateSprite(const char *path);
-
-/*
- * Clip a sprite
- */
-void R2D_ClipSprite(R2D_Sprite *spr, int x, int y, int w, int h);
-
-/*
- * Rotate a sprite
- */
-void R2D_RotateSprite(R2D_Sprite *spr, GLfloat angle, int position);
-
-/*
- * Draw a sprite
- */
-void R2D_DrawSprite(R2D_Sprite *spr);
-
-/*
- * Free a sprite
- */
-void R2D_FreeSprite(R2D_Sprite *spr);
 
 // Tile ////////////////////////////////////////////////////////////////////////
 
@@ -692,7 +642,6 @@ void R2D_GL_DrawTriangle(
   GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
   GLfloat x3, GLfloat y3,
   GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-void R2D_GL_DrawSprite(R2D_Sprite *spr);
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
   GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
 void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
@@ -712,7 +661,6 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-  void R2D_GLES_DrawSprite(R2D_Sprite *spr);
     void R2D_GLES_DrawTile(R2D_Image *img, int x, int y,
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
@@ -737,8 +685,6 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-  void R2D_GL2_DrawSprite(R2D_Sprite *spr);
-  void R2D_GL3_DrawSprite(R2D_Sprite *spr);
   void R2D_GL2_DrawTile(R2D_Image *img, int x, int y,
     int tw, int th,
     GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
