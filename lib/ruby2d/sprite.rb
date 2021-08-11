@@ -36,10 +36,7 @@ module Ruby2D
       @last_frame = 0
       @done_proc = nil
 
-      # # Initialize the sprite
-      # unless ext_init(@path)
-      #   raise Error, "Sprite image `#{@path}` cannot be created"
-      # end
+      # # Initialize the sprite texture
       @texture = Texture.new(*Image.ext_load_image(@path))
       @img_width = @texture.width
       @img_height = @texture.height
