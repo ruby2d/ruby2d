@@ -8,12 +8,13 @@ module Ruby2D
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data, :x, :y, :width, :height
 
     def initialize(path, opts = {})
-      unless File.exist? path
-        raise Error, "Cannot find sprite image file `#{path}`"
-      end
-
       # Sprite image file path
       @path = path
+
+      # Initialize the sprite texture
+      @texture = Texture.new(*Image.load_image(@path))
+      @img_width = @texture.width
+      @img_height = @texture.height
 
       # Coordinates, size, and rotation of the sprite
       @x = opts[:x] || 0
@@ -35,11 +36,6 @@ module Ruby2D
       @current_frame = opts[:default] || 0
       @last_frame = 0
       @done_proc = nil
-
-      # # Initialize the sprite texture
-      @texture = Texture.new(*Image.ext_load_image(@path))
-      @img_width = @texture.width
-      @img_height = @texture.height
 
       # The clipping rectangle
       @clip_x = opts[:clip_x] || 0

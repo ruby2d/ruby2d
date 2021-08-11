@@ -5,10 +5,13 @@ module Ruby2D
     include Renderable
 
     def initialize(path, opts = {})
-      unless File.exist? path
-        raise Error, "Cannot find tileset image file `#{path}`"
-      end
       @path = path
+
+      # Initialize the tileset texture
+      @texture = Texture.new(*Image.load_image(@path))
+      @width = opts[:width] || @texture.width
+      @height = opts[:height] || @texture.height
+
       @tiles = []
       @defined_tiles = {}
       @padding = opts[:padding] || 0
@@ -16,15 +19,11 @@ module Ruby2D
       @tile_width = opts[:tile_width]
       @tile_height = opts[:tile_height]
 
-      unless ext_init(@path)
-        raise Error, "Tileset `#{@path}` cannot be created"
-      end
-
       unless opts[:show] == false then add end
     end
 
-    def define_tile(name, x, y)
-      @defined_tiles[name] = { x: x, y: y }
+    def define_tile(name, x, y, rotate = 0, flip = nil)
+      @defined_tiles[name] = { x: x, y: y , rotate: rotate, flip: flip }
     end
 
     def set_tile(name, coordinates)
@@ -34,6 +33,8 @@ module Ruby2D
         @tiles.push({
           tile_x: tile.fetch(:x), 
           tile_y: tile.fetch(:y), 
+          tile_rotate: tile.fetch(:rotate),
+          tile_flip: tile.fetch(:flip),
           x: coordinate.fetch(:x),
           y: coordinate.fetch(:y)
         })
@@ -45,25 +46,30 @@ module Ruby2D
     end
   end
 
-  def draw(opts = {})
-    render(opts)
+  def draw
+    render
   end
 
   private
 
-  def render(opts = {})
-    opts[:tile_width] = opts[:tile_width] || @tile_width
-    opts[:tile_height] = opts[:tile_height] || @tile_height
-    opts[:padding] = opts[:padding] || @padding
-    opts[:spacing] = opts[:spacing] || @spacing
-
+  def render
     @tiles.each do |tile|
-      self.class.ext_draw(
-        [
-          self, opts[:tile_width], opts[:tile_height], opts[:padding], opts[:spacing],
-          tile.fetch(:tile_x), tile.fetch(:tile_y), tile.fetch(:x),
-          tile.fetch(:y)
-        ])
+      crop = {
+        x: @padding + (tile.fetch(:tile_x) + @spacing) * @tile_width,
+        y: @padding + (tile.fetch(:tile_y) + @spacing) * @tile_height,
+        width: @tile_width,
+        height: @tile_height,
+        image_width: @width,
+        image_height: @height,
+      }
+
+      color = defined?(@color) ? @color : Color.new([1.0, 1.0, 1.0, 1.0])
+
+      vertices = Vertices.new(tile.fetch(:x), tile.fetch(:y), @tile_width, @tile_height, tile.fetch(:tile_rotate), crop: crop, flip: tile.fetch(:tile_flip))
+
+      @texture.draw(
+        vertices.coordinates, vertices.texture_coordinates, color
+      )
     end
   end
 end
