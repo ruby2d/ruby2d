@@ -19,7 +19,7 @@ module Ruby2D
       self.color = opts[:color] || 'white'
       self.color.opacity = opts[:opacity] if opts[:opacity]
 
-      @texture = Texture.new(*ext_load_image(@path))
+      @texture = Texture.new(*Image.ext_load_image(@path))
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
 

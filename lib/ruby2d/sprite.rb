@@ -5,7 +5,7 @@ module Ruby2D
     include Renderable
 
     attr_reader :path
-    attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data
+    attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data, :x, :y, :width, :height
 
     def initialize(path, opts = {})
       unless File.exist? path
@@ -19,18 +19,12 @@ module Ruby2D
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
-      @width  = opts[:width]  || nil
-      @height = opts[:height] || nil
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
       self.color.opacity = opts[:opacity] if opts[:opacity]
 
-      # Flipping status, coordinates, and size, used internally
+      # Flipping status
       @flip = nil
-      @flip_x = @x
-      @flip_y = @y
-      @flip_width  = @width
-      @flip_height = @height
 
       # Animation attributes
       @start_time = 0.0
@@ -42,19 +36,20 @@ module Ruby2D
       @last_frame = 0
       @done_proc = nil
 
-      # The sprite image size set by the native extension `ext_init`
-      @img_width = nil; @img_height = nil
-
-      # Initialize the sprite
-      unless ext_init(@path)
-        raise Error, "Sprite image `#{@path}` cannot be created"
-      end
+      # # Initialize the sprite texture
+      @texture = Texture.new(*Image.ext_load_image(@path))
+      @img_width = @texture.width
+      @img_height = @texture.height
 
       # The clipping rectangle
       @clip_x = opts[:clip_x] || 0
       @clip_y = opts[:clip_y] || 0
       @clip_width  = opts[:clip_width]  || @img_width
       @clip_height = opts[:clip_height] || @img_height
+
+      # Dimensions
+      @width  = opts[:width]  || nil
+      @height = opts[:height] || nil
 
       # Set the default animation
       @animations[:default] = 0..(@img_width / @clip_width) - 1
@@ -73,38 +68,6 @@ module Ruby2D
 
       # Add the sprite to the window
       unless opts[:show] == false then add end
-    end
-
-    # Set the x coordinate
-    def x=(x)
-      @x = @flip_x = x
-      if @flip == :horizontal || @flip == :both
-        @flip_x = x + @width
-      end
-    end
-
-    # Set the y coordinate
-    def y=(y)
-      @y = @flip_y = y
-      if @flip == :vertical || @flip == :both
-        @flip_y = y + @height
-      end
-    end
-
-    # Set the width
-    def width=(width)
-      @width = @flip_width = width
-      if @flip == :horizontal || @flip == :both
-        @flip_width = -width
-      end
-    end
-
-    # Set the height
-    def height=(height)
-      @height = @flip_height = height
-      if @flip == :vertical || @flip == :both
-        @flip_height = -height
-      end
     end
 
     # Play an animation
@@ -165,26 +128,6 @@ module Ruby2D
       end
 
       @flip = flip
-
-      # Reset flip values
-      @flip_x      = @x
-      @flip_y      = @y
-      @flip_width  = @width
-      @flip_height = @height
-
-      case flip
-      when :horizontal
-        @flip_x      = @x + @width
-        @flip_width  = -@width
-      when :vertical
-        @flip_y      = @y + @height
-        @flip_height = -@height
-      when :both     # horizontal and vertical
-        @flip_x      = @x + @width
-        @flip_width  = -@width
-        @flip_y      = @y + @height
-        @flip_height = -@height
-      end
     end
 
     # Reset frame to defaults
@@ -248,8 +191,8 @@ module Ruby2D
     end
 
     def draw(opts = {})
-      opts[:width] = opts[:width] || @flip_width
-      opts[:height] = opts[:height] || @flip_height
+      opts[:width] = opts[:width] || (@width || @clip_width)
+      opts[:height] = opts[:height] || (@height || @clip_height)
       opts[:rotate] = opts[:rotate] || @rotate
       opts[:clip_x] = opts[:clip_x] || @clip_x
       opts[:clip_y] = opts[:clip_y] || @clip_y
@@ -259,24 +202,33 @@ module Ruby2D
         opts[:color] = [1.0, 1.0, 1.0, 1.0]
       end
 
-      self.class.ext_draw([
-        self, opts[:x], opts[:y], opts[:width], opts[:height], opts[:rotate],
-        opts[:clip_x], opts[:clip_y], opts[:clip_width], opts[:clip_height],
-        opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
-      ])
+      render(x: opts[:x], y: opts[:y], width: opts[:width], height: opts[:height], color: Color.new(color), rotate: opts[:rotate], crop: {
+        x: opts[:clip_x],
+        y: opts[:clip_y],
+        width: opts[:clip_width],
+        height: opts[:clip_height],
+        image_width: @img_width,
+        image_height: @img_height,
+      })
     end
 
     private
 
-    def render
+    def render(x: @x, y: @y, width: (@width || @clip_width), height: (@height || @clip_height) , color: @color, rotate: @rotate, flip: @flip, crop: {
+      x: @clip_x,
+      y: @clip_y,
+      width: @clip_width,
+      height: @clip_height,
+      image_width: @img_width,
+      image_height: @img_height,
+    })
       update
-      self.class.ext_draw([
-        self, @flip_x, @flip_y, @flip_width, @flip_height, @rotate,
-        @clip_x, @clip_y, @clip_width, @clip_height,
-        @color.r, @color.g, @color.b, @color.a
-      ])
+
+      vertices = Vertices.new(x, y, width, height, rotate, crop: crop, flip: flip)
+
+      @texture.draw(
+        vertices.coordinates, vertices.texture_coordinates, color
+      )
     end
-
-
   end
 end

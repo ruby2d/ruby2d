@@ -361,22 +361,6 @@ void R2D_GL_DrawTriangle(GLfloat x1, GLfloat y1,
 
 
 /*
- * Draw sprite
- */
-void R2D_GL_DrawSprite(R2D_Sprite *spr) {
-  #if GLES
-    R2D_GLES_DrawSprite(spr);
-  #else
-    if (R2D_GL2) {
-      R2D_GL2_DrawSprite(spr);
-    } else {
-      R2D_GL3_DrawSprite(spr);
-    }
-  #endif
-}
-
-
-/*
  * Draw a tile
  */
 void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,

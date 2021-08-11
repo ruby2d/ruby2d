@@ -335,20 +335,6 @@ void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[]
 
 
 /*
- * Draw sprite
- */
-void R2D_GL3_DrawSprite(R2D_Sprite *spr) {
-  R2D_GL3_DrawTexture(
-    spr->x, spr->y, spr->width, spr->height,
-    spr->rotate, spr->rx, spr->ry,
-    spr->color.r, spr->color.g, spr->color.b, spr->color.a,
-    spr->tx1, spr->ty1, spr->tx2, spr->ty2, spr->tx3, spr->ty3, spr->tx4, spr->ty4,
-    spr->img->texture_id
-  );
-}
-
-
-/*
  * Draw a tile
  */
 void R2D_GL3_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,

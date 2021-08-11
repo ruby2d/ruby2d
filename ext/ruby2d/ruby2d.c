@@ -112,10 +112,6 @@ static R2D_Window *window;
   static const struct mrb_data_type image_data_type = {
     "image", free_image
   };
-  static void free_sprite(mrb_state *mrb, void *p_);
-  static const struct mrb_data_type sprite_data_type = {
-    "sprite", free_sprite
-  };
   static void free_sound(mrb_state *mrb, void *p_);
   static const struct mrb_data_type sound_data_type = {
     "sound", free_sound
@@ -126,7 +122,6 @@ static R2D_Window *window;
   };
 #else
   static void free_image(R2D_Image *img);
-  static void free_sprite(R2D_Sprite *spr);
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
@@ -394,85 +389,6 @@ static void free_image(mrb_state *mrb, void *p_) {
 static void free_image(R2D_Image *img) {
 #endif
   R2D_FreeImage(img);
-}
-
-
-/*
- * Ruby2D::Sprite#ext_init
- * Initialize sprite structure data
- */
-#if MRUBY
-static R_VAL ruby2d_sprite_ext_init(mrb_state* mrb, R_VAL self) {
-  mrb_value path;
-  mrb_get_args(mrb, "o", &path);
-#else
-static R_VAL ruby2d_sprite_ext_init(R_VAL self, R_VAL path) {
-#endif
-  R2D_Sprite *spr = R2D_CreateSprite(RSTRING_PTR(path));
-  if (!spr) return R_FALSE;
-
-  r_iv_set(self, "@img_width" , INT2NUM(spr->width));
-  r_iv_set(self, "@img_height", INT2NUM(spr->height));
-  r_iv_set(self, "@data", r_data_wrap_struct(sprite, spr));
-
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Sprite#ext_draw
- */
-#if MRUBY
-static R_VAL ruby2d_sprite_ext_draw(mrb_state* mrb, R_VAL self) {
-  mrb_value a;
-  mrb_get_args(mrb, "o", &a);
-#else
-static R_VAL ruby2d_sprite_ext_draw(R_VAL self, R_VAL a) {
-#endif
-  // `a` is the array representing the sprite
-
-  R2D_Sprite *spr;
-  r_data_get_struct(r_ary_entry(a, 0), "@data", &sprite_data_type, R2D_Sprite, spr);
-
-  spr->x = NUM2DBL(r_ary_entry(a, 1));
-  spr->y = NUM2DBL(r_ary_entry(a, 2));
-
-  R_VAL w = r_ary_entry(a, 3);
-  if (r_test(w)) spr->width = NUM2DBL(w);
-
-  R_VAL h = r_ary_entry(a, 4);
-  if (r_test(h)) spr->height = NUM2DBL(h);
-
-  R2D_RotateSprite(spr, NUM2DBL(r_ary_entry(a, 5)), R2D_CENTER);
-
-  R2D_ClipSprite(
-    spr,
-    NUM2INT(r_ary_entry(a, 6)),
-    NUM2INT(r_ary_entry(a, 7)),
-    NUM2INT(r_ary_entry(a, 8)),
-    NUM2INT(r_ary_entry(a, 9))
-  );
-
-  spr->color.r = NUM2DBL(r_ary_entry(a, 10));
-  spr->color.g = NUM2DBL(r_ary_entry(a, 11));
-  spr->color.b = NUM2DBL(r_ary_entry(a, 12));
-  spr->color.a = NUM2DBL(r_ary_entry(a, 13));
-
-  R2D_DrawSprite(spr);
-  return R_NIL;
-}
-
-
-/*
- * Free sprite structure attached to Ruby 2D `Sprite` class
- */
-#if MRUBY
-static void free_sprite(mrb_state *mrb, void *p_) {
-  R2D_Sprite *spr = (R2D_Sprite *)p_;
-#else
-static void free_sprite(R2D_Sprite *spr) {
-#endif
-  R2D_FreeSprite(spr);
 }
 
 
@@ -1279,16 +1195,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
 
   // Ruby2D::Image#ext_load_image
-  r_define_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
-
-  // Ruby2D::Sprite
-  R_CLASS ruby2d_sprite_class = r_define_class(ruby2d_module, "Sprite");
-
-  // Ruby2D::Sprite#ext_init
-  r_define_method(ruby2d_sprite_class, "ext_init", ruby2d_sprite_ext_init, r_args_req(1));
-
-  // Ruby2D::Sprite#self.ext_draw
-  r_define_class_method(ruby2d_sprite_class, "ext_draw", ruby2d_sprite_ext_draw, r_args_req(1));
+  r_define_class_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
 
   // Ruby2D::Tileset
   R_CLASS ruby2d_tileset_class = r_define_class(ruby2d_module, "Tileset");
@@ -1303,7 +1210,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
 
   // Ruby2D::Text#ext_load_text
-  r_define_method(ruby2d_text_class, "ext_load_text", ruby2d_text_ext_load_text, r_args_req(2));
+  r_define_class_method(ruby2d_text_class, "ext_load_text", ruby2d_text_ext_load_text, r_args_req(2));
 
   // Ruby2D::Sound
   R_CLASS ruby2d_sound_class = r_define_class(ruby2d_module, "Sound");
@@ -1363,7 +1270,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_font_class = r_define_class(ruby2d_module, "Font");
 
   // Ruby2D::Font#ext_load
-  r_define_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
+  r_define_class_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
 
   // Ruby2D::Texture
   R_CLASS ruby2d_texture_class = r_define_class(ruby2d_module, "Texture");
