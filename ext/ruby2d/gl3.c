@@ -254,57 +254,6 @@ void R2D_GL3_DrawTriangle(GLfloat x1, GLfloat y1,
 
 
 /*
- * Draw a texture
- */
-static void R2D_GL3_DrawTexture(int x, int y, int w, int h,
-                                GLfloat angle, GLfloat rx, GLfloat ry,
-                                GLfloat r, GLfloat g, GLfloat b, GLfloat a,
-                                GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-                                GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4,
-                                GLuint texture_id) {
-
-  // Currently, textures are not buffered, so we have to flush all buffers so
-  // textures get rendered in the correct Z order
-  R2D_GL3_FlushBuffers();
-
-  // Set up the vertex points
-  R2D_GL_Point v1 = { .x = x,     .y = y     };
-  R2D_GL_Point v2 = { .x = x + w, .y = y     };
-  R2D_GL_Point v3 = { .x = x + w, .y = y + h };
-  R2D_GL_Point v4 = { .x = x,     .y = y + h };
-
-  // Rotate vertices
-  if (angle != 0) {
-    v1 = R2D_RotatePoint(v1, angle, rx, ry);
-    v2 = R2D_RotatePoint(v2, angle, rx, ry);
-    v3 = R2D_RotatePoint(v3, angle, rx, ry);
-    v4 = R2D_RotatePoint(v4, angle, rx, ry);
-  }
-
-  // Set the textured quad data into a formatted array
-  GLfloat vertices[] =
-  //  vertex coords | colors      | x, y texture coords
-    { v1.x, v1.y,     r, g, b, a,   tx1, ty1,    // Top-left
-      v2.x, v2.y,     r, g, b, a,   tx2, ty2,    // Top-right
-      v3.x, v3.y,     r, g, b, a,   tx3, ty3,    // Bottom-right
-      v4.x, v4.y,     r, g, b, a,   tx4, ty4 };  // Bottom-left
-
-  // Use the texture shader program
-  glUseProgram(texShaderProgram);
-
-  // Bind the texture using the provided ID
-  glBindTexture(GL_TEXTURE_2D, texture_id);
-
-  // Create and Initialize the vertex data and array indices
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-  // Render the textured quad
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-}
-
-
-/*
  * Draw a texture (New method with vertices pre-calculated)
  */
 void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {

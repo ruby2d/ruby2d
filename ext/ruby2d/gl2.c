@@ -64,44 +64,6 @@ void R2D_GL2_DrawTriangle(GLfloat x1, GLfloat y1,
 
 
 /*
- * Draw texture
- */
-static void R2D_GL2_DrawTexture(int x, int y, int w, int h,
-                                GLfloat angle, GLfloat rx, GLfloat ry,
-                                GLfloat r, GLfloat g, GLfloat b, GLfloat a,
-                                GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-                                GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4,
-                                GLuint texture_id) {
-
-  R2D_GL_Point v1 = { .x = x,     .y = y     };
-  R2D_GL_Point v2 = { .x = x + w, .y = y     };
-  R2D_GL_Point v3 = { .x = x + w, .y = y + h };
-  R2D_GL_Point v4 = { .x = x,     .y = y + h };
-
-  // Rotate vertices
-  if (angle != 0) {
-    v1 = R2D_RotatePoint(v1, angle, rx, ry);
-    v2 = R2D_RotatePoint(v2, angle, rx, ry);
-    v3 = R2D_RotatePoint(v3, angle, rx, ry);
-    v4 = R2D_RotatePoint(v4, angle, rx, ry);
-  }
-
-  glEnable(GL_TEXTURE_2D);
-
-  glBindTexture(GL_TEXTURE_2D, texture_id);
-
-  glBegin(GL_QUADS);
-    glColor4f(r, g, b, a);
-    glTexCoord2f(tx1, ty1); glVertex2f(v1.x, v1.y);
-    glTexCoord2f(tx2, ty2); glVertex2f(v2.x, v2.y);
-    glTexCoord2f(tx3, ty3); glVertex2f(v3.x, v3.y);
-    glTexCoord2f(tx4, ty4); glVertex2f(v4.x, v4.y);
-  glEnd();
-
-  glDisable(GL_TEXTURE_2D);
-}
-
-/*
  * Draw a texture (New method with vertices pre-calculated)
  */
 void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
