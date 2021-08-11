@@ -272,24 +272,6 @@ typedef struct {
   bool close;
 } R2D_Window;
 
-// R2D_Image
-typedef struct {
-  const char *path;
-  SDL_Surface *surface;
-  int format;
-  GLuint texture_id;
-  R2D_Color color;
-  int x;
-  int y;
-  int width;
-  int height;
-  int orig_width;
-  int orig_height;
-  GLfloat rotate;  // Rotation angle in degrees
-  GLfloat rx;      // X coordinate to be rotated around
-  GLfloat ry;      // Y coordinate to be rotated around
-} R2D_Image;
-
 
 // R2D_Sound
 typedef struct {
@@ -412,11 +394,6 @@ void R2D_DrawCircle(
 // Image ///////////////////////////////////////////////////////////////////////
 
 /*
- * Create an image, given a file path
- */
-R2D_Image *R2D_CreateImage(const char *path);
-
-/*
  * Create a surface with image pixel data, given a file path
  */
 SDL_Surface *R2D_CreateImageSurface(const char *path);
@@ -425,13 +402,6 @@ SDL_Surface *R2D_CreateImageSurface(const char *path);
  * Convert images to RGB format if they are in a different (BGR for example) format.
  */
 void R2D_ImageConvertToRGB(SDL_Surface *surface);
-
-
-/*
- * Free an image
- */
-void R2D_FreeImage(R2D_Image *img);
-
 
 // Font ////////////////////////////////////////////////////////////////////////
 

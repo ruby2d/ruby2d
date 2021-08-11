@@ -108,10 +108,6 @@ static R2D_Window *window;
 
 // Method signatures and structures for Ruby 2D classes
 #if MRUBY
-  static void free_image(mrb_state *mrb, void *p_);
-  static const struct mrb_data_type image_data_type = {
-    "image", free_image
-  };
   static void free_sound(mrb_state *mrb, void *p_);
   static const struct mrb_data_type sound_data_type = {
     "sound", free_sound
@@ -121,7 +117,6 @@ static R2D_Window *window;
     "music", free_music
   };
 #else
-  static void free_image(R2D_Image *img);
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
@@ -376,19 +371,6 @@ static R_VAL ruby2d_image_ext_load_image(R_VAL self, R_VAL path) {
   rb_ary_push(result, INT2NUM(surface->h));
 
   return result;
-}
-
-
-/*
- * Free image structure attached to Ruby 2D `Image` class
- */
-#if MRUBY
-static void free_image(mrb_state *mrb, void *p_) {
-  R2D_Image *img = (R2D_Image *)p_;
-#else
-static void free_image(R2D_Image *img) {
-#endif
-  R2D_FreeImage(img);
 }
 
 
