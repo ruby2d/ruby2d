@@ -109,9 +109,7 @@ module Ruby2D
       @render_proc = Proc.new {}
 
       # Detect if window is being used through the DSL or as a class instance
-      unless method(:update).parameters.empty? || method(:render).parameters.empty?
-        @using_dsl = true
-      end
+      @using_dsl = !(method(:update).parameters.empty? || method(:render).parameters.empty?)
 
       # Whether diagnostic messages should be printed
       @diagnostics = false
