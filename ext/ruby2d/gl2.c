@@ -66,7 +66,7 @@ void R2D_GL2_DrawTriangle(GLfloat x1, GLfloat y1,
 /*
  * Draw a texture (New method with vertices pre-calculated)
  */
-void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
+void R2D_GL2_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   glEnable(GL_TEXTURE_2D);
 
   glBindTexture(GL_TEXTURE_2D, texture_id);

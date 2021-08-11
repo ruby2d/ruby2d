@@ -204,7 +204,7 @@ void R2D_GLES_DrawTriangle(GLfloat x1, GLfloat y1,
 /*
  * Draw a texture (New method with vertices pre-calculated)
  */
-void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+void R2D_GLES_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
   GLfloat vertices[] =
   //  x, y coords | x, y texture coords
   {

@@ -256,7 +256,7 @@ void R2D_GL3_DrawTriangle(GLfloat x1, GLfloat y1,
 /*
  * Draw a texture (New method with vertices pre-calculated)
  */
-void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
+void R2D_GL3_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   // Currently, textures are not buffered, so we have to flush all buffers so
   // textures get rendered in the correct Z order
   R2D_GL3_FlushBuffers();

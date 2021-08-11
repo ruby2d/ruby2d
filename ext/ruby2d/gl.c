@@ -365,12 +365,12 @@ void R2D_GL_DrawTriangle(GLfloat x1, GLfloat y1,
  */
 void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   #if GLES
-    R2D_GLES_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+    R2D_GLES_DrawTexture(coordinates, texture_coordinates, color, texture_id);
   #else
     if (R2D_GL2) {
-      R2D_GL2_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+      R2D_GL2_DrawTexture(coordinates, texture_coordinates, color, texture_id);
     } else {
-      R2D_GL3_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+      R2D_GL3_DrawTexture(coordinates, texture_coordinates, color, texture_id);
     }
   #endif
 }
