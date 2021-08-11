@@ -2,6 +2,7 @@
 
 # This class generates a vertices array which are passed to the openGL rendering code.
 # The vertices array is split up into 4 groups (1 - top left, 2 - top right, 3 - bottom right, 4 - bottom left)
+# This class is responsible for transforming textures, it can scale / crop / rotate and flip textures
 
 module Ruby2D
   class Vertices
@@ -45,9 +46,9 @@ module Ruby2D
         tx4 = 0.0; ty4 = 1.0 # Bottom left
       else
         tx1 = @crop[:x] / @crop[:image_width].to_f; ty1 = @crop[:y] / @crop[:image_height].to_f # Top left
-        tx2 = tx1 + (@crop[:width] / @crop[:image_width].to_f); ty2 = ty1    # Top right
-        tx3 = tx2; ty3 = ty1 + (@crop[:height] / @crop[:image_height].to_f)   # Botttom right
-        tx4 = tx1; ty4 = ty3                                # Bottom left
+        tx2 = tx1 + (@crop[:width] / @crop[:image_width].to_f); ty2 = ty1                       # Top right
+        tx3 = tx2; ty3 = ty1 + (@crop[:height] / @crop[:image_height].to_f)                     # Botttom right
+        tx4 = tx1; ty4 = ty3                                                                    # Bottom left
       end
 
       [ tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4 ]
