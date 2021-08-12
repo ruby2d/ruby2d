@@ -7,21 +7,27 @@ module Ruby2D
     attr_reader :path
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
-    def initialize(path, opts = {})
+    def self.load_image(path)
       unless File.exist? path
         raise Error, "Cannot find image file `#{path}`"
       end
+
+      ext_load_image(path)
+    end
+
+    def initialize(path, opts = {})
       @path = path
+
+      @texture = Texture.new(*Image.load_image(@path))
+      @width = opts[:width] || @texture.width
+      @height = opts[:height] || @texture.height
+
       @x = opts[:x] || 0
       @y = opts[:y] || 0
       @z = opts[:z] || 0
       @rotate = opts[:rotate] || 0
       self.color = opts[:color] || 'white'
       self.color.opacity = opts[:opacity] if opts[:opacity]
-
-      @texture = Texture.new(*Image.ext_load_image(@path))
-      @width = opts[:width] || @texture.width
-      @height = opts[:height] || @texture.height
 
       unless opts[:show] == false then add end
     end

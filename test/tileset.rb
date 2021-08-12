@@ -15,8 +15,8 @@ class GameWindow < Ruby2D::Window
   def update
     @tileset.clear_tiles
 
-    @tileset.define_tile('num-1', 0, 0)
-    @tileset.define_tile('num-2', 1, 1)
+    @tileset.define_tile('num-1', 0, 0, flip: :both)
+    @tileset.define_tile('num-2', 1, 1, rotate: 20)
     @tileset.define_tile('num-3', 2, 0)
 
     @tileset.set_tile('num-1', [

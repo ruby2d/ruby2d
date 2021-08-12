@@ -335,11 +335,11 @@ int R2D_Show(R2D_Window *window) {
  * Set the icon for the window
  */
 void R2D_SetIcon(R2D_Window *window, const char *icon) {
-  R2D_Image *img = R2D_CreateImage(icon);
-  if (img) {
+  SDL_Surface *iconSurface = R2D_CreateImageSurface(icon);
+  if (iconSurface) {
     window->icon = icon;
-    SDL_SetWindowIcon(window->sdl, img->surface);
-    R2D_FreeImage(img);
+    SDL_SetWindowIcon(window->sdl, iconSurface);
+    SDL_FreeSurface(iconSurface);
   } else {
     R2D_Log(R2D_WARN, "Could not set window icon");
   }

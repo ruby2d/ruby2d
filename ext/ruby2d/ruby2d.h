@@ -272,24 +272,6 @@ typedef struct {
   bool close;
 } R2D_Window;
 
-// R2D_Image
-typedef struct {
-  const char *path;
-  SDL_Surface *surface;
-  int format;
-  GLuint texture_id;
-  R2D_Color color;
-  int x;
-  int y;
-  int width;
-  int height;
-  int orig_width;
-  int orig_height;
-  GLfloat rotate;  // Rotation angle in degrees
-  GLfloat rx;      // X coordinate to be rotated around
-  GLfloat ry;      // Y coordinate to be rotated around
-} R2D_Image;
-
 
 // R2D_Sound
 typedef struct {
@@ -412,11 +394,6 @@ void R2D_DrawCircle(
 // Image ///////////////////////////////////////////////////////////////////////
 
 /*
- * Create an image, given a file path
- */
-R2D_Image *R2D_CreateImage(const char *path);
-
-/*
  * Create a surface with image pixel data, given a file path
  */
 SDL_Surface *R2D_CreateImageSurface(const char *path);
@@ -425,20 +402,6 @@ SDL_Surface *R2D_CreateImageSurface(const char *path);
  * Convert images to RGB format if they are in a different (BGR for example) format.
  */
 void R2D_ImageConvertToRGB(SDL_Surface *surface);
-
-
-/*
- * Free an image
- */
-void R2D_FreeImage(R2D_Image *img);
-
-
-// Tile ////////////////////////////////////////////////////////////////////////
-
-/*
- * Draw a tile
- */
-void R2D_DrawTile(R2D_Image *img, int tw, int th, int padding, int spacing, int tx, int ty, int x, int y);
 
 // Font ////////////////////////////////////////////////////////////////////////
 
@@ -642,8 +605,6 @@ void R2D_GL_DrawTriangle(
   GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
   GLfloat x3, GLfloat y3,
   GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
-  GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
 void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 void R2D_GL_FreeTexture(GLuint *id);
 void R2D_GL_Clear(R2D_Color clr);
@@ -661,11 +622,7 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-    void R2D_GLES_DrawTile(R2D_Image *img, int x, int y,
-    int tw, int th,
-    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GLES_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -685,16 +642,8 @@ void R2D_GL_FlushBuffers();
     GLfloat r2, GLfloat g2, GLfloat b2, GLfloat a2,
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
-  void R2D_GL2_DrawTile(R2D_Image *img, int x, int y,
-    int tw, int th,
-    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GL3_DrawTile(R2D_Image *img, int x, int y,
-    int tw, int th,
-    GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-    GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4);
-  void R2D_GL2_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
-  void R2D_GL3_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GL2_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GL3_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
   void R2D_GL3_FlushBuffers();
 #endif
 

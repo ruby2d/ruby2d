@@ -361,32 +361,16 @@ void R2D_GL_DrawTriangle(GLfloat x1, GLfloat y1,
 
 
 /*
- * Draw a tile
- */
-void R2D_GL_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
-  GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
-  #if GLES
-    R2D_GLES_DrawTile(img, x, y, tw, th, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4);
-  #else
-    if (R2D_GL2) {
-      R2D_GL2_DrawTile(img, x, y, tw, th, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4);
-    } else {
-      R2D_GL3_DrawTile(img, x, y, tw, th, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4);
-    }
-  #endif
-}
-
-/*
  * Draw a texture
  */
 void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
   #if GLES
-    R2D_GLES_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+    R2D_GLES_DrawTexture(coordinates, texture_coordinates, color, texture_id);
   #else
     if (R2D_GL2) {
-      R2D_GL2_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+      R2D_GL2_DrawTexture(coordinates, texture_coordinates, color, texture_id);
     } else {
-      R2D_GL3_NewDrawTexture(coordinates, texture_coordinates, color, texture_id);
+      R2D_GL3_DrawTexture(coordinates, texture_coordinates, color, texture_id);
     }
   #endif
 }

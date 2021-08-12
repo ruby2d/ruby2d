@@ -202,71 +202,9 @@ void R2D_GLES_DrawTriangle(GLfloat x1, GLfloat y1,
 
 
 /*
- * Draw a texture
- */
-static void R2D_GLES_DrawTexture(int x, int y, int w, int h,
-                                 GLfloat angle, GLfloat rx, GLfloat ry,
-                                 GLfloat r, GLfloat g, GLfloat b, GLfloat a,
-                                 GLfloat tx1, GLfloat ty1, GLfloat tx2, GLfloat ty2,
-                                 GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4,
-                                 GLuint texture_id) {
-
-  R2D_GL_Point v1 = { .x = x,     .y = y     };
-  R2D_GL_Point v2 = { .x = x + w, .y = y     };
-  R2D_GL_Point v3 = { .x = x + w, .y = y + h };
-  R2D_GL_Point v4 = { .x = x,     .y = y + h };
-
-  // Rotate vertices
-  if (angle != 0) {
-    v1 = R2D_RotatePoint(v1, angle, rx, ry);
-    v2 = R2D_RotatePoint(v2, angle, rx, ry);
-    v3 = R2D_RotatePoint(v3, angle, rx, ry);
-    v4 = R2D_RotatePoint(v4, angle, rx, ry);
-  }
-
-  GLfloat vertices[] =
-  //  x, y coords | x, y texture coords
-    { v1.x, v1.y,   0.f, tx1, ty1,
-      v2.x, v2.y,   0.f, tx2, ty2,
-      v3.x, v3.y,   0.f, tx3, ty3,
-      v4.x, v4.y,   0.f, tx4, ty4 };
-
-  GLfloat colors[] =
-    { r, g, b, a,
-      r, g, b, a,
-      r, g, b, a,
-      r, g, b, a };
-
-  glUseProgram(texShaderProgram);
-
-  // Load the vertex position
-  glVertexAttribPointer(texPositionLocation, 3, GL_FLOAT, GL_FALSE,
-                        5 * sizeof(GLfloat), vertices);
-  glEnableVertexAttribArray(texPositionLocation);
-
-  // Load the colors
-  glVertexAttribPointer(texColorLocation, 4, GL_FLOAT, GL_FALSE, 0, colors);
-  glEnableVertexAttribArray(texColorLocation);
-
-  // Load the texture coordinate
-  glVertexAttribPointer(texCoordLocation, 2, GL_FLOAT, GL_FALSE,
-                        5 * sizeof(GLfloat), &vertices[3]);
-  glEnableVertexAttribArray(texCoordLocation);
-
-  // Bind the texture
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texture_id);
-
-  // Set the sampler texture unit to 0
-  glUniform1i(samplerLocation, 0);
-
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
-}
-
-/*
  * Draw a texture (New method with vertices pre-calculated)
  */
-void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+void R2D_GLES_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
   GLfloat vertices[] =
   //  x, y coords | x, y texture coords
   {
@@ -307,19 +245,5 @@ void R2D_GLES_NewDrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 }
 
-
-/*
- * Draw a tile
- */
-void R2D_GLES_DrawTile(R2D_Image *img, int x, int y, int tw, int th, GLfloat tx1, GLfloat ty1, GLfloat tx2,
-GLfloat ty2, GLfloat tx3, GLfloat ty3, GLfloat tx4, GLfloat ty4) {
-  R2D_GLES_DrawTexture(
-    x, y, tw, th,
-    img->rotate, img->rx, img->ry,
-    img->color.r, img->color.g, img->color.b, img->color.a,
-    tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4,
-    img->texture_id
-  );
-}
 
 #endif
