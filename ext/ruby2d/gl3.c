@@ -214,7 +214,7 @@ void R2D_GL3_FlushBuffers() {
   GLuint verticesOffset = 0;
   GLuint lastTextureId = verticesTextureIds[0];
 
-  for (int i = 0; i <= vboDataIndex; i++) {
+  for (GLuint i = 0; i <= vboDataIndex; i++) {
     if(lastTextureId != verticesTextureIds[i] || i == vboDataIndex) {
       // A texture ID of 0 represents no texture (render a triangle)
       if(lastTextureId == 0) {
