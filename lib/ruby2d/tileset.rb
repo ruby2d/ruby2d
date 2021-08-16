@@ -11,6 +11,7 @@ module Ruby2D
       @texture = Texture.new(*Image.load_image(@path))
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
+      @z = opts[:z] || 0
 
       @tiles = []
       @defined_tiles = {}

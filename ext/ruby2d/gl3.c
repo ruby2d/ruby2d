@@ -10,12 +10,10 @@ static GLuint vboSize;  // size of the VBO in bytes
 static GLfloat *vboData;  // pointer to the VBO data
 static GLfloat *vboDataCurrent;  // pointer to the data for the current vertices
 static GLuint vboDataIndex = 0;  // index of the current object being rendered
-static GLuint vboObjCapacity = 2500;  // number of objects the VBO can store
+static GLuint vboObjCapacity = 7500;  // number of objects the VBO can store
+static GLuint verticesTextureIds[7500]; // store the texture_id of each vertices
 static GLuint shaderProgram;  // triangle shader program
 static GLuint texShaderProgram;  // texture shader program
-static GLuint indices[] =  // indices for rendering textured quads
-  { 0, 1, 2,
-    2, 3, 0 };
 
 
 /*
@@ -106,7 +104,7 @@ int R2D_GL3_Init() {
   // Create a vertex buffer object and allocate data
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  vboSize = vboObjCapacity * sizeof(GLfloat) * 24;
+  vboSize = vboObjCapacity * sizeof(GLfloat) * 8;
   vboData = (GLfloat *) malloc(vboSize);
   vboDataCurrent = vboData;
 
@@ -207,17 +205,39 @@ int R2D_GL3_Init() {
  * Render the vertex buffer and reset it
  */
 void R2D_GL3_FlushBuffers() {
-
-  // Use the triangle shader program
-  glUseProgram(shaderProgram);
-
   // Bind to the vertex buffer object and update its data
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, vboSize, NULL, GL_DYNAMIC_DRAW);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GLfloat) * vboDataIndex * 24, vboData);
 
-  // Render all the triangles in the buffer
-  glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(vboDataIndex * 3));
+  glBufferData(GL_ARRAY_BUFFER, vboSize, NULL, GL_DYNAMIC_DRAW);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GLfloat) * vboDataIndex * 8, vboData);
+
+  GLuint verticesOffset = 0;
+  GLuint lastTextureId = verticesTextureIds[0];
+
+  for (GLuint i = 0; i <= vboDataIndex; i++) {
+    if(lastTextureId != verticesTextureIds[i] || i == vboDataIndex) {
+      // A texture ID of 0 represents no texture (render a triangle)
+      if(lastTextureId == 0) {
+
+        // Use the triangle shader program
+        glUseProgram(shaderProgram);
+
+      // A number other than 0 represents a texture_id
+      } else {
+
+        // Use the texture shader program
+        glUseProgram(texShaderProgram);
+
+        // Bind the texture using the provided ID
+        glBindTexture(GL_TEXTURE_2D, lastTextureId);
+      }
+
+      glDrawArrays(GL_TRIANGLES, verticesOffset, i - verticesOffset);
+
+      lastTextureId = verticesTextureIds[i];
+      verticesOffset = i;
+    }
+  }
 
   // Reset the buffer object index and data pointer
   vboDataIndex = 0;
@@ -236,10 +256,10 @@ void R2D_GL3_DrawTriangle(GLfloat x1, GLfloat y1,
                           GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3) {
 
   // If buffer is full, flush it
-  if (vboDataIndex >= vboObjCapacity) R2D_GL3_FlushBuffers();
+  if (vboDataIndex + 3 >= vboObjCapacity) R2D_GL3_FlushBuffers();
 
   // Set the triangle data into a formatted array
-  GLfloat vertices[] =
+  GLfloat vertices[24] =
     { x1, y1, r1, g1, b1, a1, 0, 0,
       x2, y2, r2, g2, b2, a2, 0, 0,
       x3, y3, r3, g3, b3, a3, 0, 0 };
@@ -248,7 +268,8 @@ void R2D_GL3_DrawTriangle(GLfloat x1, GLfloat y1,
   memcpy(vboDataCurrent, vertices, sizeof(vertices));
 
   // Increment the buffer object index and the vertex data pointer for next use
-  vboDataIndex++;
+  verticesTextureIds[vboDataIndex] = verticesTextureIds[vboDataIndex + 1] = verticesTextureIds[vboDataIndex + 2] = 0;
+  vboDataIndex += 3;
   vboDataCurrent = (GLfloat *)((char *)vboDataCurrent + (sizeof(GLfloat) * 24));
 }
 
@@ -257,29 +278,27 @@ void R2D_GL3_DrawTriangle(GLfloat x1, GLfloat y1,
  * Draw a texture (New method with vertices pre-calculated)
  */
 void R2D_GL3_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id) {
-  // Currently, textures are not buffered, so we have to flush all buffers so
-  // textures get rendered in the correct Z order
-  R2D_GL3_FlushBuffers();
+  // If buffer is full, flush it
+  if (vboDataIndex + 6 >= vboObjCapacity) R2D_GL3_FlushBuffers();
 
-  // Use the texture shader program
-  glUseProgram(texShaderProgram);
-
-  // Bind the texture using the provided ID
-  glBindTexture(GL_TEXTURE_2D, texture_id);
-
-  GLfloat vertices[32] = {
+  // There are 6 vertices for a square as we are rendering two Triangles to make up our square:
+  // Triangle one: Top left, Top right, Bottom right
+  // Triangle two: Bottom right, Bottom left, Top left
+  GLfloat vertices[48] = {
     coordinates[0], coordinates[1], color[0], color[1], color[2], color[3], texture_coordinates[0], texture_coordinates[1],
     coordinates[2], coordinates[3], color[0], color[1], color[2], color[3], texture_coordinates[2], texture_coordinates[3],
     coordinates[4], coordinates[5], color[0], color[1], color[2], color[3], texture_coordinates[4], texture_coordinates[5],
+    coordinates[4], coordinates[5], color[0], color[1], color[2], color[3], texture_coordinates[4], texture_coordinates[5],
     coordinates[6], coordinates[7], color[0], color[1], color[2], color[3], texture_coordinates[6], texture_coordinates[7],
+    coordinates[0], coordinates[1], color[0], color[1], color[2], color[3], texture_coordinates[0], texture_coordinates[1],
   };
 
-  // Create and Initialize the vertex data and array indices
-  glBufferData(GL_ARRAY_BUFFER, 32 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+  // Copy the vertex data into the current position of the buffer
+  memcpy(vboDataCurrent, vertices, sizeof(vertices));
 
-  // Render the textured quad
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+  verticesTextureIds[vboDataIndex] = verticesTextureIds[vboDataIndex + 1] = verticesTextureIds[vboDataIndex + 2] = verticesTextureIds[vboDataIndex + 3] = verticesTextureIds[vboDataIndex + 4] = verticesTextureIds[vboDataIndex + 5] = texture_id;
+  vboDataIndex += 6;
+  vboDataCurrent = (GLfloat *)((char *)vboDataCurrent + (sizeof(GLfloat) * 48));
 }
 
 
