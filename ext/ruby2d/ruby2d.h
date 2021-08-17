@@ -408,7 +408,7 @@ void R2D_ImageConvertToRGB(SDL_Surface *surface);
 /*
  * Create a TTF_Font object given a path to a font and a size
  */
-TTF_Font *R2D_FontCreateTTFFont(const char *path, int size);
+TTF_Font *R2D_FontCreateTTFFont(const char *path, int size, const char *style);
 
 // Text ////////////////////////////////////////////////////////////////////////
 
