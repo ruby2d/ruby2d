@@ -187,6 +187,8 @@ module Ruby2D
     end
 
     def draw(opts = {})
+      Window.render_ready_check
+
       opts[:width] = opts[:width] || (@width || @clip_width)
       opts[:height] = opts[:height] || (@height || @clip_height)
       opts[:rotate] = opts[:rotate] || @rotate

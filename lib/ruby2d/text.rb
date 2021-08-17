@@ -40,6 +40,8 @@ module Ruby2D
     end
 
     def draw(opts = {})
+      Window.render_ready_check
+
       opts[:rotate] = opts[:rotate] || @rotate
       unless opts[:color]
         opts[:color] = [1.0, 1.0, 1.0, 1.0]
