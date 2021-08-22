@@ -625,8 +625,8 @@ module Ruby2D
         raise Error, "Window#show called multiple times, Ruby2D only supports a single open window"
       end
 
-      ext_show
       @@open_window = true
+      ext_show
     end
 
     # Take screenshot
@@ -646,7 +646,6 @@ module Ruby2D
     # Close the window
     def close
       ext_close
-      @@open_window = false
     end
 
     # Private instance methods
