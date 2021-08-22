@@ -20,5 +20,9 @@ module Ruby2D
         color = [color.r, color.g, color.b, color.a]
         ext_draw(coordinates, texture_coordinates, color, @texture_id)
       end
+
+      def delete
+        ext_delete(@texture_id)
+      end
     end
 end
