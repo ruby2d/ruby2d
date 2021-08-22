@@ -14,6 +14,7 @@ module Ruby2D
       @text = text.to_s
       @size = opts[:size] || 20
       @rotate = opts[:rotate] || 0
+      @style = opts[:style]
       self.color = opts[:color] || 'white'
       self.color.opacity = opts[:opacity] if opts[:opacity]
       @font_path = opts[:font] || Font.default
@@ -59,7 +60,7 @@ module Ruby2D
     end
 
     def create_font
-      @font = Font.load(@font_path, @size)
+      @font = Font.load(@font_path, @size, @style)
     end
 
     def create_texture

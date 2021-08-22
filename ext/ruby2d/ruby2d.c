@@ -652,10 +652,10 @@ static R_VAL ruby2d_music_ext_length(R_VAL self) {
 /*
  * Ruby2D::Font#ext_load
  */
-static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size) {
+static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size, R_VAL style) {
   R2D_Init();
 
-  TTF_Font *font = R2D_FontCreateTTFFont(RSTRING_PTR(path), NUM2INT(size));
+  TTF_Font *font = R2D_FontCreateTTFFont(RSTRING_PTR(path), NUM2INT(size), RSTRING_PTR(style));
   if (!font) {
     return R_NIL;
   }
@@ -1199,7 +1199,7 @@ void Init_ruby2d() {
   R_CLASS ruby2d_font_class = r_define_class(ruby2d_module, "Font");
 
   // Ruby2D::Font#ext_load
-  r_define_class_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(2));
+  r_define_class_method(ruby2d_font_class, "ext_load", ruby2d_font_ext_load, r_args_req(3));
 
   // Ruby2D::Texture
   R_CLASS ruby2d_texture_class = r_define_class(ruby2d_module, "Texture");

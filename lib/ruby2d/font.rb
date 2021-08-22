@@ -6,17 +6,17 @@ module Ruby2D
 
     attr_reader :ttf_font
 
-    def initialize(path, size)
-      @ttf_font = Font.ext_load(path, size)
+    def initialize(path, size, style=nil)
+      @ttf_font = Font.ext_load(path, size, style.to_s)
     end
 
     class << self
-      def load(path, size)
+      def load(path, size, style=nil)
         unless File.exist? path
           raise Error, "Cannot find font file `#{path}`"
         end
 
-        @@loaded_fonts[[path, size]] ||= Font.new(path, size)
+        @@loaded_fonts[[path, size, style]] ||= Font.new(path, size, style)
       end
 
       # List all fonts, names only
