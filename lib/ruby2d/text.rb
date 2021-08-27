@@ -64,6 +64,10 @@ module Ruby2D
     end
 
     def create_texture
+      if defined?(@texture)
+        @texture.delete
+      end
+
       @texture = Texture.new(*Text.ext_load_text(@font.ttf_font, @text))
       @width = @texture.width
       @height = @texture.height

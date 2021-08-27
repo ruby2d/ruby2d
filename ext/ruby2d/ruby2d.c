@@ -397,7 +397,9 @@ static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
   return result;
 }
 
-
+/*
+ * Ruby2D::Texture#ext_create
+ */
 static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL width, R_VAL height) {
   GLuint texture_id = 0;
   SDL_Surface *surface;
@@ -414,6 +416,17 @@ static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL widt
                        surface->pixels, GL_NEAREST);
 
   return INT2NUM(texture_id);
+}
+
+/*
+ * Ruby2D::Texture#ext_delete
+ */
+static R_VAL ruby2d_texture_ext_delete(R_VAL self, R_VAL rubyTexture_id) {
+  GLuint texture_id = NUM2INT(rubyTexture_id);
+
+  R2D_GL_FreeTexture(&texture_id);
+
+  return R_NIL;
 }
 
 
@@ -1209,6 +1222,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Texture#ext_create
   r_define_method(ruby2d_texture_class, "ext_create", ruby2d_texture_ext_create, r_args_req(3));
+
+  // Ruby2D::Texture#ext_delete
+  r_define_method(ruby2d_texture_class, "ext_delete", ruby2d_texture_ext_delete, r_args_req(1));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
