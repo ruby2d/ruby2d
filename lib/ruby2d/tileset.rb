@@ -19,6 +19,7 @@ module Ruby2D
       @spacing = opts[:spacing] || 0
       @tile_width = opts[:tile_width]
       @tile_height = opts[:tile_height]
+      @scale = opts[:scale] || 1
 
       unless opts[:show] == false then add end
     end
@@ -55,20 +56,28 @@ module Ruby2D
 
   private
 
+
   def render
+    scaled_padding = @padding * @scale
+    scaled_spacing = @spacing * @scale
+    scaled_tile_width = @tile_width * @scale
+    scaled_tile_height = @tile_height * @scale
+    scaled_width = @width * @scale
+    scaled_height = @height * @scale
+
     @tiles.each do |tile|
       crop = {
-        x: @padding + (tile.fetch(:tile_x) + @spacing) * @tile_width,
-        y: @padding + (tile.fetch(:tile_y) + @spacing) * @tile_height,
-        width: @tile_width,
-        height: @tile_height,
-        image_width: @width,
-        image_height: @height,
+        x: scaled_padding + (tile.fetch(:tile_x) * (scaled_spacing + scaled_tile_width)),
+        y: scaled_padding + (tile.fetch(:tile_y) * (scaled_spacing + scaled_tile_height)),
+        width: scaled_tile_width,
+        height: scaled_tile_height,
+        image_width: scaled_width,
+        image_height: scaled_height,
       }
 
       color = defined?(@color) ? @color : Color.new([1.0, 1.0, 1.0, 1.0])
 
-      vertices = Vertices.new(tile.fetch(:x), tile.fetch(:y), @tile_width, @tile_height, tile.fetch(:tile_rotate), crop: crop, flip: tile.fetch(:tile_flip))
+      vertices = Vertices.new(tile.fetch(:x), tile.fetch(:y), scaled_tile_width, scaled_tile_height, tile.fetch(:tile_rotate), crop: crop, flip: tile.fetch(:tile_flip))
 
       @texture.draw(
         vertices.coordinates, vertices.texture_coordinates, color
