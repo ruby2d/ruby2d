@@ -48,6 +48,8 @@ module Ruby2D
   end
 
   def draw
+    Window.render_ready_check
+
     render
   end
 

@@ -22,6 +22,8 @@ module Ruby2D
     end
 
     def self.draw(opts = {})
+      Window.render_ready_check
+
       ext_draw([
         opts[:x], opts[:y], opts[:radius], opts[:sectors],
         opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]

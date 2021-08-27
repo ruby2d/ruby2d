@@ -4,6 +4,7 @@
 
 module Ruby2D
   class Window
+    @@open_window = false
 
     # Event structures
     EventDescriptor       = Struct.new(:type, :id)
@@ -187,6 +188,12 @@ module Ruby2D
 
       def close
         DSL.window.close
+      end
+
+      def render_ready_check
+        unless @@open_window
+          raise Error, "Attempting to draw before the window is ready. Please put calls to draw() inside of a render block."
+        end
       end
     end
 
@@ -614,6 +621,11 @@ module Ruby2D
 
     # Show the window
     def show
+      if @@open_window
+        raise Error, "Window#show called multiple times, Ruby2D only supports a single open window"
+      end
+
+      @@open_window = true
       ext_show
     end
 
