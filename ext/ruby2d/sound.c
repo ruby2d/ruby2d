@@ -57,7 +57,7 @@ int R2D_GetSoundLength(R2D_Sound *snd) {
   int channels = 0;
 
   // Populate the frequency, format and channel variables
-  if (!Mix_QuerySpec(&frequency, &format, &channels)) return -1; // Querying audio deails failed
+  if (!Mix_QuerySpec(&frequency, &format, &channels)) return -1; // Querying audio details failed
   if (!snd) return -1;
 
   // points = bytes / samplesize
