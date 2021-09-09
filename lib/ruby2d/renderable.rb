@@ -4,6 +4,8 @@ module Ruby2D
   module Renderable
 
     attr_reader :x, :y, :z, :width, :height, :color
+    alias_method :w, :width
+    alias_method :h, :height
 
     # Set the z position (depth) of the object
     def z=(z)
