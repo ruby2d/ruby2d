@@ -7,6 +7,12 @@ module Ruby2D
     alias_method :w, :width
     alias_method :h, :height
 
+    def initialize(*args)
+      @width = w unless w.nil?
+      @height = h unless h.nil?
+      super()
+    end
+
     # Set the z position (depth) of the object
     def z=(z)
       remove
@@ -37,6 +43,5 @@ module Ruby2D
     def contains?(x, y)
       x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
     end
-
   end
 end

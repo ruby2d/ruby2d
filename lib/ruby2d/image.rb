@@ -2,7 +2,7 @@
 
 module Ruby2D
   class Image
-    include Renderable
+    prepend Renderable
 
     attr_reader :path
     attr_accessor :x, :y, :width, :height, :rotate, :data

@@ -4,10 +4,9 @@ RSpec.describe Ruby2D::Renderable do
 
   # Create and use a fresh class to ensure nothing is overridden
   class SomeShape
-    include Renderable
-    def initialize(x: 0, y: 0, width: 100, height: 100)
-      @x, @y, @width, @height = x, y, width, height
-    end
+    prepend Renderable
+
+    def initialize(x: 0, y: 0, w: 100, h: 100); end
   end
 
   it "allows colors to be set on objects" do

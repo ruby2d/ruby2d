@@ -2,7 +2,7 @@
 
 module Ruby2D
   class Quad
-    include Renderable
+    prepend Renderable
 
     # Coordinates in clockwise order, starting at top left:
     # x1,y1 == top left

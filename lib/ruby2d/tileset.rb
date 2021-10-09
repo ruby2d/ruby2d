@@ -2,7 +2,7 @@
 
 module Ruby2D
   class Tileset
-    include Renderable
+    prepend Renderable
 
     def initialize(path, opts = {})
       @path = path

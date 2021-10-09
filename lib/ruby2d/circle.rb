@@ -2,7 +2,7 @@
 
 module Ruby2D
   class Circle
-    include Renderable
+    prepend Renderable
 
     attr_accessor :x, :y, :radius, :sectors
 

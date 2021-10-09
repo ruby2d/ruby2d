@@ -2,7 +2,7 @@
 
 module Ruby2D
   class Sprite
-    include Renderable
+    prepend Renderable
 
     attr_reader :path
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data, :x, :y, :width, :height
