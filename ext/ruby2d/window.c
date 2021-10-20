@@ -50,10 +50,251 @@ R2D_Window *R2D_CreateWindow(const char *title, int width, int height,
 }
 
 
+const Uint8 *key_state;
+
+Uint32 frames;
+Uint32 frames_last_sec;
+Uint32 start_ms;
+Uint32 next_second_ms;
+Uint32 begin_ms;
+Uint32 end_ms;
+Uint32 elapsed_ms;
+Uint32 loop_ms;
+int delay_ms;
+double decay_rate;
+double fps;
+
+R2D_Window *window;
+
+
+
+
+
+
+
+void main_loop() {
+
+  // Clear Frame /////////////////////////////////////////////////////////////
+
+  R2D_GL_Clear(window->background);
+
+  // Set FPS /////////////////////////////////////////////////////////////////
+
+  frames++;
+  frames_last_sec++;
+  end_ms = SDL_GetTicks();
+  elapsed_ms = end_ms - start_ms;
+
+  // Calculate the frame rate using an exponential moving average
+  if (next_second_ms < end_ms) {
+    fps = decay_rate * fps + (1.0 - decay_rate) * frames_last_sec;
+    frames_last_sec = 0;
+    next_second_ms = SDL_GetTicks() + 1000;
+  }
+
+  loop_ms = end_ms - begin_ms;
+  delay_ms = (1000 / window->fps_cap) - loop_ms;
+
+  if (delay_ms < 0) delay_ms = 0;
+
+  // Note: `loop_ms + delay_ms` should equal `1000 / fps_cap`
+
+  #ifndef __EMSCRIPTEN__
+    SDL_Delay(delay_ms);
+  #endif
+
+  begin_ms = SDL_GetTicks();
+
+  // Handle Input and Window Events //////////////////////////////////////////
+
+  int mx, my;  // mouse x, y coordinates
+
+  SDL_Event e;
+  while (SDL_PollEvent(&e)) {
+    switch (e.type) {
+
+      case SDL_KEYDOWN:
+        if (window->on_key && e.key.repeat == 0) {
+          R2D_Event event = {
+            .type = R2D_KEY_DOWN, .key = SDL_GetScancodeName(e.key.keysym.scancode)
+          };
+          window->on_key(event);
+        }
+        break;
+
+      case SDL_KEYUP:
+        if (window->on_key) {
+          R2D_Event event = {
+            .type = R2D_KEY_UP, .key = SDL_GetScancodeName(e.key.keysym.scancode)
+          };
+          window->on_key(event);
+        }
+        break;
+
+      case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
+        if (window->on_mouse) {
+          R2D_GetMouseOnViewport(window, e.button.x, e.button.y, &mx, &my);
+          R2D_Event event = {
+            .button = e.button.button, .x = mx, .y = my
+          };
+          event.type = e.type == SDL_MOUSEBUTTONDOWN ? R2D_MOUSE_DOWN : R2D_MOUSE_UP;
+          event.dblclick = e.button.clicks == 2 ? true : false;
+          window->on_mouse(event);
+        }
+        break;
+
+      case SDL_MOUSEWHEEL:
+        if (window->on_mouse) {
+          R2D_Event event = {
+            .type = R2D_MOUSE_SCROLL, .direction = e.wheel.direction,
+            .delta_x = e.wheel.x, .delta_y = -e.wheel.y
+          };
+          window->on_mouse(event);
+        }
+        break;
+
+      case SDL_MOUSEMOTION:
+        if (window->on_mouse) {
+          R2D_GetMouseOnViewport(window, e.motion.x, e.motion.y, &mx, &my);
+          R2D_Event event = {
+            .type = R2D_MOUSE_MOVE,
+            .x = mx, .y = my, .delta_x = e.motion.xrel, .delta_y = e.motion.yrel
+          };
+          window->on_mouse(event);
+        }
+        break;
+
+      case SDL_CONTROLLERAXISMOTION:
+        if (window->on_controller) {
+          R2D_Event event = {
+            .which = e.caxis.which, .type = R2D_AXIS,
+            .axis = e.caxis.axis, .value = e.caxis.value
+          };
+          window->on_controller(event);
+        }
+        break;
+
+      case SDL_JOYAXISMOTION:
+        if (window->on_controller && !R2D_IsController(e.jbutton.which)) {
+          R2D_Event event = {
+            .which = e.jaxis.which, .type = R2D_AXIS,
+            .axis = e.jaxis.axis, .value = e.jaxis.value
+          };
+          window->on_controller(event);
+        }
+        break;
+
+      case SDL_CONTROLLERBUTTONDOWN: case SDL_CONTROLLERBUTTONUP:
+        if (window->on_controller) {
+          R2D_Event event = {
+            .which = e.cbutton.which, .button = e.cbutton.button
+          };
+          event.type = e.type == SDL_CONTROLLERBUTTONDOWN ? R2D_BUTTON_DOWN : R2D_BUTTON_UP;
+          window->on_controller(event);
+        }
+        break;
+
+      case SDL_JOYBUTTONDOWN: case SDL_JOYBUTTONUP:
+        if (window->on_controller && !R2D_IsController(e.jbutton.which)) {
+          R2D_Event event = {
+            .which = e.jbutton.which, .button = e.jbutton.button
+          };
+          event.type = e.type == SDL_JOYBUTTONDOWN ? R2D_BUTTON_DOWN : R2D_BUTTON_UP;
+          window->on_controller(event);
+        }
+        break;
+
+      case SDL_JOYDEVICEADDED:
+        R2D_Log(R2D_INFO, "Controller connected (%i total)", SDL_NumJoysticks());
+        R2D_OpenControllers();
+        break;
+
+      case SDL_JOYDEVICEREMOVED:
+        if (R2D_IsController(e.jdevice.which)) {
+          R2D_Log(R2D_INFO, "Controller #%i: %s removed (%i remaining)", e.jdevice.which, SDL_GameControllerName(SDL_GameControllerFromInstanceID(e.jdevice.which)), SDL_NumJoysticks());
+          SDL_GameControllerClose(SDL_GameControllerFromInstanceID(e.jdevice.which));
+        } else {
+          R2D_Log(R2D_INFO, "Controller #%i: %s removed (%i remaining)", e.jdevice.which, SDL_JoystickName(SDL_JoystickFromInstanceID(e.jdevice.which)), SDL_NumJoysticks());
+          SDL_JoystickClose(SDL_JoystickFromInstanceID(e.jdevice.which));
+        }
+        break;
+
+      case SDL_WINDOWEVENT:
+        switch (e.window.event) {
+          case SDL_WINDOWEVENT_RESIZED:
+            // Store new window size, set viewport
+            window->width  = e.window.data1;
+            window->height = e.window.data2;
+            R2D_GL_SetViewport(window);
+            break;
+        }
+        break;
+
+      case SDL_QUIT:
+        R2D_Close(window);
+        break;
+    }
+  }
+
+  // Detect keys held down
+  int num_keys;
+  key_state = SDL_GetKeyboardState(&num_keys);
+
+  for (int i = 0; i < num_keys; i++) {
+    if (window->on_key) {
+      if (key_state[i] == 1) {
+        R2D_Event event = {
+          .type = R2D_KEY_HELD, .key = SDL_GetScancodeName(i)
+        };
+        window->on_key(event);
+      }
+    }
+  }
+
+  // Get and store mouse position relative to the viewport
+  int wx, wy;  // mouse x, y coordinates relative to the window
+  SDL_GetMouseState(&wx, &wy);
+  R2D_GetMouseOnViewport(window, wx, wy, &window->mouse.x, &window->mouse.y);
+
+  // Update Window State /////////////////////////////////////////////////////
+
+  // Store new values in the window
+  window->frames     = frames;
+  window->elapsed_ms = elapsed_ms;
+  window->loop_ms    = loop_ms;
+  window->delay_ms   = delay_ms;
+  window->fps        = fps;
+
+  // Call update and render callbacks
+  if (window->update) window->update();
+  if (window->render) window->render();
+
+  // Draw Frame //////////////////////////////////////////////////////////////
+
+  // Render and flush all OpenGL buffers
+  R2D_GL_FlushBuffers();
+
+  // Swap buffers to display drawn contents in the window
+  SDL_GL_SwapWindow(window->sdl);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 /*
  * Show the window
  */
-int R2D_Show(R2D_Window *window) {
+int R2D_Show(R2D_Window *win) {
+
+  window = win;
 
   if (!window) {
     R2D_Error("R2D_Show", "Window cannot be shown (because it's NULL)");
@@ -99,19 +340,18 @@ int R2D_Show(R2D_Window *window) {
 
   // Set Main Loop Data ////////////////////////////////////////////////////////
 
-  const Uint8 *key_state;
 
-  Uint32 frames = 0;           // Total frames since start
-  Uint32 frames_last_sec = 0;  // Frames in the last second
-  Uint32 start_ms = SDL_GetTicks();  // Elapsed time since start
-  Uint32 next_second_ms = SDL_GetTicks(); // The last time plus a second
-  Uint32 begin_ms = start_ms;  // Time at beginning of loop
-  Uint32 end_ms;               // Time at end of loop
-  Uint32 elapsed_ms;           // Total elapsed time
-  Uint32 loop_ms;              // Elapsed time of loop
-  int delay_ms;                // Amount of delay to achieve desired frame rate
-  const double decay_rate = 0.5;  // Determines how fast an average decays over time
-  double fps = window->fps_cap;   // Moving average of actual FPS, initial value a guess
+  frames = 0;           // Total frames since start
+  frames_last_sec = 0;  // Frames in the last second
+  start_ms = SDL_GetTicks();  // Elapsed time since start
+  next_second_ms = SDL_GetTicks(); // The last time plus a second
+  begin_ms = start_ms;  // Time at beginning of loop
+  end_ms;               // Time at end of loop
+  elapsed_ms;           // Total elapsed time
+  loop_ms;              // Elapsed time of loop
+  delay_ms;                // Amount of delay to achieve desired frame rate
+  decay_rate = 0.5;  // Determines how fast an average decays over time
+  fps = window->fps_cap;   // Moving average of actual FPS, initial value a guess
 
   // Enable VSync
   if (window->vsync) {
@@ -124,211 +364,15 @@ int R2D_Show(R2D_Window *window) {
 
   // Main Loop /////////////////////////////////////////////////////////////////
 
-  while (!window->close) {
-
-    // Clear Frame /////////////////////////////////////////////////////////////
-
-    R2D_GL_Clear(window->background);
-
-    // Set FPS /////////////////////////////////////////////////////////////////
-
-    frames++;
-    frames_last_sec++;
-    end_ms = SDL_GetTicks();
-    elapsed_ms = end_ms - start_ms;
-
-    // Calculate the frame rate using an exponential moving average
-    if (next_second_ms < end_ms) {
-      fps = decay_rate * fps + (1.0 - decay_rate) * frames_last_sec;
-      frames_last_sec = 0;
-      next_second_ms = SDL_GetTicks() + 1000;
-    }
-
-    loop_ms = end_ms - begin_ms;
-    delay_ms = (1000 / window->fps_cap) - loop_ms;
-
-    if (delay_ms < 0) delay_ms = 0;
-
-    // Note: `loop_ms + delay_ms` should equal `1000 / fps_cap`
-
-    SDL_Delay(delay_ms);
-    begin_ms = SDL_GetTicks();
-
-    // Handle Input and Window Events //////////////////////////////////////////
-
-    int mx, my;  // mouse x, y coordinates
-
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-      switch (e.type) {
-
-        case SDL_KEYDOWN:
-          if (window->on_key && e.key.repeat == 0) {
-            R2D_Event event = {
-              .type = R2D_KEY_DOWN, .key = SDL_GetScancodeName(e.key.keysym.scancode)
-            };
-            window->on_key(event);
-          }
-          break;
-
-        case SDL_KEYUP:
-          if (window->on_key) {
-            R2D_Event event = {
-              .type = R2D_KEY_UP, .key = SDL_GetScancodeName(e.key.keysym.scancode)
-            };
-            window->on_key(event);
-          }
-          break;
-
-        case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
-          if (window->on_mouse) {
-            R2D_GetMouseOnViewport(window, e.button.x, e.button.y, &mx, &my);
-            R2D_Event event = {
-              .button = e.button.button, .x = mx, .y = my
-            };
-            event.type = e.type == SDL_MOUSEBUTTONDOWN ? R2D_MOUSE_DOWN : R2D_MOUSE_UP;
-            event.dblclick = e.button.clicks == 2 ? true : false;
-            window->on_mouse(event);
-          }
-          break;
-
-        case SDL_MOUSEWHEEL:
-          if (window->on_mouse) {
-            R2D_Event event = {
-              .type = R2D_MOUSE_SCROLL, .direction = e.wheel.direction,
-              .delta_x = e.wheel.x, .delta_y = -e.wheel.y
-            };
-            window->on_mouse(event);
-          }
-          break;
-
-        case SDL_MOUSEMOTION:
-          if (window->on_mouse) {
-            R2D_GetMouseOnViewport(window, e.motion.x, e.motion.y, &mx, &my);
-            R2D_Event event = {
-              .type = R2D_MOUSE_MOVE,
-              .x = mx, .y = my, .delta_x = e.motion.xrel, .delta_y = e.motion.yrel
-            };
-            window->on_mouse(event);
-          }
-          break;
-
-        case SDL_CONTROLLERAXISMOTION:
-          if (window->on_controller) {
-            R2D_Event event = {
-              .which = e.caxis.which, .type = R2D_AXIS,
-              .axis = e.caxis.axis, .value = e.caxis.value
-            };
-            window->on_controller(event);
-          }
-          break;
-
-        case SDL_JOYAXISMOTION:
-          if (window->on_controller && !R2D_IsController(e.jbutton.which)) {
-            R2D_Event event = {
-              .which = e.jaxis.which, .type = R2D_AXIS,
-              .axis = e.jaxis.axis, .value = e.jaxis.value
-            };
-            window->on_controller(event);
-          }
-          break;
-
-        case SDL_CONTROLLERBUTTONDOWN: case SDL_CONTROLLERBUTTONUP:
-          if (window->on_controller) {
-            R2D_Event event = {
-              .which = e.cbutton.which, .button = e.cbutton.button
-            };
-            event.type = e.type == SDL_CONTROLLERBUTTONDOWN ? R2D_BUTTON_DOWN : R2D_BUTTON_UP;
-            window->on_controller(event);
-          }
-          break;
-
-        case SDL_JOYBUTTONDOWN: case SDL_JOYBUTTONUP:
-          if (window->on_controller && !R2D_IsController(e.jbutton.which)) {
-            R2D_Event event = {
-              .which = e.jbutton.which, .button = e.jbutton.button
-            };
-            event.type = e.type == SDL_JOYBUTTONDOWN ? R2D_BUTTON_DOWN : R2D_BUTTON_UP;
-            window->on_controller(event);
-          }
-          break;
-
-        case SDL_JOYDEVICEADDED:
-          R2D_Log(R2D_INFO, "Controller connected (%i total)", SDL_NumJoysticks());
-          R2D_OpenControllers();
-          break;
-
-        case SDL_JOYDEVICEREMOVED:
-          if (R2D_IsController(e.jdevice.which)) {
-            R2D_Log(R2D_INFO, "Controller #%i: %s removed (%i remaining)", e.jdevice.which, SDL_GameControllerName(SDL_GameControllerFromInstanceID(e.jdevice.which)), SDL_NumJoysticks());
-            SDL_GameControllerClose(SDL_GameControllerFromInstanceID(e.jdevice.which));
-          } else {
-            R2D_Log(R2D_INFO, "Controller #%i: %s removed (%i remaining)", e.jdevice.which, SDL_JoystickName(SDL_JoystickFromInstanceID(e.jdevice.which)), SDL_NumJoysticks());
-            SDL_JoystickClose(SDL_JoystickFromInstanceID(e.jdevice.which));
-          }
-          break;
-
-        case SDL_WINDOWEVENT:
-          switch (e.window.event) {
-            case SDL_WINDOWEVENT_RESIZED:
-              // Store new window size, set viewport
-              window->width  = e.window.data1;
-              window->height = e.window.data2;
-              R2D_GL_SetViewport(window);
-              break;
-          }
-          break;
-
-        case SDL_QUIT:
-          R2D_Close(window);
-          break;
-      }
-    }
-
-    // Detect keys held down
-    int num_keys;
-    key_state = SDL_GetKeyboardState(&num_keys);
-
-    for (int i = 0; i < num_keys; i++) {
-      if (window->on_key) {
-        if (key_state[i] == 1) {
-          R2D_Event event = {
-            .type = R2D_KEY_HELD, .key = SDL_GetScancodeName(i)
-          };
-          window->on_key(event);
-        }
-      }
-    }
-
-    // Get and store mouse position relative to the viewport
-    int wx, wy;  // mouse x, y coordinates relative to the window
-    SDL_GetMouseState(&wx, &wy);
-    R2D_GetMouseOnViewport(window, wx, wy, &window->mouse.x, &window->mouse.y);
-
-    // Update Window State /////////////////////////////////////////////////////
-
-    // Store new values in the window
-    window->frames     = frames;
-    window->elapsed_ms = elapsed_ms;
-    window->loop_ms    = loop_ms;
-    window->delay_ms   = delay_ms;
-    window->fps        = fps;
-
-    // Call update and render callbacks
-    if (window->update) window->update();
-    if (window->render) window->render();
-
-    // Draw Frame //////////////////////////////////////////////////////////////
-
-    // Render and flush all OpenGL buffers
-    R2D_GL_FlushBuffers();
-
-    // Swap buffers to display drawn contents in the window
-    SDL_GL_SwapWindow(window->sdl);
-  }
+  #ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(main_loop, 0, true);
+  #else
+    while (!window->close) main_loop();
+  #endif
 
   return 0;
 }
+
 
 
 /*

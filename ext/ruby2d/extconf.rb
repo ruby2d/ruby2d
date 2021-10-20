@@ -1,25 +1,8 @@
 require 'mkmf'
 require_relative '../../lib/ruby2d/cli/colorize'
+require_relative '../../lib/ruby2d/cli/platform'
 
 $errors = []  # Holds errors
-
-# Set the OS platform
-case RUBY_PLATFORM
-when /darwin/
-  $platform = :macos
-when /linux/
-  $platform = :linux
-  if `cat /etc/os-release` =~ /raspbian/
-    $platform = :linux_rpi
-  end
-when /bsd/
-  $platform = :bsd
-when /mingw/
-  $platform = :windows
-else
-  $platform = nil
-end
-
 
 # Helper functions #############################################################
 
@@ -111,7 +94,7 @@ if ARGV.include? 'libs'
 else
   add_flags(:c, '-std=c11')
 
-  case $platform
+  case $RUBY2D_PLATFORM
 
   when :macos
     add_flags(:c, '-I../../assets/include')
@@ -128,7 +111,7 @@ else
 
     set_rpi_flags
     add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
-    if $platform == :linux then add_flags(:ld, '-lGL') end
+    if $RUBY2D_PLATFORM == :linux then add_flags(:ld, '-lGL') end
 
   when :windows
     add_flags(:c, '-I../../assets/include')

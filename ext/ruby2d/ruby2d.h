@@ -1,5 +1,8 @@
 // ruby2d.h
 
+#ifndef RUBY2D_H
+#define RUBY2D_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,12 +35,18 @@ extern "C" {
   #define MINGW true
 #endif
 
-// GLES
-#if defined(__arm__) || IOS || TVOS
-  #define GLES true
-#else
-  #define GLES false
-#endif
+
+
+#define GLES true
+
+// // ARM and GLES
+// #if defined(__arm__) || IOS || TVOS || __EMSCRIPTEN__
+//   #define GLES true
+// #else
+//   #define GLES false
+// #endif
+
+
 
 // Includes ////////////////////////////////////////////////////////////////////
 
@@ -73,6 +82,13 @@ extern "C" {
 // If MinGW, undefine `main()` from SDL_main.c
 #if MINGW
   #undef main
+#endif
+
+#ifdef __EMSCRIPTEN__
+  #include <emscripten.h>
+  #include <SDL.h>
+  #define GL_GLEXT_PROTOTYPES 1
+  #include <SDL_opengles2.h>
 #endif
 
 // OpenGL
@@ -623,6 +639,7 @@ void R2D_GL_FlushBuffers();
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
   void R2D_GLES_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GLES_FlushBuffers();
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -650,3 +667,5 @@ void R2D_GL_FlushBuffers();
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* RUBY2D_H */

@@ -2,7 +2,6 @@
 
 #include "ruby2d.h"
 
-// Skip this file if OpenGL ES
 #if !GLES
 
 static GLuint vbo;  // our primary vertex buffer object (VBO)
