@@ -120,7 +120,7 @@ else
     add_flags(:ld, "#{ldir}/libSDL2.a #{ldir}/libSDL2_image.a #{ldir}/libSDL2_mixer.a #{ldir}/libSDL2_ttf.a")
     add_flags(:ld, "#{ldir}/libjpeg.a #{ldir}/libpng16.a #{ldir}/libtiff.a #{ldir}/libwebp.a")
     add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libogg.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a")
-    add_flags(:ld, "#{ldir}/libfreetype.a")
+    add_flags(:ld, "#{ldir}/libfreetype.a #{ldir}/libmodplug.a")
     add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
 
   when :linux, :linux_rpi, :bsd
