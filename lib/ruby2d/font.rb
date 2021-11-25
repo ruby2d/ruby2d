@@ -2,6 +2,8 @@
 
 module Ruby2D
   class Font
+    FONT_CACHE_LIMIT = 100
+
     @@loaded_fonts = {}
 
     attr_reader :ttf_font
@@ -16,7 +18,11 @@ module Ruby2D
           raise Error, "Cannot find font file `#{path}`"
         end
 
-        @@loaded_fonts[[path, size, style]] ||= Font.new(path, size, style)
+        (@@loaded_fonts[[path, size, style]] ||= Font.new(path, size, style)).tap do |font|
+          if @@loaded_fonts.size > FONT_CACHE_LIMIT
+            @@loaded_fonts.shift
+          end
+        end
       end
 
       # List all fonts, names only
