@@ -57,16 +57,14 @@ Uint32 frames_last_sec;
 Uint32 start_ms;
 Uint32 next_second_ms;
 Uint32 begin_ms;
-Uint32 end_ms;
-Uint32 elapsed_ms;
-Uint32 loop_ms;
-int delay_ms;
+Uint32 end_ms;      // Time at end of loop
+Uint32 elapsed_ms;  // Total elapsed time
+Uint32 loop_ms;     // Elapsed time of current loop
+int delay_ms;       // Amount of delay to achieve desired frame rate
 double decay_rate;
 double fps;
 
 R2D_Window *window;
-
-
 
 
 
@@ -346,10 +344,6 @@ int R2D_Show(R2D_Window *win) {
   start_ms = SDL_GetTicks();  // Elapsed time since start
   next_second_ms = SDL_GetTicks(); // The last time plus a second
   begin_ms = start_ms;  // Time at beginning of loop
-  end_ms;               // Time at end of loop
-  elapsed_ms;           // Total elapsed time
-  loop_ms;              // Elapsed time of loop
-  delay_ms;                // Amount of delay to achieve desired frame rate
   decay_rate = 0.5;  // Determines how fast an average decays over time
   fps = window->fps_cap;   // Moving average of actual FPS, initial value a guess
 

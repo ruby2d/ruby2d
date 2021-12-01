@@ -3,7 +3,7 @@ require 'ruby2d'
 set title: "Ruby 2D — Sprite", width: 400, height: 300
 
 coin1 = Sprite.new(
-  'media/coin.png',
+  "#{Ruby2D.test_media}/coin.png",
   clip_width: 84,
   time: 300,
   loop: true
@@ -12,7 +12,7 @@ coin1 = Sprite.new(
 coin1.play
 
 coin2 = Sprite.new(
-  'media/coin.png',
+  "#{Ruby2D.test_media}/coin.png",
   y: 90,
   width: 42,
   height: 42,
@@ -24,14 +24,14 @@ coin2 = Sprite.new(
 coin2.play
 
 boom = Sprite.new(
-  'media/boom.png',
+  "#{Ruby2D.test_media}/boom.png",
   x: 109,
   clip_width: 127,
   time: 75
 )
 
 hero = Sprite.new(
-  'media/hero.png',
+  "#{Ruby2D.test_media}/hero.png",
   x: 261,
   width: 78,
   height: 99,
@@ -45,7 +45,7 @@ hero = Sprite.new(
 )
 
 atlas = Sprite.new(
-  'media/texture_atlas.png',
+  "#{Ruby2D.test_media}/texture_atlas.png",
   x: 50, y: 90,
   animations: {
     count: [

@@ -1,14 +1,13 @@
-# Build a Ruby 2D app natively and for the web
+# Build a compiled Ruby 2D app with mruby
 
+require 'ruby2d'
 require 'fileutils'
+require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/platform'
 
 
-# The installed gem directory
-@gem_dir = "#{Gem::Specification.find_by_name('ruby2d').gem_dir}"
-
 # The Ruby 2D library files
-@lib_files = [
+@ruby2d_lib_files = [
   'cli/colorize',
   'exceptions',
   'renderable',
@@ -30,11 +29,13 @@ require 'ruby2d/cli/platform'
   'text',
   'sound',
   'music',
+  'texture',
+  'vertices',
   '../ruby2d'
 ]
 
 
-### Helpers ###
+# Helpers ######################################################################
 
 # Remove `require 'ruby2d'` from source file
 def strip_require(file)
@@ -46,6 +47,7 @@ def strip_require(file)
 end
 
 
+# Add linker flags
 def add_ld_flags(ld_flags, name, type, dir = nil)
   case type
   when :archive
@@ -55,19 +57,18 @@ def add_ld_flags(ld_flags, name, type, dir = nil)
   end
 end
 
-###
 
+# Build Tasks ##################################################################
 
-
-
-def build(target, src)
+# Build the user's application
+def build(target, ruby2d_app)
 
   # Check if source file provided is good
-  if !src
+  if !ruby2d_app
     puts "Please provide a Ruby file to build"
     exit
-  elsif !File.exist? src
-    puts "Can't find file: #{src}"
+  elsif !File.exist? ruby2d_app
+    puts "Can't find file: #{ruby2d_app}"
     exit
   end
 
@@ -79,40 +80,41 @@ def build(target, src)
 
   # Assemble Ruby 2D library files into one '.rb' file
 
-  lib_dir = "#{@gem_dir}/lib/ruby2d/"
+  ruby2d_lib_dir = "#{Ruby2D.gem_dir}/lib/ruby2d/"
 
-  lib = ''
-  @lib_files.each do |f|
-    lib << File.read("#{lib_dir + f}.rb") + "\n\n"
+  ruby2d_lib = ''
+  @ruby2d_lib_files.each do |f|
+    ruby2d_lib << File.read("#{ruby2d_lib_dir + f}.rb") + "\n\n"
   end
 
-  File.write('build/lib.rb', lib)
+  File.write('build/ruby2d_lib.rb', ruby2d_lib)
 
   # Assemble the Ruby 2D C extension files into one '.c' file
 
-  ext_dir = "#{@gem_dir}/ext/ruby2d/"
+  ruby2d_ext_dir = "#{Ruby2D.gem_dir}/ext/ruby2d/"
 
-  ext = "#define MRUBY 1" << "\n\n"
-  Dir["#{ext_dir}*.c"].each do |c_file|
-    ext << File.read(c_file)
+  ruby2d_ext = "#define MRUBY 1" << "\n\n"
+  Dir["#{ruby2d_ext_dir}*.c"].each do |c_file|
+    ruby2d_ext << File.read(c_file)
   end
 
-  File.write('build/ext.c', ext)
+  File.write('build/ruby2d_ext.c', ruby2d_ext)
 
-  # Compile to mruby bytecode
-  `mrbc #{debug_flag} -Bruby2d_lib -obuild/lib.c build/lib.rb`
+  # Compile the Ruby 2D lib (`.rb` files) to mruby bytecode
+  system "mrbc #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
 
-  # Read the provided Ruby source file, copy to build dir and compile to bytecode
-  File.open('build/src.rb', 'w') { |f| f << strip_require(src) }
-  `mrbc #{debug_flag} -Bruby2d_app -obuild/src.c build/src.rb`
+  # Read the user's provided Ruby source file, copy to build dir and compile to bytecode
+  File.open('build/ruby2d_app.rb', 'w') { |f| f << strip_require(ruby2d_app) }
+  system "mrbc #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c build/ruby2d_app.rb"
 
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
-    ['src', 'lib', 'ext'].each do |c_file|
+    ['ruby2d_app', 'ruby2d_lib', 'ruby2d_ext'].each do |c_file|
       f << File.read("build/#{c_file}.c") << "\n\n"
     end
   end
 
+  # Compile the final application based on the target platform
   case target
   when :native
     compile_native
@@ -120,11 +122,8 @@ def build(target, src)
     compile_web
   end
 
-  # Clean up
-  # clean_up unless @debug
-
-  # Success!
-  puts "Created #{target} app in `build/` directory".success
+  # Remove files used in the build process
+  clean_up unless @debug
 
 end
 
@@ -132,60 +131,68 @@ end
 # Create a native executable using the available C compiler
 def compile_native
 
-  incl_dir_ruby2d = "#{@gem_dir}/ext/ruby2d/"
-  incl_dir_sdl2 = "#{@gem_dir}/assets/include/"
+  # Get include directories
+  incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
+  incl_dir_deps = "#{Ruby2D.assets}/include/"
 
+  # Add compiler flags for each platform
   case $RUBY2D_PLATFORM
-  when :macos
-    ld_dir = "#{@gem_dir}/assets/macos/lib"
-    ld_flags = ''
 
-    ['SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf', 'jpeg', 'png16', 'tiff', 'webp',
-     'mpg123', 'ogg', 'FLAC', 'vorbis', 'vorbisfile', 'freetype'].each do |name|
+  when :macos
+    ld_dir = "#{Ruby2D.assets}/macos/universal"
+
+    ld_flags = ''
+    ['SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf',
+     'jpeg', 'png16', 'tiff', 'webp',
+     'mpg123', 'ogg', 'FLAC', 'vorbis', 'vorbisfile', 'modplug',
+     'freetype'].each do |name|
       add_ld_flags(ld_flags, name, :archive, ld_dir)
     end
 
-    ld_flags << "-lmruby -lz -lbz2 -liconv "
-
+    ld_flags << "-lmruby -lz -lbz2 -liconv -lstdc++ "
     ['Cocoa', 'Carbon', 'CoreVideo', 'OpenGL', 'Metal', 'CoreAudio', 'AudioToolbox',
      'IOKit', 'GameController', 'ForceFeedback', 'CoreHaptics'].each do |name|
       add_ld_flags(ld_flags, name, :framework)
     end
+
+  when :linux, :linux_rpi, :bsd
+    # TODO: implement this
+    # ld_flags = '-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm -lGL'
+
+  when :windows
+    # TODO: implement this
+    # ld_dir = "#{Ruby2D.assets}/..."
   end
 
-  `cc -I#{incl_dir_ruby2d} -I#{incl_dir_sdl2} build/app.c #{ld_flags} -o build/app`
+  # Compile the app
+  system "cc -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
 end
 
 
 # Create a WebAssembly executable using Emscripten
 def compile_web
 
-  wasm_assets = "#{@gem_dir}/assets/wasm"
+  wasm_assets = "#{Ruby2D.assets}/wasm"
 
   # Check for compiler toolchain issues
   if doctor_web(:building)
     puts "Fix errors before building.\n\n"
-    return false
   end
 
   incl_mruby = "#{wasm_assets}/mruby/include/"
-  incl_ruby2d = "#{@gem_dir}/ext/ruby2d/"
+  incl_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
 
   optimize_flags = '-Os --closure 1'
   ld_flags = "#{wasm_assets}/mruby/libmruby.a"
 
   # Compile using Emscripten
-  `emcc -s WASM=1 -I#{incl_mruby} -I#{incl_ruby2d} -I#{wasm_assets} -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s #{wasm_assets}/SDL2/libSDL2_ttf.a build/app.c #{ld_flags} -o build/app.html`
+  system "emcc -s WASM=1 -I#{incl_mruby} -I#{incl_ruby2d} -I#{wasm_assets} "\
+         "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s "\
+         "#{wasm_assets}/SDL2/libSDL2_ttf.a build/app.c #{ld_flags} -o build/app.html"
 
   # Copy HTML template from gem assets to build directory
   # FileUtils.cp "#{wasm_assets}/template.html", 'build/app.html'
 end
-
-
-
-
-
-
 
 
 def doctor_native
@@ -246,7 +253,7 @@ def doctor_web(mode = nil)
       puts "* Did you run \`./emsdk_env.sh\` ?", "  For help, check out the \"Getting Started\" guide on webassembly.org"
     end
     puts "\n"
-    exit
+    exit(1)
   else
     puts "\n👍 Everything looks good!\n\n" unless mode == :building
   end
@@ -347,8 +354,7 @@ end
 # Clean up unneeded build files
 def clean_up(cmd = nil)
   FileUtils.rm(
-    Dir.glob('build/{src,lib}.{rb,c,js}') +
-    Dir.glob('build/app.c')
+    Dir.glob('build/*.{rb,c,js}')
   )
   if cmd == :all
     puts "cleaning up..."

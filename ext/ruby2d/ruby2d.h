@@ -37,14 +37,14 @@ extern "C" {
 
 
 
-#define GLES true
+// #define GLES true
 
-// // ARM and GLES
-// #if defined(__arm__) || IOS || TVOS || __EMSCRIPTEN__
-//   #define GLES true
-// #else
-//   #define GLES false
-// #endif
+// ARM and GLES
+#if defined(__arm__) || IOS || TVOS || __EMSCRIPTEN__
+  #define GLES true
+#else
+  #define GLES false
+#endif
 
 
 

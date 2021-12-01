@@ -4,9 +4,9 @@ RSpec.describe Ruby2D::Image do
 
   describe "#new" do
     it "creates images in various formats" do
-      Image.new('test/media/image.bmp')
-      Image.new('test/media/image.jpg')
-      Image.new('test/media/image.png')
+      Image.new("#{Ruby2D.test_media}/image.bmp")
+      Image.new("#{Ruby2D.test_media}/image.jpg")
+      Image.new("#{Ruby2D.test_media}/image.png")
     end
 
     it "raises exception if image file doesn't exist" do
@@ -14,7 +14,7 @@ RSpec.describe Ruby2D::Image do
     end
 
     it "creates an image with a white filter by default" do
-      img = Image.new('test/media/colors.png')
+      img = Image.new("#{Ruby2D.test_media}/colors.png")
       expect(img.color).to be_a(Ruby2D::Color)
       expect(img.color.r).to eq(1)
       expect(img.color.g).to eq(1)
@@ -24,13 +24,13 @@ RSpec.describe Ruby2D::Image do
 
     it "creates an image with options" do
       img = Image.new(
-        'test/media/colors.png',
+        "#{Ruby2D.test_media}/colors.png",
         x: 10, y: 20, z: 30,
         width: 40, height: 50, rotate: 60,
         color: 'gray', opacity: 0.5
       )
 
-      expect(img.path).to eq('test/media/colors.png')
+      expect(img.path).to eq("#{Ruby2D.test_media}/colors.png")
       expect(img.x).to eq(10)
       expect(img.y).to eq(20)
       expect(img.z).to eq(30)
@@ -44,7 +44,7 @@ RSpec.describe Ruby2D::Image do
 
   describe "attributes" do
     it "can be set and read" do
-      img = Image.new('test/media/colors.png')
+      img = Image.new("#{Ruby2D.test_media}/colors.png")
       img.x = 10
       img.y = 20
       img.z = 30

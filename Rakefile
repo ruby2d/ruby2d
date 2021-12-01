@@ -2,6 +2,8 @@ require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/cli/colorize'
 require_relative 'lib/ruby2d/version'
 
+# Helpers ######################################################################
+
 def get_args
   ARGV.each { |a| task a.to_sym do ; end }
 end
@@ -15,44 +17,13 @@ def run_cmd(cmd)
   system cmd
 end
 
-def run_int_test(file)
-  print_task "Running interpreted test: #{file}.rb"
-  run_cmd "( cd test/ && ruby -w #{file}.rb )"
-end
-
-def run_native_test(file)
-  print_task "Running native test: #{file}.rb"
-  run_cmd "ruby2d build --clean"
-  run_cmd "ruby2d build --native test/#{file}.rb --debug"
-  run_cmd "( cd test/ && ../build/app )"
-end
-
-def run_web_test(file)
-  print_task "Running web test: #{file}.rb"
-  run_cmd "ruby2d build --clean"
-  run_cmd "ruby2d build --web test/#{file}.rb --debug"
-  return  # temporarily disable
-  open_cmd = 'open'
-  case RUBY_PLATFORM
-  when /linux/
-    open_cmd = "xdg-#{open_cmd}"
-  when /mingw/
-    open_cmd = "start"
-  end
-  Thread.new do
-    sleep 2
-    run_cmd "#{open_cmd} http://localhost:4001/build/app.html"
-  end
-  run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'"
-end
-
 def run_apple_test(device)
   run_cmd "ruby2d build --clean"
   run_cmd "ruby2d build --#{device} test/triangle-ios-tvos.rb --debug"
   run_cmd "ruby2d launch --#{device}"
 end
 
-# Tasks
+# Tasks ########################################################################
 
 task default: 'all'
 
@@ -92,32 +63,63 @@ RSpec::Core::RakeTask.new do |t|
   t.pattern = "test/*spec.rb"
 end
 
+task :test => 'test:cruby'
+
 namespace :test do
-  desc "Run interpreted test"
-  task :int do
+  desc "Run test using CRuby (MRI)"
+  task :cruby do
     get_args
-    run_int_test ARGV[1]
+    test_file = ARGV[1]
+    print_task "Running `#{test_file}.rb` with CRuby (MRI)"
+    run_cmd "( cd test/ && ruby -w #{test_file}.rb )"
   end
 
-  desc "Run native test"
-  task :native do
+  desc "An alias to CRuby"
+  task :mri => :cruby
+
+  desc "Run test using mruby"
+  task :mruby do
     get_args
-    run_native_test ARGV[1]
+    test_file = ARGV[1]
+    print_task "Running `#{test_file}.rb` with mruby"
+    run_cmd "ruby2d build --clean"
+    run_cmd "ruby2d build --native test/#{test_file}.rb --debug"
+    run_cmd "( cd test/ && ../build/app )"
   end
 
-  desc "Run web test"
-  task :web do
+  desc "Run test using WebAssembly"
+  task :wasm do
     get_args
-    run_web_test ARGV[1]
+    test_file = ARGV[1]
+    print_task "Running `#{test_file}.rb` with WebAssembly"
+
+    run_cmd "ruby2d build --clean"
+    result = run_cmd "ruby2d build --web test/#{test_file}.rb --debug"
+    unless result then exit(1) end
+
+    open_cmd = 'open'
+    case RUBY_PLATFORM
+    when /linux/
+      open_cmd = "xdg-#{open_cmd}"
+    when /mingw/
+      open_cmd = "start"
+    end
+
+    Thread.new do
+      sleep 2
+      run_cmd "#{open_cmd} http://localhost:4001/build/app.html"
+    end
+
+    run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'"
   end
 
-  desc "Run iOS test"
+  desc "Run the iOS test"
   task :ios do
     print_task "Running iOS test"
     run_apple_test('ios')
   end
 
-  desc "Run tvOS test"
+  desc "Run the tvOS test"
   task :tvos do
     print_task "Running tvOS test"
     run_apple_test('tvos')

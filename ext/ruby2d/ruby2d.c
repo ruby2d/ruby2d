@@ -398,8 +398,7 @@ static R_VAL ruby2d_image_ext_load_image(R_VAL self, R_VAL path) {
 #if MRUBY
 static R_VAL ruby2d_text_ext_load_text(mrb_state* mrb, R_VAL self) {
   mrb_value font, message;
-  mrb_get_args(mrb, "o", &font);
-  mrb_get_args(mrb, "o", &message);
+  mrb_get_args(mrb, "oo", &font, &message);
 #else
 static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
 #endif
@@ -434,20 +433,18 @@ static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
 #if MRUBY
 static R_VAL ruby2d_texture_ext_create(mrb_state* mrb, R_VAL self) {
   mrb_value rubySurface, width, height;
-  mrb_get_args(mrb, "o", &rubySurface);
-  mrb_get_args(mrb, "o", &width);
-  mrb_get_args(mrb, "o", &height);
+  mrb_get_args(mrb, "ooo", &rubySurface, &width, &height);
 #else
 static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL width, R_VAL height) {
 #endif
   GLuint texture_id = 0;
   SDL_Surface *surface;
 
-#if MRUBY
-  Data_Get_Struct(mrb, rubySurface, &surface_data_type, surface);
-#else
-  Data_Get_Struct(rubySurface, SDL_Surface, surface);
-#endif
+  #if MRUBY
+    Data_Get_Struct(mrb, rubySurface, &surface_data_type, surface);
+  #else
+    Data_Get_Struct(rubySurface, SDL_Surface, surface);
+  #endif
 
   // Detect image mode
   GLint format = GL_RGB;
@@ -733,9 +730,7 @@ static R_VAL ruby2d_music_ext_length(R_VAL self) {
 #if MRUBY
 static R_VAL ruby2d_font_ext_load(mrb_state* mrb, R_VAL self) {
   mrb_value path, size, style;
-  mrb_get_args(mrb, "o", &path);
-  mrb_get_args(mrb, "o", &size);
-  mrb_get_args(mrb, "o", &style);
+  mrb_get_args(mrb, "ooo", &path, &size, &style);
 #else
 static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size, R_VAL style) {
 #endif
@@ -756,10 +751,7 @@ static R_VAL ruby2d_font_ext_load(R_VAL self, R_VAL path, R_VAL size, R_VAL styl
 #if MRUBY
 static R_VAL ruby2d_texture_ext_draw(mrb_state* mrb, R_VAL self) {
   mrb_value ruby_coordinates, ruby_texture_coordinates, ruby_color, texture_id;
-  mrb_get_args(mrb, "o", &ruby_coordinates);
-  mrb_get_args(mrb, "o", &ruby_texture_coordinates);
-  mrb_get_args(mrb, "o", &ruby_color);
-  mrb_get_args(mrb, "o", &texture_id);
+  mrb_get_args(mrb, "oooo", &ruby_coordinates, &ruby_texture_coordinates, &ruby_color, &texture_id);
 #else
 static R_VAL ruby2d_texture_ext_draw(R_VAL self, R_VAL ruby_coordinates, R_VAL ruby_texture_coordinates, R_VAL ruby_color, R_VAL texture_id) {
 #endif

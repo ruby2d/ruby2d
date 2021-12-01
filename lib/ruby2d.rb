@@ -26,8 +26,9 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/vertices'
 
   if defined?(RubyInstaller)
-    s2d_dll_path = Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
-    RubyInstaller::Runtime.add_dll_directory(File.expand_path(s2d_dll_path))
+    RubyInstaller::Runtime.add_dll_directory(File.expand_path(
+      Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
+    ))
   end
 
   require 'ruby2d/ruby2d'  # load native extension
@@ -35,24 +36,24 @@ end
 
 
 module Ruby2D
-
-  @assets = nil
-
-  class << self
-    def assets
-      unless @assets
-        if RUBY_ENGINE == 'mruby'
-          @assets = Ruby2D.ext_base_path + 'assets'
-        else
-          @assets = './assets'
-        end
-      end
-      @assets
+  def self.gem_dir
+    # mruby doesn't define `Gem`
+    if RUBY_ENGINE == 'mruby'
+      `ruby -e "print Gem::Specification.find_by_name('ruby2d').gem_dir"`
+    else
+      Gem::Specification.find_by_name('ruby2d').gem_dir
     end
+  end
 
-    def assets=(path); @assets = path end
+  def self.assets
+    "#{gem_dir}/assets"
+  end
+
+  def self.test_media
+    "#{gem_dir}/assets/test_media"
   end
 end
+
 
 include Ruby2D
 extend  Ruby2D::DSL

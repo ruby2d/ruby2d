@@ -15,15 +15,15 @@ RSpec.describe Ruby2D::Music do
 
     unless ENV['CI']
       it "creates music in various formats" do
-        Music.new('test/media/music.wav')
-        Music.new('test/media/music.mp3')
-        Music.new('test/media/music.ogg')
-        Music.new('test/media/music.flac')
+        Music.new("#{Ruby2D.test_media}/music.wav")
+        Music.new("#{Ruby2D.test_media}/music.mp3")
+        Music.new("#{Ruby2D.test_media}/music.ogg")
+        Music.new("#{Ruby2D.test_media}/music.flac")
       end
 
       it "creates music with options" do
-        mus = Music.new('test/media/music.mp3', loop: true)
-        expect(mus.path).to eq('test/media/music.mp3')
+        mus = Music.new("#{Ruby2D.test_media}/music.mp3", loop: true)
+        expect(mus.path).to eq("#{Ruby2D.test_media}/music.mp3")
         expect(mus.loop).to be true
       end
     end
@@ -32,7 +32,7 @@ RSpec.describe Ruby2D::Music do
   describe "attributes" do
     unless ENV['CI']
       it "can be set and read" do
-        mus = Music.new('test/media/music.mp3')
+        mus = Music.new("#{Ruby2D.test_media}/music.mp3")
         expect(mus.loop).to be false
         mus.loop = true
         expect(mus.loop).to be true
@@ -43,7 +43,7 @@ RSpec.describe Ruby2D::Music do
   describe "#volume" do
     unless ENV['CI']
       it "sets the volume on music instances" do
-        mus = Music.new('test/media/music.mp3')
+        mus = Music.new("#{Ruby2D.test_media}/music.mp3")
         expect(mus.volume).to eq(100)
         mus.volume = 68
         expect(mus.volume).to eq(68)
@@ -68,10 +68,10 @@ RSpec.describe Ruby2D::Music do
   describe '#length' do
     unless ENV['CI']
       it "returns the length of the music track in seconds" do
-        expect(Music.new('test/media/music.wav').length).to eq(8)
-        expect(Music.new('test/media/music.mp3').length).to eq(8)
-        expect(Music.new('test/media/music.ogg').length).to eq(8)
-        expect(Music.new('test/media/music.flac').length).to eq(8)
+        expect(Music.new("#{Ruby2D.test_media}/music.wav").length).to eq(8)
+        expect(Music.new("#{Ruby2D.test_media}/music.mp3").length).to eq(8)
+        expect(Music.new("#{Ruby2D.test_media}/music.ogg").length).to eq(8)
+        expect(Music.new("#{Ruby2D.test_media}/music.flac").length).to eq(8)
       end
     end
   end
