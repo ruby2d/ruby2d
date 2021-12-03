@@ -37,6 +37,12 @@ require 'ruby2d/cli/platform'
 
 # Helpers ######################################################################
 
+def run_cmd(cmd)
+  puts "#{'$'.info} #{cmd.bold}\n" if @debug
+  system cmd
+end
+
+
 # Remove `require 'ruby2d'` from source file
 def strip_require(file)
   output = ''
@@ -101,11 +107,11 @@ def build(target, ruby2d_app)
   File.write('build/ruby2d_ext.c', ruby2d_ext)
 
   # Compile the Ruby 2D lib (`.rb` files) to mruby bytecode
-  system "mrbc #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
+  run_cmd "mrbc #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
 
   # Read the user's provided Ruby source file, copy to build dir and compile to bytecode
   File.open('build/ruby2d_app.rb', 'w') { |f| f << strip_require(ruby2d_app) }
-  system "mrbc #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c build/ruby2d_app.rb"
+  run_cmd "mrbc #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c build/ruby2d_app.rb"
 
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
@@ -165,33 +171,36 @@ def compile_native
   end
 
   # Compile the app
-  system "cc -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
+  run_cmd "cc -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
 end
 
 
 # Create a WebAssembly executable using Emscripten
 def compile_web
 
-  wasm_assets = "#{Ruby2D.assets}/wasm"
-
   # Check for compiler toolchain issues
   if doctor_web(:building)
     puts "Fix errors before building.\n\n"
   end
 
-  incl_mruby = "#{wasm_assets}/mruby/include/"
-  incl_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
+  wasm_assets = "#{Ruby2D.assets}/wasm"
+
+  # Get include directories
+  incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
+  incl_dir_deps = "#{Ruby2D.assets}/include/"
 
   optimize_flags = '-Os --closure 1'
-  ld_flags = "#{wasm_assets}/mruby/libmruby.a"
+  ld_flags = "#{wasm_assets}/libmruby.a"
 
   # Compile using Emscripten
-  system "emcc -s WASM=1 -I#{incl_mruby} -I#{incl_ruby2d} -I#{wasm_assets} "\
-         "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s "\
-         "#{wasm_assets}/SDL2/libSDL2_ttf.a build/app.c #{ld_flags} -o build/app.html"
+  run_cmd "emcc -s WASM=1 -I#{incl_dir_ruby2d} -I#{incl_dir_deps} "\
+          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 "\
+          "build/app.c #{ld_flags} -o build/app.html"
 
-  # Copy HTML template from gem assets to build directory
+  # TODO: Copy HTML template from gem assets to build directory
   # FileUtils.cp "#{wasm_assets}/template.html", 'build/app.html'
+
+  exit(1) unless $?.success?
 end
 
 
@@ -255,7 +264,7 @@ def doctor_web(mode = nil)
     puts "\n"
     exit(1)
   else
-    puts "\n👍 Everything looks good!\n\n" unless mode == :building
+    puts "\n👍 Everything looks good!\n\n"
   end
 end
 

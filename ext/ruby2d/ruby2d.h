@@ -85,6 +85,10 @@ extern "C" {
 #endif
 
 #ifdef __EMSCRIPTEN__
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <string.h>
+  #include <math.h>
   #include <emscripten.h>
   #include <SDL.h>
   #define GL_GLEXT_PROTOTYPES 1

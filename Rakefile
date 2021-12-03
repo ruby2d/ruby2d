@@ -110,7 +110,7 @@ namespace :test do
       run_cmd "#{open_cmd} http://localhost:4001/build/app.html"
     end
 
-    run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'"
+    run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start' &> /dev/null"
   end
 
   desc "Run the iOS test"
