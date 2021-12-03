@@ -74,7 +74,6 @@ module Ruby2D
       flip = opts[:flip]
 
       if !@playing || (animation != @playing_animation && animation != nil) || flip != @flip
-
         @playing = true
         @playing_animation = animation || :default
         frames = @animations[@playing_animation]
@@ -94,8 +93,12 @@ module Ruby2D
           @last_frame    = frames.length - 1
         end
 
-        # Set looping
-        @loop = loop == true || @defaults[:loop] ? true : false
+        @loop =
+          if loop != nil
+            loop
+          else
+            @defaults[:loop] ? true : false
+          end
 
         set_frame
         restart_time
