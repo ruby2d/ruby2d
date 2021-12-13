@@ -98,7 +98,7 @@ def build_native(rb_file)
   end
 
   # Compile to a native executable
-  `cc build/app.c -lmruby -o build/app`
+  `cc build/app.c -lmruby -I #{@gem_dir}/ext/ruby2d -o build/app`
 
   # Clean up
   clean_up unless @debug
