@@ -73,7 +73,7 @@ def build_native(rb_file)
   check_build_src_file(rb_file)
 
   # Check if MRuby exists; if not, quit
-  if `which mruby`.empty?
+  if `which mruby`.empty? || `where mruby`.empty?
     puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
     exit
   end
