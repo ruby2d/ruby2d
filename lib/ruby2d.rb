@@ -28,6 +28,17 @@ unless RUBY_ENGINE == 'mruby'
   if defined?(RubyInstaller)
     s2d_dll_path = Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
     RubyInstaller::Runtime.add_dll_directory(File.expand_path(s2d_dll_path))
+  elsif RUBY_PLATFORM =~ /mingw/
+    # https://stackoverflow.com/a/59045531/1143732
+    require 'fiddle/import'
+    require 'fiddle/types'
+    module WinAPI
+      extend Fiddle::Importer
+      dlload 'kernel32.dll'
+      include Fiddle::Win32Types
+      extern 'int SetDllDirectory(LPCSTR)'
+    end
+    WinAPI.SetDllDirectory(Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin')
   end
 
   require 'ruby2d/ruby2d'  # load native extension
