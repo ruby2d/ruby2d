@@ -273,7 +273,7 @@ module Ruby2D
         raise Error, "Cannot remove '#{o.class}' from window!"
       end
 
-      collection = o.class.ancestors.include?(Ruby2D::Entity) ? @entities : @objects
+      collection = o.class.ancestors.include?('Ruby2D::Entity') ? @entities : @objects
       if i = collection.index(o)
         collection.delete_at(i)
         true
