@@ -30,10 +30,17 @@ module Ruby2D
     end
 
     def coordinates
-      x1, y1 = rotate(@x,          @y);           # Top left
-      x2, y2 = rotate(@x + @width, @y);           # Top right
-      x3, y3 = rotate(@x + @width, @y + @height); # Bottom right
-      x4, y4 = rotate(@x,          @y + @height); # Bottom left
+      if @rotate == 0
+        x1, y1 = @x,          @y;           # Top left
+        x2, y2 = @x + @width, @y;           # Top right
+        x3, y3 = @x + @width, @y + @height; # Bottom right
+        x4, y4 = @x,          @y + @height; # Bottom left
+      else
+        x1, y1 = rotate(@x,          @y);           # Top left
+        x2, y2 = rotate(@x + @width, @y);           # Top right
+        x3, y3 = rotate(@x + @width, @y + @height); # Bottom right
+        x4, y4 = rotate(@x,          @y + @height); # Bottom left
+      end
 
       [ x1, y1, x2, y2, x3, y3, x4, y4 ]
     end
@@ -57,8 +64,6 @@ module Ruby2D
     private
 
     def rotate(x, y)
-      return [x, y] if @rotate == 0
-
       # Convert from degrees to radians
       angle = @rotate * Math::PI / 180.0
 

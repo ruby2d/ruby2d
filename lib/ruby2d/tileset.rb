@@ -2,6 +2,8 @@
 
 module Ruby2D
   class Tileset
+    DEFAULT_COLOR = Color.new([1.0, 1.0, 1.0, 1.0])
+
     include Renderable
 
     def initialize(path, opts = {})
@@ -46,42 +48,41 @@ module Ruby2D
     def clear_tiles
       @tiles = []
     end
-  end
 
-  def draw
-    Window.render_ready_check
+    def draw
+      Window.render_ready_check
 
-    render
-  end
+      render
+    end
 
-  private
+    private
 
+    def render
+      scaled_padding = @padding * @scale
+      scaled_spacing = @spacing * @scale
+      scaled_tile_width = @tile_width * @scale
+      scaled_tile_height = @tile_height * @scale
+      scaled_width = @width * @scale
+      scaled_height = @height * @scale
 
-  def render
-    scaled_padding = @padding * @scale
-    scaled_spacing = @spacing * @scale
-    scaled_tile_width = @tile_width * @scale
-    scaled_tile_height = @tile_height * @scale
-    scaled_width = @width * @scale
-    scaled_height = @height * @scale
+      @tiles.each do |tile|
+        crop = {
+          x: scaled_padding + (tile.fetch(:tile_x) * (scaled_spacing + scaled_tile_width)),
+          y: scaled_padding + (tile.fetch(:tile_y) * (scaled_spacing + scaled_tile_height)),
+          width: scaled_tile_width,
+          height: scaled_tile_height,
+          image_width: scaled_width,
+          image_height: scaled_height,
+        }
 
-    @tiles.each do |tile|
-      crop = {
-        x: scaled_padding + (tile.fetch(:tile_x) * (scaled_spacing + scaled_tile_width)),
-        y: scaled_padding + (tile.fetch(:tile_y) * (scaled_spacing + scaled_tile_height)),
-        width: scaled_tile_width,
-        height: scaled_tile_height,
-        image_width: scaled_width,
-        image_height: scaled_height,
-      }
+        color = defined?(@color) ? @color : DEFAULT_COLOR
 
-      color = defined?(@color) ? @color : Color.new([1.0, 1.0, 1.0, 1.0])
+        vertices = Vertices.new(tile.fetch(:x), tile.fetch(:y), scaled_tile_width, scaled_tile_height, tile.fetch(:tile_rotate), crop: crop, flip: tile.fetch(:tile_flip))
 
-      vertices = Vertices.new(tile.fetch(:x), tile.fetch(:y), scaled_tile_width, scaled_tile_height, tile.fetch(:tile_rotate), crop: crop, flip: tile.fetch(:tile_flip))
-
-      @texture.draw(
-        vertices.coordinates, vertices.texture_coordinates, color
-      )
+        @texture.draw(
+          vertices.coordinates, vertices.texture_coordinates, color
+        )
+      end
     end
   end
 end
