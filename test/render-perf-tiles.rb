@@ -22,7 +22,7 @@ render do
 
   tileset.clear_tiles
 
-  # 10,000 squares drawn at ~28 fps
+  # 10,000 squares drawn at ~39 fps
   # Apple M1 8 core CPU / 8 core GPU
   125.times do |i|
     79.times do |j|
