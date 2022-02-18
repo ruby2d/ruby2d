@@ -1,5 +1,9 @@
 // Native C extension for Ruby and MRuby
 
+#ifndef RUBY2D_IOS_TVOS
+#define RUBY2D_IOS_TVOS 0
+#endif
+
 // Ruby 2D includes
 #if RUBY2D_IOS_TVOS
 #else

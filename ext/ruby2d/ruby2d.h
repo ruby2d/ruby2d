@@ -11,6 +11,10 @@ extern "C" {
 
 // Set Platform Constants //////////////////////////////////////////////////////
 
+#ifndef MRUBY
+#define MRUBY false
+#endif
+
 // Apple
 #ifdef __APPLE__
   #ifndef __TARGETCONDITIONALS__
@@ -18,29 +22,47 @@ extern "C" {
   #endif
   #if TARGET_OS_OSX
     #define MACOS true
-  #elif TARGET_OS_IOS
-    #define IOS   true
-  #elif TARGET_OS_TV
-    #define TVOS  true
+  #else
+    #define MACOS false
+  #endif
+  #if TARGET_OS_IOS
+    #define IOS true
+  #else
+    #define IOS false
+  #endif
+  #if TARGET_OS_TV
+    #define TVOS true
+  #else
+    #define TVOS false
   #endif
 #endif
 
 // Windows
 #ifdef _WIN32
   #define WINDOWS true
+#else
+  #define WINDOWS false
 #endif
 
 // Windows and MinGW
 #ifdef __MINGW32__
   #define MINGW true
+#else
+  #define MINGW false
 #endif
 
+// WebAssembly
+#ifdef __EMSCRIPTEN__
+  #define WASM true
+#else
+  #define WASM false
+#endif
 
 
 // #define GLES true
 
 // ARM and GLES
-#if defined(__arm__) || IOS || TVOS || __EMSCRIPTEN__
+#if IOS || TVOS || WASM
   #define GLES true
 #else
   #define GLES false
@@ -65,6 +87,7 @@ extern "C" {
 #if WINDOWS
   #include <stdio.h>
   #include <math.h>
+  #include <winsock2.h>
   #include <windows.h>
   // For terminal colors
   #ifndef  ENABLE_VIRTUAL_TERMINAL_PROCESSING
@@ -84,7 +107,7 @@ extern "C" {
   #undef main
 #endif
 
-#ifdef __EMSCRIPTEN__
+#if WASM
   #include <stdlib.h>
   #include <stdio.h>
   #include <string.h>
@@ -105,6 +128,7 @@ extern "C" {
 #else
   #define GL_GLEXT_PROTOTYPES 1
   #if WINDOWS
+    #define GLEW_STATIC
     #include <glew.h>
   #endif
   #include <SDL2/SDL_opengl.h>
