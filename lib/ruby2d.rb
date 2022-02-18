@@ -24,13 +24,6 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/music'
   require 'ruby2d/texture'
   require 'ruby2d/vertices'
-
-  if defined?(RubyInstaller)
-    RubyInstaller::Runtime.add_dll_directory(File.expand_path(
-      Gem::Specification.find_by_name('ruby2d').gem_dir + '/assets/mingw/bin'
-    ))
-  end
-
   require 'ruby2d/ruby2d'  # load native extension
 end
 

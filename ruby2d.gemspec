@@ -11,12 +11,12 @@ Gem::Specification.new do |s|
   s.email       = 'tom@blacktm.com'
 
   s.required_ruby_version = '>= 2.0.0'
-  s.add_development_dependency 'rspec', '~> 3.8'
+  s.add_development_dependency 'rspec', '~> 3.10'
 
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('assets/include/**/*') +
             Dir.glob('assets/macos/universal/**/*') +
-            Dir.glob('assets/mingw/**/*') +
+            Dir.glob('assets/windows/**/*') +
             Dir.glob('assets/test_media/**/*') +
             Dir.glob('assets/wasm/**/*') +
             Dir.glob('assets/xcode/**/*') +

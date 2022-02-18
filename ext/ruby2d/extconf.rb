@@ -98,13 +98,17 @@ else
 
   when :macos
     add_flags(:c, '-I../../assets/include')
-    ldir = "#{Dir.pwd}/../../assets/macos/universal"
+    ldir = "#{Dir.pwd}/../../assets/macos/universal/lib"
 
     add_flags(:ld, "#{ldir}/libSDL2.a #{ldir}/libSDL2_image.a #{ldir}/libSDL2_mixer.a #{ldir}/libSDL2_ttf.a")
     add_flags(:ld, "#{ldir}/libjpeg.a #{ldir}/libpng16.a #{ldir}/libtiff.a #{ldir}/libwebp.a")
     add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libogg.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a #{ldir}/libmodplug.a")
-    add_flags(:ld, "#{ldir}/libfreetype.a")
+    add_flags(:ld, "#{ldir}/libfreetype.a #{ldir}/libharfbuzz.a #{ldir}/libgraphite2.a")
     add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
+
+    # Delete the quarantine attribute on the mruby compiler executable
+    # (This may not be needed)
+    #   system "xattr -d com.apple.quarantine #{Dir.pwd}/../../assets/macos/universal/bin/mrbc"
 
   when :linux, :linux_rpi, :bsd
     check_sdl
@@ -115,8 +119,35 @@ else
 
   when :windows
     add_flags(:c, '-I../../assets/include')
-    add_flags(:ld, '-L../../assets/mingw/lib -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf')
-    add_flags(:ld, '-lmingw32 -lopengl32 -lglew32')
+    ldir = "#{Dir.pwd}/../../assets/windows/mingw-w64-x86_64/lib"
+
+    # Start linker flags (needed to avoid circular dependencies)
+    add_flags(:ld, "-Wl,--start-group")
+
+    # SDL2
+    add_flags(:ld, "#{ldir}/libSDL2.a")
+
+    # SDL2_image
+    add_flags(:ld, "#{ldir}/libSDL2_image.a")
+    add_flags(:ld, "#{ldir}/libjpeg.a #{ldir}/libpng16.a #{ldir}/libtiff.a #{ldir}/libwebp.a")
+    add_flags(:ld, "#{ldir}/libjbig.a #{ldir}/libdeflate.a #{ldir}/liblzma.a #{ldir}/libzstd.a #{ldir}/libLerc.a")
+
+    # SDL2_mixer
+    add_flags(:ld, "#{ldir}/libSDL2_mixer.a")
+    add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a #{ldir}/libogg.a "\
+                   "#{ldir}/libmodplug.a #{ldir}/libopus.a #{ldir}/libopusfile.a #{ldir}/libsndfile.a")
+
+    # SDL2_ttf
+    add_flags(:ld, "#{ldir}/libSDL2_ttf.a")
+    add_flags(:ld, "#{ldir}/libfreetype.a #{ldir}/libharfbuzz.a #{ldir}/libgraphite2.a "\
+                   "#{ldir}/libbz2.a #{ldir}/libbrotlicommon.a #{ldir}/libbrotlidec.a")
+
+    # Other dependencies
+    add_flags(:ld, "#{ldir}/libglew32.a #{ldir}/libstdc++.a #{ldir}/libz.a")
+    add_flags(:ld, '-lmingw32 -lopengl32 -lole32 -loleaut32 -limm32 -lversion -lwinmm -lrpcrt4 -mwindows -lsetupapi -ldwrite')
+
+    # End linker flags
+    add_flags(:ld, "-Wl,--end-group")
 
   # If can't detect the platform, use libraries installed by the user
   else
