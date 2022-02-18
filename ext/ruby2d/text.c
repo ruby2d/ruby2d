@@ -18,5 +18,18 @@ SDL_Surface *R2D_TextCreateSurface(TTF_Font *font, const char *message) {
     return NULL;
   }
 
+  // Re-pack surface for OpenGL
+  // See: https://discourse.libsdl.org/t/sdl-ttf-2-0-18-surface-to-opengl-texture-not-consistent-with-ttf-2-0-15
+  Sint32 i;
+  Uint32 len = surface->w * surface->format->BytesPerPixel;
+  Uint8 *src = surface->pixels;
+  Uint8 *dst = surface->pixels;
+  for (i = 0; i < surface->h; i++) {
+    SDL_memmove(dst, src, len);
+    dst += len;
+    src += surface->pitch;
+  }
+  surface->pitch = len;
+
   return surface;
 }

@@ -4,11 +4,11 @@ RSpec.describe Ruby2D::Sprite do
 
   describe "#new" do
     it "raises exception if file doesn't exist" do
-      expect { Sprite.new("bad_sprite_sheet.png") }.to raise_error(Ruby2D::Error)
+      expect { Sprite.new('bad_sprite_sheet.png') }.to raise_error(Ruby2D::Error)
     end
 
     it "creates a sprite with a white filter by default" do
-      spr = Sprite.new('test/media/coin.png')
+      spr = Sprite.new("#{Ruby2D.test_media}/coin.png")
       expect(spr.color).to be_a(Ruby2D::Color)
       expect(spr.color.r).to eq(1)
       expect(spr.color.g).to eq(1)
@@ -18,13 +18,13 @@ RSpec.describe Ruby2D::Sprite do
 
     it "creates an image with options" do
       spr = Sprite.new(
-        'test/media/coin.png',
+        "#{Ruby2D.test_media}/coin.png",
         x: 10, y: 20, z: 30,
         width: 40, height: 50, rotate: 60,
         color: 'gray', opacity: 0.5
       )
 
-      expect(spr.path).to eq('test/media/coin.png')
+      expect(spr.path).to eq("#{Ruby2D.test_media}/coin.png")
       expect(spr.x).to eq(10)
       expect(spr.y).to eq(20)
       expect(spr.z).to eq(30)
@@ -38,7 +38,7 @@ RSpec.describe Ruby2D::Sprite do
 
   describe "attributes" do
     it "can be set and read" do
-      spr = Sprite.new('test/media/coin.png')
+      spr = Sprite.new("#{Ruby2D.test_media}/coin.png")
       spr.x = 10
       spr.y = 20
       spr.z = 30

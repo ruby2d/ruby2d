@@ -25,9 +25,8 @@ Use the #{'build'.bold} command to compile or build Ruby 2D apps.
 To compile and create a native executable, use:
   build --native <ruby_file>
 
-To build for the web, creating a JavaScript and HTML package, use:
+To build for the web with WebAssembly, use:
   build --web <ruby_file>
-  #{'Warning:'.warn} #{"This feature is currently disabled while it's being upgraded.".bold}
 
 To build a macOS app bundle, use:
   build --macos <ruby_file>
@@ -82,9 +81,9 @@ when 'build'
   if ARGV.delete '--debug' then @debug = true end
   case ARGV[1]
   when '--native'
-    build_native(ARGV[2])
+    build(:native, ARGV[2])
   when '--web'
-    build_web(ARGV[2])
+    build(:web, ARGV[2])
   when '--macos'
     build_macos(ARGV[2])
   when '--ios'

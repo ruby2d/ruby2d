@@ -1,5 +1,8 @@
 // ruby2d.h
 
+#ifndef RUBY2D_H
+#define RUBY2D_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -8,6 +11,10 @@ extern "C" {
 
 // Set Platform Constants //////////////////////////////////////////////////////
 
+#ifndef MRUBY
+#define MRUBY false
+#endif
+
 // Apple
 #ifdef __APPLE__
   #ifndef __TARGETCONDITIONALS__
@@ -15,29 +22,53 @@ extern "C" {
   #endif
   #if TARGET_OS_OSX
     #define MACOS true
-  #elif TARGET_OS_IOS
-    #define IOS   true
-  #elif TARGET_OS_TV
-    #define TVOS  true
+  #else
+    #define MACOS false
+  #endif
+  #if TARGET_OS_IOS
+    #define IOS true
+  #else
+    #define IOS false
+  #endif
+  #if TARGET_OS_TV
+    #define TVOS true
+  #else
+    #define TVOS false
   #endif
 #endif
 
 // Windows
 #ifdef _WIN32
   #define WINDOWS true
+#else
+  #define WINDOWS false
 #endif
 
 // Windows and MinGW
 #ifdef __MINGW32__
   #define MINGW true
+#else
+  #define MINGW false
 #endif
 
-// GLES
-#if defined(__arm__) || IOS || TVOS
+// WebAssembly
+#ifdef __EMSCRIPTEN__
+  #define WASM true
+#else
+  #define WASM false
+#endif
+
+
+// #define GLES true
+
+// ARM and GLES
+#if IOS || TVOS || WASM
   #define GLES true
 #else
   #define GLES false
 #endif
+
+
 
 // Includes ////////////////////////////////////////////////////////////////////
 
@@ -56,6 +87,7 @@ extern "C" {
 #if WINDOWS
   #include <stdio.h>
   #include <math.h>
+  #include <winsock2.h>
   #include <windows.h>
   // For terminal colors
   #ifndef  ENABLE_VIRTUAL_TERMINAL_PROCESSING
@@ -75,6 +107,17 @@ extern "C" {
   #undef main
 #endif
 
+#if WASM
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <string.h>
+  #include <math.h>
+  #include <emscripten.h>
+  #include <SDL.h>
+  #define GL_GLEXT_PROTOTYPES 1
+  #include <SDL_opengles2.h>
+#endif
+
 // OpenGL
 #if GLES
   #if IOS || TVOS
@@ -85,6 +128,7 @@ extern "C" {
 #else
   #define GL_GLEXT_PROTOTYPES 1
   #if WINDOWS
+    #define GLEW_STATIC
     #include <glew.h>
   #endif
   #include <SDL2/SDL_opengl.h>
@@ -623,6 +667,7 @@ void R2D_GL_FlushBuffers();
     GLfloat x3, GLfloat y3,
     GLfloat r3, GLfloat g3, GLfloat b3, GLfloat a3);
   void R2D_GLES_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GLfloat color[], int texture_id);
+  void R2D_GLES_FlushBuffers();
 #else
   int R2D_GL2_Init();
   int R2D_GL3_Init();
@@ -650,3 +695,5 @@ void R2D_GL_FlushBuffers();
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* RUBY2D_H */

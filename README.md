@@ -12,7 +12,7 @@ To work on the gem locally, first clone this repo using:
 git clone --recursive https://github.com/ruby2d/ruby2d.git
 ```
 
-To keep the size of this repository small, [Git submodules](https://git-scm.com/book/en/Git-Tools-Submodules) are used to reference [test media](https://github.com/simple2d/test_media) and other [assets](https://github.com/ruby2d/assets). The `--recursive` flag ensures submodules are initialized and updated when this repo is cloned. If you happened to clone this repo without the `--recursive` flag, you can still initialize and update submodules with:
+To keep the size of this source code repository small, [Git submodules](https://git-scm.com/book/en/Git-Tools-Submodules) are used to reference [assets](https://github.com/ruby2d/assets). The `--recursive` flag ensures submodules are initialized and updated when this repo is cloned. If you happened to clone this repo without the `--recursive` flag, you can still initialize and update submodules with:
 
 ```bash
 git submodule init
@@ -21,25 +21,23 @@ git submodule update --remote
 
 Update these submodules at any time using `git submodule update --remote` or the `rake update` task.
 
-Next, install dependencies:
-- With [Bundler](http://bundler.io), run `bundle install` to get the required development gems.
-- Install [MRuby](http://mruby.org) in order to build Ruby 2D apps natively. On macOS using [Homebrew](https://brew.sh), run `brew install mruby`. On Ubuntu, use `sudo apt install mruby libmruby-dev`
+Next, install dependencies with [Bundler](http://bundler.io) by running `bundle install` to get the development gems.
 
 Finally, run `rake` to build and install the gem locally. Use `rake dev` to build referencing user-installed libraries (e.g. SDL).
 
 ## Tests
 
-Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and manual, interactive tests to verify the correctness of visual, audio, and input functionality. Build the gem and run all automated tests using the `rake` command. Build and run an interactive test in the [`test/`](test/) directory using `rake test:<environment> <name_of_test>`, for example:
+Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and manual, interactive tests to verify the correctness of visual, audio, and input functionality. Build the gem and run all automated tests using the `rake` command. Build and run an interactive test in the [`test/`](test/) directory using `rake test:<target> <name_of_test>`, for example:
 
 ```bash
 # Run `test/testcard.rb` using the standard Ruby interpreter, MRI (CRuby)
-rake test:int testcard
+rake test:cruby testcard  # `test:mri` or just `test` work also
 
-# Build `test/audio.rb` natively using MRuby and run
-rake test:native audio
+# Build `test/audio.rb` using mruby and run
+rake test:mruby audio
 
 # Build `test/mouse.rb` for the web using WebAssembly and run in the default browser
-rake test:web mouse
+rake test:wasm mouse
 ```
 
 ## Contribute
@@ -64,7 +62,7 @@ In order to achieve such simplicity, a lot has to happen under the hood. Whether
 
 - **Check if there is an existing issue, and if not, open a new one to start a discussion.** Before dedicating time and energy to an idea or fix, let's make sure it's consistent with the principles and goals of the project, and that we have a solid strategy in place to implement and test.
 
-- **Use a subset of Ruby that works everywhere.** Ruby 2D applications are, of course, written in Ruby. Some users may choose to harness the full power of the language, standard library, and ecosystem of gems by writing interpreted apps targeting the standard implementation, [MRI](https://en.wikipedia.org/wiki/Ruby_MRI). Others may want to target the web via [WebAssembly](https://webassembly.org), mobile devices, or build native desktop applications, all which make use of a different Ruby implementation called [MRuby](http://mruby.org). Ruby 2D aims to support all of these use cases, even with the same app codebase. Your contribution must support a subset of Ruby that is compatible with and behaves similarly across MRI and MRuby. Beyond reading the documentation for each Ruby implementation, you can also try out code snippets on the command line using their respective REPLs: `irb` for MRI, and `mirb` for MRuby.
+- **Use a subset of Ruby that works everywhere.** Ruby 2D applications are, of course, written in Ruby. Some users may choose to harness the full power of the language, standard library, and ecosystem of gems by writing interpreted apps targeting the standard implementation, [MRI](https://en.wikipedia.org/wiki/Ruby_MRI). Others may want to target the web via [WebAssembly](https://webassembly.org), mobile devices, or build native desktop applications, all which make use of a different Ruby implementation called [mruby](http://mruby.org). Ruby 2D aims to support all of these use cases, even with the same app codebase. Your contribution must support a subset of Ruby that is compatible with and behaves similarly across MRI/CRuby and mruby. Beyond reading the documentation for each Ruby implementation, you can also try out code snippets on the command line using their respective REPLs: `irb` for MRI, and `mirb` for mruby.
 
 - **Comprehensively test your change.** Unlike other Ruby libraries, not everything here can be easily covered with unit tests alone. We also need to make sure things look and sound right, inputs work as expected, and behavior is consistent across all platforms Ruby 2D supports.
 

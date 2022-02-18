@@ -8,7 +8,7 @@ update do
   fps.text = Window.fps
 end
 
-tileset = Tileset.new('media/colors.png', tile_width: 8, tile_height: 8)
+tileset = Tileset.new("#{Ruby2D.test_media}/colors.png", tile_width: 8, tile_height: 8)
 
 
 100.times do |i|

@@ -382,7 +382,7 @@ void R2D_GL_DrawTexture(GLfloat coordinates[], GLfloat texture_coordinates[], GL
 void R2D_GL_FlushBuffers() {
   // Only implemented in our OpenGL 3.3+ and ES 2.0 renderers
   #if GLES
-    // TODO: R2D_GLES_FlushBuffers();
+    R2D_GLES_FlushBuffers();
   #else
     if (!R2D_GL2) R2D_GL3_FlushBuffers();
   #endif

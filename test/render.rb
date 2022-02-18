@@ -1,7 +1,7 @@
 require 'ruby2d'
 
 
-set icon: 'media/colors.png'
+set icon: "#{Ruby2D.test_media}/colors.png"
 
 
 Quad.new(x3: 125, x4: 25)
@@ -10,10 +10,10 @@ Square.new(y: 250)
 Line.new(x1: 5, y1: 375, x2: 95, y2: 475, width: 5)
 Triangle.new(x1: 325, y1: 0, x2: 375, y2: 100, x3: 275, y3: 100)
 Circle.new(x: 400, y: 175)
-img = Image.new('media/image.png', x: 250, y: 250)
+img = Image.new("#{Ruby2D.test_media}/image.png", x: 250, y: 250)
 txt = Text.new('Hello', x: 250, y: 375)
 spr = Sprite.new(
-  'media/coin.png',
+  "#{Ruby2D.test_media}/coin.png",
   x: 500,
   y: 250,
   width: 84,

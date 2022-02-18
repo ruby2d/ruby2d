@@ -2,8 +2,8 @@ require 'ruby2d'
 
 set width: 300, height: 200, title: "Ruby 2D — Audio"
 
-snd = Sound.new('media/sound.wav')
-mus = Music.new('media/music.wav')
+snd = Sound.new("#{Ruby2D.test_media}/sound.wav")
+mus = Music.new("#{Ruby2D.test_media}/music.wav")
 
 music_vol_label = Text.new("Music Volume: 100",  x: 65, y: 10, z:2, color: 'white', size: 20)
 music_volume_bar = Rectangle.new(color: 'green', z:1, width: 300, height: 50)

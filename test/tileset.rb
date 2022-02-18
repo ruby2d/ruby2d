@@ -10,7 +10,7 @@ class GameWindow < Ruby2D::Window
     set width: 108 * SCALE
     set height: 135 * SCALE
     set background: 'white'
-    @tileset = Tileset.new('media/texture_atlas.png', tile_width: TILE_WIDTH, tile_height: TILE_HEIGHT, scale: SCALE)
+    @tileset = Tileset.new("#{Ruby2D.test_media}/texture_atlas.png", tile_width: TILE_WIDTH, tile_height: TILE_HEIGHT, scale: SCALE)
   end
 
   def update
