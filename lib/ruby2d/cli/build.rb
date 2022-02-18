@@ -106,12 +106,22 @@ def build(target, ruby2d_app)
 
   File.write('build/ruby2d_ext.c', ruby2d_ext)
 
+  # Select `mrbc` executable based on platform
+  case $RUBY2D_PLATFORM
+  when :macos
+    mrbc = "#{Ruby2D.assets}/macos/universal/bin/mrbc"
+  when :windows
+    mrbc = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/bin/mrbc.exe"
+  else
+    mrbc = 'mrbc'
+  end
+
   # Compile the Ruby 2D lib (`.rb` files) to mruby bytecode
-  run_cmd "mrbc #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
+  run_cmd "#{mrbc} #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
 
   # Read the user's provided Ruby source file, copy to build dir and compile to bytecode
   File.open('build/ruby2d_app.rb', 'w') { |f| f << strip_require(ruby2d_app) }
-  run_cmd "mrbc #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c build/ruby2d_app.rb"
+  run_cmd "#{mrbc} #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c build/ruby2d_app.rb"
 
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
@@ -145,17 +155,19 @@ def compile_native
   case $RUBY2D_PLATFORM
 
   when :macos
-    ld_dir = "#{Ruby2D.assets}/macos/universal"
+    ld_dir = "#{Ruby2D.assets}/macos/universal/lib"
+
+    c_flags = '-arch arm64 -arch x86_64'
 
     ld_flags = ''
-    ['SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf',
+    ['mruby', 'SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf',
      'jpeg', 'png16', 'tiff', 'webp',
      'mpg123', 'ogg', 'FLAC', 'vorbis', 'vorbisfile', 'modplug',
-     'freetype'].each do |name|
+     'freetype', 'harfbuzz', 'graphite2'].each do |name|
       add_ld_flags(ld_flags, name, :archive, ld_dir)
     end
 
-    ld_flags << "-lmruby -lz -lbz2 -liconv -lstdc++ "
+    ld_flags << "-lz -lbz2 -liconv -lstdc++ "
     ['Cocoa', 'Carbon', 'CoreVideo', 'OpenGL', 'Metal', 'CoreAudio', 'AudioToolbox',
      'IOKit', 'GameController', 'ForceFeedback', 'CoreHaptics'].each do |name|
       add_ld_flags(ld_flags, name, :framework)
@@ -166,12 +178,27 @@ def compile_native
     # ld_flags = '-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm -lGL'
 
   when :windows
-    # TODO: implement this
-    # ld_dir = "#{Ruby2D.assets}/..."
+    ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/lib"
+
+    ld_flags = '-static -Wl,--start-group '
+    ['mruby',
+     'SDL2',
+     'SDL2_image', 'jpeg', 'png16', 'tiff', 'webp', 'jbig', 'deflate', 'lzma', 'zstd', 'Lerc',
+     'SDL2_mixer', 'mpg123', 'FLAC', 'vorbis', 'vorbisfile', 'ogg', 'modplug', 'opus', 'opusfile', 'sndfile',
+     'SDL2_ttf', 'freetype', 'harfbuzz', 'graphite2', 'bz2', 'brotlicommon', 'brotlidec',
+     'glew32', 'stdc++', 'z', 'ssp'
+    ].each do |name|
+      add_ld_flags(ld_flags, name, :archive, ld_dir)
+    end
+    ld_flags << '-lmingw32 -lopengl32 -lole32 -loleaut32 -limm32 -lversion -lwinmm -lrpcrt4 -mwindows -lsetupapi -ldwrite '\
+                '-lws2_32 -lshlwapi '
+    ld_flags << '-Wl,--end-group'
   end
 
   # Compile the app
-  run_cmd "cc -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
+  run_cmd "cc #{c_flags} -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
+
+  create_macos_bundle if $RUBY2D_PLATFORM == :macos
 end
 
 
@@ -270,10 +297,7 @@ end
 
 
 # Build an app bundle for macOS
-def build_macos(rb_file)
-
-  # Build native app for macOS
-  build_native(rb_file)
+def create_macos_bundle
 
   # Property list source for the bundle
   info_plist = %(
@@ -308,10 +332,10 @@ def build_macos(rb_file)
   #   FileUtils.cp "#{@gem_dir}/assets/app.icns", 'build/App.app/Contents/Resources'
 
   # Clean up
-  FileUtils.rm_f 'build/app' unless @debug
+  # FileUtils.rm_f 'build/app' unless @debug
 
   # Success!
-  puts 'macOS app bundle created: `build/App.app`'
+  # puts 'macOS app bundle created: `build/App.app`'
 end
 
 
