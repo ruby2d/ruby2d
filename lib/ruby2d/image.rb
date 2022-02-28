@@ -7,18 +7,36 @@ module Ruby2D
     attr_reader :path
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
+    @@cached_images = {} # Hash[Path, Image]
+    @@cached_textures = {} # Hash[Path, Texture]
+    # Caching is disabled by default because
+    # a user might expect different behavior.
+    @@cache = false
+
     def self.load_image(path)
       unless File.exist? path
         raise Error, "Cannot find image file `#{path}`"
       end
 
-      ext_load_image(path)
+      return ext_load_image(path) unless @cache
+
+      if image = @@cached_images[path]
+        image
+      else
+        @@cached_images[path] = ext_load_image(path)
+      end
     end
 
     def initialize(path, opts = {})
       @path = path
 
-      @texture = Texture.new(*Image.load_image(@path))
+      if @@cache = opts[:cache] and texture = @@cached_textures[path]
+        @texture = texture
+      else
+        @texture = Texture.new(*Image.load_image(@path))
+        @@cached_textures[path] = @texture
+      end
+
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
 
