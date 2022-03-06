@@ -177,8 +177,13 @@ module Ruby2D
           unless @loop
             # Stop animation and play block, if provided
             stop
-            if @done_proc then @done_proc.call end
-            @done_proc = nil
+            if @done_proc
+              # allow proc to make nested `play/do` calls to sequence multiple
+              # animations by clearing `@done_proc` before the call
+              kept_done_proc = @done_proc
+              @done_proc = nil
+              kept_done_proc.call
+            end
           end
         end
 

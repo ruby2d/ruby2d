@@ -80,6 +80,18 @@ atlas = Sprite.new(
 
 atlas.play animation: :count, loop: true
 
+def climb_up_down_up_down_walk(hero)
+  # test nested play/do
+  hero.play animation: :climb do
+    hero.play animation: :climb, flip: :vertical do
+      hero.play animation: :climb do
+        hero.play animation: :climb, flip: :vertical do
+          hero.play animation: :walk, loop: true
+        end
+      end
+    end
+  end
+end
 
 on :key_down do |e|
   close if e.key == 'escape'
@@ -109,6 +121,8 @@ on :key_down do |e|
     hero.play animation: :climb, loop: true, flip: :vertical
   when 'h'
     hero.play animation: :climb, loop: true, flip: :both
+  when 'space'
+    climb_up_down_up_down_walk hero
   when 'c'
     hero.play animation: :cheer
   end
