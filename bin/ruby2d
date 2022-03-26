@@ -13,63 +13,12 @@ Usage: ruby2d <command> <options>
               [-v|--version]
 
 Summary of commands and options:
-  console       Run script in an interactive console
-  build         Build a Ruby source file
-  launch        Launch a built Ruby 2D application
-  simulator     Interact with iOS and tvOS simulators
+  build         Compile a Ruby source file on available plaforms
+    --debug       Print debugging info and save files generated
+    --clean       Cleans the build directory
+  serve         Start a local server and open a built web app
   -v|--version  Prints the installed version\n\n"
 
-usage_build = "
-Use the #{'build'.bold} command to compile or build Ruby 2D apps.
-
-To compile and create a native executable, use:
-  build --native <ruby_file>
-
-To build for the web with WebAssembly, use:
-  build --web <ruby_file>
-
-To build a macOS app bundle, use:
-  build --macos <ruby_file>
-
-To build an iOS or tvOS app, use:
-  build --ios <ruby_file>
-  build --tvos <ruby_file>
-
-To build for every platform supported by the current system, use:
-  build --all <ruby_file>
-
-To clean up the build directory, use:
-  build --clean
-
-Add the #{'--debug'.bold} option to print debugging info
-and keep all intermediate files generated.\n\n"
-
-usage_launch = "
-Use the #{'launch'.bold} command to run a Ruby 2D app that has been built.
-Choose one of the following options to select the kind of app to run:
-
-  --native
-  --web
-  --ios
-  --tvos\n\n"
-
-usage_simulator = "
-Choose an option with the #{'simulator'.bold} command:
-
-  --list      List available devices
-  --booted    Show currently booted devices
-
-  --open <device_name>    Open a simulator device with a given device name
-
-  --install <app_file>    Install an app on the booted simulator given the path
-                          to the app e.g. \"Release-iphonesimulator/MyApp.app\"
-
-  --launch <bundle_id>    Launch an app given the app bundle's identifier,
-                          e.g. \"Ruby2D.MyApp\"
-
-  --log           Stream log of the booted simulator
-  --log <app>     Stream log for the app only, given the app name
-  --log-errors    Stream log containing only error messages\n\n"
 
 # Check Command-line Arguments #################################################
 
@@ -79,61 +28,14 @@ when 'console'
 when 'build'
   require 'ruby2d/cli/build'
   if ARGV.delete '--debug' then @debug = true end
-  case ARGV[1]
-  when '--native'
-    build(:native, ARGV[2])
-  when '--web'
-    build(:web, ARGV[2])
-  when '--macos'
-    build_macos(ARGV[2])
-  when '--ios'
-    build_ios_tvos(ARGV[2], 'ios')
-  when '--tvos'
-    build_ios_tvos(ARGV[2], 'tvos')
-  when '--all'
-    build_native(ARGV[2])
-    build_web(ARGV[2])
-    build_ios_tvos(ARGV[2], 'ios')
-    build_ios_tvos(ARGV[2], 'tvos')
-  when '--clean'
+  if ARGV[1] == '--clean'
     clean_up(:all)
   else
-    puts usage_build
+    build(ARGV[1])
   end
-when 'launch'
-  require 'ruby2d/cli/launch'
-  case ARGV[1]
-  when '--native'
-    launch_native
-  when '--web'
-    launch_web
-  when '--ios'
-    launch_apple('ios')
-  when '--tvos'
-    launch_apple('tvos')
-  else
-    puts usage_launch
-  end
-# TODO: Need add this functionality to the gem
-when 'simulator'
-  case ARGV[1]
-  when '--list'
-    puts `simple2d simulator --list`
-  when '--booted'
-    puts `simple2d simulator --booted`
-  when '--open'
-    puts `simple2d simulator --open "#{ARGV[2]}"`
-  when '--install'
-    puts `simple2d simulator --install "#{ARGV[2]}"`
-  when '--launch'
-    puts `simple2d simulator --launch "#{ARGV[2]}"`
-  when '--log'
-    puts `simple2d simulator --log`
-  when '--log-errors'
-    puts `simple2d simulator --log-errors`
-  else
-    puts usage_simulator
-  end
+when 'serve'
+  require 'ruby2d/cli/build'
+  serve(ARGV[1])
 when '-v', '--version'
   puts Ruby2D::VERSION
 else
