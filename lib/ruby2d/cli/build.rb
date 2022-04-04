@@ -178,7 +178,12 @@ def compile_native
     # ld_flags = '-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm -lGL'
 
   when :windows
-    ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/lib"
+
+    if RUBY_PLATFORM =~ /ucrt/
+      ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-ucrt-x86_64/lib"
+    else
+      ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/lib"
+    end
 
     ld_flags = '-static -Wl,--start-group '
     ['mruby',
