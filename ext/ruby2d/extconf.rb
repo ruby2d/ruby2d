@@ -119,7 +119,12 @@ else
 
   when :windows
     add_flags(:c, '-I../../assets/include')
-    ldir = "#{Dir.pwd}/../../assets/windows/mingw-w64-x86_64/lib"
+
+    if RUBY_PLATFORM =~ /ucrt/
+      ldir = "#{Dir.pwd}/../../assets/windows/mingw-w64-ucrt-x86_64/lib"
+    else
+      ldir = "#{Dir.pwd}/../../assets/windows/mingw-w64-x86_64/lib"
+    end
 
     # Start linker flags (needed to avoid circular dependencies)
     add_flags(:ld, "-Wl,--start-group")
