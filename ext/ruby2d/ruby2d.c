@@ -496,12 +496,17 @@ static R_VAL ruby2d_canvas_ext_create(R_VAL self, R_VAL a) {
     0, NUM2INT(r_ary_entry(a, 0)), NUM2INT(r_ary_entry(a, 1)),
     32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
   );
-  SDL_FillRect(surf, NULL, SDL_MapRGBA(surf->format,
-    NUM2DBL(r_ary_entry(a, 2)) * 255,  // r
-    NUM2DBL(r_ary_entry(a, 3)) * 255,  // g
-    NUM2DBL(r_ary_entry(a, 4)) * 255,  // b
-    NUM2DBL(r_ary_entry(a, 5)) * 255   // a
-  ));
+
+  R2D_Canvas_DrawRect(
+    surf, 0, 0,
+    NUM2INT(r_ary_entry(a, 0)), // w
+    NUM2INT(r_ary_entry(a, 1)), // h
+    NUM2DBL(r_ary_entry(a, 2)), // r
+    NUM2DBL(r_ary_entry(a, 3)), // g
+    NUM2DBL(r_ary_entry(a, 4)), // b
+    NUM2DBL(r_ary_entry(a, 5))  // a
+  );
+
   SDL_SetSurfaceBlendMode(surf, SDL_BLENDMODE_BLEND);
   r_iv_set(self, "@ext_pixel_data", r_data_wrap_struct(surface, surf));
   return R_NIL;
