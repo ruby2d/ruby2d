@@ -503,6 +503,13 @@ void R2D_SetSoundMixVolume(int volume);
  */
 void R2D_FreeSound(R2D_Sound *snd);
 
+// Canvas //////////////////////////////////////////////////////////////////////
+
+/*
+ * Draw a rectangle on a canvas
+ */
+void R2D_Canvas_DrawRect(SDL_Surface *surf, int x, int y, int w, int h, double r, double g, double b, double a);
+
 // Music ///////////////////////////////////////////////////////////////////////
 
 /*

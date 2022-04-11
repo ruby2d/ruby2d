@@ -27,6 +27,7 @@ require 'ruby2d/cli/platform'
   'tileset',
   'font',
   'text',
+  'canvas',
   'sound',
   'music',
   'texture',

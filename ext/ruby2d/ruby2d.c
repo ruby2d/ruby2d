@@ -523,31 +523,19 @@ static R_VAL ruby2d_canvas_ext_draw_rectangle(R_VAL self, R_VAL a) {
   SDL_Surface *surf;
   r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
 
-  SDL_Rect rect = {
-    .x = NUM2INT(r_ary_entry(a, 0)),  // x
-    .y = NUM2INT(r_ary_entry(a, 1)),  // y
-    .w = NUM2INT(r_ary_entry(a, 2)),  // w
-    .h = NUM2INT(r_ary_entry(a, 3))   // h
-  };
-
-  SDL_FillRect(
-    surf, &rect,
-    SDL_MapRGBA(
-      surf->format,
-      NUM2DBL(r_ary_entry(a, 4)) * 255,  // r
-      NUM2DBL(r_ary_entry(a, 5)) * 255,  // g
-      NUM2DBL(r_ary_entry(a, 6)) * 255,  // b
-      NUM2DBL(r_ary_entry(a, 7)) * 255   // a
-    )
+  R2D_Canvas_DrawRect(
+    surf,
+    NUM2INT(r_ary_entry(a, 0)),  // x
+    NUM2INT(r_ary_entry(a, 1)),  // y
+    NUM2INT(r_ary_entry(a, 2)),  // w
+    NUM2INT(r_ary_entry(a, 3)),  // h
+    NUM2DBL(r_ary_entry(a, 4)),  // r
+    NUM2DBL(r_ary_entry(a, 5)),  // g
+    NUM2DBL(r_ary_entry(a, 6)),  // b
+    NUM2DBL(r_ary_entry(a, 7))   // a
   );
 
   return R_NIL;
-}
-
-
-void putpixel(SDL_Surface *surf, int x, int y, int s, double r, double g, double b, double a) {
-  SDL_Rect rect = { .x = x, .y = y, .w = s, .h = s };
-  SDL_FillRect(surf, &rect, SDL_MapRGBA(surf->format, r * 255, g * 255, b * 255, a * 255));
 }
 
 
@@ -580,10 +568,12 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
   x = x1;
   y = y1;
 
+  // Draw the pixel on the canvas
   for (i = 0; i < length; i += 1) {
-    putpixel(
+    R2D_Canvas_DrawRect(
       surf, x, y,
-      NUM2INT(r_ary_entry(a, 4)),  // size
+      NUM2INT(r_ary_entry(a, 4)),  // w (w & h are same val, the pixel "size")
+      NUM2INT(r_ary_entry(a, 4)),  // h ꜛ
       NUM2DBL(r_ary_entry(a, 5)),  // r
       NUM2DBL(r_ary_entry(a, 6)),  // g
       NUM2DBL(r_ary_entry(a, 7)),  // b

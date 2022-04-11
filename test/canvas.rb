@@ -12,14 +12,14 @@ canvas = Canvas.new(x: 50, y: 50, width: Window.width - 100, height: Window.heig
 
 update do
   canvas.draw_rectangle(
-    Window.mouse_x - 50, Window.mouse_y - 50,
-    50, 50,
-    rand(0.0..1.0), rand(0.0..1.0), rand(0.0..1.0), 1
+    x: Window.mouse_x - 50, y: Window.mouse_y - 50,
+    width: 50, height: 50,
+    color: [rand, rand, rand, 1]
   )
 
   canvas.draw_line(
-    0, 0, Window.mouse_x - 50, Window.mouse_y - 50, 1,
-    rand(0.0..1.0), rand(0.0..1.0), rand(0.0..1.0), 1
+    x1: 0, y1: 0, x2: Window.mouse_x - 50, y2: Window.mouse_y - 50, width: 1,
+    color: [rand, rand, rand, 1]
   )
 end
 
