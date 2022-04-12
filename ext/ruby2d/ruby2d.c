@@ -483,6 +483,116 @@ static R_VAL ruby2d_texture_ext_delete(R_VAL self, R_VAL rubyTexture_id) {
 
 
 /*
+ * Ruby2D::Canvas#ext_create
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_create(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_create(R_VAL self, R_VAL a) {
+#endif
+  SDL_Surface *surf = SDL_CreateRGBSurface(
+    0, NUM2INT(r_ary_entry(a, 0)), NUM2INT(r_ary_entry(a, 1)),
+    32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
+  );
+
+  R2D_Canvas_DrawRect(
+    surf, 0, 0,
+    NUM2INT(r_ary_entry(a, 0)), // w
+    NUM2INT(r_ary_entry(a, 1)), // h
+    NUM2DBL(r_ary_entry(a, 2)), // r
+    NUM2DBL(r_ary_entry(a, 3)), // g
+    NUM2DBL(r_ary_entry(a, 4)), // b
+    NUM2DBL(r_ary_entry(a, 5))  // a
+  );
+
+  SDL_SetSurfaceBlendMode(surf, SDL_BLENDMODE_BLEND);
+  r_iv_set(self, "@ext_pixel_data", r_data_wrap_struct(surface, surf));
+  return R_NIL;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_draw_rectangle
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_rectangle(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_draw_rectangle(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the rectangle
+
+  SDL_Surface *surf;
+  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+
+  R2D_Canvas_DrawRect(
+    surf,
+    NUM2INT(r_ary_entry(a, 0)),  // x
+    NUM2INT(r_ary_entry(a, 1)),  // y
+    NUM2INT(r_ary_entry(a, 2)),  // w
+    NUM2INT(r_ary_entry(a, 3)),  // h
+    NUM2DBL(r_ary_entry(a, 4)),  // r
+    NUM2DBL(r_ary_entry(a, 5)),  // g
+    NUM2DBL(r_ary_entry(a, 6)),  // b
+    NUM2DBL(r_ary_entry(a, 7))   // a
+  );
+
+  return R_NIL;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_draw_line
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_line(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the line
+
+  SDL_Surface *surf;
+  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+
+  int x1 = NUM2INT(r_ary_entry(a, 0));
+  int y1 = NUM2INT(r_ary_entry(a, 1));
+  int x2 = NUM2INT(r_ary_entry(a, 2));
+  int y2 = NUM2INT(r_ary_entry(a, 3));
+
+  int i;
+  double x = x2 - x1;
+  double y = y2 - y1;
+  double length = sqrt(x*x + y*y);
+  double addx = x / length;
+  double addy = y / length;
+  x = x1;
+  y = y1;
+
+  // Draw the pixel on the canvas
+  for (i = 0; i < length; i += 1) {
+    R2D_Canvas_DrawRect(
+      surf, x, y,
+      NUM2INT(r_ary_entry(a, 4)),  // w (w & h are same val, the pixel "size")
+      NUM2INT(r_ary_entry(a, 4)),  // h ꜛ
+      NUM2DBL(r_ary_entry(a, 5)),  // r
+      NUM2DBL(r_ary_entry(a, 6)),  // g
+      NUM2DBL(r_ary_entry(a, 7)),  // b
+      NUM2DBL(r_ary_entry(a, 8))   // a
+    );
+    x += addx;
+    y += addy;
+  }
+
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Sound#ext_init
  * Initialize sound structure data
  */
@@ -1319,6 +1429,18 @@ void Init_ruby2d() {
 
   // Ruby2D::Texture#ext_delete
   r_define_method(ruby2d_texture_class, "ext_delete", ruby2d_texture_ext_delete, r_args_req(1));
+
+  // Ruby2D::Canvas
+  R_CLASS ruby2d_canvas_class = r_define_class(ruby2d_module, "Canvas");
+
+  // Ruby2D::Canvas#ext_create
+  r_define_method(ruby2d_canvas_class, "ext_create", ruby2d_canvas_ext_create, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_draw_rectangle
+  r_define_method(ruby2d_canvas_class, "ext_draw_rectangle", ruby2d_canvas_ext_draw_rectangle, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_draw_line
+  r_define_method(ruby2d_canvas_class, "ext_draw_line", ruby2d_canvas_ext_draw_line, r_args_req(1));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
