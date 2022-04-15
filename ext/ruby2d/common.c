@@ -131,7 +131,11 @@ bool R2D_Init() {
   R2D_Log(R2D_INFO, "Initializing Ruby 2D");
 
   // Initialize SDL
-  if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+  #if WASM
+    if (SDL_Init(SDL_INIT_EVERYTHING & ~(SDL_INIT_HAPTIC)) != 0) {
+  #else
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+  #endif
     R2D_Error("SDL_Init", SDL_GetError());
     return false;
   }

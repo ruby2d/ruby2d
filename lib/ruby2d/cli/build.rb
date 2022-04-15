@@ -9,6 +9,7 @@ require 'ruby2d/cli/platform'
 # The Ruby 2D library files
 @ruby2d_lib_files = [
   'cli/colorize',
+  'cli/platform',
   'exceptions',
   'renderable',
   'color',
@@ -70,7 +71,7 @@ end
 # Build Tasks ##################################################################
 
 # Build the user's application
-def build(ruby2d_app)
+def build(ruby2d_app, assets_dir)
 
   # Check if source file provided is good
   if !ruby2d_app
@@ -81,9 +82,36 @@ def build(ruby2d_app)
     exit 1
   end
 
+  # If assets directory provided, make sure it exists
+  if assets_dir && !Dir.exist?(assets_dir)
+    puts "Cannot find assets directory `#{assets_dir}`"
+    exit 1
+  end
+
+  # Clean the build directory
   clean_up(:all)
 
-  puts '==>'.info << " Building #{ruby2d_app}".bold
+  # Get build platforms
+  build_platforms = {}
+  case $RUBY2D_PLATFORM
+  when :macos
+    build_platforms[:macos] = 'macOS'
+  when :windows
+    build_platforms[:windows] = 'Windows'
+  when :linux
+    build_platforms[:linux] = 'Linux'
+  end
+  if system('which emcc', out: File::NULL)
+    build_platforms[:wasm] = 'WebAssembly'
+  end
+
+  # Print status
+  puts '=== Building ==='.bold
+  puts "Platforms: #{build_platforms.values.join(', ')}"
+  puts "Ruby Engine: mruby"
+  puts "File: #{ruby2d_app}"
+  puts "Assets: #{assets_dir}" if assets_dir
+  print "Compiling..."
 
   # Add debugging information to produce backtrace
   if @debug then debug_flag = '-g' end
@@ -138,24 +166,31 @@ def build(ruby2d_app)
   end
 
   # Compile the final application based on the target platform
-  compile_native
+  compile_native(assets_dir)
 
-  if system('which emcc', out: File::NULL)
-    compile_web
+  # Compile for WebAssembly if Emscripten tools are present
+  if build_platforms.has_key? :wasm
+    compile_web(assets_dir)
   end
 
   # Remove files used in the build process
   clean_up unless @debug
 
-  puts "Build complete!".success
+  # Print summary
+  puts "done"
 
+  puts "Outputs:"
+  puts "  build/macos" if build_platforms.has_key? :macos
+  puts "  build/windows" if build_platforms.has_key? :windows
+  puts "  build/linux" if build_platforms.has_key? :linux
+  puts "  build/web" if build_platforms.has_key? :wasm
+
+  puts "Build complete 🏁".success
 end
 
 
 # Create a native executable using the available C compiler
-def compile_native
-
-  puts "==> Building for this platform: #{$RUBY2D_PLATFORM}"
+def compile_native(assets_dir)
 
   # Get include directories
   incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
@@ -215,14 +250,15 @@ def compile_native
   # Compile the app
   run_cmd "cc #{c_flags} -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/#{$RUBY2D_PLATFORM}/app"
 
-  create_macos_bundle if $RUBY2D_PLATFORM == :macos
+  # TODO: Copy assets if provided
+  # FileUtils.cp_r("#{assets_dir}/.", "build/#{$RUBY2D_PLATFORM}") if assets_dir
+
+  create_macos_bundle(assets_dir) if $RUBY2D_PLATFORM == :macos
 end
 
 
 # Create a WebAssembly executable using Emscripten
-def compile_web
-
-  puts "==> Building for WebAssembly"
+def compile_web(assets_dir)
 
   wasm_assets = "#{Ruby2D.assets}/wasm"
 
@@ -237,8 +273,11 @@ def compile_web
 
   # Compile using Emscripten
   run_cmd "emcc -s WASM=1 -I#{incl_dir_ruby2d} -I#{incl_dir_deps} "\
-          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 "\
-          "build/app.c #{ld_flags} -o build/web/app.js #{unless @debug then '&> /dev/null' end}"
+          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 -s "\
+          "#{if assets_dir then "--preload-file #{assets_dir}@" end} "\
+          "--use-preload-plugins -s ALLOW_MEMORY_GROWTH=1 "\
+          "build/app.c #{ld_flags} -o build/web/app.js "\
+          "#{unless @debug then '&> /dev/null' end}"
 
   # Copy HTML template from gem assets to build directory
   FileUtils.cp "#{wasm_assets}/template.html", 'build/web/app.html'
@@ -246,9 +285,7 @@ end
 
 
 # Build an app bundle for macOS
-def create_macos_bundle
-
-  puts "==> Creating macOS app bundle"
+def create_macos_bundle(assets_dir)
 
   # Property list source for the bundle
   info_plist = %(
@@ -281,6 +318,10 @@ def create_macos_bundle
   # Create Info.plist and copy over assets
   File.open("#{build_dir}/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
   FileUtils.cp "#{build_dir}/app", "#{build_dir}/App.app/Contents/MacOS/"
+
+  # TODO: Copy assets if provided
+  # FileUtils.cp_r("#{assets_dir}/.", "#{build_dir}/App.app/Contents/MacOS/") if assets_dir
+
   # Consider using an icon:
   #   FileUtils.cp "#{@gem_dir}/assets/app.icns", 'build/App.app/Contents/Resources'
 end
@@ -293,6 +334,8 @@ def clean_up(cmd = nil)
   )
   if cmd == :all
     FileUtils.rm_rf 'build/macos'
+    FileUtils.rm_rf 'build/linux'
+    FileUtils.rm_rf 'build/windows'
     FileUtils.rm_rf 'build/web'
   end
 end
@@ -325,6 +368,6 @@ def serve(html_file)
   pid = Process.spawn "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'", err: '/dev/null'
   sleep 0.5
   system "#{open_cmd} http://localhost:4001/#{html_file}"
-  sleep 0.5
+  sleep 1
   Process.kill 'QUIT', pid
 end

@@ -106,17 +106,6 @@ else
     add_flags(:ld, "#{ldir}/libfreetype.a #{ldir}/libharfbuzz.a #{ldir}/libgraphite2.a")
     add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
 
-    # Delete the quarantine attribute on the mruby compiler executable
-    # (This may not be needed)
-    #   system "xattr -d com.apple.quarantine #{Dir.pwd}/../../assets/macos/universal/bin/mrbc"
-
-  when :linux, :linux_rpi, :bsd
-    check_sdl
-
-    set_rpi_flags
-    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
-    if $RUBY2D_PLATFORM == :linux then add_flags(:ld, '-lGL') end
-
   when :windows
     add_flags(:c, '-I../../assets/include')
 
@@ -153,6 +142,13 @@ else
 
     # End linker flags
     add_flags(:ld, "-Wl,--end-group")
+
+  when :linux, :linux_rpi, :bsd
+    check_sdl
+
+    set_rpi_flags
+    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
+    if $RUBY2D_PLATFORM == :linux then add_flags(:ld, '-lGL') end
 
   # If can't detect the platform, use libraries installed by the user
   else

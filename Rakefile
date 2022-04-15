@@ -1,5 +1,6 @@
 require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/cli/colorize'
+require_relative 'lib/ruby2d/cli/platform'
 require_relative 'lib/ruby2d/version'
 
 # Helpers ######################################################################
@@ -77,8 +78,8 @@ namespace :test do
     test_file = ARGV[1]
     print_task "Running `#{test_file}.rb` with mruby"
     run_cmd "ruby2d build --clean"
-    run_cmd "ruby2d build --native test/#{test_file}.rb --debug"
-    run_cmd "( cd test/ && ../build/app )"
+    run_cmd "ruby2d build test/#{test_file}.rb --debug"
+    run_cmd "( cd test/ && ../build/#{$RUBY2D_PLATFORM}/app )"
   end
 
   desc "Run test using WebAssembly"
@@ -88,7 +89,7 @@ namespace :test do
     print_task "Running `#{test_file}.rb` with WebAssembly"
 
     run_cmd "ruby2d build --clean"
-    result = run_cmd "ruby2d build test/#{test_file}.rb --debug"
+    result = run_cmd "ruby2d build test/#{test_file}.rb --assets assets/test_media --debug"
     unless result then exit(1) end
 
     run_cmd "ruby2d serve build/web/app.html"

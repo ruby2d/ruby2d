@@ -1,17 +1,19 @@
 # Set the OS and platform
 
-case RUBY_PLATFORM
-when /darwin/
+case
+when RUBY_PLATFORM.include?('darwin')
   $RUBY2D_PLATFORM = :macos
-when /linux/
+when RUBY_PLATFORM.include?('mingw')
+  $RUBY2D_PLATFORM = :windows
+when RUBY_PLATFORM.include?('linux')
   $RUBY2D_PLATFORM = :linux
-  if `cat /etc/os-release` =~ /raspbian/
+  if `cat /etc/os-release`.include?('raspbian')
     $RUBY2D_PLATFORM = :linux_rpi
   end
-when /bsd/
+when RUBY_PLATFORM.include?('bsd')
   $RUBY2D_PLATFORM = :bsd
-when /mingw/
-  $RUBY2D_PLATFORM = :windows
+when RUBY_PLATFORM.include?('wasm')
+  $RUBY2D_PLATFORM = :wasm
 else
   $RUBY2D_PLATFORM = nil
 end

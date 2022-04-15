@@ -187,7 +187,12 @@ void R2D_GL_SetViewport(R2D_Window *window) {
       break;
   }
 
-  glViewport(x, y, w, h);
+  #if WASM
+    double dpr = emscripten_get_device_pixel_ratio();
+    glViewport(x, y, window->width * dpr, window->height * dpr);
+  #else
+    glViewport(x, y, w, h);
+  #endif
 
   // Set orthographic projection matrix
   orthoMatrix[0] =  2.0f / (GLfloat)ortho_w;
@@ -318,6 +323,11 @@ void R2D_GL_CreateTexture(GLuint *id, GLint internalFormat, GLint format, GLenum
   // Set the filtering mode
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+
+  // Set wrapping to "clamp to edge"
+  // (important for WebGL, for textures that are not a power of 2 in both dimensions)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 

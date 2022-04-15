@@ -14,6 +14,7 @@ Usage: ruby2d <command> <options>
 
 Summary of commands and options:
   build         Compile a Ruby source file on available plaforms
+    --assets      Include a directory containing media assets
     --debug       Print debugging info and save files generated
     --clean       Cleans the build directory
   serve         Start a local server and open a built web app
@@ -22,16 +23,25 @@ Summary of commands and options:
 
 # Check Command-line Arguments #################################################
 
+def get_flag(flag)
+  flag_index = ARGV.find_index flag
+  return nil unless flag_index
+  val = ARGV[flag_index + 1]
+  ARGV.delete flag
+  return '' unless val
+  ARGV.delete val
+  val
+end
+
 case ARGV[0]
-when 'console'
-  require 'ruby2d/cli/console'
 when 'build'
   require 'ruby2d/cli/build'
   if ARGV.delete '--debug' then @debug = true end
   if ARGV[1] == '--clean'
     clean_up(:all)
   else
-    build(ARGV[1])
+    assets_dir = get_flag '--assets'
+    build(ARGV[1], assets_dir)
   end
 when 'serve'
   require 'ruby2d/cli/build'

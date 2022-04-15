@@ -58,16 +58,12 @@ extern "C" {
   #define WASM false
 #endif
 
-
-// #define GLES true
-
 // ARM and GLES
 #if IOS || TVOS || WASM
   #define GLES true
 #else
   #define GLES false
 #endif
-
 
 
 // Includes ////////////////////////////////////////////////////////////////////
@@ -113,6 +109,7 @@ extern "C" {
   #include <string.h>
   #include <math.h>
   #include <emscripten.h>
+  #include <emscripten/html5.h>
   #include <SDL.h>
   #define GL_GLEXT_PROTOTYPES 1
   #include <SDL_opengles2.h>

@@ -51,7 +51,6 @@ R2D_Window *R2D_CreateWindow(const char *title, int width, int height,
 
 
 const Uint8 *key_state;
-
 Uint32 frames;
 Uint32 frames_last_sec;
 Uint32 start_ms;
@@ -63,11 +62,7 @@ Uint32 loop_ms;     // Elapsed time of current loop
 int delay_ms;       // Amount of delay to achieve desired frame rate
 double decay_rate;
 double fps;
-
 R2D_Window *window;
-
-
-
 
 
 void main_loop() {
@@ -97,9 +92,7 @@ void main_loop() {
 
   // Note: `loop_ms + delay_ms` should equal `1000 / fps_cap`
 
-  #ifndef __EMSCRIPTEN__
-    SDL_Delay(delay_ms);
-  #endif
+  SDL_Delay(delay_ms);
 
   begin_ms = SDL_GetTicks();
 
@@ -277,16 +270,6 @@ void main_loop() {
 }
 
 
-
-
-
-
-
-
-
-
-
-
 /*
  * Show the window
  */
@@ -298,6 +281,10 @@ int R2D_Show(R2D_Window *win) {
     R2D_Error("R2D_Show", "Window cannot be shown (because it's NULL)");
     return 1;
   }
+
+  #if WASM
+    window->flags = window->flags | SDL_WINDOW_ALLOW_HIGHDPI;
+  #endif
 
   // Create SDL window
   window->sdl = SDL_CreateWindow(
@@ -335,6 +322,7 @@ int R2D_Show(R2D_Window *win) {
   #if MACOS
     SDL_SetWindowSize(window->sdl, window->width, window->height);
   #endif
+
 
   // Set Main Loop Data ////////////////////////////////////////////////////////
 

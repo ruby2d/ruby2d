@@ -72,7 +72,7 @@ int R2D_GLES_Init() {
 
   // Fragment shader source string
   GLchar fragmentSource[] =
-    #ifdef __EMSCRIPTEN__
+    #if WASM
     "precision mediump float;"
     #endif
     // input vertex color from vertex shader
@@ -85,7 +85,7 @@ int R2D_GLES_Init() {
 
   // Fragment shader source string for textures
   GLchar texFragmentSource[] =
-    #ifdef __EMSCRIPTEN__
+    #if WASM
     "precision mediump float;"
     #endif
     // input vertex color from vertex shader
@@ -98,22 +98,12 @@ int R2D_GLES_Init() {
     "  gl_FragColor = texture2D(s_texture, v_texcoord) * v_color;"
     "}";
 
-  // // Create a vertex array object
-  // GLuint vao;
-  // glGenVertexArrays(1, &vao);
-  // glBindVertexArray(vao);
-
   // Create a vertex buffer object and allocate data
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   vboSize = vboObjCapacity * sizeof(GLfloat) * 8;
   vboData = (GLfloat *) malloc(vboSize);
   vboDataCurrent = vboData;
-
-  // Create an element buffer object
-  GLuint ebo;
-  glGenBuffers(1, &ebo);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 
   // Load the vertex and fragment shaders
   GLuint vertexShader      = R2D_GL_LoadShader(  GL_VERTEX_SHADER,      vertexSource, "GLES Vertex");
