@@ -17,6 +17,12 @@ update do
     color: [rand, rand, rand, 1]
   )
 
+  canvas.fill_rectangle(
+    x: Window.mouse_x - 50 + 5, y: Window.mouse_y - 50 + 5,
+    width: 40, height: 40,
+    color: [rand, rand, rand, 1]
+  )
+
   canvas.draw_line(
     x1: 0, y1: 0, x2: Window.mouse_x - 50, y2: Window.mouse_y - 50, width: 1,
     color: [rand, rand, rand, 1]
