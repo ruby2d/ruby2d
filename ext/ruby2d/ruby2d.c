@@ -497,14 +497,17 @@ static R_VAL ruby2d_canvas_ext_create(R_VAL self, R_VAL a) {
     32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
   );
 
-  R2D_Canvas_DrawRect(
+  R2D_Canvas_FillRect_RGBA(
     surf, 0, 0,
     NUM2INT(r_ary_entry(a, 0)), // w
     NUM2INT(r_ary_entry(a, 1)), // h
-    NUM2DBL(r_ary_entry(a, 2)), // r
-    NUM2DBL(r_ary_entry(a, 3)), // g
-    NUM2DBL(r_ary_entry(a, 4)), // b
-    NUM2DBL(r_ary_entry(a, 5))  // a
+    R2D_Canvas_Color2RGBA(
+      surf,
+      NUM2DBL(r_ary_entry(a, 2)),  // r
+      NUM2DBL(r_ary_entry(a, 3)),  // g
+      NUM2DBL(r_ary_entry(a, 4)),  // b
+      NUM2DBL(r_ary_entry(a, 5))   // a
+    )
   );
 
   SDL_SetSurfaceBlendMode(surf, SDL_BLENDMODE_BLEND);
@@ -512,6 +515,39 @@ static R_VAL ruby2d_canvas_ext_create(R_VAL self, R_VAL a) {
   return R_NIL;
 }
 
+
+/*
+ * Ruby2D::Canvas#ext_fill_rectangle
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_fill_rectangle(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_fill_rectangle(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the rectangle
+
+  SDL_Surface *surf;
+  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+
+  R2D_Canvas_FillRect_RGBA(
+    surf,
+    NUM2INT(r_ary_entry(a, 0)),  // x
+    NUM2INT(r_ary_entry(a, 1)),  // y
+    NUM2INT(r_ary_entry(a, 2)),  // w
+    NUM2INT(r_ary_entry(a, 3)),  // h
+    R2D_Canvas_Color2RGBA(
+      surf,
+      NUM2DBL(r_ary_entry(a, 4)),  // r
+      NUM2DBL(r_ary_entry(a, 5)),  // g
+      NUM2DBL(r_ary_entry(a, 6)),  // b
+      NUM2DBL(r_ary_entry(a, 7))   // a
+    )
+  );
+
+  return R_NIL;
+}
 
 /*
  * Ruby2D::Canvas#ext_draw_rectangle
@@ -528,21 +564,23 @@ static R_VAL ruby2d_canvas_ext_draw_rectangle(R_VAL self, R_VAL a) {
   SDL_Surface *surf;
   r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
 
-  R2D_Canvas_DrawRect(
+  R2D_Canvas_DrawRect_RGBA(
     surf,
     NUM2INT(r_ary_entry(a, 0)),  // x
     NUM2INT(r_ary_entry(a, 1)),  // y
     NUM2INT(r_ary_entry(a, 2)),  // w
     NUM2INT(r_ary_entry(a, 3)),  // h
-    NUM2DBL(r_ary_entry(a, 4)),  // r
-    NUM2DBL(r_ary_entry(a, 5)),  // g
-    NUM2DBL(r_ary_entry(a, 6)),  // b
-    NUM2DBL(r_ary_entry(a, 7))   // a
+    R2D_Canvas_Color2RGBA(
+      surf,
+      NUM2DBL(r_ary_entry(a, 4)),  // r
+      NUM2DBL(r_ary_entry(a, 5)),  // g
+      NUM2DBL(r_ary_entry(a, 6)),  // b
+      NUM2DBL(r_ary_entry(a, 7))   // a
+    )
   );
 
   return R_NIL;
 }
-
 
 /*
  * Ruby2D::Canvas#ext_draw_line
@@ -559,35 +597,21 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
   SDL_Surface *surf;
   r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
 
-  int x1 = NUM2INT(r_ary_entry(a, 0));
-  int y1 = NUM2INT(r_ary_entry(a, 1));
-  int x2 = NUM2INT(r_ary_entry(a, 2));
-  int y2 = NUM2INT(r_ary_entry(a, 3));
-
-  int i;
-  double x = x2 - x1;
-  double y = y2 - y1;
-  double length = sqrt(x*x + y*y);
-  double addx = x / length;
-  double addy = y / length;
-  x = x1;
-  y = y1;
-
-  // Draw the pixel on the canvas
-  for (i = 0; i < length; i += 1) {
-    R2D_Canvas_DrawRect(
-      surf, x, y,
-      NUM2INT(r_ary_entry(a, 4)),  // w (w & h are same val, the pixel "size")
-      NUM2INT(r_ary_entry(a, 4)),  // h ꜛ
+  R2D_Canvas_DrawLine_RGBA(
+    surf,
+    NUM2INT(r_ary_entry(a, 0)), // x1
+    NUM2INT(r_ary_entry(a, 1)), // y1
+    NUM2INT(r_ary_entry(a, 2)), // x2
+    NUM2INT(r_ary_entry(a, 3)), // y2
+    NUM2INT(r_ary_entry(a, 4)), // thickness
+    R2D_Canvas_Color2RGBA(
+      surf,
       NUM2DBL(r_ary_entry(a, 5)),  // r
       NUM2DBL(r_ary_entry(a, 6)),  // g
       NUM2DBL(r_ary_entry(a, 7)),  // b
       NUM2DBL(r_ary_entry(a, 8))   // a
-    );
-    x += addx;
-    y += addy;
-  }
-
+    )
+  );
   return R_NIL;
 }
 
@@ -1435,6 +1459,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_create
   r_define_method(ruby2d_canvas_class, "ext_create", ruby2d_canvas_ext_create, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_fill_rectangle
+  r_define_method(ruby2d_canvas_class, "ext_fill_rectangle", ruby2d_canvas_ext_fill_rectangle, r_args_req(1));
 
   // Ruby2D::Canvas#ext_draw_rectangle
   r_define_method(ruby2d_canvas_class, "ext_draw_rectangle", ruby2d_canvas_ext_draw_rectangle, r_args_req(1));

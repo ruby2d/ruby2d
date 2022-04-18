@@ -20,7 +20,18 @@ module Ruby2D
       @texture = Texture.new(@ext_pixel_data, @width, @height)
       unless opts[:show] == false then add end
     end
+    
+    # Draw a filled rectangle.
+    def fill_rectangle(opts = {})
+      clr = Color.new(opts[:color] || opts[:colour])
+      ext_fill_rectangle([
+        opts[:x], opts[:y], opts[:width], opts[:height],
+        clr.r, clr.g, clr.b, clr.a
+      ])
+      update_texture if @update
+    end
 
+    # Draw an outline of a rectangle
     def draw_rectangle(opts = {})
       clr = Color.new(opts[:color] || opts[:colour])
       ext_draw_rectangle([
@@ -30,6 +41,7 @@ module Ruby2D
       update_texture if @update
     end
 
+    # Draw a straight line
     def draw_line(opts = {})
       clr = Color.new(opts[:color] || opts[:colour])
       ext_draw_line([

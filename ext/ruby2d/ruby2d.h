@@ -506,9 +506,24 @@ void R2D_FreeSound(R2D_Sound *snd);
 // Canvas //////////////////////////////////////////////////////////////////////
 
 /*
- * Draw a rectangle on a canvas
+ * Convert colour to a 32-bit RGBA integer
  */
-void R2D_Canvas_DrawRect(SDL_Surface *surf, int x, int y, int w, int h, double r, double g, double b, double a);
+Uint32 R2D_Canvas_Color2RGBA(SDL_Surface *surf, double r, double g, double b, double a);
+
+/*
+ * Draw a rectangle on a canvas using a pre-converted RGBA colour value.
+ */
+void R2D_Canvas_FillRect_RGBA(SDL_Surface *surf, int x, int y, int w, int h, Uint32 rgba);
+
+/*
+ * Draw the outline of a rectangle on a canvas using a pre-converted RGBA colour value.
+ */
+void R2D_Canvas_DrawRect_RGBA(SDL_Surface *surf, int x, int y, int w, int h, Uint32 rgba);
+
+/*
+ * Draw a thick line on a canvas using a pre-converted RGBA colour value.
+ */
+void R2D_Canvas_DrawLine_RGBA(SDL_Surface *surf, int x1, int y1, int x2, int y2, int thickness, Uint32 rgba);
 
 // Music ///////////////////////////////////////////////////////////////////////
 
