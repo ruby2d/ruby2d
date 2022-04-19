@@ -10,7 +10,11 @@ Square.new(size: 500, color: 'red')
 # If `update: false` is set, `canvas.update` must be manually called to update the rendered texture
 canvas = Canvas.new(x: 50, y: 50, width: Window.width - 100, height: Window.height - 100, fill: [1, 1, 1, 0.5])
 
+clear_between_draw = false
+
 update do
+  canvas.clear if clear_between_draw
+
   canvas.draw_rectangle(
     x: Window.mouse_x - 50, y: Window.mouse_y - 50,
     width: 50, height: 50,
@@ -30,7 +34,12 @@ update do
 end
 
 on :key_down do |event|
-  close if event.key == 'escape'
+  case event.key
+  when 'escape'
+    close
+  when 'space'
+    clear_between_draw = !clear_between_draw
+  end
   canvas.update
 end
 
