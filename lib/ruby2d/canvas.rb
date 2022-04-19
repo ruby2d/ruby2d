@@ -21,6 +21,13 @@ module Ruby2D
       unless opts[:show] == false then add end
     end
     
+    # Clear the entire canvas, replacing every pixel with fill colour without blending.
+    def clear(fill_color = nil)
+      color = fill_color || @fill
+      ext_clear([color.r, color.g, color.b, color.a])
+      update_texture if @update
+    end
+
     # Draw a filled rectangle.
     def fill_rectangle(opts = {})
       clr = Color.new(opts[:color] || opts[:colour])
