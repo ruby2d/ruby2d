@@ -132,11 +132,16 @@ static void free_surface(mrb_state *mrb, void *p_);
   static const struct mrb_data_type surface_data_type = {
     "surface", free_surface
   };
+static void free_renderer(mrb_state *mrb, void *p_);
+  static const struct mrb_data_type renderer_data_type = {
+    "renderer", free_renderer
+  };
 #else
   static void free_sound(R2D_Sound *snd);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
   static void free_surface(SDL_Surface *surface);
+  static void free_renderer(SDL_Renderer *renderer);
 #endif
 
 
@@ -497,24 +502,52 @@ static R_VAL ruby2d_canvas_ext_create(R_VAL self, R_VAL a) {
     32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
   );
 
-  R2D_Canvas_FillRect_RGBA(
-    surf, 0, 0,
-    NUM2INT(r_ary_entry(a, 0)), // w
-    NUM2INT(r_ary_entry(a, 1)), // h
-    R2D_Canvas_Color2RGBA(
-      surf,
-      NUM2DBL(r_ary_entry(a, 2)),  // r
-      NUM2DBL(r_ary_entry(a, 3)),  // g
-      NUM2DBL(r_ary_entry(a, 4)),  // b
-      NUM2DBL(r_ary_entry(a, 5))   // a
-    )
-  );
+  SDL_Renderer *render = SDL_CreateSoftwareRenderer(surf);
+
+  SDL_SetRenderDrawColor(render,
+          NUM2DBL(r_ary_entry(a, 2)) * 255, // r
+          NUM2DBL(r_ary_entry(a, 3)) * 255, // g
+          NUM2DBL(r_ary_entry(a, 4)) * 255, // b
+          NUM2DBL(r_ary_entry(a, 5)) * 255  // a
+          );
+  SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
+  SDL_RenderClear(render);
 
   SDL_SetSurfaceBlendMode(surf, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
+
   r_iv_set(self, "@ext_pixel_data", r_data_wrap_struct(surface, surf));
+  r_iv_set(self, "@ext_renderer", r_data_wrap_struct(renderer, render));
   return R_NIL;
 }
 
+/*
+ * Ruby2D::Canvas#ext_clear
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_clear(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_clear(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the colour values
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  SDL_SetRenderDrawColor(render,
+          NUM2DBL(r_ary_entry(a, 0)) * 255, // r
+          NUM2DBL(r_ary_entry(a, 1)) * 255, // g
+          NUM2DBL(r_ary_entry(a, 2)) * 255, // b
+          NUM2DBL(r_ary_entry(a, 3)) * 255  // a
+          );
+  SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
+  SDL_RenderClear(render);
+  SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
+
+  return R_NIL;
+}
 
 /*
  * Ruby2D::Canvas#ext_fill_rectangle
@@ -528,23 +561,24 @@ static R_VAL ruby2d_canvas_ext_fill_rectangle(R_VAL self, R_VAL a) {
 #endif
   // `a` is the array representing the rectangle
 
-  SDL_Surface *surf;
-  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  R2D_Canvas_FillRect_RGBA(
-    surf,
-    NUM2INT(r_ary_entry(a, 0)),  // x
-    NUM2INT(r_ary_entry(a, 1)),  // y
-    NUM2INT(r_ary_entry(a, 2)),  // w
-    NUM2INT(r_ary_entry(a, 3)),  // h
-    R2D_Canvas_Color2RGBA(
-      surf,
-      NUM2DBL(r_ary_entry(a, 4)),  // r
-      NUM2DBL(r_ary_entry(a, 5)),  // g
-      NUM2DBL(r_ary_entry(a, 6)),  // b
-      NUM2DBL(r_ary_entry(a, 7))   // a
-    )
-  );
+  SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
+
+  SDL_Rect rect = { .x = NUM2INT(r_ary_entry(a, 0)),
+                    .y = NUM2INT(r_ary_entry(a, 1)),
+                    .w = NUM2INT(r_ary_entry(a, 2)),
+                    .h = NUM2INT(r_ary_entry(a, 3))
+                    };
+
+  SDL_SetRenderDrawColor(render,
+          NUM2DBL(r_ary_entry(a, 4)) * 255, // r
+          NUM2DBL(r_ary_entry(a, 5)) * 255, // g
+          NUM2DBL(r_ary_entry(a, 6)) * 255, // b
+          NUM2DBL(r_ary_entry(a, 7)) * 255  // a
+          );
+  SDL_RenderFillRect(render, &rect);
 
   return R_NIL;
 }
@@ -561,23 +595,22 @@ static R_VAL ruby2d_canvas_ext_draw_rectangle(R_VAL self, R_VAL a) {
 #endif
   // `a` is the array representing the rectangle
 
-  SDL_Surface *surf;
-  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  R2D_Canvas_DrawRect_RGBA(
-    surf,
-    NUM2INT(r_ary_entry(a, 0)),  // x
-    NUM2INT(r_ary_entry(a, 1)),  // y
-    NUM2INT(r_ary_entry(a, 2)),  // w
-    NUM2INT(r_ary_entry(a, 3)),  // h
-    R2D_Canvas_Color2RGBA(
-      surf,
-      NUM2DBL(r_ary_entry(a, 4)),  // r
-      NUM2DBL(r_ary_entry(a, 5)),  // g
-      NUM2DBL(r_ary_entry(a, 6)),  // b
-      NUM2DBL(r_ary_entry(a, 7))   // a
-    )
-  );
+  SDL_Rect rect = { .x = NUM2INT(r_ary_entry(a, 0)),
+                    .y = NUM2INT(r_ary_entry(a, 1)),
+                    .w = NUM2INT(r_ary_entry(a, 2)),
+                    .h = NUM2INT(r_ary_entry(a, 3))
+                    };
+
+  SDL_SetRenderDrawColor(render,
+          NUM2DBL(r_ary_entry(a, 4)) * 255, // r
+          NUM2DBL(r_ary_entry(a, 5)) * 255, // g
+          NUM2DBL(r_ary_entry(a, 6)) * 255, // b
+          NUM2DBL(r_ary_entry(a, 7)) * 255  // a
+          );
+  SDL_RenderDrawRect(render, &rect);
 
   return R_NIL;
 }
@@ -594,23 +627,21 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
 #endif
   // `a` is the array representing the line
 
-  SDL_Surface *surf;
-  r_data_get_struct(self, "@ext_pixel_data", &surface_data_type, SDL_Surface, surf);
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  R2D_Canvas_DrawLine_RGBA(
-    surf,
+  SDL_SetRenderDrawColor(render,
+          NUM2DBL(r_ary_entry(a, 5)) * 255, // r
+          NUM2DBL(r_ary_entry(a, 6)) * 255, // g
+          NUM2DBL(r_ary_entry(a, 7)) * 255, // b
+          NUM2DBL(r_ary_entry(a, 8)) * 255  // a
+          );
+  R2D_Canvas_DrawLine(render, 
     NUM2INT(r_ary_entry(a, 0)), // x1
     NUM2INT(r_ary_entry(a, 1)), // y1
     NUM2INT(r_ary_entry(a, 2)), // x2
     NUM2INT(r_ary_entry(a, 3)), // y2
-    NUM2INT(r_ary_entry(a, 4)), // thickness
-    R2D_Canvas_Color2RGBA(
-      surf,
-      NUM2DBL(r_ary_entry(a, 5)),  // r
-      NUM2DBL(r_ary_entry(a, 6)),  // g
-      NUM2DBL(r_ary_entry(a, 7)),  // b
-      NUM2DBL(r_ary_entry(a, 8))   // a
-    )
+    NUM2INT(r_ary_entry(a, 4))  // thickness
   );
   return R_NIL;
 }
@@ -930,6 +961,18 @@ static void free_surface(mrb_state *mrb, void *p_) {
 static void free_surface(SDL_Surface *surface) {
 #endif
   SDL_FreeSurface(surface);
+}
+
+/*
+ * Free renderer structure used within the Ruby 2D `Canvas` class
+ */
+#if MRUBY
+static void free_renderer(mrb_state *mrb, void *p_) {
+  SDL_Renderer *renderer = (SDL_Renderer *)p_;
+#else
+static void free_renderer(SDL_Renderer *renderer) {
+#endif
+  SDL_DestroyRenderer(renderer);
 }
 
 
@@ -1459,6 +1502,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_create
   r_define_method(ruby2d_canvas_class, "ext_create", ruby2d_canvas_ext_create, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_clear
+  r_define_method(ruby2d_canvas_class, "ext_clear", ruby2d_canvas_ext_clear, r_args_req(1));
 
   // Ruby2D::Canvas#ext_fill_rectangle
   r_define_method(ruby2d_canvas_class, "ext_fill_rectangle", ruby2d_canvas_ext_fill_rectangle, r_args_req(1));
