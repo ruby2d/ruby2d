@@ -646,6 +646,66 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
   return R_NIL;
 }
 
+/*
+ * Ruby2D::Canvas#self.ext_fill_triangle
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_fill_triangle(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_fill_triangle(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the triangle
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  SDL_Vertex verts[3];
+
+  #define TRI_VOFS 0
+  verts[0].position = (SDL_FPoint) { 
+    .x = NUM2INT(r_ary_entry(a,  TRI_VOFS + 0)),  // x1
+    .y = NUM2INT(r_ary_entry(a,  TRI_VOFS + 1)),  // y1
+  };
+  verts[0].color = (SDL_Color) {
+    .r = NUM2DBL(r_ary_entry(a, TRI_VOFS + 2)) * 255,
+    .g = NUM2DBL(r_ary_entry(a, TRI_VOFS + 3)) * 255,
+    .b = NUM2DBL(r_ary_entry(a, TRI_VOFS + 4)) * 255,
+    .a = NUM2DBL(r_ary_entry(a, TRI_VOFS + 5)) * 255,
+  };
+
+  #undef TRI_VOFS
+  #define TRI_VOFS 6
+  verts[1].position = (SDL_FPoint) { 
+    .x = NUM2INT(r_ary_entry(a,  TRI_VOFS + 0)),  // x1
+    .y = NUM2INT(r_ary_entry(a,  TRI_VOFS + 1)),  // y1
+  };
+  verts[1].color = (SDL_Color) {
+    .r = NUM2DBL(r_ary_entry(a, TRI_VOFS + 2)) * 255,
+    .g = NUM2DBL(r_ary_entry(a, TRI_VOFS + 3)) * 255,
+    .b = NUM2DBL(r_ary_entry(a, TRI_VOFS + 4)) * 255,
+    .a = NUM2DBL(r_ary_entry(a, TRI_VOFS + 5)) * 255,
+  };
+
+  #undef TRI_VOFS
+  #define TRI_VOFS 12
+  verts[2].position = (SDL_FPoint) { 
+    .x = NUM2INT(r_ary_entry(a,  TRI_VOFS + 0)),  // x1
+    .y = NUM2INT(r_ary_entry(a,  TRI_VOFS + 1)),  // y1
+  };
+  verts[2].color = (SDL_Color) {
+    .r = NUM2DBL(r_ary_entry(a, TRI_VOFS + 2)) * 255,
+    .g = NUM2DBL(r_ary_entry(a, TRI_VOFS + 3)) * 255,
+    .b = NUM2DBL(r_ary_entry(a, TRI_VOFS + 4)) * 255,
+    .a = NUM2DBL(r_ary_entry(a, TRI_VOFS + 5)) * 255,
+  };
+
+  SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
+
+  return R_NIL;
+}
+
 
 /*
  * Ruby2D::Sound#ext_init
@@ -1514,6 +1574,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_draw_line
   r_define_method(ruby2d_canvas_class, "ext_draw_line", ruby2d_canvas_ext_draw_line, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_fill_triangle
+  r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

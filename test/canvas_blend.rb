@@ -36,6 +36,14 @@ end
   )
 end
 
+canvas.fill_triangle x1: 100, y1: 100, x2: 200, y2: 150, x3: 150, y3: 400,
+                     color: [1, 1, 1, 0.5]
+
+canvas.fill_triangle x1: 300, y1: 100, x2: 400, y2: 150, x3: 350, y3: 400,
+                     color: Color::Set.new([[1, 0, 0, 0.5],
+                                            [0, 1, 0, 0.5],
+                                            [0, 0, 1, 0.5]])
+
 update do
   canvas.update
 end
