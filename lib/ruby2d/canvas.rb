@@ -54,6 +54,35 @@ module Ruby2D
       update_texture if @update
     end
 
+    # Draw a filled quad(rilateral) with a single colour or per-vertex colour blending.
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] x4
+    # @param [Numeric] y4
+    # @param [Color, Color::Set] color (or +colour+) Set one or per-vertex colour
+    def fill_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color: nil, colour:nil)
+      clr = color || colour
+      if clr.is_a? Color::Set
+        c1 = clr[0]
+        c2 = clr[1] || c1
+        c3 = clr[2] || c2
+        c4 = clr[3] || c3
+      else
+        c1 = c2 = c3 = c4 = (clr.is_a?(Color) ? clr : Color.new(clr))
+      end
+      ext_fill_quad([
+        x1, y1, c1.r, c1.g, c1.b, c1.a,
+        x2, y2, c2.r, c2.g, c2.b, c2.a,
+        x3, y3, c3.r, c3.g, c3.b, c3.a,
+        x4, y4, c4.r, c4.g, c4.b, c4.a
+      ])
+      update_texture if @update
+    end
+
     # Draw a filled rectangle.
     # @param [Numeric] x
     # @param [Numeric] y
