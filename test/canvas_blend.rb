@@ -39,10 +39,32 @@ end
 canvas.fill_triangle x1: 100, y1: 100, x2: 200, y2: 150, x3: 150, y3: 400,
                      color: [1, 1, 1, 0.5]
 
-canvas.fill_triangle x1: 300, y1: 100, x2: 400, y2: 150, x3: 350, y3: 400,
+canvas.fill_triangle x1: 250, y1: 100, x2: 350, y2: 150, x3: 300, y3: 400,
                      color: Color::Set.new([[1, 0, 0, 0.5],
                                             [0, 1, 0, 0.5],
                                             [0, 0, 1, 0.5]])
+
+canvas.fill_rectangle(x: 400 - 5, y: 200 - 5, width: 10, height: 10, color: 'white')
+canvas.fill_rectangle(x: 450 - 5, y: 150 - 5, width: 10, height: 10, color: 'white')
+canvas.fill_rectangle(x: 500 - 5, y: 300 - 5, width: 10, height: 10, color: 'white')
+canvas.fill_rectangle(x: 450 - 5, y: 190 - 5, width: 10, height: 10, color: 'white')
+
+canvas.fill_quad x1: 400, y1: 200,
+                 x2: 450, y2: 150,
+                 x3: 500, y3: 300,
+                 x4: 450, y4: 190,
+                 color: [0, 0, 1, 0.5]
+
+canvas.fill_quad x1: 500, y1: 200,
+                 x2: 550, y2: 150,
+                 x3: 600, y3: 300,
+                 x4: 550, y4: 400,
+                 color: Color::Set.new([
+                                         [1, 0, 0, 0.5],
+                                         [0, 1, 0, 0.5],
+                                         [0, 0, 1, 0.5],
+                                         [0, 1, 1, 0.5]
+                                       ])
 
 update do
   canvas.update
