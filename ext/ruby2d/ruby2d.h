@@ -507,8 +507,11 @@ void R2D_FreeSound(R2D_Sound *snd);
 
 /*
  * Draw a thick line on a canvas using a pre-converted RGBA colour value.
+ * @param [int] thickness must be > 1, else does nothing
  */
-void R2D_Canvas_DrawLine(SDL_Renderer *render, int x1, int y1, int x2, int y2, int thickness);
+void R2D_Canvas_DrawThickLine(SDL_Renderer *render, 
+                       int x1, int y1, int x2, int y2, int thickness, 
+                       int r, int g, int b, int a);
 
 // Music ///////////////////////////////////////////////////////////////////////
 

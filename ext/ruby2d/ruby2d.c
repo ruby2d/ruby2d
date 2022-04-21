@@ -630,19 +630,38 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  SDL_SetRenderDrawColor(render,
-          NUM2DBL(r_ary_entry(a, 5)) * 255, // r
-          NUM2DBL(r_ary_entry(a, 6)) * 255, // g
-          NUM2DBL(r_ary_entry(a, 7)) * 255, // b
-          NUM2DBL(r_ary_entry(a, 8)) * 255  // a
-          );
-  R2D_Canvas_DrawLine(render, 
-    NUM2INT(r_ary_entry(a, 0)), // x1
-    NUM2INT(r_ary_entry(a, 1)), // y1
-    NUM2INT(r_ary_entry(a, 2)), // x2
-    NUM2INT(r_ary_entry(a, 3)), // y2
-    NUM2INT(r_ary_entry(a, 4))  // thickness
-  );
+  int thickness = NUM2INT(r_ary_entry(a, 4)); 
+  if (thickness == 1) {
+    // use the SDL_Renderer's draw line for single pixel lines
+    SDL_SetRenderDrawColor(render,
+            NUM2DBL(r_ary_entry(a, 5)) * 255, // r
+            NUM2DBL(r_ary_entry(a, 6)) * 255, // g
+            NUM2DBL(r_ary_entry(a, 7)) * 255, // b
+            NUM2DBL(r_ary_entry(a, 8)) * 255  // a
+            );
+    SDL_RenderDrawLine(render, 
+      NUM2INT(r_ary_entry(a, 0)), // x1
+      NUM2INT(r_ary_entry(a, 1)), // y1
+      NUM2INT(r_ary_entry(a, 2)), // x2
+      NUM2INT(r_ary_entry(a, 3))  // y2
+    );
+  }
+  else if (thickness > 1) {
+    // use a custom handler to convert a thick line into a 
+    // quad and draw using SDL_Renderer's geometry renderer
+    R2D_Canvas_DrawThickLine(render, 
+      NUM2INT(r_ary_entry(a, 0)), // x1
+      NUM2INT(r_ary_entry(a, 1)), // y1
+      NUM2INT(r_ary_entry(a, 2)), // x2
+      NUM2INT(r_ary_entry(a, 3)), // y2
+      thickness,
+      NUM2DBL(r_ary_entry(a, 5)) * 255, // r
+      NUM2DBL(r_ary_entry(a, 6)) * 255, // g
+      NUM2DBL(r_ary_entry(a, 7)) * 255, // b
+      NUM2DBL(r_ary_entry(a, 8)) * 255  // a
+    );
+  }
+
   return R_NIL;
 }
 

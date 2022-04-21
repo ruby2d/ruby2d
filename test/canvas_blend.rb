@@ -22,10 +22,8 @@ canvas = Canvas.new(x: 50, y: 50,
   )
 end
 
-#
-# Currently fat lines don't blend so we don't get the
-# same effect ... yet.
 (1..3).each do |ix|
+  # thick line
   canvas.draw_line(
     x1: 10,
     y1: 75 + (ix * 15),
@@ -33,6 +31,14 @@ end
     y2: 420 + (ix * 15),
     width: 30,
     color: Color.new([0.5 + (ix * 0.1), 0.5 + (ix * 0.1), 1, 0.5])
+  )
+  # thin line along the middle of the thick line
+  canvas.draw_line(
+    x1: 10,
+    y1: 75 + (ix * 15),
+    x2: 310,
+    y2: 420 + (ix * 15),
+    color: 'white'
   )
 end
 
