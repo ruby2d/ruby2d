@@ -68,3 +68,58 @@ void R2D_Canvas_DrawThickLine(SDL_Renderer *render,
   int indices[] = { 0, 1, 2, 2, 3, 0 };
   SDL_RenderGeometry(render, NULL, verts, 4, indices, 6);
 }
+
+/*
+ * Draw a thick circle on a canvas using a pre-converted RGBA colour value.
+ * @param [int] thickness must be > 1, else does nothing
+ */
+void R2D_Canvas_DrawThickCircle(SDL_Renderer *render, 
+                       int x, int y, float radius, float sectors, int thickness, 
+                       int r, int g, int b, int a) {
+  if (thickness <= 1) {
+    return;
+  }
+
+  // renders a thick circle by treating each segment as a monotonic quad
+  // and rendering as two triangles per segment
+  SDL_Vertex verts[4];
+
+  // colour all vertices
+  verts[3].color = verts[2].color = verts[1].color = verts[0].color = (SDL_Color) {
+      .r = r, .g = g, .b = b, .a = a
+  };
+  float half_thick = thickness / 2.0f;
+  float outer_radius = radius + half_thick;
+  float inner_radius = radius - half_thick;
+  float cache_cosf = cosf(0), cache_sinf = sinf(0);
+  float angle = 2 * M_PI / sectors;
+
+  int indices[] = { 0, 1, 3, 3, 1, 2 };
+
+  // point at 0 radians
+  verts[0].position = (SDL_FPoint) { 
+    .x = x + outer_radius * cache_cosf, 
+    .y = y + outer_radius * cache_sinf
+  };
+  verts[3].position = (SDL_FPoint) { 
+    .x = x + inner_radius * cache_cosf, 
+    .y = y + inner_radius * cache_sinf
+  };
+  for (float i = 1; i <= sectors; i++) {
+    // re-use index 0 and 3 from previous calculation
+    verts[1].position = verts[0].position;
+    verts[2].position = verts[3].position;
+    // calculate new index 0 and 3 values
+    cache_cosf = cosf(i * angle);
+    cache_sinf = sinf(i * angle);
+    verts[0].position = (SDL_FPoint) { 
+      .x = x + outer_radius * cache_cosf, 
+      .y = y + outer_radius * cache_sinf
+    };
+    verts[3].position = (SDL_FPoint) { 
+      .x = x + inner_radius * cache_cosf, 
+      .y = y + inner_radius * cache_sinf
+    };
+    SDL_RenderGeometry(render, NULL, verts, 4, indices, 6);
+  }
+}
