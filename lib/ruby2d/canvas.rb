@@ -90,11 +90,11 @@ module Ruby2D
     # @param [Numeric] sectors The number of segments to subdivide the circumference.
     # @param [Numeric] width The thickness of the circle in pixels
     # @param [Color] color (or +colour+) The fill colour
-    def draw_circle(x:, y:, radius:, sectors: 30, width: 1, color: nil, colour: nil)
+    def draw_circle(x:, y:, radius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_circle([
-        x, y, radius, sectors, width,
+        x, y, radius, sectors, pen_width,
         clr.r, clr.g, clr.b, clr.a
       ])
       update_texture if @update
@@ -155,11 +155,11 @@ module Ruby2D
     # @param [Numeric] y2
     # @param [Numeric] width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
-    def draw_line(x1:, y1:, x2:, y2:, width: 1, color: nil, colour: nil)
+    def draw_line(x1:, y1:, x2:, y2:, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_line([
-        x1, y1, x2, y2, width,
+        x1, y1, x2, y2, pen_width,
         clr.r, clr.g, clr.b, clr.a
       ])
       update_texture if @update
