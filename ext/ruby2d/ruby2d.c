@@ -675,7 +675,7 @@ static R_VAL ruby2d_canvas_ext_fill_circle(mrb_state* mrb, R_VAL self) {
 #else
 static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
 #endif
-  // `a` is the array representing the triangle
+  // `a` is the array representing the filled circle
   // [ x, y, radius, sectors, r, g, b, a ]
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
@@ -714,6 +714,64 @@ static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
       .y = y + radius * sinf(i * angle)
     };
     SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
+  }
+
+  return R_NIL;
+}
+
+/*
+ * Ruby2D::Canvas#self.ext_draw_circle
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_circle(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_draw_circle(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the drawn circle
+  // [ x, y, radius, sectors, thickness, r, g, b, a ]
+
+  // thickness
+  int thickness = NUM2INT(r_ary_entry(a,  4));
+  if (thickness <= 0) return R_NIL;
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  // center
+  float x = NUM2INT(r_ary_entry(a,  0));
+  float y = NUM2INT(r_ary_entry(a,  1)) ;
+  // dimensions
+  float radius = NUM2INT(r_ary_entry(a,  2));
+  float sectors = NUM2INT(r_ary_entry(a,  3));
+  // colors
+  int clr_r = NUM2DBL(r_ary_entry(a, 5)) * 255;
+  int clr_g = NUM2DBL(r_ary_entry(a, 6)) * 255;
+  int clr_b = NUM2DBL(r_ary_entry(a, 7)) * 255;
+  int clr_a = NUM2DBL(r_ary_entry(a, 8)) * 255;
+  
+  if (thickness > 1) {
+    R2D_Canvas_DrawThickCircle(render, 
+      x, y, radius, sectors, thickness,
+      clr_r, clr_g, clr_b, clr_a);
+  }
+  else {
+    // draw single pixel circle by drawing line segments
+    float x1 = x + radius * cosf(0);
+    float y1 = y + radius * sinf(0);
+    float angle = 2 * M_PI / sectors;
+    SDL_SetRenderDrawColor(render, clr_r, clr_g, clr_b, clr_a);
+    for (float i = 1; i <= sectors; i++) {
+      // re-use from previous calculation
+      float x2 = x1;
+      float y2 = y1;
+      // calculate new point
+      x1 = x + radius * cosf(i * angle);
+      y1 = y + radius * sinf(i * angle);
+      SDL_RenderDrawLine(render, x1, y1, x2, y2);
+    }
+
   }
 
   return R_NIL;
@@ -1701,6 +1759,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_fill_circle
   r_define_method(ruby2d_canvas_class, "ext_fill_circle", ruby2d_canvas_ext_fill_circle, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_draw_circle
+  r_define_method(ruby2d_canvas_class, "ext_draw_circle", ruby2d_canvas_ext_draw_circle, r_args_req(1));
 
   // Ruby2D::Canvas#ext_fill_quad
   r_define_method(ruby2d_canvas_class, "ext_fill_quad", ruby2d_canvas_ext_fill_quad, r_args_req(1));

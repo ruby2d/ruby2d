@@ -83,6 +83,23 @@ module Ruby2D
       update_texture if @update
     end
 
+    # Draw a circle.
+    # @param [Numeric] x Centre
+    # @param [Numeric] y Centre
+    # @param [Numeric] radius
+    # @param [Numeric] sectors The number of segments to subdivide the circumference.
+    # @param [Numeric] width The thickness of the circle in pixels
+    # @param [Color] color (or +colour+) The fill colour
+    def draw_circle(x:, y:, radius:, sectors: 30, width: 1, color: nil, colour: nil)
+      clr = color || colour
+      clr = Color.new(clr) unless clr.is_a? Color
+      ext_draw_circle([
+        x, y, radius, sectors, width,
+        clr.r, clr.g, clr.b, clr.a
+      ])
+      update_texture if @update
+    end
+
     # Draw a filled circle.
     # @param [Numeric] x Centre
     # @param [Numeric] y Centre

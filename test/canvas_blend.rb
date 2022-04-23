@@ -23,9 +23,16 @@ canvas = Canvas.new(x: 50, y: 50,
 end
 
 canvas.fill_circle(
-  x: 300, y: 300, radius: 200,
+  x: 175, y: 350, radius: 150,
   color: [0.9, 0.9, 0.9, 0.3]
 )
+
+[1, 3, 5, 7, 9].each do |ix|
+  canvas.draw_circle(
+    x: 175, y: 350, radius: 150 - (ix * ix), width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
+    color: [1, 1, 1, 0.5]
+  )
+end
 
 (1..3).each do |ix|
   # thick line

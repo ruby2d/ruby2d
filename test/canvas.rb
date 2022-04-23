@@ -16,20 +16,24 @@ draw_shape = :square
 update do
   canvas.clear if clear_between_draw
 
-  canvas.draw_rectangle(
-    x: Window.mouse_x - 50, y: Window.mouse_y - 50,
-    width: 50, height: 50,
-    color: [rand, rand, rand, 1]
-  )
-
   case draw_shape
   when :circle
+    canvas.draw_circle(
+      x: Window.mouse_x - 25, y: Window.mouse_y - 25,
+      radius: 25, sectors: 10,
+      color: [rand, rand, rand, 1]
+    )
     canvas.fill_circle(
       x: Window.mouse_x - 25, y: Window.mouse_y - 25,
       radius: 20, sectors: 10,
       color: [rand, rand, rand, 1]
     )
   else
+    canvas.draw_rectangle(
+      x: Window.mouse_x - 50, y: Window.mouse_y - 50,
+      width: 50, height: 50,
+      color: [rand, rand, rand, 1]
+    )
     canvas.fill_rectangle(
       x: Window.mouse_x - 50 + 5, y: Window.mouse_y - 50 + 5,
       width: 40, height: 40,
