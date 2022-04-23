@@ -666,6 +666,60 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
 }
 
 /*
+ * Ruby2D::Canvas#self.ext_fill_circle
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_fill_circle(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the triangle
+  // [ x, y, radius, sectors, r, g, b, a ]
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  SDL_Vertex verts[3];
+  // center
+  float x, y;
+  verts[0].position = (SDL_FPoint) { 
+    .x = x = NUM2INT(r_ary_entry(a,  0)), 
+    .y = y = NUM2INT(r_ary_entry(a,  1)) 
+  };
+  // dimensions
+  float radius = NUM2INT(r_ary_entry(a,  2));
+  float sectors = NUM2INT(r_ary_entry(a,  3));
+  float angle = 2 * M_PI / sectors;
+
+  // colour all vertices
+  verts[1].color = verts[2].color = verts[0].color = (SDL_Color) {
+      .r = NUM2DBL(r_ary_entry(a, 4)) * 255,
+      .g = NUM2DBL(r_ary_entry(a, 5)) * 255,
+      .b = NUM2DBL(r_ary_entry(a, 6)) * 255,
+      .a = NUM2DBL(r_ary_entry(a, 7)) * 255,
+  };
+
+  // point at 0 radians
+  verts[1].position = (SDL_FPoint) { 
+    .x = x + radius * cosf(0), 
+    .y = y + radius * sinf(0)
+  };
+  for (float i = 1; i <= sectors; i++) {
+    // re-use from previous calculation
+    verts[2].position = verts[1].position;
+    // calculate new point
+    verts[1].position = (SDL_FPoint) { 
+      .x = x + radius * cosf(i * angle), 
+      .y = y + radius * sinf(i * angle)
+    };
+    SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
+  }
+
+  return R_NIL;
+}
+
+/*
  * Ruby2D::Canvas#self.ext_fill_triangle
  */
 #if MRUBY
@@ -1644,6 +1698,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_fill_triangle
   r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_fill_circle
+  r_define_method(ruby2d_canvas_class, "ext_fill_circle", ruby2d_canvas_ext_fill_circle, r_args_req(1));
 
   // Ruby2D::Canvas#ext_fill_quad
   r_define_method(ruby2d_canvas_class, "ext_fill_quad", ruby2d_canvas_ext_fill_quad, r_args_req(1));
