@@ -22,6 +22,11 @@ canvas = Canvas.new(x: 50, y: 50,
   )
 end
 
+canvas.fill_circle(
+  x: 300, y: 300, radius: 200,
+  color: [0.9, 0.9, 0.9, 0.3]
+)
+
 (1..3).each do |ix|
   # thick line
   canvas.draw_line(
@@ -60,6 +65,10 @@ canvas.fill_quad x1: 400, y1: 200,
                  x3: 500, y3: 300,
                  x4: 450, y4: 190,
                  color: [0, 0, 1, 0.5]
+
+canvas.fill_circle x: 450, y: 250,
+                   radius: 100,
+                   color: [0, 0.7, 1, 0.3]
 
 canvas.fill_quad x1: 500, y1: 200,
                  x2: 550, y2: 150,
