@@ -42,7 +42,7 @@ update do
   end
 
   canvas.draw_line(
-    x1: 0, y1: 0, x2: Window.mouse_x - 50, y2: Window.mouse_y - 50, width: 1,
+    x1: 0, y1: 0, x2: Window.mouse_x - 50, y2: Window.mouse_y - 50, pen_width: 1,
     color: [rand, rand, rand, 1]
   )
 end
