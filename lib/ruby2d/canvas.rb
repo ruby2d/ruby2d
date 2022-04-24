@@ -88,7 +88,7 @@ module Ruby2D
     # @param [Numeric] y Centre
     # @param [Numeric] radius
     # @param [Numeric] sectors The number of segments to subdivide the circumference.
-    # @param [Numeric] width The thickness of the circle in pixels
+    # @param [Numeric] pen_width The thickness of the circle in pixels
     # @param [Color] color (or +colour+) The fill colour
     def draw_circle(x:, y:, radius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
@@ -153,13 +153,33 @@ module Ruby2D
     # @param [Numeric] y1
     # @param [Numeric] x2
     # @param [Numeric] y2
-    # @param [Numeric] width The line's thickness in pixels; defaults to 1.
+    # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
     def draw_line(x1:, y1:, x2:, y2:, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_line([
         x1, y1, x2, y2, pen_width,
+        clr.r, clr.g, clr.b, clr.a
+      ])
+      update_texture if @update
+    end
+
+    # Draw a poly-line between three points. 
+    # @note A more general purpose method to draw N-point poly-line will eventually replace this method.
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
+    # @param [Color] color (or +colour+) The line colour
+    def draw_polyline3(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour: nil)
+      clr = color || colour
+      clr = Color.new(clr) unless clr.is_a? Color
+      ext_draw_polyline3([
+        x1, y1, x2, y2, x3, y3, pen_width,
         clr.r, clr.g, clr.b, clr.a
       ])
       update_texture if @update

@@ -666,6 +666,66 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
 }
 
 /*
+ * Ruby2D::Canvas#ext_draw_polyline3
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_polyline3(mrb_state* mrb, R_VAL self) {
+  mrb_value a;
+  mrb_get_args(mrb, "o", &a);
+#else
+static R_VAL ruby2d_canvas_ext_draw_polyline3(R_VAL self, R_VAL a) {
+#endif
+  // `a` is the array representing the line
+  //    0,  1,  2,  3,  4,  5,      6,    7, 8, 9, 10
+  // [ x1, y1, x2, y2, x3, y3, thickness, r, g, b, a ]
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  int thickness = NUM2INT(r_ary_entry(a, 6)); 
+  if (thickness == 1) {
+    // use the SDL_Renderer's draw line for single pixel lines
+    SDL_SetRenderDrawColor(render,
+            NUM2DBL(r_ary_entry(a, 7)) * 255, // r
+            NUM2DBL(r_ary_entry(a, 8)) * 255, // g
+            NUM2DBL(r_ary_entry(a, 9)) * 255, // b
+            NUM2DBL(r_ary_entry(a, 10)) * 255  // a
+            );
+    SDL_RenderDrawLine(render, 
+      NUM2INT(r_ary_entry(a, 0)), // x1
+      NUM2INT(r_ary_entry(a, 1)), // y1
+      NUM2INT(r_ary_entry(a, 2)), // x2
+      NUM2INT(r_ary_entry(a, 3))  // y2
+    );
+    SDL_RenderDrawLine(render, 
+      NUM2INT(r_ary_entry(a, 2)), // x2
+      NUM2INT(r_ary_entry(a, 3)), // y2
+      NUM2INT(r_ary_entry(a, 4)), // x3
+      NUM2INT(r_ary_entry(a, 5))  // y3
+    );
+  }
+  else if (thickness > 1) {
+    // use a custom handler to convert a thick line into a 
+    // quad and draw using SDL_Renderer's geometry renderer
+    R2D_Canvas_DrawThickPolyline3(render, 
+      NUM2INT(r_ary_entry(a, 0)), // x1
+      NUM2INT(r_ary_entry(a, 1)), // y1
+      NUM2INT(r_ary_entry(a, 2)), // x2
+      NUM2INT(r_ary_entry(a, 3)), // y2
+      NUM2INT(r_ary_entry(a, 4)), // x3
+      NUM2INT(r_ary_entry(a, 5)), // y3
+      thickness,
+      NUM2DBL(r_ary_entry(a, 7)) * 255, // r
+      NUM2DBL(r_ary_entry(a, 8)) * 255, // g
+      NUM2DBL(r_ary_entry(a, 9)) * 255, // b
+      NUM2DBL(r_ary_entry(a, 10)) * 255  // a
+    );
+  }
+
+  return R_NIL;
+}
+
+/*
  * Ruby2D::Canvas#self.ext_fill_circle
  */
 #if MRUBY
@@ -1753,6 +1813,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_draw_line
   r_define_method(ruby2d_canvas_class, "ext_draw_line", ruby2d_canvas_ext_draw_line, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_draw_line
+  r_define_method(ruby2d_canvas_class, "ext_draw_polyline3", ruby2d_canvas_ext_draw_polyline3, r_args_req(1));
 
   // Ruby2D::Canvas#ext_fill_triangle
   r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
