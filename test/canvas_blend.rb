@@ -29,7 +29,7 @@ canvas.fill_circle(
 
 [1, 3, 5, 7, 9].each do |ix|
   canvas.draw_circle(
-    x: 175, y: 350, radius: 150 - (ix * ix), 
+    x: 175, y: 350, radius: 150 - (ix * ix),
     pen_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
     color: [1, 1, 1, 0.5]
   )
@@ -88,6 +88,14 @@ canvas.fill_quad x1: 500, y1: 200,
                                          [0, 0, 1, 0.5],
                                          [0, 1, 1, 0.5]
                                        ])
+
+canvas.draw_polyline3 x1: 300, y1: 300, x2: 550, y2: 200, x3: 500, y3: 450,
+                      pen_width: 20,
+                      color: [1, 1, 1, 0.5]
+
+canvas.draw_polyline3 x1: 300, y1: 300, x2: 550, y2: 200, x3: 500, y3: 450,
+                      pen_width: 1,
+                      color: [1, 1, 1, 1]
 
 update do
   canvas.update

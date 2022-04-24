@@ -521,6 +521,16 @@ void R2D_Canvas_DrawThickCircle(SDL_Renderer *render,
                        int x, int y, float radius, float sectors, int thickness, 
                        int r, int g, int b, int a);
 
+/*
+ * Draw a thick three-point (two line) polyline, with a mitre join where the two segments
+ * are joined.
+ * @param [int] thickness must be > 1, else does nothing
+ */
+void R2D_Canvas_DrawThickPolyline3(
+  SDL_Renderer *render, 
+  int x1, int y1, int x2, int y2, int x3, int y3, 
+  int thickness, int r, int g, int b, int a);
+
 // Music ///////////////////////////////////////////////////////////////////////
 
 /*
