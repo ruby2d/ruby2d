@@ -89,13 +89,19 @@ canvas.fill_quad x1: 500, y1: 200,
                                          [0, 1, 1, 0.5]
                                        ])
 
-canvas.draw_polyline3 x1: 300, y1: 300, x2: 550, y2: 200, x3: 500, y3: 450,
-                      pen_width: 20,
-                      color: [1, 1, 1, 0.5]
+polyline = [400, 100,
+            500, 200,
+            400, 300,
+            500, 400,
+            600, 100]
 
-canvas.draw_polyline3 x1: 300, y1: 300, x2: 550, y2: 200, x3: 500, y3: 450,
-                      pen_width: 1,
-                      color: [1, 1, 1, 1]
+canvas.draw_polyline coordinates: polyline,
+                     pen_width: 20,
+                     color: [1, 1, 1, 0.5]
+
+canvas.draw_polyline coordinates: polyline,
+                     pen_width: 1,
+                     color: [1, 1, 1, 1]
 
 update do
   canvas.update

@@ -186,34 +186,49 @@ static bool intersect_two_lines(const vector_t *line1_p1,
   return true;
 }
 
+#define POLYLINE_RENDER_NVERTS 6
+#define POLYLINE_RENDER_NINDICES 6
+
 /*
- * Draw a thick three-point (two line) polyline, with a mitre join where the two
+ * Draw a thick N-point polyline, with a mitre join where two
  * segments are joined.
  * @param [int] thickness must be > 1, else does nothing
  */
-void R2D_Canvas_DrawThickPolyline3(SDL_Renderer *render, int x1, int y1, int x2,
-                                   int y2, int x3, int y3, int thickness, int r,
-                                   int g, int b, int a)
+void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
+                                  int num_points, int thickness, int r, int g,
+                                  int b, int a)
 {
   if (thickness <= 1)
+    return;
+  if (num_points < 3)
     return;
 
   float thick_half = thickness / 2.0f;
 
-  // line one: (x1, y1) -> (x2, y2)
-  // line two: (x2, y2) -> (x3, y3)
-  //
+  // Prepare to store the different points used map
+  // the triangles that render the thick polyline
+  SDL_Vertex verts[POLYLINE_RENDER_NVERTS];
+
+  // all points have the same colour so
+  for (int i = 0; i < POLYLINE_RENDER_NVERTS; i++) {
+    verts[i].color = (SDL_Color){.r = r, .g = g, .b = b, .a = a};
+  }
+
+  // the indices into the vertex, always the same two triangles
+  const int indices[] = {
+      0, 1, 2, // left outer triangle
+      0, 2, 3, // left inner triangle
+  };
+
+  // Setup the first segment
+  int x1 = points[0].x, y1 = points[0].y;
+  int x2 = points[1].x, y2 = points[1].y;
+
   // calculate the unit perpendicular for each of the line segments
   vector_t vec_one_perp = {.x = (x2 - x1), .y = (y2 - y1)};
   vector_times_scalar(vector_normalize(vector_perpendicular(&vec_one_perp)),
                       thick_half);
-  vector_t vec_two_perp = {.x = (x3 - x2), .y = (y3 - y2)};
-  vector_times_scalar(vector_normalize(vector_perpendicular(&vec_two_perp)),
-                      thick_half);
 
-  // Prepare to store the different points used map
-  // the triangles that render the thick polyline
-  SDL_Vertex verts[10];
   // left outer bottom
   verts[0].position =
       (SDL_FPoint){.x = x1 + vec_one_perp.x, .y = y1 + vec_one_perp.y};
@@ -226,43 +241,68 @@ void R2D_Canvas_DrawThickPolyline3(SDL_Renderer *render, int x1, int y1, int x2,
   // left inner bottom
   verts[3].position =
       (SDL_FPoint){.x = x1 - vec_one_perp.x, .y = y1 - vec_one_perp.y};
-  // right inner bottom
-  verts[4].position =
-      (SDL_FPoint){.x = x3 - vec_two_perp.x, .y = y3 - vec_two_perp.y};
-  // right outer bottom
-  verts[5].position =
-      (SDL_FPoint){.x = x3 + vec_two_perp.x, .y = y3 + vec_two_perp.y};
 
-  // temporarily calculate the "right inner top" to
-  // figure out the intersection with the "left inner top" which
-  vector_t tmp = {.x = x2 - vec_two_perp.x, .y = y2 - vec_two_perp.y};
-  // find intersection of the left/right inner lines
-  bool has_intersect = intersect_two_lines(
-      &verts[3].position, &verts[2].position, &verts[4].position, &tmp,
-      &verts[2].position // over-write
-  );
+  //
+  // go through each subsequent point to work with the two segments and
+  // figure out how they join, and then render the
+  // left segment.
+  // then shift the vertices left to work on the next and so on
+  // until we have one last segment left after the loop is done
+  for (int pix = 2; pix < num_points; pix++) {
 
-  if (has_intersect) {
-    // adjust the "left outer top" point so that it's distance from (x2, y2) is
-    // the same as the left/right "inner top" intersection we calculated above
-    tmp = (vector_t){.x = x2, .y = y2};
-    vector_minus_vector(&tmp, &verts[2].position);
-    verts[1].position = (SDL_FPoint){.x = x2 + tmp.x, .y = y2 + tmp.y};
+    int x3 = points[pix].x, y3 = points[pix].y;
 
-    // all points have the same colour so
-    int vcount = 6;
-    for (int i = 0; i < vcount; i++) {
-      verts[i].color = (SDL_Color){.r = r, .g = g, .b = b, .a = a};
+    vector_t vec_two_perp = {.x = (x3 - x2), .y = (y3 - y2)};
+    vector_times_scalar(vector_normalize(vector_perpendicular(&vec_two_perp)),
+                        thick_half);
+
+    // right inner bottom
+    verts[4].position =
+        (SDL_FPoint){.x = x3 - vec_two_perp.x, .y = y3 - vec_two_perp.y};
+    // right outer bottom
+    verts[5].position =
+        (SDL_FPoint){.x = x3 + vec_two_perp.x, .y = y3 + vec_two_perp.y};
+
+    // temporarily calculate the "right inner top" to
+    // figure out the intersection with the "left inner top" which
+    vector_t tmp = {.x = x2 - vec_two_perp.x, .y = y2 - vec_two_perp.y};
+    // find intersection of the left/right inner lines
+    bool has_intersect = intersect_two_lines(
+        &verts[3].position, &verts[2].position, &verts[4].position, &tmp,
+        &verts[2].position // over-write
+    );
+
+    if (has_intersect) {
+      // adjust the "left outer top" point so that it's distance from (x2, y2)
+      // is the same as the left/right "inner top" intersection we calculated
+      // above
+      tmp = (vector_t){.x = x2, .y = y2};
+      vector_minus_vector(&tmp, &verts[2].position);
+      verts[1].position = (SDL_FPoint){.x = x2 + tmp.x, .y = y2 + tmp.y};
+
+      // we only render the "left" segment of this particular segment pair
+      SDL_RenderGeometry(render, NULL, verts, POLYLINE_RENDER_NVERTS, indices,
+                         POLYLINE_RENDER_NINDICES);
     }
-    // setup the index array to define the triangles to render
-    int indices[] = {
-        0, 1, 2, // left outer triangle
-        0, 2, 3, // left inner triangle
-        1, 2, 4, // right inner triangle
-        1, 4, 5, // right outer triangle
-    };
-    SDL_RenderGeometry(render, NULL, verts, vcount, indices, 12);
+    // else TODO ... not sure how to handle this yet, but it's a degenerate
+    // case.
+
+    // shift left
+    // i.e. (x2, y2) becomes the first point in the next triple
+    //      (x3, y3) becomes the second point
+    //      and their respective calculated thick corners are shifted as well
+    //      ans t
+    x1 = x2;
+    y1 = y2;
+    x2 = x3;
+    y2 = y3;
+    verts[0].position = verts[1].position;
+    verts[3].position = verts[2].position;
+    verts[2].position = verts[4].position;
+    verts[1].position = verts[5].position;
   }
-  // else no intersection, which is an extreme case which for now
-  // we will ignore and render nothing.
+
+  // we render the last segment.
+  SDL_RenderGeometry(render, NULL, verts, POLYLINE_RENDER_NVERTS, indices,
+                     POLYLINE_RENDER_NINDICES);
 }
