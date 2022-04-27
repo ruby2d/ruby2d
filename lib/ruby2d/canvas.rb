@@ -165,23 +165,17 @@ module Ruby2D
       update_texture if @update
     end
 
-    # Draw a poly-line between three points. 
+    # Draw a poly-line between N points. 
     # @note A more general purpose method to draw N-point poly-line will eventually replace this method.
-    # @param [Numeric] x1
-    # @param [Numeric] y1
-    # @param [Numeric] x2
-    # @param [Numeric] y2
-    # @param [Numeric] x3
-    # @param [Numeric] y3
+    # @param [Array] coordinates An array of numbers x1, y1, x2, y2 ... with at least three coordinates (6 values)
     # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
-    def draw_polyline3(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour: nil)
+    def draw_polyline(coordinates:, pen_width: 1, color: nil, colour: nil)
+      return if coordinates.nil? || coordinates.count < 6
+
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
-      ext_draw_polyline3([
-        x1, y1, x2, y2, x3, y3, pen_width,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+      ext_draw_polyline([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
       update_texture if @update
     end
 

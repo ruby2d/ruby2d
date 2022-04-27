@@ -11,9 +11,11 @@ Square.new(size: 500, color: 'red')
 canvas = Canvas.new(x: 50, y: 50, width: Window.width - 100, height: Window.height - 100, fill: [1, 1, 1, 0.5])
 
 points = [
-  { x: 300, y: 300 },
-  { x: 550, y: 200 },
-  { x: 500, y: 450 }
+  { x: 200, y: 200 },
+  { x: 350, y: 100 },
+  { x: 400, y: 250 },
+  { x: 350, y: 350 },
+  { x: 300, y: 400 }
 ]
 control_index = 2
 
@@ -23,17 +25,19 @@ update do
   points[control_index][:x] = Window.mouse_x - 50
   points[control_index][:y] = Window.mouse_y - 50
 
-  canvas.draw_polyline3 x1: points[0][:x], y1: points[0][:y],
-                        x2: points[1][:x], y2: points[1][:y],
-                        x3: points[2][:x], y3: points[2][:y],
-                        pen_width: 20,
-                        color: [1, 1, 1, 0.5]
+  polyline = [points[0][:x], points[0][:y],
+              points[1][:x], points[1][:y],
+              points[2][:x], points[2][:y],
+              points[3][:x], points[3][:y],
+              points[4][:x], points[4][:y]]
 
-  canvas.draw_polyline3 x1: points[0][:x], y1: points[0][:y],
-                        x2: points[1][:x], y2: points[1][:y],
-                        x3: points[2][:x], y3: points[2][:y],
-                        pen_width: 1,
-                        color: [1, 1, 1, 1]
+  canvas.draw_polyline coordinates: polyline,
+                       pen_width: 20,
+                       color: [1, 1, 1, 0.5]
+
+  canvas.draw_polyline coordinates: polyline,
+                       pen_width: 1,
+                       color: [1, 1, 1, 1]
 end
 
 #
@@ -44,16 +48,14 @@ on :key_down do |event|
   case event.key
   when 'escape'
     close
-  when '0', '1', '2'
-    control_index = event.key.to_i
+  when '1', '2', '3', '4', '5'
+    control_index = event.key.to_i - 1
   end
 end
 
 puts '
 Press Esc to exit.
-Press 0 to select the first point to manipulate
-Press 1 to select second (middle) point
-Press 2 to select third (last) point <-- default
+Press 1, 2, ... to select the first, second ... points to manipulate with the mouse
 '
 
 show
