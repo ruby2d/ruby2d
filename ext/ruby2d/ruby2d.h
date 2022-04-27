@@ -506,6 +506,14 @@ void R2D_FreeSound(R2D_Sound *snd);
 // Canvas //////////////////////////////////////////////////////////////////////
 
 /*
+ * Draw a thick rectangle on a canvas using a pre-converted RGBA colour value.
+ * @param [int] thickness must be > 1, else does nothing
+ */
+void R2D_Canvas_DrawThickRect(SDL_Renderer *render, int x, int y, int width,
+                              int height, int thickness, int r, int g, int b,
+                              int a);
+
+/*
  * Draw a thick line on a canvas using a pre-converted RGBA colour value.
  * @param [int] thickness must be > 1, else does nothing
  */

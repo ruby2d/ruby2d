@@ -137,12 +137,13 @@ module Ruby2D
     # @param [Numeric] y
     # @param [Numeric] width
     # @param [Numeric] height
+    # @param [Numeric] pen_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_rectangle(x:, y:, width:, height:, color: nil, colour: nil)
+    def draw_rectangle(x:, y:, width:, height:, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_rectangle([
-        x, y, width, height,
+        x, y, width, height, pen_width,
         clr.r, clr.g, clr.b, clr.a
       ])
       update_texture if @update
