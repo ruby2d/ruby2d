@@ -20,6 +20,12 @@ canvas = Canvas.new(x: 50, y: 50,
     width: 100, height: 100,
     color: Color.new([0, 1, 0, 0.5])
   )
+  canvas.draw_rectangle(
+    x: 10 + ix * 30, y: 10 + ix * 30,
+    width: 100, height: 100,
+    pen_width: 8,
+    color: Color.new([0, 0, 1, 0.25])
+  )
 end
 
 canvas.fill_circle(

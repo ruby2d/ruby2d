@@ -595,24 +595,41 @@ static R_VAL ruby2d_canvas_ext_draw_rectangle(mrb_state* mrb, R_VAL self) {
 static R_VAL ruby2d_canvas_ext_draw_rectangle(R_VAL self, R_VAL a) {
 #endif
   // `a` is the array representing the rectangle
+  //   0, 1,   2,     3,       4,      5, 6, 7, 8
+  // [ x, y, width, height, thickness, r, g, b, a]
 
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  SDL_Rect rect = { .x = NUM2INT(r_ary_entry(a, 0)),
-                    .y = NUM2INT(r_ary_entry(a, 1)),
-                    .w = NUM2INT(r_ary_entry(a, 2)),
-                    .h = NUM2INT(r_ary_entry(a, 3))
-                    };
+  int thickness = NUM2INT(r_ary_entry(a, 4)); 
+  if (thickness == 1) {
+    SDL_Rect rect = { .x = NUM2INT(r_ary_entry(a, 0)),
+                      .y = NUM2INT(r_ary_entry(a, 1)),
+                      .w = NUM2INT(r_ary_entry(a, 2)),
+                      .h = NUM2INT(r_ary_entry(a, 3))
+                      };
 
-  SDL_SetRenderDrawColor(render,
-          NUM2DBL(r_ary_entry(a, 4)) * 255, // r
-          NUM2DBL(r_ary_entry(a, 5)) * 255, // g
-          NUM2DBL(r_ary_entry(a, 6)) * 255, // b
-          NUM2DBL(r_ary_entry(a, 7)) * 255  // a
-          );
-  SDL_RenderDrawRect(render, &rect);
-
+    SDL_SetRenderDrawColor(render,
+            NUM2DBL(r_ary_entry(a, 5)) * 255, // r
+            NUM2DBL(r_ary_entry(a, 6)) * 255, // g
+            NUM2DBL(r_ary_entry(a, 7)) * 255, // b
+            NUM2DBL(r_ary_entry(a, 8)) * 255  // a
+            );
+    SDL_RenderDrawRect(render, &rect);
+  }
+  else if (thickness > 1) {
+    R2D_Canvas_DrawThickRect(render, 
+      NUM2INT(r_ary_entry(a, 0)), // x
+      NUM2INT(r_ary_entry(a, 1)), // y
+      NUM2INT(r_ary_entry(a, 2)), // width
+      NUM2INT(r_ary_entry(a, 3)), // height
+      thickness,
+      NUM2DBL(r_ary_entry(a, 5)) * 255, // r
+      NUM2DBL(r_ary_entry(a, 6)) * 255, // g
+      NUM2DBL(r_ary_entry(a, 7)) * 255, // b
+      NUM2DBL(r_ary_entry(a, 8)) * 255  // a
+    );
+  }
   return R_NIL;
 }
 

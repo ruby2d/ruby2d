@@ -98,6 +98,57 @@ void R2D_Canvas_DrawThickLine(SDL_Renderer *render, int x1, int y1, int x2,
 }
 
 /*
+ * Draw a thick rectangle on a canvas using a pre-converted RGBA colour value.
+ * @param [int] thickness must be > 1, else does nothing
+ */
+void R2D_Canvas_DrawThickRect(SDL_Renderer *render, int x, int y, int width,
+                              int height, int thickness, int r, int g, int b,
+                              int a)
+{
+  if (thickness <= 1) {
+    return;
+  }
+
+  float half_thick = thickness / 2.0f;
+  SDL_Vertex verts[8];
+
+  // all points have the same colour so
+  verts[0].color = (SDL_Color){.r = r, .g = g, .b = b, .a = a};
+  for (register int i = 1; i < 8; i++) {
+    verts[i].color = verts[0].color;
+  }
+
+  // outer coords
+  verts[0].position = (SDL_FPoint){.x = x - half_thick, .y = y - half_thick};
+  verts[1].position =
+      (SDL_FPoint){.x = x + width + half_thick, .y = y - half_thick};
+  verts[2].position =
+      (SDL_FPoint){.x = x + width + half_thick, .y = y + height + half_thick};
+  verts[3].position =
+      (SDL_FPoint){.x = x - half_thick, .y = y + height + half_thick};
+
+  // inner coords
+  verts[4].position = (SDL_FPoint){.x = x + half_thick, .y = y + half_thick};
+  verts[5].position =
+      (SDL_FPoint){.x = x + width - half_thick, .y = y + half_thick};
+  verts[6].position =
+      (SDL_FPoint){.x = x + width - half_thick, .y = y + height - half_thick};
+  verts[7].position =
+      (SDL_FPoint){.x = x + half_thick, .y = y + height - half_thick};
+
+  int indices[] = {
+      0, 4, 1, // top outer triangle
+      4, 1, 5, //     inner
+      1, 5, 2, // right outer
+      5, 2, 6, //       inner
+      2, 6, 3, // bottom outer
+      6, 3, 7, //        inner
+      3, 7, 0, // left outer
+      7, 0, 4  //      inner
+  };
+  SDL_RenderGeometry(render, NULL, verts, 8, indices, 24);
+}
+/*
  * Draw a thick circle on a canvas using a pre-converted RGBA colour value.
  * @param [int] thickness must be > 1, else does nothing
  */
