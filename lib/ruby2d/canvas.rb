@@ -4,26 +4,28 @@ module Ruby2D
   class Canvas
     include Renderable
 
-    def initialize(opts = {})
-      @x = opts[:x] || 0
-      @y = opts[:y] || 0
-      @z = opts[:z] || 0
-      @width = opts[:width]
-      @height = opts[:height]
-      @rotate = opts[:rotate] || 0
-      @fill = Color.new(opts[:fill] || [0, 0, 0, 0])
-      self.color = opts[:color] || opts[:colour] || 'white'
-      self.color.opacity = opts[:opacity] if opts[:opacity]
-      @update = if opts[:update] == nil then true else opts[:update] end
+    def initialize(width:, height:, x: 0, y: 0, z: 0, rotate: 0,
+                   fill: [0, 0, 0, 0], color: nil, colour: nil, opacity: nil,
+                   update: true, show: true)
+      @x = x
+      @y = y
+      @z = z
+      @width = width
+      @height = height
+      @rotate = rotate
+      @fill = Color.new(fill)
+      self.color = color || colour || 'white'
+      color.opacity = opacity if opacity
+      @update = update
 
-      ext_create([@width, @height, @fill.r, @fill.g, @fill.b, @fill.a])  # sets @ext_pixel_data
+      ext_create([@width, @height, @fill.r, @fill.g, @fill.b, @fill.a]) # sets @ext_pixel_data
       @texture = Texture.new(@ext_pixel_data, @width, @height)
-      unless opts[:show] == false then add end
+      add if show
     end
-    
+
     # Clear the entire canvas, replacing every pixel with fill colour without blending.
-    # @param [Color] fill_color 
-    def clear(fill_color = nil)
+    # @param [Color] fill_color
+    def clear(fill_color = @fill)
       color = fill_color || @fill
       ext_clear([color.r, color.g, color.b, color.a])
       update_texture if @update
@@ -37,7 +39,7 @@ module Ruby2D
     # @param [Numeric] x3
     # @param [Numeric] y3
     # @param [Color, Color::Set] color (or +colour+) Set one or per-vertex colour
-    def fill_triangle(x1:, y1:, x2:, y2:, x3:, y3:, color: nil, colour:nil)
+    def fill_triangle(x1:, y1:, x2:, y2:, x3:, y3:, color: nil, colour: nil)
       clr = color || colour
       if clr.is_a? Color::Set
         c1 = clr[0]
@@ -47,10 +49,10 @@ module Ruby2D
         c1 = c2 = c3 = (clr.is_a?(Color) ? clr : Color.new(clr))
       end
       ext_fill_triangle([
-        x1, y1, c1.r, c1.g, c1.b, c1.a,
-        x2, y2, c2.r, c2.g, c2.b, c2.a,
-        x3, y3, c3.r, c3.g, c3.b, c3.a
-      ])
+                          x1, y1, c1.r, c1.g, c1.b, c1.a,
+                          x2, y2, c2.r, c2.g, c2.b, c2.a,
+                          x3, y3, c3.r, c3.g, c3.b, c3.a
+                        ])
       update_texture if @update
     end
 
@@ -64,7 +66,7 @@ module Ruby2D
     # @param [Numeric] x4
     # @param [Numeric] y4
     # @param [Color, Color::Set] color (or +colour+) Set one or per-vertex colour
-    def fill_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color: nil, colour:nil)
+    def fill_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color: nil, colour: nil)
       clr = color || colour
       if clr.is_a? Color::Set
         c1 = clr[0]
@@ -74,12 +76,10 @@ module Ruby2D
       else
         c1 = c2 = c3 = c4 = (clr.is_a?(Color) ? clr : Color.new(clr))
       end
-      ext_fill_quad([
-        x1, y1, c1.r, c1.g, c1.b, c1.a,
-        x2, y2, c2.r, c2.g, c2.b, c2.a,
-        x3, y3, c3.r, c3.g, c3.b, c3.a,
-        x4, y4, c4.r, c4.g, c4.b, c4.a
-      ])
+      ext_fill_quad([x1, y1, c1.r, c1.g, c1.b, c1.a,
+                     x2, y2, c2.r, c2.g, c2.b, c2.a,
+                     x3, y3, c3.r, c3.g, c3.b, c3.a,
+                     x4, y4, c4.r, c4.g, c4.b, c4.a])
       update_texture if @update
     end
 
@@ -94,9 +94,9 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_circle([
-        x, y, radius, sectors, pen_width,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+                        x, y, radius, sectors, pen_width,
+                        clr.r, clr.g, clr.b, clr.a
+                      ])
       update_texture if @update
     end
 
@@ -110,9 +110,9 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_fill_circle([
-        x, y, radius, sectors,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+                        x, y, radius, sectors,
+                        clr.r, clr.g, clr.b, clr.a
+                      ])
       update_texture if @update
     end
 
@@ -126,9 +126,9 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_fill_rectangle([
-        x, y, width, height,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+                           x, y, width, height,
+                           clr.r, clr.g, clr.b, clr.a
+                         ])
       update_texture if @update
     end
 
@@ -141,10 +141,10 @@ module Ruby2D
     # @param [Numeric] y3
     # @param [Numeric] pen_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_triangle(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour:nil)
-      draw_polyline closed:true, 
-                        coordinates: [x1, y1, x2, y2, x3, y3],
-                        color: color, colour: colour, pen_width: pen_width
+    def draw_triangle(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour: nil)
+      draw_polyline closed: true,
+                    coordinates: [x1, y1, x2, y2, x3, y3],
+                    color: color, colour: colour, pen_width: pen_width
     end
 
     # Draw an outline of a quad.
@@ -158,10 +158,10 @@ module Ruby2D
     # @param [Numeric] y4
     # @param [Numeric] pen_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, pen_width: 1, color: nil, colour:nil)
-      draw_polyline closed:true, 
-                        coordinates: [x1, y1, x2, y2, x3, y3, x4, y4],
-                        color: color, colour: colour, pen_width: pen_width
+    def draw_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, pen_width: 1, color: nil, colour: nil)
+      draw_polyline closed: true,
+                    coordinates: [x1, y1, x2, y2, x3, y3, x4, y4],
+                    color: color, colour: colour, pen_width: pen_width
     end
 
     # Draw an outline of a rectangle
@@ -175,9 +175,9 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_rectangle([
-        x, y, width, height, pen_width,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+                           x, y, width, height, pen_width,
+                           clr.r, clr.g, clr.b, clr.a
+                         ])
       update_texture if @update
     end
 
@@ -192,13 +192,13 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_line([
-        x1, y1, x2, y2, pen_width,
-        clr.r, clr.g, clr.b, clr.a
-      ])
+                      x1, y1, x2, y2, pen_width,
+                      clr.r, clr.g, clr.b, clr.a
+                    ])
       update_texture if @update
     end
 
-    # Draw a poly-line between N points. 
+    # Draw a poly-line between N points.
     # @note A more general purpose method to draw N-point poly-line will eventually replace this method.
     # @param [Array] coordinates An array of numbers x1, y1, x2, y2 ... with at least three coordinates (6 values)
     # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
@@ -210,9 +210,9 @@ module Ruby2D
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       if closed
-        ext_draw_polygon([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
+        ext_draw_polygon([pen_width, clr.r, clr.g, clr.b, clr.a], coordinates)
       else
-        ext_draw_polyline([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
+        ext_draw_polyline([pen_width, clr.r, clr.g, clr.b, clr.a], coordinates)
       end
       update_texture if @update
     end
@@ -235,6 +235,5 @@ module Ruby2D
         vertices.coordinates, vertices.texture_coordinates, color
       )
     end
-
   end
 end
