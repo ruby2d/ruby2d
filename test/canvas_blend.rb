@@ -63,6 +63,8 @@ end
 
 canvas.fill_triangle x1: 100, y1: 100, x2: 200, y2: 150, x3: 150, y3: 400,
                      color: [1, 1, 1, 0.5]
+canvas.draw_triangle x1: 100 - 5, y1: 100 - 5, x2: 200 + 5, y2: 150 - 5, x3: 150, y3: 400 + 5,
+                     color: [1, 1, 1, 0.75], pen_width: 10
 
 canvas.fill_triangle x1: 250, y1: 100, x2: 350, y2: 150, x3: 300, y3: 400,
                      color: Color::Set.new([[1, 0, 0, 0.5],
@@ -83,6 +85,12 @@ canvas.fill_quad x1: 400, y1: 200,
 canvas.fill_circle x: 450, y: 250,
                    radius: 100,
                    color: [0, 0.7, 1, 0.3]
+
+canvas.draw_quad x1: 500 - 5, y1: 200 - 5,
+                 x2: 550 + 5, y2: 150 - 5,
+                 x3: 600 + 5, y3: 300,
+                 x4: 550, y4: 400 + 5,
+                 color: [1, 1, 1, 0.75], pen_width: 5
 
 canvas.fill_quad x1: 500, y1: 200,
                  x2: 550, y2: 150,
@@ -108,6 +116,15 @@ canvas.draw_polyline coordinates: polyline,
 canvas.draw_polyline coordinates: polyline,
                      pen_width: 1,
                      color: [1, 1, 1, 1]
+
+polygon = [500, 100,
+           600, 200,
+           500, 300,
+           300, 300]
+
+canvas.draw_polyline coordinates: polygon,
+                     pen_width: 20, closed: true,
+                     color: [0, 1, 1, 0.25]
 
 update do
   canvas.update

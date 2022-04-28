@@ -18,6 +18,7 @@ points = [
   { x: 300, y: 400 }
 ]
 control_index = 2
+closed_shape = false
 
 update do
   canvas.clear
@@ -33,11 +34,13 @@ update do
 
   canvas.draw_polyline coordinates: polyline,
                        pen_width: 20,
-                       color: [1, 1, 1, 0.5]
+                       color: [1, 1, 1, 0.5],
+                       closed: closed_shape
 
   canvas.draw_polyline coordinates: polyline,
                        pen_width: 1,
-                       color: [1, 1, 1, 1]
+                       color: [1, 1, 1, 1],
+                       closed: closed_shape
 end
 
 #
@@ -48,6 +51,8 @@ on :key_down do |event|
   case event.key
   when 'escape'
     close
+  when 'c'
+    closed_shape = !closed_shape
   when '1', '2', '3', '4', '5'
     control_index = event.key.to_i - 1
   end
@@ -55,6 +60,7 @@ end
 
 puts '
 Press Esc to exit.
+Press C or c to toggle closing the polyline (i.e. polyine vs polygon)
 Press 1, 2, ... to select the first, second ... points to manipulate with the mouse
 '
 

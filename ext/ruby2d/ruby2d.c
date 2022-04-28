@@ -683,6 +683,8 @@ static R_VAL ruby2d_canvas_ext_draw_line(R_VAL self, R_VAL a) {
   return R_NIL;
 }
 
+#define MAX_POLY_POINTS 64
+
 /*
  * Ruby2D::Canvas#ext_draw_polyline
  */
@@ -728,14 +730,14 @@ static R_VAL ruby2d_canvas_ext_draw_polyline(R_VAL self, R_VAL config, R_VAL coo
     // use a custom handler to convert a thick line into a 
     // quad and draw using SDL_Renderer's geometry renderer
 
-    SDL_FPoint points[64];
+    SDL_FPoint points[MAX_POLY_POINTS];
     int num_points = 0;
 
     points[num_points++] = (SDL_FPoint) { 
       .x = NUM2INT(r_ary_entry(coords, 0)), 
       .y = NUM2INT(r_ary_entry(coords, 1))
     };
-    for (int i = 2; i < coord_count && num_points < 64; i+= 2) {
+    for (int i = 2; i < coord_count && num_points < MAX_POLY_POINTS; i+= 2) {
       points[num_points++] = (SDL_FPoint) { 
         .x = NUM2INT(r_ary_entry(coords, i)), 
         .y = NUM2INT(r_ary_entry(coords, i+1)) };
@@ -746,12 +748,96 @@ static R_VAL ruby2d_canvas_ext_draw_polyline(R_VAL self, R_VAL config, R_VAL coo
       NUM2DBL(r_ary_entry(config, 1)) * 255, // r
       NUM2DBL(r_ary_entry(config, 2)) * 255, // g
       NUM2DBL(r_ary_entry(config, 3)) * 255, // b
-      NUM2DBL(r_ary_entry(config, 4)) * 255  // a
+      NUM2DBL(r_ary_entry(config, 4)) * 255, // a
+      false // don't skip first/last
     );
   }
 
   return R_NIL;
 }
+
+/*
+ * Ruby2D::Canvas#ext_draw_polygon
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_polygon(mrb_state* mrb, R_VAL self) {
+  mrb_value config, coords;
+  mrb_get_args(mrb, "oo", &config, &coords);
+#else
+static R_VAL ruby2d_canvas_ext_draw_polygon(R_VAL self, R_VAL config, R_VAL coords) {
+#endif
+  // `config` is an array
+  //       0,        1, 2, 3, 4
+  //    [ thickness, r, g, b, a ]
+  //
+  // `coords` is an array of x, y values
+  //       0,  1,  2,  3, ...
+  //    [ x1, y1, x2, y2, ... ]
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  int coord_count = RARRAY_LEN(coords);
+  int thickness = NUM2INT(r_ary_entry(config, 0)); 
+  if (thickness == 1) {
+    // use the SDL_Renderer's draw line for single pixel lines
+    SDL_SetRenderDrawColor(render,
+            NUM2DBL(r_ary_entry(config, 1)) * 255, // r
+            NUM2DBL(r_ary_entry(config, 2)) * 255, // g
+            NUM2DBL(r_ary_entry(config, 3)) * 255, // b
+            NUM2DBL(r_ary_entry(config, 4)) * 255  // a
+            );
+    int x1 = NUM2INT(r_ary_entry(coords, 0));
+    int y1 = NUM2INT(r_ary_entry(coords, 1));
+    for (int i = 2; i < coord_count; i+= 2) {
+      int x2 = NUM2INT(r_ary_entry(coords, i));
+      int y2 = NUM2INT(r_ary_entry(coords, i+1));
+      SDL_RenderDrawLine(render, x1, y1, x2, y2);
+      x1 = x2;
+      y1 = y2;
+    }
+    // connect back to first point to close the shape
+    int x2 = NUM2INT(r_ary_entry(coords, 0));
+    int y2 = NUM2INT(r_ary_entry(coords, 1));
+    SDL_RenderDrawLine(render, x1, y1, x2, y2);
+  }
+  else if (thickness > 1) {
+    // use a custom handler to convert a thick line into a 
+    // quad and draw using SDL_Renderer's geometry renderer
+
+    SDL_FPoint points[MAX_POLY_POINTS+3];  // three extra slots to points 0, 1, 2
+    int num_points = 0;
+
+    points[num_points++] = (SDL_FPoint) { 
+      .x = NUM2INT(r_ary_entry(coords, 0)), 
+      .y = NUM2INT(r_ary_entry(coords, 1))
+    };
+    for (int i = 2; i < coord_count && num_points < MAX_POLY_POINTS; i+= 2) {
+      points[num_points++] = (SDL_FPoint) { 
+        .x = NUM2INT(r_ary_entry(coords, i)), 
+        .y = NUM2INT(r_ary_entry(coords, i+1)) };
+    }
+    // repeat first three coordinates at the end
+    points[num_points++] = points[0];
+    points[num_points++] = points[1];
+    points[num_points++] = points[2];
+    // use polyline draw but ask it to skip first and last segments
+    // since we added three more points at the end, these produce the
+    // missing segments with proper joins
+    R2D_Canvas_DrawThickPolyline(render,
+      points, num_points,
+      thickness,
+      NUM2DBL(r_ary_entry(config, 1)) * 255, // r
+      NUM2DBL(r_ary_entry(config, 2)) * 255, // g
+      NUM2DBL(r_ary_entry(config, 3)) * 255, // b
+      NUM2DBL(r_ary_entry(config, 4)) * 255, // a
+      true // skip first/last segments when drawing the polyline
+    );
+  }
+
+  return R_NIL;
+}
+
 
 /*
  * Ruby2D::Canvas#self.ext_fill_circle
@@ -1844,6 +1930,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_draw_polyline
   r_define_method(ruby2d_canvas_class, "ext_draw_polyline", ruby2d_canvas_ext_draw_polyline, r_args_req(2));
+
+  // Ruby2D::Canvas#ext_draw_polygon
+  r_define_method(ruby2d_canvas_class, "ext_draw_polygon", ruby2d_canvas_ext_draw_polygon, r_args_req(2));
 
   // Ruby2D::Canvas#ext_fill_triangle
   r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
