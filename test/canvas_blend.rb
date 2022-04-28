@@ -33,11 +33,24 @@ canvas.fill_circle(
   color: [0.9, 0.9, 0.9, 0.3]
 )
 
-[1, 3, 5, 7, 9].each do |ix|
+canvas.fill_ellipse(
+  x: 475, y: 50, xradius: 50, yradius: 35,
+  color: [0.9, 0.7, 0.5, 0.6]
+)
+
+[1, 5, 9].each do |ix|
   canvas.draw_circle(
     x: 175, y: 350, radius: 150 - (ix * ix),
     pen_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
     color: [1, 1, 1, 0.5]
+  )
+end
+
+[3, 7].each do |ix|
+  canvas.draw_ellipse(
+    x: 175, y: 350, xradius: 150 - (ix * ix), yradius: 100 - (ix * ix),
+    pen_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
+    color: [0.8, 1, 0.6, 0.5]
   )
 end
 

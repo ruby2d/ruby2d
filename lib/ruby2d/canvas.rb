@@ -93,10 +93,28 @@ module Ruby2D
     def draw_circle(x:, y:, radius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
-      ext_draw_circle([
-                        x, y, radius, sectors, pen_width,
-                        clr.r, clr.g, clr.b, clr.a
-                      ])
+      ext_draw_ellipse([
+                         x, y, radius, radius, sectors, pen_width,
+                         clr.r, clr.g, clr.b, clr.a
+                       ])
+      update_texture if @update
+    end
+
+    # Draw an ellipse
+    # @param [Numeric] x Centre
+    # @param [Numeric] y Centre
+    # @param [Numeric] xradius
+    # @param [Numeric] yradius
+    # @param [Numeric] sectors The number of segments to subdivide the circumference.
+    # @param [Numeric] pen_width The thickness of the circle in pixels
+    # @param [Color] color (or +colour+) The fill colour
+    def draw_ellipse(x:, y:, xradius:, yradius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
+      clr = color || colour
+      clr = Color.new(clr) unless clr.is_a? Color
+      ext_draw_ellipse([
+                         x, y, xradius, yradius, sectors, pen_width,
+                         clr.r, clr.g, clr.b, clr.a
+                       ])
       update_texture if @update
     end
 
@@ -109,10 +127,27 @@ module Ruby2D
     def fill_circle(x:, y:, radius:, sectors: 30, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
-      ext_fill_circle([
-                        x, y, radius, sectors,
-                        clr.r, clr.g, clr.b, clr.a
-                      ])
+      ext_fill_ellipse([
+                         x, y, radius, radius, sectors,
+                         clr.r, clr.g, clr.b, clr.a
+                       ])
+      update_texture if @update
+    end
+
+    # Draw a filled ellipse.
+    # @param [Numeric] x Centre
+    # @param [Numeric] y Centre
+    # @param [Numeric] xradius
+    # @param [Numeric] yradius
+    # @param [Numeric] sectors The number of segments to subdivide the circumference.
+    # @param [Color] color (or +colour+) The fill colour
+    def fill_ellipse(x:, y:, xradius:, yradius:, sectors: 30, color: nil, colour: nil)
+      clr = color || colour
+      clr = Color.new(clr) unless clr.is_a? Color
+      ext_fill_ellipse([
+                         x, y, xradius, yradius, sectors,
+                         clr.r, clr.g, clr.b, clr.a
+                       ])
       update_texture if @update
     end
 
