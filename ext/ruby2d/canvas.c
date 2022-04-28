@@ -228,7 +228,6 @@ static bool intersect_two_lines(const vector_t *line1_p1,
   vector_t theta = {.x = line1_p1->x - line2_p1->x,
                     .y = line1_p1->y - line2_p1->y};
   float alpha_numerator = beta.y * theta.x - (beta.x * theta.y);
-  // float beta_numerator = alpha.x * theta.y - (alpha.y * theta.x);
 
   intersection->x = alpha.x;
   intersection->y = alpha.y;
@@ -247,7 +246,7 @@ static bool intersect_two_lines(const vector_t *line1_p1,
  */
 void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
                                   int num_points, int thickness, int r, int g,
-                                  int b, int a)
+                                  int b, int a, bool skip_first_last)
 {
   if (thickness <= 1)
     return;
@@ -302,6 +301,8 @@ void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
   for (int pix = 2; pix < num_points; pix++) {
 
     int x3 = points[pix].x, y3 = points[pix].y;
+    if (x3 == x2 && y3 == y2)
+      continue;
 
     vector_t vec_two_perp = {.x = (x3 - x2), .y = (y3 - y2)};
     vector_times_scalar(vector_normalize(vector_perpendicular(&vec_two_perp)),
@@ -319,24 +320,29 @@ void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
     vector_t tmp = {.x = x2 - vec_two_perp.x, .y = y2 - vec_two_perp.y};
     // find intersection of the left/right inner lines
     bool has_intersect = intersect_two_lines(
-        &verts[3].position, &verts[2].position, &verts[4].position, &tmp,
-        &verts[2].position // over-write
+        &verts[3].position, &verts[2].position, // left inner line
+        &verts[4].position, &tmp,               // right inner line
+        &verts[2].position                      // over-write with intersection
     );
 
     if (has_intersect) {
+      // not collinear
       // adjust the "left outer top" point so that it's distance from (x2, y2)
       // is the same as the left/right "inner top" intersection we calculated
       // above
       tmp = (vector_t){.x = x2, .y = y2};
       vector_minus_vector(&tmp, &verts[2].position);
       verts[1].position = (SDL_FPoint){.x = x2 + tmp.x, .y = y2 + tmp.y};
-
+    }
+    //
+    // TODO: handle degenerate case that can result in crazy long mitre join
+    // point
+    //
+    if (pix > 2 || !skip_first_last) {
       // we only render the "left" segment of this particular segment pair
       SDL_RenderGeometry(render, NULL, verts, POLYLINE_RENDER_NVERTS, indices,
                          POLYLINE_RENDER_NINDICES);
     }
-    // else TODO ... not sure how to handle this yet, but it's a degenerate
-    // case.
 
     // shift left
     // i.e. (x2, y2) becomes the first point in the next triple
@@ -353,7 +359,9 @@ void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
     verts[1].position = verts[5].position;
   }
 
-  // we render the last segment.
-  SDL_RenderGeometry(render, NULL, verts, POLYLINE_RENDER_NVERTS, indices,
-                     POLYLINE_RENDER_NINDICES);
+  if (!skip_first_last) {
+    // we render the last segment.
+    SDL_RenderGeometry(render, NULL, verts, POLYLINE_RENDER_NVERTS, indices,
+                       POLYLINE_RENDER_NINDICES);
+  }
 }

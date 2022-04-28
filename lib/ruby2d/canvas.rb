@@ -132,6 +132,38 @@ module Ruby2D
       update_texture if @update
     end
 
+    # Draw an outline of a triangle.
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] pen_width The thickness of the rectangle in pixels
+    # @param [Color] color (or +colour+) The line colour
+    def draw_triangle(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour:nil)
+      draw_polyline closed:true, 
+                        coordinates: [x1, y1, x2, y2, x3, y3],
+                        color: color, colour: colour, pen_width: pen_width
+    end
+
+    # Draw an outline of a quad.
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] x4
+    # @param [Numeric] y4
+    # @param [Numeric] pen_width The thickness of the rectangle in pixels
+    # @param [Color] color (or +colour+) The line colour
+    def draw_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, pen_width: 1, color: nil, colour:nil)
+      draw_polyline closed:true, 
+                        coordinates: [x1, y1, x2, y2, x3, y3, x4, y4],
+                        color: color, colour: colour, pen_width: pen_width
+    end
+
     # Draw an outline of a rectangle
     # @param [Numeric] x
     # @param [Numeric] y
@@ -171,12 +203,17 @@ module Ruby2D
     # @param [Array] coordinates An array of numbers x1, y1, x2, y2 ... with at least three coordinates (6 values)
     # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
-    def draw_polyline(coordinates:, pen_width: 1, color: nil, colour: nil)
+    # @param [Boolean] closed Use +true+ to draw this as a closed shape
+    def draw_polyline(coordinates:, pen_width: 1, color: nil, colour: nil, closed: false)
       return if coordinates.nil? || coordinates.count < 6
 
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
-      ext_draw_polyline([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
+      if closed
+        ext_draw_polygon([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
+      else
+        ext_draw_polyline([pen_width,clr.r, clr.g, clr.b, clr.a], coordinates)
+      end
       update_texture if @update
     end
 

@@ -533,10 +533,11 @@ void R2D_Canvas_DrawThickCircle(SDL_Renderer *render,
  * Draw a thick N-point polyline, with a mitre join where two
  * segments are joined.
  * @param [int] thickness must be > 1, else does nothing
+ * @param [bool] skip_first_last use false for polyline, true for polygon when specifying first, second points again at the end
  */
 void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
                                   int num_points, int thickness, int r, int g,
-                                  int b, int a);
+                                  int b, int a, bool skip_first_last);
 
 // Music ///////////////////////////////////////////////////////////////////////
 
