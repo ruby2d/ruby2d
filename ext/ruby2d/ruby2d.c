@@ -840,17 +840,18 @@ static R_VAL ruby2d_canvas_ext_draw_polygon(R_VAL self, R_VAL config, R_VAL coor
 
 
 /*
- * Ruby2D::Canvas#self.ext_fill_circle
+ * Ruby2D::Canvas#self.ext_fill_ellipse
  */
 #if MRUBY
-static R_VAL ruby2d_canvas_ext_fill_circle(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_canvas_ext_fill_ellipse(mrb_state* mrb, R_VAL self) {
   mrb_value a;
   mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
+static R_VAL ruby2d_canvas_ext_fill_ellipse(R_VAL self, R_VAL a) {
 #endif
   // `a` is the array representing the filled circle
-  // [ x, y, radius, sectors, r, g, b, a ]
+  //   0  1     2        3        4     5  6  7  8
+  // [ x, y, xradius, yradius, sectors, r, g, b, a ]
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
@@ -862,30 +863,32 @@ static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
     .y = y = NUM2INT(r_ary_entry(a,  1)) 
   };
   // dimensions
-  float radius = NUM2INT(r_ary_entry(a,  2));
-  float sectors = NUM2INT(r_ary_entry(a,  3));
-  float angle = 2 * M_PI / sectors;
+  float xradius = NUM2INT(r_ary_entry(a,  2));
+  float yradius = NUM2INT(r_ary_entry(a,  3));
+  float sectors = NUM2INT(r_ary_entry(a,  4));
+  float unit_angle = 2 * M_PI / sectors;
 
   // colour all vertices
   verts[1].color = verts[2].color = verts[0].color = (SDL_Color) {
-      .r = NUM2DBL(r_ary_entry(a, 4)) * 255,
-      .g = NUM2DBL(r_ary_entry(a, 5)) * 255,
-      .b = NUM2DBL(r_ary_entry(a, 6)) * 255,
-      .a = NUM2DBL(r_ary_entry(a, 7)) * 255,
+      .r = NUM2DBL(r_ary_entry(a, 5)) * 255,
+      .g = NUM2DBL(r_ary_entry(a, 6)) * 255,
+      .b = NUM2DBL(r_ary_entry(a, 7)) * 255,
+      .a = NUM2DBL(r_ary_entry(a, 8)) * 255,
   };
 
   // point at 0 radians
   verts[1].position = (SDL_FPoint) { 
-    .x = x + radius * cosf(0), 
-    .y = y + radius * sinf(0)
+    .x = x + xradius * cosf(0), 
+    .y = y + yradius * sinf(0)
   };
   for (float i = 1; i <= sectors; i++) {
+    float angle = i * unit_angle;
     // re-use from previous calculation
     verts[2].position = verts[1].position;
     // calculate new point
     verts[1].position = (SDL_FPoint) { 
-      .x = x + radius * cosf(i * angle), 
-      .y = y + radius * sinf(i * angle)
+      .x = x + xradius * cosf(angle), 
+      .y = y + yradius * sinf(angle)
     };
     SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
   }
@@ -894,20 +897,21 @@ static R_VAL ruby2d_canvas_ext_fill_circle(R_VAL self, R_VAL a) {
 }
 
 /*
- * Ruby2D::Canvas#self.ext_draw_circle
+ * Ruby2D::Canvas#self.ext_draw_ellipse
  */
 #if MRUBY
-static R_VAL ruby2d_canvas_ext_draw_circle(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_canvas_ext_draw_ellipse(mrb_state* mrb, R_VAL self) {
   mrb_value a;
   mrb_get_args(mrb, "o", &a);
 #else
-static R_VAL ruby2d_canvas_ext_draw_circle(R_VAL self, R_VAL a) {
+static R_VAL ruby2d_canvas_ext_draw_ellipse(R_VAL self, R_VAL a) {
 #endif
-  // `a` is the array representing the drawn circle
-  // [ x, y, radius, sectors, thickness, r, g, b, a ]
+  // `a` is the array representing the ellipse to draw
+  //   0  1     2        3        4         5      6  7  8  9
+  // [ x, y, xradius, yradius, sectors, thickness, r, g, b, a ]
 
   // thickness
-  int thickness = NUM2INT(r_ary_entry(a,  4));
+  int thickness = NUM2INT(r_ary_entry(a,  5));
   if (thickness <= 0) return R_NIL;
 
   SDL_Renderer *render;
@@ -917,35 +921,24 @@ static R_VAL ruby2d_canvas_ext_draw_circle(R_VAL self, R_VAL a) {
   float x = NUM2INT(r_ary_entry(a,  0));
   float y = NUM2INT(r_ary_entry(a,  1)) ;
   // dimensions
-  float radius = NUM2INT(r_ary_entry(a,  2));
-  float sectors = NUM2INT(r_ary_entry(a,  3));
+  float xradius = NUM2INT(r_ary_entry(a,  2));
+  float yradius = NUM2INT(r_ary_entry(a,  3));
+  float sectors = NUM2INT(r_ary_entry(a,  4));
   // colors
-  int clr_r = NUM2DBL(r_ary_entry(a, 5)) * 255;
-  int clr_g = NUM2DBL(r_ary_entry(a, 6)) * 255;
-  int clr_b = NUM2DBL(r_ary_entry(a, 7)) * 255;
-  int clr_a = NUM2DBL(r_ary_entry(a, 8)) * 255;
+  int clr_r = NUM2DBL(r_ary_entry(a, 6)) * 255;
+  int clr_g = NUM2DBL(r_ary_entry(a, 7)) * 255;
+  int clr_b = NUM2DBL(r_ary_entry(a, 8)) * 255;
+  int clr_a = NUM2DBL(r_ary_entry(a, 9)) * 255;
   
   if (thickness > 1) {
-    R2D_Canvas_DrawThickCircle(render, 
-      x, y, radius, sectors, thickness,
+    R2D_Canvas_DrawThickEllipse(render, 
+      x, y, xradius, yradius, sectors, thickness,
       clr_r, clr_g, clr_b, clr_a);
   }
   else {
-    // draw single pixel circle by drawing line segments
-    float x1 = x + radius * cosf(0);
-    float y1 = y + radius * sinf(0);
-    float angle = 2 * M_PI / sectors;
-    SDL_SetRenderDrawColor(render, clr_r, clr_g, clr_b, clr_a);
-    for (float i = 1; i <= sectors; i++) {
-      // re-use from previous calculation
-      float x2 = x1;
-      float y2 = y1;
-      // calculate new point
-      x1 = x + radius * cosf(i * angle);
-      y1 = y + radius * sinf(i * angle);
-      SDL_RenderDrawLine(render, x1, y1, x2, y2);
-    }
-
+    R2D_Canvas_DrawThinEllipse(render, 
+      x, y, xradius, yradius, sectors,
+      clr_r, clr_g, clr_b, clr_a);
   }
 
   return R_NIL;
@@ -1937,11 +1930,11 @@ void Init_ruby2d() {
   // Ruby2D::Canvas#ext_fill_triangle
   r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
 
-  // Ruby2D::Canvas#ext_fill_circle
-  r_define_method(ruby2d_canvas_class, "ext_fill_circle", ruby2d_canvas_ext_fill_circle, r_args_req(1));
+  // Ruby2D::Canvas#ext_fill_ellipse
+  r_define_method(ruby2d_canvas_class, "ext_fill_ellipse", ruby2d_canvas_ext_fill_ellipse, r_args_req(1));
 
-  // Ruby2D::Canvas#ext_draw_circle
-  r_define_method(ruby2d_canvas_class, "ext_draw_circle", ruby2d_canvas_ext_draw_circle, r_args_req(1));
+  // Ruby2D::Canvas#ext_draw_ellipse
+  r_define_method(ruby2d_canvas_class, "ext_draw_ellipse", ruby2d_canvas_ext_draw_ellipse, r_args_req(1));
 
   // Ruby2D::Canvas#ext_fill_quad
   r_define_method(ruby2d_canvas_class, "ext_fill_quad", ruby2d_canvas_ext_fill_quad, r_args_req(1));

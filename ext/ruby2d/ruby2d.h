@@ -522,12 +522,20 @@ void R2D_Canvas_DrawThickLine(SDL_Renderer *render,
                        int r, int g, int b, int a);
 
 /*
- * Draw a thick circle on a canvas using a pre-converted RGBA colour value.
+ * Draw a thin (single pixel) ellipse on a canvas using a pre-converted RGBA
+ * colour value.
+ */
+void R2D_Canvas_DrawThinEllipse(SDL_Renderer *render, int x, int y,
+                                float xradius, float yradius, float sectors,
+                                int r, int g, int b, int a);
+
+/*
+ * Draw a thick ellipse on a canvas using a pre-converted RGBA colour value.
  * @param [int] thickness must be > 1, else does nothing
  */
-void R2D_Canvas_DrawThickCircle(SDL_Renderer *render, 
-                       int x, int y, float radius, float sectors, int thickness, 
-                       int r, int g, int b, int a);
+void R2D_Canvas_DrawThickEllipse(SDL_Renderer *render, int x, int y,
+                                 float xradius, float yradius, float sectors,
+                                 int thickness, int r, int g, int b, int a);
 
 /*
  * Draw a thick N-point polyline, with a mitre join where two

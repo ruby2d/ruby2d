@@ -148,13 +148,14 @@ void R2D_Canvas_DrawThickRect(SDL_Renderer *render, int x, int y, int width,
   };
   SDL_RenderGeometry(render, NULL, verts, 8, indices, 24);
 }
+
 /*
- * Draw a thick circle on a canvas using a pre-converted RGBA colour value.
+ * Draw a thick ellipse on a canvas using a pre-converted RGBA colour value.
  * @param [int] thickness must be > 1, else does nothing
  */
-void R2D_Canvas_DrawThickCircle(SDL_Renderer *render, int x, int y,
-                                float radius, float sectors, int thickness,
-                                int r, int g, int b, int a)
+void R2D_Canvas_DrawThickEllipse(SDL_Renderer *render, int x, int y,
+                                 float xradius, float yradius, float sectors,
+                                 int thickness, int r, int g, int b, int a)
 {
   if (thickness <= 1) {
     return;
@@ -168,30 +169,58 @@ void R2D_Canvas_DrawThickCircle(SDL_Renderer *render, int x, int y,
   verts[3].color = verts[2].color = verts[1].color = verts[0].color =
       (SDL_Color){.r = r, .g = g, .b = b, .a = a};
   float half_thick = thickness / 2.0f;
-  float outer_radius = radius + half_thick;
-  float inner_radius = radius - half_thick;
+  SDL_FPoint outer_radius = {.x = xradius + half_thick,
+                             .y = yradius + half_thick};
+  SDL_FPoint inner_radius = {.x = xradius - half_thick,
+                             .y = yradius - half_thick};
   float cache_cosf = cosf(0), cache_sinf = sinf(0);
-  float angle = 2 * M_PI / sectors;
+  float unit_angle = 2 * M_PI / sectors;
 
   int indices[] = {0, 1, 3, 3, 1, 2};
 
   // point at 0 radians
-  verts[0].position = (SDL_FPoint){.x = x + outer_radius * cache_cosf,
-                                   .y = y + outer_radius * cache_sinf};
-  verts[3].position = (SDL_FPoint){.x = x + inner_radius * cache_cosf,
-                                   .y = y + inner_radius * cache_sinf};
+  verts[0].position = (SDL_FPoint){.x = x + outer_radius.x * cache_cosf,
+                                   .y = y + outer_radius.y * cache_sinf};
+  verts[3].position = (SDL_FPoint){.x = x + inner_radius.x * cache_cosf,
+                                   .y = y + inner_radius.y * cache_sinf};
   for (float i = 1; i <= sectors; i++) {
+    float angle = i * unit_angle;
     // re-use index 0 and 3 from previous calculation
     verts[1].position = verts[0].position;
     verts[2].position = verts[3].position;
     // calculate new index 0 and 3 values
-    cache_cosf = cosf(i * angle);
-    cache_sinf = sinf(i * angle);
-    verts[0].position = (SDL_FPoint){.x = x + outer_radius * cache_cosf,
-                                     .y = y + outer_radius * cache_sinf};
-    verts[3].position = (SDL_FPoint){.x = x + inner_radius * cache_cosf,
-                                     .y = y + inner_radius * cache_sinf};
+    cache_cosf = cosf(angle);
+    cache_sinf = sinf(angle);
+    verts[0].position = (SDL_FPoint){.x = x + outer_radius.x * cache_cosf,
+                                     .y = y + outer_radius.y * cache_sinf};
+    verts[3].position = (SDL_FPoint){.x = x + inner_radius.x * cache_cosf,
+                                     .y = y + inner_radius.y * cache_sinf};
     SDL_RenderGeometry(render, NULL, verts, 4, indices, 6);
+  }
+}
+
+/*
+ * Draw a thin (single pixel) ellipse on a canvas using a pre-converted RGBA
+ * colour value.
+ */
+void R2D_Canvas_DrawThinEllipse(SDL_Renderer *render, int x, int y,
+                                float xradius, float yradius, float sectors,
+                                int r, int g, int b, int a)
+{
+  float unit_angle = 2 * M_PI / sectors;
+  // point at 0 radians
+  float x1 = x + xradius * cosf(0);
+  float y1 = y + yradius * sinf(0);
+  SDL_SetRenderDrawColor(render, r, g, b, a);
+  for (float i = 1; i <= sectors; i++) {
+    float angle = i * unit_angle;
+    // re-use from previous calculation
+    float x2 = x1;
+    float y2 = y1;
+    // calculate new point
+    x1 = x + xradius * cosf(angle);
+    y1 = y + yradius * sinf(angle);
+    SDL_RenderDrawLine(render, x1, y1, x2, y2);
   }
 }
 
