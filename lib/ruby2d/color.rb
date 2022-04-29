@@ -1,20 +1,39 @@
 # Ruby2D::Color
 
-require 'forwardable'
-
 module Ruby2D
   class Color
 
     # Color::Set represents an array of colors
     class Set
       include Enumerable
-      extend Forwardable
 
       def initialize(colors)
         @colors = colors.map { |c| Color.new(c) }
       end
 
-      def_delegators :@colors, :[], :length, :count, :each, :first, :last
+      def [](index)
+        @colors[index]
+      end
+
+      def length
+        @colors.length
+      end
+
+      alias count length
+
+      def each
+        @colors.each do |c|
+          yield c
+        end
+      end
+
+      def first
+        @colors.first
+      end
+
+      def last
+        @colors.last
+      end
 
       def opacity
         @colors.first.opacity
