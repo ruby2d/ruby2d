@@ -5,19 +5,39 @@ module Ruby2D
 
     # Color::Set represents an array of colors
     class Set
+      include Enumerable
+
       def initialize(colors)
         @colors = colors.map { |c| Color.new(c) }
       end
 
-      def [](i)
-        @colors[i]
+      def [](index)
+        @colors[index]
       end
 
       def length
         @colors.length
       end
 
-      def opacity; @colors[0].opacity end
+      alias count length
+
+      def each
+        @colors.each do |c|
+          yield c
+        end
+      end
+
+      def first
+        @colors.first
+      end
+
+      def last
+        @colors.last
+      end
+
+      def opacity
+        @colors.first.opacity
+      end
 
       def opacity=(opacity)
         @colors.each do |color|
@@ -104,6 +124,11 @@ module Ruby2D
     # Convenience methods to alias `opacity` to `@a`
     def opacity; @a end
     def opacity=(opacity); @a = opacity end
+
+    # Retiurn colour components as an array +[r, g, b, a]+
+    def to_a
+      [@r, @g, @b, @a]
+    end
 
     private
 

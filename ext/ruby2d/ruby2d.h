@@ -547,6 +547,19 @@ void R2D_Canvas_DrawThickPolyline(SDL_Renderer *render, SDL_FPoint *points,
                                   int num_points, int thickness, int r, int g,
                                   int b, int a, bool skip_first_last);
 
+/*
+ * Fill a polygon with a single colour.
+ * @param points Array of points
+ * @param num_points Number of points
+ * @param colors Array of colours
+ * @param num_colors Number of colors, must be at least 1, and may be less than
+ *                      +num_points+ in which case the colours will be repeated
+ *                      via modulo.
+ * @note Currently supports only: convex polygons or simple polygons with one concave corner. For now.
+ */
+void R2D_Canvas_FillPolygon(SDL_Renderer *render, SDL_FPoint *points,
+                            int num_points, SDL_Color *colors, int num_colors);
+
 // Music ///////////////////////////////////////////////////////////////////////
 
 /*

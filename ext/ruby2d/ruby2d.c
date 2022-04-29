@@ -838,6 +838,56 @@ static R_VAL ruby2d_canvas_ext_draw_polygon(R_VAL self, R_VAL config, R_VAL coor
   return R_NIL;
 }
 
+/*
+ * Ruby2D::Canvas#ext_fill_polygon
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_fill_polygon(mrb_state* mrb, R_VAL self) {
+  mrb_value coords, rgbas;
+  mrb_get_args(mrb, "oo", &coords, &rgbas);
+#else
+static R_VAL ruby2d_canvas_ext_fill_polygon(R_VAL self, R_VAL coords, R_VAL rgbas) {
+#endif
+  // `coords` is an array of x, y values
+  //       0,  1,  2,  3, ...
+  //    [ x1, y1, x2, y2, ... ]
+  //
+  // `rgbas` is an array of r, g, b, a values
+  //       0,  1,  2,  3,  4,  5,  6,  7 ...
+  //    [ r1, g1, b1, a1, r2, g2, b2, a2, ... ]
+
+  SDL_Renderer *render;
+  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+  int coord_len = RARRAY_LEN(coords);
+  int rgbas_len = RARRAY_LEN(rgbas);
+
+  if (coord_len >= 6 && rgbas_len > 0) {
+    SDL_FPoint points[MAX_POLY_POINTS];
+    int num_points = 0;
+
+    SDL_Color colors[MAX_POLY_POINTS];
+    int num_colors = 0;
+
+    for (int i = 0; i < coord_len && num_points < MAX_POLY_POINTS; i+= 2) {
+      points[num_points++] = (SDL_FPoint) { 
+        .x = NUM2INT(r_ary_entry(coords, i)), 
+        .y = NUM2INT(r_ary_entry(coords, i+1)) };
+    }
+    for (int i = 0; i < rgbas_len && num_colors < MAX_POLY_POINTS; i+= 4) {
+      colors[num_colors++] = (SDL_Color) { 
+        .r = NUM2DBL(r_ary_entry(rgbas, i)) * 255, // r
+        .g = NUM2DBL(r_ary_entry(rgbas, i+1)) * 255, // g
+        .b = NUM2DBL(r_ary_entry(rgbas, i+2)) * 255, // b
+        .a = NUM2DBL(r_ary_entry(rgbas, i+3)) * 255  // a
+      };
+    }
+
+    R2D_Canvas_FillPolygon(render, points, num_points, colors, num_colors);
+  }
+
+  return R_NIL;
+}
 
 /*
  * Ruby2D::Canvas#self.ext_fill_ellipse
@@ -1926,6 +1976,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_draw_polygon
   r_define_method(ruby2d_canvas_class, "ext_draw_polygon", ruby2d_canvas_ext_draw_polygon, r_args_req(2));
+
+  // Ruby2D::Canvas#ext_fill_polygon
+  r_define_method(ruby2d_canvas_class, "ext_fill_polygon", ruby2d_canvas_ext_fill_polygon, r_args_req(2));
 
   // Ruby2D::Canvas#ext_fill_triangle
   r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));

@@ -62,6 +62,138 @@ static vector_t *vector_plus_xy(vector_t *vec, float other_x, float other_y)
   return vec;
 }
 
+typedef enum { CONCAVE = -1, INVALID, CONVEX } poly_type_e;
+
+//
+// Go through each corner and identify and count the number of concave
+// ones, also noting down the last concave point.
+//
+// TODO: collect all the concave points for a later ear-clipper.
+// @param [int *] pconcave_ix Pointer to array of slots for concave point
+// indices
+// @param [int] max_pconcave Max number of clots for concave point indices
+//
+// @return number of concave points; note this may be > +max_pconcave+ so caller
+//                needs to check result carefully.
+//
+static int count_concave_corners(const SDL_FPoint *points, int num_points,
+                                 int *pconcave_ix, const int max_pconcave)
+{
+  if (num_points < 3)
+    return (0);
+
+  int nconcave = 0;
+
+  // pick first last and first points
+  int x1 = points[0].x;
+  int y1 = points[0].y;
+  int x2 = points[1].x;
+  int y2 = points[1].y;
+  // start with second point and proceed point by point inspecting
+  // each corner
+  float z, zprev = 0;
+  for (int i = 1; i < num_points; i++, zprev = z) {
+    int j = (i + 1) % num_points;
+    int x3 = points[j].x;
+    int y3 = points[j].y;
+    // cross product
+    z = ((x1 - x2) * (y2 - y3)) - ((y1 - y2) * (x2 - x3));
+    if (z < 0) {
+      if (nconcave < max_pconcave)
+        *pconcave_ix++ = i;
+      nconcave++;
+    }
+    // shift points left so we
+    x1 = x2;
+    y1 = y2;
+    x2 = x3;
+    y2 = y3;
+  }
+  return nconcave;
+}
+
+//
+// If a polygon is entirely conves, we triangulate trivially
+// by using the first point as the anchor to fan out the triangles
+static void fill_convex_polygon(SDL_Renderer *render, const SDL_FPoint *points,
+                                int num_points, const SDL_Color *colors,
+                                int num_colors)
+{
+  // Setup the vertices from incoming arguments
+  SDL_Vertex verts[3];
+
+  // use first vertex as anchor and draw a triangle with
+  // subsequent pair of points.
+  verts[0].position = points[0];
+  verts[0].color = colors[0];
+  for (int i = 2; i < num_points; i++) {
+    verts[1].position = points[i - 1];
+    verts[1].color = colors[(i - 1) % num_colors];
+    verts[2].position = points[i];
+    verts[2].color = colors[i % num_colors];
+    SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
+  }
+}
+
+//
+// If a polygon has one concave corner, we can still do trivial
+// triangulation as we do for convex polygons using the
+// concave corner as the anchor point for the fan-out.
+static void fill_concave1pt_polygon(SDL_Renderer *render,
+                                    const SDL_FPoint *points, int num_points,
+                                    int anchor_ix, const SDL_Color *colors,
+                                    int num_colors)
+{
+  // Setup the vertices from incoming arguments
+  SDL_Vertex verts[3];
+
+  verts[0].position = points[anchor_ix];
+  verts[0].color = colors[anchor_ix];
+  anchor_ix = (anchor_ix + 1) % num_points;
+  for (int i = 2; i < num_points; i++) {
+    verts[1].position = points[anchor_ix];
+    verts[1].color = colors[anchor_ix % num_colors];
+    anchor_ix = (anchor_ix + 1) % num_points;
+    verts[2].position = points[anchor_ix];
+    verts[2].color = colors[anchor_ix % num_colors];
+    SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
+  }
+}
+
+#define MAX_CONCAVE_POINT_INDICES 32
+
+/*
+ * Fill a polygon with a single colour.
+ * @param points Array of points
+ * @param num_points Number of points
+ * @param colors Array of colours
+ * @param num_colors Number of colors, must be at least 1, and may be less than
+ *                      +num_points+ in which case the colours will be repeated
+ *                      via modulo.
+ * @note Currently supports only: convex polygons or simple polygons with one
+ * concave corner. For now.
+ */
+void R2D_Canvas_FillPolygon(SDL_Renderer *render, SDL_FPoint *points,
+                            int num_points, SDL_Color *colors, int num_colors)
+{
+  // poly_type_e type = polygon_type(points, num_points);
+  int concave_point_indices[MAX_CONCAVE_POINT_INDICES];
+  int nconcave = count_concave_corners(
+      points, num_points, concave_point_indices, MAX_CONCAVE_POINT_INDICES);
+
+  if (nconcave == 0) {
+    // convex
+    fill_convex_polygon(render, points, num_points, colors, num_colors);
+  }
+  else if (nconcave == 1) {
+    // use concave point as the origin if only one concave vertex
+    fill_concave1pt_polygon(render, points, num_points,
+                            concave_point_indices[0], colors, num_colors);
+  }
+  // else
+  //   printf("TODO: Non-convex polygon with %d concave corners\n", nconcave);
+}
+
 /*
  * Draw a thick line on a canvas using a pre-converted RGBA colour value.
  * @param [int] thickness must be > 1, else does nothing
