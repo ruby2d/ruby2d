@@ -79,7 +79,8 @@ typedef enum { CONCAVE = -1, INVALID, CONVEX } poly_type_e;
 static int count_concave_corners(const SDL_FPoint *points, int num_points,
                                  int *pconcave_ix, const int max_pconcave)
 {
-  if (num_points < 3)
+  // triangles are always convex
+  if (num_points <= 3)
     return (0);
 
   int nconcave = 0;
@@ -148,7 +149,7 @@ static void fill_concave1pt_polygon(SDL_Renderer *render,
   SDL_Vertex verts[3];
 
   verts[0].position = points[anchor_ix];
-  verts[0].color = colors[anchor_ix];
+  verts[0].color = colors[anchor_ix % num_colors];
   anchor_ix = (anchor_ix + 1) % num_points;
   for (int i = 2; i < num_points; i++) {
     verts[1].position = points[anchor_ix];
@@ -176,10 +177,17 @@ static void fill_concave1pt_polygon(SDL_Renderer *render,
 void R2D_Canvas_FillPolygon(SDL_Renderer *render, SDL_FPoint *points,
                             int num_points, SDL_Color *colors, int num_colors)
 {
+  if (num_points < 3)
+    return;
+
   // poly_type_e type = polygon_type(points, num_points);
   int concave_point_indices[MAX_CONCAVE_POINT_INDICES];
-  int nconcave = count_concave_corners(
-      points, num_points, concave_point_indices, MAX_CONCAVE_POINT_INDICES);
+
+  int nconcave =
+      num_points == 3
+          ? 0 // triangles are always convex
+          : count_concave_corners(points, num_points, concave_point_indices,
+                                  MAX_CONCAVE_POINT_INDICES);
 
   if (nconcave == 0) {
     // convex
