@@ -995,40 +995,6 @@ static R_VAL ruby2d_canvas_ext_draw_ellipse(R_VAL self, R_VAL a) {
 }
 
 /*
- * Ruby2D::Canvas#self.ext_fill_triangle
- */
-#if MRUBY
-static R_VAL ruby2d_canvas_ext_fill_triangle(mrb_state* mrb, R_VAL self) {
-  mrb_value a;
-  mrb_get_args(mrb, "o", &a);
-#else
-static R_VAL ruby2d_canvas_ext_fill_triangle(R_VAL self, R_VAL a) {
-#endif
-  // `a` is the array representing the triangle
-
-  SDL_Renderer *render;
-  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
-
-  SDL_Vertex verts[3];
-  for (int vix = 0; vix < 3; vix++) {
-    int vofs = vix * 6;
-    verts[vix].position = (SDL_FPoint) { 
-      .x = NUM2INT(r_ary_entry(a,  vofs + 0)),  // x1
-      .y = NUM2INT(r_ary_entry(a,  vofs + 1)),  // y1
-    };
-    verts[vix].color = (SDL_Color) {
-      .r = NUM2DBL(r_ary_entry(a, vofs + 2)) * 255,
-      .g = NUM2DBL(r_ary_entry(a, vofs + 3)) * 255,
-      .b = NUM2DBL(r_ary_entry(a, vofs + 4)) * 255,
-      .a = NUM2DBL(r_ary_entry(a, vofs + 5)) * 255,
-    };
-  }
-  SDL_RenderGeometry(render, NULL, verts, 3, NULL, 0);
-
-  return R_NIL;
-}
-
-/*
  * Calculate the cross product of the two lines
  * connecting the three points clock-wise. A negative value
  * means the angle "to the right" is > 180. 
@@ -1040,67 +1006,6 @@ static inline int cross_product_corner(x1, y1, x2, y2, x3, y3) {
   register int vec2_y = y2 - y3;
 
   return (vec1_x * vec2_y) - (vec1_y * vec2_x);
-}
-
-/*
- * Ruby2D::Canvas#self.ext_fill_quad
- */
-#if MRUBY
-static R_VAL ruby2d_canvas_ext_fill_quad(mrb_state* mrb, R_VAL self) {
-  mrb_value a;
-  mrb_get_args(mrb, "o", &a);
-#else
-static R_VAL ruby2d_canvas_ext_fill_quad(R_VAL self, R_VAL a) {
-#endif
-  // `a` is the array representing the quad
-
-  SDL_Renderer *render;
-  r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
-
-  // Setup the vertices from incoming arguments
-  SDL_Vertex verts[4];
-  for (int vix = 0, vofs = 0; vix < 4; vix++, vofs += 6) {
-    verts[vix].position = (SDL_FPoint) { 
-      .x = NUM2INT(r_ary_entry(a,  vofs + 0)),  // x1
-      .y = NUM2INT(r_ary_entry(a,  vofs + 1)),  // y1
-    };
-    verts[vix].color = (SDL_Color) {
-      .r = NUM2DBL(r_ary_entry(a, vofs + 2)) * 255,
-      .g = NUM2DBL(r_ary_entry(a, vofs + 3)) * 255,
-      .b = NUM2DBL(r_ary_entry(a, vofs + 4)) * 255,
-      .a = NUM2DBL(r_ary_entry(a, vofs + 5)) * 255,
-    };
-  }
-  // Check all the corners to determine if the quad is convex or not
-  bool convex = true;
-  int vix = 0;
-  for (; vix < 4; vix ++) {
-    int v0 = vix < 1 ? 3 : vix - 1; // previous corner
-    int v1 = vix;
-    int v2 = vix == 3 ? 0 : vix + 1;  // next corner
-    int cross = cross_product_corner(
-      verts[v0].position.x, verts[v0].position.y,
-      verts[v1].position.x, verts[v1].position.y,
-      verts[v2].position.x, verts[v2].position.y);
-    if (cross < 0) {
-      convex = false;
-      break;
-    }
-  }
-  if (convex) vix = 0;  // start at first vertex if convex
-  // else start at concave vertex
-
-  int triangle_corners[6] = { 
-    vix,
-    (vix+1) % 4,
-    (vix+2) % 4,
-    (vix+2) % 4,
-    (vix+3) % 4,
-    (vix+4) % 4,
-  };
-  SDL_RenderGeometry(render, NULL, verts, 4, triangle_corners, 6);
-
-  return R_NIL;
 }
 
 /*
@@ -1980,17 +1885,11 @@ void Init_ruby2d() {
   // Ruby2D::Canvas#ext_fill_polygon
   r_define_method(ruby2d_canvas_class, "ext_fill_polygon", ruby2d_canvas_ext_fill_polygon, r_args_req(2));
 
-  // Ruby2D::Canvas#ext_fill_triangle
-  r_define_method(ruby2d_canvas_class, "ext_fill_triangle", ruby2d_canvas_ext_fill_triangle, r_args_req(1));
-
   // Ruby2D::Canvas#ext_fill_ellipse
   r_define_method(ruby2d_canvas_class, "ext_fill_ellipse", ruby2d_canvas_ext_fill_ellipse, r_args_req(1));
 
   // Ruby2D::Canvas#ext_draw_ellipse
   r_define_method(ruby2d_canvas_class, "ext_draw_ellipse", ruby2d_canvas_ext_draw_ellipse, r_args_req(1));
-
-  // Ruby2D::Canvas#ext_fill_quad
-  r_define_method(ruby2d_canvas_class, "ext_fill_quad", ruby2d_canvas_ext_fill_quad, r_args_req(1));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");

@@ -99,11 +99,11 @@ canvas.fill_circle x: 450, y: 250,
                    radius: 100,
                    color: [0, 0.7, 1, 0.3]
 
-canvas.draw_quad x1: 500 - 5, y1: 200 - 5,
-                 x2: 550 + 5, y2: 150 - 5,
-                 x3: 600 + 5, y3: 300,
-                 x4: 550, y4: 400 + 5,
-                 color: [1, 1, 1, 0.75], pen_width: 5
+canvas.draw_quad x1: 500, y1: 200,
+                 x2: 550, y2: 150,
+                 x3: 600, y3: 300,
+                 x4: 550, y4: 400,
+                 color: [1, 1, 1, 0.75], pen_width: 10
 
 canvas.fill_quad x1: 500, y1: 200,
                  x2: 550, y2: 150,
