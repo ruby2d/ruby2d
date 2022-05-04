@@ -40,20 +40,7 @@ module Ruby2D
     # @param [Numeric] y3
     # @param [Color, Color::Set] color (or +colour+) Set one or per-vertex colour
     def fill_triangle(x1:, y1:, x2:, y2:, x3:, y3:, color: nil, colour: nil)
-      clr = color || colour
-      if clr.is_a? Color::Set
-        c1 = clr[0]
-        c2 = clr[1] || c1
-        c3 = clr[2] || c2
-      else
-        c1 = c2 = c3 = (clr.is_a?(Color) ? clr : Color.new(clr))
-      end
-      ext_fill_triangle([
-                          x1, y1, c1.r, c1.g, c1.b, c1.a,
-                          x2, y2, c2.r, c2.g, c2.b, c2.a,
-                          x3, y3, c3.r, c3.g, c3.b, c3.a
-                        ])
-      update_texture if @update
+      fill_polygon coordinates: [x1, y1, x2, y2, x3, y3], color: color || colour
     end
 
     # Draw a filled quad(rilateral) with a single colour or per-vertex colour blending.
@@ -67,20 +54,7 @@ module Ruby2D
     # @param [Numeric] y4
     # @param [Color, Color::Set] color (or +colour+) Set one or per-vertex colour
     def fill_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color: nil, colour: nil)
-      clr = color || colour
-      if clr.is_a? Color::Set
-        c1 = clr[0]
-        c2 = clr[1] || c1
-        c3 = clr[2] || c2
-        c4 = clr[3] || c3
-      else
-        c1 = c2 = c3 = c4 = (clr.is_a?(Color) ? clr : Color.new(clr))
-      end
-      ext_fill_quad([x1, y1, c1.r, c1.g, c1.b, c1.a,
-                     x2, y2, c2.r, c2.g, c2.b, c2.a,
-                     x3, y3, c3.r, c3.g, c3.b, c3.a,
-                     x4, y4, c4.r, c4.g, c4.b, c4.a])
-      update_texture if @update
+      fill_polygon coordinates: [x1, y1, x2, y2, x3, y3, x4, y4], color: color || colour
     end
 
     # Draw a circle.
@@ -243,10 +217,11 @@ module Ruby2D
 
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
+      config = [pen_width, clr.r, clr.g, clr.b, clr.a]
       if closed
-        ext_draw_polygon([pen_width, clr.r, clr.g, clr.b, clr.a], coordinates)
+        ext_draw_polygon(config, coordinates)
       else
-        ext_draw_polyline([pen_width, clr.r, clr.g, clr.b, clr.a], coordinates)
+        ext_draw_polyline(config, coordinates)
       end
       update_texture if @update
     end
@@ -259,7 +234,8 @@ module Ruby2D
     def fill_polygon(coordinates:, color: nil, colour: nil)
       return if coordinates.nil? || coordinates.count < 6 || (color.nil? && colour.nil?)
 
-      ext_fill_polygon(coordinates, colors_to_a(color || colour))
+      colors = colors_to_a(color || colour)
+      ext_fill_polygon(coordinates, colors)
       update_texture if @update
     end
 
