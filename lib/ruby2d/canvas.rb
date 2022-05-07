@@ -62,13 +62,13 @@ module Ruby2D
     # @param [Numeric] y Centre
     # @param [Numeric] radius
     # @param [Numeric] sectors The number of segments to subdivide the circumference.
-    # @param [Numeric] pen_width The thickness of the circle in pixels
+    # @param [Numeric] stroke_width The thickness of the circle in pixels
     # @param [Color] color (or +colour+) The fill colour
-    def draw_circle(x:, y:, radius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
+    def draw_circle(x:, y:, radius:, sectors: 30, stroke_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_ellipse([
-                         x, y, radius, radius, sectors, pen_width,
+                         x, y, radius, radius, sectors, stroke_width,
                          clr.r, clr.g, clr.b, clr.a
                        ])
       update_texture if @update
@@ -80,13 +80,13 @@ module Ruby2D
     # @param [Numeric] xradius
     # @param [Numeric] yradius
     # @param [Numeric] sectors The number of segments to subdivide the circumference.
-    # @param [Numeric] pen_width The thickness of the circle in pixels
+    # @param [Numeric] stroke_width The thickness of the circle in pixels
     # @param [Color] color (or +colour+) The fill colour
-    def draw_ellipse(x:, y:, xradius:, yradius:, sectors: 30, pen_width: 1, color: nil, colour: nil)
+    def draw_ellipse(x:, y:, xradius:, yradius:, sectors: 30, stroke_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_ellipse([
-                         x, y, xradius, yradius, sectors, pen_width,
+                         x, y, xradius, yradius, sectors, stroke_width,
                          clr.r, clr.g, clr.b, clr.a
                        ])
       update_texture if @update
@@ -148,12 +148,12 @@ module Ruby2D
     # @param [Numeric] y2
     # @param [Numeric] x3
     # @param [Numeric] y3
-    # @param [Numeric] pen_width The thickness of the rectangle in pixels
+    # @param [Numeric] stroke_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_triangle(x1:, y1:, x2:, y2:, x3:, y3:, pen_width: 1, color: nil, colour: nil)
+    def draw_triangle(x1:, y1:, x2:, y2:, x3:, y3:, stroke_width: 1, color: nil, colour: nil)
       draw_polyline closed: true,
                     coordinates: [x1, y1, x2, y2, x3, y3],
-                    color: color, colour: colour, pen_width: pen_width
+                    color: color, colour: colour, stroke_width: stroke_width
     end
 
     # Draw an outline of a quad.
@@ -165,12 +165,12 @@ module Ruby2D
     # @param [Numeric] y3
     # @param [Numeric] x4
     # @param [Numeric] y4
-    # @param [Numeric] pen_width The thickness of the rectangle in pixels
+    # @param [Numeric] stroke_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, pen_width: 1, color: nil, colour: nil)
+    def draw_quad(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, stroke_width: 1, color: nil, colour: nil)
       draw_polyline closed: true,
                     coordinates: [x1, y1, x2, y2, x3, y3, x4, y4],
-                    color: color, colour: colour, pen_width: pen_width
+                    color: color, colour: colour, stroke_width: stroke_width
     end
 
     # Draw an outline of a rectangle
@@ -178,13 +178,13 @@ module Ruby2D
     # @param [Numeric] y
     # @param [Numeric] width
     # @param [Numeric] height
-    # @param [Numeric] pen_width The thickness of the rectangle in pixels
+    # @param [Numeric] stroke_width The thickness of the rectangle in pixels
     # @param [Color] color (or +colour+) The line colour
-    def draw_rectangle(x:, y:, width:, height:, pen_width: 1, color: nil, colour: nil)
+    def draw_rectangle(x:, y:, width:, height:, stroke_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_rectangle([
-                           x, y, width, height, pen_width,
+                           x, y, width, height, stroke_width,
                            clr.r, clr.g, clr.b, clr.a
                          ])
       update_texture if @update
@@ -195,13 +195,13 @@ module Ruby2D
     # @param [Numeric] y1
     # @param [Numeric] x2
     # @param [Numeric] y2
-    # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
+    # @param [Numeric] stroke_width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
-    def draw_line(x1:, y1:, x2:, y2:, pen_width: 1, color: nil, colour: nil)
+    def draw_line(x1:, y1:, x2:, y2:, stroke_width: 1, color: nil, colour: nil)
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
       ext_draw_line([
-                      x1, y1, x2, y2, pen_width,
+                      x1, y1, x2, y2, stroke_width,
                       clr.r, clr.g, clr.b, clr.a
                     ])
       update_texture if @update
@@ -209,15 +209,15 @@ module Ruby2D
 
     # Draw a poly-line between N points.
     # @param [Array] coordinates An array of numbers x1, y1, x2, y2 ... with at least three coordinates (6 values)
-    # @param [Numeric] pen_width The line's thickness in pixels; defaults to 1.
+    # @param [Numeric] stroke_width The line's thickness in pixels; defaults to 1.
     # @param [Color] color (or +colour+) The line colour
     # @param [Boolean] closed Use +true+ to draw this as a closed shape
-    def draw_polyline(coordinates:, pen_width: 1, color: nil, colour: nil, closed: false)
+    def draw_polyline(coordinates:, stroke_width: 1, color: nil, colour: nil, closed: false)
       return if coordinates.nil? || coordinates.count < 6
 
       clr = color || colour
       clr = Color.new(clr) unless clr.is_a? Color
-      config = [pen_width, clr.r, clr.g, clr.b, clr.a]
+      config = [stroke_width, clr.r, clr.g, clr.b, clr.a]
       if closed
         ext_draw_polygon(config, coordinates)
       else

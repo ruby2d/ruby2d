@@ -38,7 +38,7 @@ update do
   canvas.fill_polygon coordinates: polyline, color: Color::Set.new(%w[red green blue yellow black])
 
   canvas.draw_polyline coordinates: polyline,
-                       pen_width: 1,
+                       stroke_width: 1,
                        color: [1, 0, 0, 1],
                        closed: true
 end
