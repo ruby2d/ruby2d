@@ -23,7 +23,7 @@ canvas = Canvas.new(x: 50, y: 50,
   canvas.draw_rectangle(
     x: 10 + ix * 30, y: 10 + ix * 30,
     width: 100, height: 100,
-    pen_width: 8,
+    stroke_width: 8,
     color: Color.new([0, 0, 1, 0.25])
   )
 end
@@ -41,7 +41,7 @@ canvas.fill_ellipse(
 [1, 5, 9].each do |ix|
   canvas.draw_circle(
     x: 175, y: 350, radius: 150 - (ix * ix),
-    pen_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
+    stroke_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
     color: [1, 1, 1, 0.5]
   )
 end
@@ -49,7 +49,7 @@ end
 [3, 7].each do |ix|
   canvas.draw_ellipse(
     x: 175, y: 350, xradius: 150 - (ix * ix), yradius: 100 - (ix * ix),
-    pen_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
+    stroke_width: ix > 1 ? ix * 2 : 1, sectors: 50 - ix,
     color: [0.8, 1, 0.6, 0.5]
   )
 end
@@ -61,7 +61,7 @@ end
     y1: 75 + (ix * 15),
     x2: 310,
     y2: 420 + (ix * 15),
-    pen_width: 30,
+    stroke_width: 30,
     color: Color.new([0.5 + (ix * 0.1), 0.5 + (ix * 0.1), 1, 0.5])
   )
   # thin line along the middle of the thick line
@@ -77,7 +77,7 @@ end
 canvas.fill_triangle x1: 100, y1: 100, x2: 200, y2: 150, x3: 150, y3: 400,
                      color: [1, 1, 1, 0.5]
 canvas.draw_triangle x1: 100 - 5, y1: 100 - 5, x2: 200 + 5, y2: 150 - 5, x3: 150, y3: 400 + 5,
-                     color: [1, 1, 1, 0.75], pen_width: 10
+                     color: [1, 1, 1, 0.75], stroke_width: 10
 
 canvas.fill_triangle x1: 250, y1: 100, x2: 350, y2: 150, x3: 300, y3: 400,
                      color: Color::Set.new([[1, 0, 0, 0.5],
@@ -103,7 +103,7 @@ canvas.draw_quad x1: 500, y1: 200,
                  x2: 550, y2: 150,
                  x3: 600, y3: 300,
                  x4: 550, y4: 400,
-                 color: [1, 1, 1, 0.75], pen_width: 10
+                 color: [1, 1, 1, 0.75], stroke_width: 10
 
 canvas.fill_quad x1: 500, y1: 200,
                  x2: 550, y2: 150,
@@ -123,11 +123,11 @@ polyline = [400, 100,
             600, 100]
 
 canvas.draw_polyline coordinates: polyline,
-                     pen_width: 20,
+                     stroke_width: 20,
                      color: [1, 1, 1, 0.5]
 
 canvas.draw_polyline coordinates: polyline,
-                     pen_width: 1,
+                     stroke_width: 1,
                      color: [1, 1, 1, 1]
 
 polygon = [500, 100,
@@ -136,7 +136,7 @@ polygon = [500, 100,
            300, 300]
 
 canvas.draw_polyline coordinates: polygon,
-                     pen_width: 20, closed: true,
+                     stroke_width: 20, closed: true,
                      color: [0, 1, 1, 0.25]
 
 update do

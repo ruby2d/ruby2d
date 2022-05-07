@@ -33,12 +33,12 @@ update do
               points[4][:x], points[4][:y]]
 
   canvas.draw_polyline coordinates: polyline,
-                       pen_width: 20,
+                       stroke_width: 20,
                        color: [1, 1, 1, 0.5],
                        closed: closed_shape
 
   canvas.draw_polyline coordinates: polyline,
-                       pen_width: 1,
+                       stroke_width: 1,
                        color: [1, 1, 1, 1],
                        closed: closed_shape
 end
