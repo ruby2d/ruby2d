@@ -10,7 +10,8 @@ module Ruby2D
       @path = path
 
       # Initialize the tileset texture
-      @texture = Texture.new(*Image.load_image(@path))
+      # Consider input pixmap atlas if supplied to load image file
+      @texture = Image.load_image_as_texture path, atlas: opts[:atlas]
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
       @z = opts[:z] || 0

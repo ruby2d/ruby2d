@@ -377,30 +377,36 @@ static R_VAL ruby2d_circle_ext_draw(R_VAL self, R_VAL a) {
 
 
 /*
- * Ruby2D::Image#ext_load_image
- * Create an SDL surface from an image path, return the surface, width, and height
+ * Ruby2D::Pixmap#ext_load_pixmap
+ * Create an SDL surface from an image path, and ... 
+ * TODO: store the surface, width, and height in the object
  */
 #if MRUBY
-static R_VAL ruby2d_image_ext_load_image(mrb_state* mrb, R_VAL self) {
+static R_VAL ruby2d_pixmap_ext_load_pixmap(mrb_state* mrb, R_VAL self) {
   mrb_value path;
   mrb_get_args(mrb, "o", &path);
 #else
-static R_VAL ruby2d_image_ext_load_image(R_VAL self, R_VAL path) {
+static R_VAL ruby2d_pixmap_ext_load_pixmap(R_VAL self, R_VAL path) {
 #endif
   R2D_Init();
 
-  R_VAL result = r_ary_new();
-
   SDL_Surface *surface = R2D_CreateImageSurface(RSTRING_PTR(path));
-  R2D_ImageConvertToRGB(surface);
+  if (surface != NULL) {
+    R2D_ImageConvertToRGB(surface);
 
-  r_ary_push(result, r_data_wrap_struct(surface, surface));
-  r_ary_push(result, INT2NUM(surface->w));
-  r_ary_push(result, INT2NUM(surface->h));
-
-  return result;
+    r_iv_set(self, "@ext_pixel_data", r_data_wrap_struct(surface, surface));
+    r_iv_set(self, "@width", INT2NUM(surface->w));
+    r_iv_set(self, "@height", INT2NUM(surface->h));
+  }
+  else {
+    // TODO: use rb_raise
+    //       for docs: https://silverhammermba.github.io/emberb/c/#raise
+    r_iv_set(self, "@ext_pixel_data", R_NIL);
+    r_iv_set(self, "@width", INT2NUM(0));
+    r_iv_set(self, "@height", INT2NUM(0));
+  }
+  return R_NIL;
 }
-
 
 /*
  * Ruby2D::Text#ext_load_text
@@ -1774,11 +1780,14 @@ void Init_ruby2d() {
   // Ruby2D::Circle#self.ext_draw
   r_define_class_method(ruby2d_circle_class, "ext_draw", ruby2d_circle_ext_draw, r_args_req(1));
 
+  // Ruby2D::Pixmap
+  R_CLASS ruby2d_pixmap_class = r_define_class(ruby2d_module, "Pixmap");
+
+  // Ruby2D::Pixmap#ext_load_pixmap
+  r_define_method(ruby2d_pixmap_class, "ext_load_pixmap", ruby2d_pixmap_ext_load_pixmap, r_args_req(1));
+
   // Ruby2D::Image
   R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
-
-  // Ruby2D::Image#ext_load_image
-  r_define_class_method(ruby2d_image_class, "ext_load_image", ruby2d_image_ext_load_image, r_args_req(1));
 
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");
