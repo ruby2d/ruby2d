@@ -1,4 +1,6 @@
-# Ruby2D::Image
+# frozen_string_literal: true
+
+# Ruby2D::PixmapAtlas
 
 module Ruby2D
   #

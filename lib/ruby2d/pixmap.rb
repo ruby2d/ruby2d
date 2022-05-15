@@ -1,4 +1,6 @@
-# Ruby2D::Image
+# frozen_string_literal: true
+
+# Ruby2D::Pixmap
 
 module Ruby2D
   # Error when failed to load an image
