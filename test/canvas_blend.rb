@@ -139,6 +139,17 @@ canvas.draw_polyline coordinates: polygon,
                      stroke_width: 20, closed: true,
                      color: [0, 1, 1, 0.25]
 
+atlas = PixmapAtlas.new
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.bmp", as: 'bmp'
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.png", as: 'png'
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.jpg", as: 'jpg'
+
+canvas.draw_pixmap atlas['png'], x: 600, y: 10
+canvas.draw_pixmap atlas['png'], x: 600, y: 120, width: 50
+canvas.draw_pixmap atlas['png'], x: 600, y: 230, height: 50
+canvas.draw_pixmap atlas['jpg'], x: 600, y: 310, width: 75, height: 75
+canvas.draw_pixmap atlas['bmp'], x: 600, y: 410, width: 50, height: 50
+
 update do
   canvas.update
 end

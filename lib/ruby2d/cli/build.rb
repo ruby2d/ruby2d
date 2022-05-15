@@ -22,6 +22,8 @@ require 'ruby2d/cli/platform'
   'square',
   'triangle',
   'pixel',
+  'pixmap',
+  'pixmap_atlas',
   'image',
   'sprite',
   'tileset',

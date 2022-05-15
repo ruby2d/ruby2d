@@ -133,6 +133,10 @@ static void free_surface(mrb_state *mrb, void *p_);
   static const struct mrb_data_type surface_data_type = {
     "surface", free_surface
   };
+static void free_sdl_texture(mrb_state *mrb, void *p_);
+  static const struct mrb_data_type sdl_texture_data_type = {
+    "sdl_texture", free_sdl_texture
+  };
 static void free_renderer(mrb_state *mrb, void *p_);
   static const struct mrb_data_type renderer_data_type = {
     "renderer", free_renderer
@@ -142,6 +146,7 @@ static void free_renderer(mrb_state *mrb, void *p_);
   static void free_music(R2D_Music *mus);
   static void free_font(TTF_Font *font);
   static void free_surface(SDL_Surface *surface);
+  static void free_sdl_texture(SDL_Texture *surface);
   static void free_renderer(SDL_Renderer *renderer);
 #endif
 
@@ -391,6 +396,9 @@ static R_VAL ruby2d_pixmap_ext_load_pixmap(R_VAL self, R_VAL path) {
   R2D_Init();
 
   SDL_Surface *surface = R2D_CreateImageSurface(RSTRING_PTR(path));
+  // initialize for later use
+  r_iv_set(self, "@ext_sdl_texture", R_NIL);
+
   if (surface != NULL) {
     R2D_ImageConvertToRGB(surface);
 
@@ -399,7 +407,7 @@ static R_VAL ruby2d_pixmap_ext_load_pixmap(R_VAL self, R_VAL path) {
     r_iv_set(self, "@height", INT2NUM(surface->h));
   }
   else {
-    // TODO: use rb_raise
+    // TODO: consider raising an exception?
     //       for docs: https://silverhammermba.github.io/emberb/c/#raise
     r_iv_set(self, "@ext_pixel_data", R_NIL);
     r_iv_set(self, "@width", INT2NUM(0));
@@ -440,6 +448,54 @@ static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
   r_ary_push(result, INT2NUM(surface->h));
 
   return result;
+}
+
+/*
+ * Ruby2D::Canvas#ext_draw_pixmap
+ */
+#if MRUBY
+static R_VAL ruby2d_canvas_ext_draw_pixmap(mrb_state* mrb, R_VAL self) {
+  mrb_value pixmap, x, y, w, h;
+  mrb_get_args(mrb, "ooooo", &pixmap, &x, &y, &w, &h);
+#else
+static R_VAL ruby2d_canvas_ext_draw_pixmap(R_VAL self, R_VAL pixmap, R_VAL x, R_VAL y, R_VAL w, R_VAL h) {
+#endif
+
+  if (r_test(pixmap)) {
+    // Retrieve pixmap's external pixel data (SDL_Surface)
+    SDL_Surface *pix_surface;
+    r_data_get_struct(pixmap, "@ext_pixel_data", &surface_data_type, SDL_Surface, pix_surface);
+
+    SDL_Texture *pix_sdl_tex = NULL;
+    R_VAL pix_ext_sdl_tex = r_iv_get(pixmap, "@ext_sdl_texture");
+    if (r_test(pix_ext_sdl_tex)) {
+      r_data_get_struct(pixmap, "@ext_sdl_texture", &sdl_texture_data_type, SDL_Texture, pix_sdl_tex);
+    }
+
+    // use incoming size or fallback to pixmap size
+    int pix_w = NUM2INT(r_test(w) ? w : r_iv_get(pixmap, "@width"));
+    int pix_h = NUM2INT(r_test(h) ? h : r_iv_get(pixmap, "@height"));
+    
+    SDL_Renderer *render;
+    r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
+
+    if (pix_sdl_tex == NULL) {
+      // create and cache an SDL_Texture for this Pixmap
+      pix_sdl_tex = SDL_CreateTextureFromSurface(render, pix_surface);
+      if (pix_sdl_tex != NULL) {
+        r_iv_set(pixmap, "@ext_sdl_texture", r_data_wrap_struct(sdl_texture, pix_sdl_tex));
+      }
+      else printf("*** Unable to create SDL_Texture: %s\n", SDL_GetError());
+    }
+
+    // Draw if we have an SDL_Texture
+    if (pix_sdl_tex != NULL) {
+      SDL_Rect src = { .x = 0, .y = 0, .w = pix_surface->w, .h = pix_surface->h };
+      SDL_Rect dst = { .x = NUM2INT(x), .y = NUM2INT(y), .w = pix_w, .h = pix_h };
+      SDL_RenderCopy (render, pix_sdl_tex, &src, &dst);
+    }
+  }
+  return R_NIL;
 }
 
 
@@ -1331,6 +1387,18 @@ static void free_surface(SDL_Surface *surface) {
 }
 
 /*
+ * Free SDL texture structure used within the Ruby 2D `Pixmap` class
+ */
+#if MRUBY
+static void free_sdl_texture(mrb_state *mrb, void *p_) {
+  SDL_Texture *sdl_texure = (SDL_Texture *)p_;
+#else
+static void free_sdl_texture(SDL_Texture *sdl_texure) {
+#endif
+  SDL_DestroyTexture(sdl_texure);
+}
+
+/*
  * Free renderer structure used within the Ruby 2D `Canvas` class
  */
 #if MRUBY
@@ -1899,6 +1967,9 @@ void Init_ruby2d() {
 
   // Ruby2D::Canvas#ext_draw_ellipse
   r_define_method(ruby2d_canvas_class, "ext_draw_ellipse", ruby2d_canvas_ext_draw_ellipse, r_args_req(1));
+
+  // Ruby2D::Canvas#ext_draw_pixmap
+  r_define_method(ruby2d_canvas_class, "ext_draw_pixmap", ruby2d_canvas_ext_draw_pixmap, r_args_req(5));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
