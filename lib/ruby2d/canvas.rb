@@ -247,8 +247,10 @@ module Ruby2D
     # @param [Numeric] y
     # @param [Numeric] width Optional, specify to scale the size
     # @param [Numeric] height  Optional, specify to scale the size
-    def draw_pixmap(pixmap, x:, y:, width: nil, height: nil)
-      ext_draw_pixmap pixmap, x, y, width, height
+    # @param [Hash] crop Optional, specify a hash with `x:, y:, width:, height:` to crop from within the pixmap to draw.
+    def draw_pixmap(pixmap, x:, y:, width: nil, height: nil, crop: nil)
+      src_rect = crop ? [crop[:x], crop[:y], crop[:width], crop[:height]] : nil
+      ext_draw_pixmap pixmap, src_rect, x, y, width, height
     end
 
     def update

@@ -455,10 +455,10 @@ static R_VAL ruby2d_text_ext_load_text(R_VAL self, R_VAL font, R_VAL message) {
  */
 #if MRUBY
 static R_VAL ruby2d_canvas_ext_draw_pixmap(mrb_state* mrb, R_VAL self) {
-  mrb_value pixmap, x, y, w, h;
-  mrb_get_args(mrb, "ooooo", &pixmap, &x, &y, &w, &h);
+  mrb_value pixmap, src_rect, x, y, w, h;
+  mrb_get_args(mrb, "oooooo", &pixmap, &src_rect, &x, &y, &w, &h);
 #else
-static R_VAL ruby2d_canvas_ext_draw_pixmap(R_VAL self, R_VAL pixmap, R_VAL x, R_VAL y, R_VAL w, R_VAL h) {
+static R_VAL ruby2d_canvas_ext_draw_pixmap(R_VAL self, R_VAL pixmap, R_VAL src_rect, R_VAL x, R_VAL y, R_VAL w, R_VAL h) {
 #endif
 
   if (r_test(pixmap)) {
@@ -472,10 +472,6 @@ static R_VAL ruby2d_canvas_ext_draw_pixmap(R_VAL self, R_VAL pixmap, R_VAL x, R_
       r_data_get_struct(pixmap, "@ext_sdl_texture", &sdl_texture_data_type, SDL_Texture, pix_sdl_tex);
     }
 
-    // use incoming size or fallback to pixmap size
-    int pix_w = NUM2INT(r_test(w) ? w : r_iv_get(pixmap, "@width"));
-    int pix_h = NUM2INT(r_test(h) ? h : r_iv_get(pixmap, "@height"));
-    
     SDL_Renderer *render;
     r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
@@ -490,7 +486,26 @@ static R_VAL ruby2d_canvas_ext_draw_pixmap(R_VAL self, R_VAL pixmap, R_VAL x, R_
 
     // Draw if we have an SDL_Texture
     if (pix_sdl_tex != NULL) {
-      SDL_Rect src = { .x = 0, .y = 0, .w = pix_surface->w, .h = pix_surface->h };
+      SDL_bool src_set = SDL_FALSE;
+      SDL_Rect src;
+      if (r_test(src_rect)) {
+        src_set = SDL_TRUE;
+        // portion of pixmap
+        src = (SDL_Rect) {
+          .x = NUM2INT(r_ary_entry(src_rect, 0)),
+          .y = NUM2INT(r_ary_entry(src_rect, 1)),
+          .w = NUM2INT(r_ary_entry(src_rect, 2)),
+          .h = NUM2INT(r_ary_entry(src_rect, 3))
+        };
+      }
+      else {
+        // whole pixmap
+        src = (SDL_Rect){ .x = 0, .y = 0, .w = pix_surface->w, .h = pix_surface->h }; 
+      }
+      // use incoming size or source size or fallback to pixmap size
+      int pix_w = r_test(w) ? NUM2INT(w) : (src_set ? src.w : NUM2INT(r_iv_get(pixmap, "@width")));
+      int pix_h = r_test(h) ? NUM2INT(h) : (src_set ? src.h : NUM2INT(r_iv_get(pixmap, "@height")));
+      
       SDL_Rect dst = { .x = NUM2INT(x), .y = NUM2INT(y), .w = pix_w, .h = pix_h };
       SDL_RenderCopy (render, pix_sdl_tex, &src, &dst);
     }
@@ -1969,7 +1984,7 @@ void Init_ruby2d() {
   r_define_method(ruby2d_canvas_class, "ext_draw_ellipse", ruby2d_canvas_ext_draw_ellipse, r_args_req(1));
 
   // Ruby2D::Canvas#ext_draw_pixmap
-  r_define_method(ruby2d_canvas_class, "ext_draw_pixmap", ruby2d_canvas_ext_draw_pixmap, r_args_req(5));
+  r_define_method(ruby2d_canvas_class, "ext_draw_pixmap", ruby2d_canvas_ext_draw_pixmap, r_args_req(6));
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
