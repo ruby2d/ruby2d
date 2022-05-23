@@ -20,13 +20,15 @@ module Ruby2D
   #
   # A pixmap represents an image made up of pixel data of fixed width and height.
   class Pixmap
-    attr_reader :width, :height
+    attr_reader :width, :height, :path
 
     def initialize(file_path)
       raise UnknownImageFileError, file_path unless File.exist? file_path
 
       ext_load_pixmap(file_path)
       raise InvalidImageFileError, file_name unless @ext_pixel_data
+
+      @path = file_path
     end
 
     def texture

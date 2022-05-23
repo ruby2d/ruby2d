@@ -36,7 +36,7 @@ module Ruby2D
       @atlas.each(&block)
     end
 
-    # Load a pixmap from an image +file+ and store it +as+ named for later lookup.
+    # Load a pixmap from an image +file_path+ and store it +as+ named for later lookup.
     #
     # @param [String] file_path The path to the image file to load as a +Pixmap+
     # @param [String] as The name to associated with the Pixmap; if +nil+ then +file_path+ is used +as+ the name
