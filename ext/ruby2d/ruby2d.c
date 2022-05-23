@@ -400,7 +400,13 @@ static R_VAL ruby2d_pixmap_ext_load_pixmap(R_VAL self, R_VAL path) {
   r_iv_set(self, "@ext_sdl_texture", R_NIL);
 
   if (surface != NULL) {
+#if GLES
+    // OpenGL ES doesn't support BGR color order, so applying the
+    // conversion to the pixels. This will however render incorrect colours
+    // for BGR images when using Canvas. 
+    // TODO: A better solution one day?
     R2D_ImageConvertToRGB(surface);
+#endif
 
     r_iv_set(self, "@ext_pixel_data", r_data_wrap_struct(surface, surface));
     r_iv_set(self, "@width", INT2NUM(surface->w));
@@ -534,18 +540,46 @@ static R_VAL ruby2d_texture_ext_create(R_VAL self, R_VAL rubySurface, R_VAL widt
   #endif
 
   // Detect image mode
-  GLint format = GL_RGB;
-  if (surface->format->BytesPerPixel == 4) {
-    format = GL_RGBA;
-  }
+  GLint gl_internal_format, gl_format;
+  GLenum gl_type;  
 
-  R2D_GL_CreateTexture(&texture_id, format,
+  switch (surface->format->BytesPerPixel) {
+    case 4:
+#if GLES
+      gl_internal_format = gl_format = GL_RGBA; 
+#else
+      gl_internal_format = GL_RGBA; 
+      gl_format = (surface->format->Rmask == 0xff0000) ? GL_BGRA : GL_RGBA;
+#endif
+      gl_type = GL_UNSIGNED_BYTE;
+      break;
+    case 3:
+#if GLES
+      gl_internal_format = gl_format = GL_RGB; 
+#else
+      gl_internal_format = GL_RGB; 
+      gl_format = (surface->format->Rmask == 0xff0000) ? GL_BGR : GL_RGB;
+#endif
+      gl_type = GL_UNSIGNED_BYTE;
+      break;
+    case 2:
+      gl_internal_format = gl_format = GL_RGB;
+      gl_type = GL_UNSIGNED_SHORT_5_6_5;
+      break;
+    case 1:
+    default:
+      // this would be ideal for font glyphs which use luminance + alpha and colour
+      // is set when drawing
+      gl_internal_format = gl_format = GL_LUMINANCE_ALPHA;
+      gl_type = GL_UNSIGNED_BYTE;
+      break;
+  }
+  R2D_GL_CreateTexture(&texture_id, gl_internal_format, gl_format, gl_type,
                        NUM2INT(width), NUM2INT(height),
                        surface->pixels, GL_NEAREST);
 
   return INT2NUM(texture_id);
 }
-
 
 /*
  * Ruby2D::Texture#ext_delete

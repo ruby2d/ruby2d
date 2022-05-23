@@ -696,7 +696,7 @@ int R2D_GL_CheckLinked(GLuint program, const char *name);
 void R2D_GL_GetViewportScale(R2D_Window *window, int *w, int *h, double *scale);
 void R2D_GL_SetViewport(R2D_Window *window);
 void R2D_GL_CreateTexture(
-  GLuint *id, GLint format,
+  GLuint *id, GLint internalFormat, GLint format, GLenum type,
   int w, int h,
   const GLvoid *data, GLint filter);
 void R2D_GL_DrawTriangle(
