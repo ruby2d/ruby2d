@@ -14,15 +14,15 @@ SDL_Surface *R2D_CreateImageSurface(const char *path) {
 
   // Load image from file as SDL_Surface
   SDL_Surface *surface = IMG_Load(path);
+  if (surface != NULL) {
+    int bits_per_color = surface->format->Amask == 0 ?
+      surface->format->BitsPerPixel / 3 :
+      surface->format->BitsPerPixel / 4;
 
-  int bits_per_color = surface->format->Amask == 0 ?
-    surface->format->BitsPerPixel / 3 :
-    surface->format->BitsPerPixel / 4;
-
-  if (bits_per_color < 8) {
-    R2D_Log(R2D_WARN, "`%s` has less than 8 bits per color and will likely not render correctly", path, bits_per_color);
+    if (bits_per_color < 8) {
+      R2D_Log(R2D_WARN, "`%s` has less than 8 bits per color and will likely not render correctly", path, bits_per_color);
+    }
   }
-
   return surface;
 }
 

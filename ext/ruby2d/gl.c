@@ -299,7 +299,7 @@ int R2D_GL_Init(R2D_Window *window) {
 /*
  * Creates a texture for rendering
  */
-void R2D_GL_CreateTexture(GLuint *id, GLint format,
+void R2D_GL_CreateTexture(GLuint *id, GLint internalFormat, GLint format, GLenum type,
                           int w, int h,
                           const GLvoid *data, GLint filter) {
 
@@ -311,8 +311,8 @@ void R2D_GL_CreateTexture(GLuint *id, GLint format,
 
   // Specifies the 2D texture image
   glTexImage2D(
-    GL_TEXTURE_2D, 0, format, w, h,
-    0, format, GL_UNSIGNED_BYTE, data
+    GL_TEXTURE_2D, 0, internalFormat, w, h,
+    0, format, type, data
   );
 
   // Set the filtering mode

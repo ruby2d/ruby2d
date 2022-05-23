@@ -139,6 +139,19 @@ canvas.draw_polyline coordinates: polygon,
                      stroke_width: 20, closed: true,
                      color: [0, 1, 1, 0.25]
 
+atlas = PixmapAtlas.new
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.bmp", as: 'bmp'
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.png", as: 'png'
+atlas.load_and_keep_image "#{Ruby2D.test_media}/image.jpg", as: 'jpg'
+atlas.load_and_keep_image "#{Ruby2D.test_media}/coin.png", as: 'coin'
+
+canvas.draw_pixmap atlas['coin'], x: 600, y: 10, crop: { x: 0, y: 0, width: 84, height: 84 }
+canvas.draw_pixmap atlas['png'], x: 600, y: 120, width: 50
+canvas.draw_pixmap atlas['png'], x: 600, y: 230, height: 50
+canvas.draw_pixmap atlas['jpg'], x: 600, y: 310, width: 75, height: 75
+canvas.draw_pixmap atlas['bmp'], x: 600, y: 410, width: 50, height: 50
+canvas.draw_pixmap atlas['coin'], x: 550, y: 410, width: 42, height: 42, crop: { x: 168, y: 0, width: 84, height: 84 }
+
 update do
   canvas.update
 end

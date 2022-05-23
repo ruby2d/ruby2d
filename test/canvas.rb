@@ -3,6 +3,9 @@ require 'ruby2d'
 set width: 800
 set height: 600
 
+atlas = PixmapAtlas.new
+atlas.load_and_keep_image "#{Ruby2D.test_media}/colors.png", as: 'colors'
+
 Square.new(size: 500, color: 'red')
 
 # Canvas options:
@@ -28,6 +31,12 @@ update do
       radius: 20, sectors: 10,
       color: [rand, rand, rand, 1]
     )
+  when :pixmap
+    canvas.draw_pixmap(
+      atlas['colors'],
+      x: Window.mouse_x - 50, y: Window.mouse_y - 50,
+      width: 50, height: 50
+    )
   else
     canvas.draw_rectangle(
       x: Window.mouse_x - 50, y: Window.mouse_y - 50,
@@ -47,6 +56,8 @@ update do
   )
 end
 
+draw_shape_options = %i[square circle pixmap]
+
 #
 # Press space to enable/disable clearing between frame while moving the mouse
 # Press s to switch between square and circle
@@ -56,11 +67,19 @@ on :key_down do |event|
   when 'escape'
     close
   when 's'
-    draw_shape = draw_shape == :square ? :circle : :square
+    draw_shape = draw_shape_options[(draw_shape_options.index(draw_shape) + 1) % draw_shape_options.count]
   when 'space'
     clear_between_draw = !clear_between_draw
   end
   canvas.update
 end
+
+puts '
+Press Esc to exit.
+Press s or S to switch between shapes: square, circle, pixmap
+Press space to toggle between clearing background or just drawing on top while moving
+
+Move the mouse.
+'
 
 show

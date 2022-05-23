@@ -7,18 +7,23 @@ module Ruby2D
     attr_reader :path
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
-    def self.load_image(path)
-      unless File.exist? path
-        raise Error, "Cannot find image file `#{path}`"
-      end
-
-      ext_load_image(path)
+    # Load an image +path+ and return a Texture, using a pixmap atlas if provided
+    # @param [PixmapAtlas] Optional pixmap atlas to use to manage the image file
+    # @return [Texture] loaded
+    def self.load_image_as_texture(path, atlas:)
+      pixmap = if atlas
+                 atlas.load_and_keep_image(path, as: path)
+               else
+                 Pixmap.new path
+               end
+      pixmap.texture
     end
 
     def initialize(path, opts = {})
       @path = path
 
-      @texture = Texture.new(*Image.load_image(@path))
+      # Consider input pixmap atlas if supplied to load image file
+      @texture = Image.load_image_as_texture path, atlas: opts[:atlas]
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
 

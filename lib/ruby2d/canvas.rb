@@ -239,6 +239,20 @@ module Ruby2D
       update_texture if @update
     end
 
+    # Draw the pixmap at the specified location and size
+    #
+    # @note This API will evolve to be able to draw a portion of the pixmap; coming soon.
+    # @param [Pixmap] pixmap
+    # @param [Numeric] x
+    # @param [Numeric] y
+    # @param [Numeric] width Optional, specify to scale the size
+    # @param [Numeric] height  Optional, specify to scale the size
+    # @param [Hash] crop Optional, specify a hash with `x:, y:, width:, height:` to crop from within the pixmap to draw.
+    def draw_pixmap(pixmap, x:, y:, width: nil, height: nil, crop: nil)
+      src_rect = crop ? [crop[:x], crop[:y], crop[:width], crop[:height]] : nil
+      ext_draw_pixmap pixmap, src_rect, x, y, width, height
+    end
+
     def update
       update_texture
     end
