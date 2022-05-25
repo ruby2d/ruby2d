@@ -54,13 +54,25 @@ void R2D_Log(int type, const char *msg, ...) {
 
     switch (type) {
       case R2D_INFO:
-        printf("\033[1;36mInfo:\033[0m ");
+        #if WASM  // don't print terminal colors, browser doesn't support it
+          printf("Info: ");
+        #else
+          printf("\033[1;36mInfo:\033[0m ");
+        #endif
         break;
       case R2D_WARN:
-        printf("\033[1;33mWarning:\033[0m ");
+        #if WASM
+          printf("Warning: ");
+        #else
+          printf("\033[1;33mWarning:\033[0m ");
+        #endif
         break;
       case R2D_ERROR:
-        printf("\033[1;31mError:\033[0m ");
+        #if WASM
+          printf("Error: ");
+        #else
+          printf("\033[1;31mError:\033[0m ");
+        #endif
         break;
     }
 
@@ -119,7 +131,11 @@ bool R2D_Init() {
   R2D_Log(R2D_INFO, "Initializing Ruby 2D");
 
   // Initialize SDL
-  if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+  #if WASM
+    if (SDL_Init(SDL_INIT_EVERYTHING & ~(SDL_INIT_HAPTIC)) != 0) {
+  #else
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+  #endif
     R2D_Error("SDL_Init", SDL_GetError());
     return false;
   }

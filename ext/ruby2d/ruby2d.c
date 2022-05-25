@@ -1851,6 +1851,13 @@ int main() {
   mrb = mrb_open();
   if (!mrb) { /* handle error */ }
 
+  // Set `RUBY_PLATFORM` when running in browser (WebAssembly)
+  #if WASM
+    mrb_const_set(mrb, mrb_obj_value(mrb->object_class), mrb_intern_lit(mrb, "RUBY_PLATFORM"), mrb_str_new_cstr(mrb, "wasm"));
+  #else
+    mrb_load_string(mrb, "RUBY_PLATFORM = `uname -s`.downcase.chomp");
+  #endif
+
   // Load the Ruby 2D library
   mrb_load_irep(mrb, ruby2d_lib);
 

@@ -58,48 +58,32 @@ module Ruby2D
 
       # Get the default font
       def default
-        if all.include? 'arial'
-          path 'arial'
+        if $RUBY2D_PLATFORM == :wasm
+          "#{Ruby2D.test_media}/bitstream_vera/vera.ttf"
         else
-          all_paths.first
+          if all.include? 'arial'
+            path 'arial'
+          else
+            all_paths.first
+          end
         end
       end
 
       # Get the fonts directory for the current platform
       def directory
-        macos_font_path   = '/Library/Fonts'
-        linux_font_path   = '/usr/share/fonts'
-        windows_font_path = 'C:/Windows/Fonts'
-        openbsd_font_path = '/usr/X11R6/lib/X11/fonts'
-
-        # If MRI and/or non-Bash shell (like cmd.exe)
-        if Object.const_defined? :RUBY_PLATFORM
-          case RUBY_PLATFORM
-          when /darwin/  # macOS
-            macos_font_path
-          when /linux/
-            linux_font_path
-          when /mingw/
-            windows_font_path
-          when /openbsd/
-            openbsd_font_path
-          end
-        # If MRuby
-        else
-          uname = `uname`
-          if uname.include? 'Darwin'  # macOS
-            macos_font_path
-          elsif uname.include? 'Linux'
-            linux_font_path
-          elsif uname.include? 'MINGW'
-            windows_font_path
-          elsif uname.include? 'OpenBSD'
-            openbsd_font_path
-          end
+        case $RUBY2D_PLATFORM
+        when :macos
+          '/Library/Fonts'
+        when :linux
+          '/usr/share/fonts'
+        when :windows
+          'C:/Windows/Fonts'
+        when :bsd
+          '/usr/X11R6/lib/X11/fonts'
+        when :wasm
+          ''
         end
       end
-
     end
-
   end
 end

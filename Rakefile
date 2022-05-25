@@ -1,5 +1,6 @@
 require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/cli/colorize'
+require_relative 'lib/ruby2d/cli/platform'
 require_relative 'lib/ruby2d/version'
 
 # Helpers ######################################################################
@@ -15,12 +16,6 @@ end
 def run_cmd(cmd)
   puts "==> #{cmd}\n"
   system cmd
-end
-
-def run_apple_test(device)
-  run_cmd "ruby2d build --clean"
-  run_cmd "ruby2d build --#{device} test/triangle-ios-tvos.rb --debug"
-  run_cmd "ruby2d launch --#{device}"
 end
 
 # Tasks ########################################################################
@@ -83,48 +78,25 @@ namespace :test do
     test_file = ARGV[1]
     print_task "Running `#{test_file}.rb` with mruby"
     run_cmd "ruby2d build --clean"
-    run_cmd "ruby2d build --native test/#{test_file}.rb --debug"
-    run_cmd "( cd test/ && ../build/app )"
+    run_cmd "ruby2d build test/#{test_file}.rb --debug"
+    run_cmd "( cd test/ && ../build/#{$RUBY2D_PLATFORM}/app )"
   end
 
   desc "Run test using WebAssembly"
-  task :wasm do
+  task :web do
     get_args
     test_file = ARGV[1]
     print_task "Running `#{test_file}.rb` with WebAssembly"
 
     run_cmd "ruby2d build --clean"
-    result = run_cmd "ruby2d build --web test/#{test_file}.rb --debug"
+    result = run_cmd "ruby2d build test/#{test_file}.rb --assets assets/test_media --debug"
     unless result then exit(1) end
 
-    open_cmd = 'open'
-    case RUBY_PLATFORM
-    when /linux/
-      open_cmd = "xdg-#{open_cmd}"
-    when /mingw/
-      open_cmd = "start"
-    end
-
-    Thread.new do
-      sleep 2
-      run_cmd "#{open_cmd} http://localhost:4001/build/app.html"
-    end
-
-    run_cmd "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start' &> /dev/null"
+    run_cmd "ruby2d serve build/web/app.html"
   end
 
-  desc "Run the iOS test"
-  task :ios do
-    print_task "Running iOS test"
-    run_apple_test('ios')
-  end
-
-  desc "Run the tvOS test"
-  task :tvos do
-    print_task "Running tvOS test"
-    run_apple_test('tvos')
-  end
-
+  desc "An alias to WebAssembly"
+  task :wasm => :web
 end
 
 desc "Uninstall, build, install, and test"

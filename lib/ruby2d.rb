@@ -2,6 +2,7 @@
 
 unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/cli/colorize'
+  require 'ruby2d/cli/platform'
   require 'ruby2d/exceptions'
   require 'ruby2d/renderable'
   require 'ruby2d/color'
@@ -46,7 +47,11 @@ module Ruby2D
   end
 
   def self.test_media
-    "#{gem_dir}/assets/test_media"
+    if $RUBY2D_PLATFORM == :wasm
+      ''  # assets will be mapped to the root dir
+    else
+      "#{gem_dir}/assets/test_media"
+    end
   end
 end
 

@@ -9,6 +9,7 @@ require 'ruby2d/cli/platform'
 # The Ruby 2D library files
 @ruby2d_lib_files = [
   'cli/colorize',
+  'cli/platform',
   'exceptions',
   'renderable',
   'color',
@@ -70,16 +71,47 @@ end
 # Build Tasks ##################################################################
 
 # Build the user's application
-def build(target, ruby2d_app)
+def build(ruby2d_app, assets_dir)
 
   # Check if source file provided is good
   if !ruby2d_app
-    puts "Please provide a Ruby file to build"
-    exit
+    puts "Provide a Ruby file to build"
+    exit 1
   elsif !File.exist? ruby2d_app
     puts "Can't find file: #{ruby2d_app}"
-    exit
+    exit 1
   end
+
+  # If assets directory provided, make sure it exists
+  if assets_dir && !Dir.exist?(assets_dir)
+    puts "Cannot find assets directory `#{assets_dir}`"
+    exit 1
+  end
+
+  # Clean the build directory
+  clean_up(:all)
+
+  # Get build platforms
+  build_platforms = {}
+  case $RUBY2D_PLATFORM
+  when :macos
+    build_platforms[:macos] = 'macOS'
+  when :windows
+    build_platforms[:windows] = 'Windows'
+  when :linux
+    build_platforms[:linux] = 'Linux'
+  end
+  if system('which emcc', out: File::NULL)
+    build_platforms[:wasm] = 'WebAssembly'
+  end
+
+  # Print status
+  puts '=== Building ==='.bold
+  puts "Platforms: #{build_platforms.values.join(', ')}"
+  puts "Ruby Engine: mruby"
+  puts "File: #{ruby2d_app}"
+  puts "Assets: #{assets_dir}" if assets_dir
+  print "Compiling..."
 
   # Add debugging information to produce backtrace
   if @debug then debug_flag = '-g' end
@@ -134,25 +166,37 @@ def build(target, ruby2d_app)
   end
 
   # Compile the final application based on the target platform
-  case target
-  when :native
-    compile_native
-  when :web
-    compile_web
+  compile_native(assets_dir)
+
+  # Compile for WebAssembly if Emscripten tools are present
+  if build_platforms.has_key? :wasm
+    compile_web(assets_dir)
   end
 
   # Remove files used in the build process
   clean_up unless @debug
 
+  # Print summary
+  puts "done"
+
+  puts "Outputs:"
+  puts "  build/macos" if build_platforms.has_key? :macos
+  puts "  build/windows" if build_platforms.has_key? :windows
+  puts "  build/linux" if build_platforms.has_key? :linux
+  puts "  build/web" if build_platforms.has_key? :wasm
+
+  puts "Build complete 🏁".success
 end
 
 
 # Create a native executable using the available C compiler
-def compile_native
+def compile_native(assets_dir)
 
   # Get include directories
   incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
   incl_dir_deps = "#{Ruby2D.assets}/include/"
+
+  FileUtils.mkpath "build/#{$RUBY2D_PLATFORM}"
 
   # Add compiler flags for each platform
   case $RUBY2D_PLATFORM
@@ -204,19 +248,17 @@ def compile_native
   end
 
   # Compile the app
-  run_cmd "cc #{c_flags} -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/app"
+  run_cmd "cc #{c_flags} -I#{incl_dir_ruby2d} -I#{incl_dir_deps} build/app.c #{ld_flags} -o build/#{$RUBY2D_PLATFORM}/app"
 
-  create_macos_bundle if $RUBY2D_PLATFORM == :macos
+  # TODO: Copy assets if provided
+  # FileUtils.cp_r("#{assets_dir}/.", "build/#{$RUBY2D_PLATFORM}") if assets_dir
+
+  create_macos_bundle(assets_dir) if $RUBY2D_PLATFORM == :macos
 end
 
 
 # Create a WebAssembly executable using Emscripten
-def compile_web
-
-  # Check for compiler toolchain issues
-  if doctor_web(:building)
-    puts "Fix errors before building.\n\n"
-  end
+def compile_web(assets_dir)
 
   wasm_assets = "#{Ruby2D.assets}/wasm"
 
@@ -227,85 +269,23 @@ def compile_web
   optimize_flags = '-Os --closure 1'
   ld_flags = "#{wasm_assets}/libmruby.a"
 
+  FileUtils.mkpath 'build/web'
+
   # Compile using Emscripten
   run_cmd "emcc -s WASM=1 -I#{incl_dir_ruby2d} -I#{incl_dir_deps} "\
-          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 "\
-          "build/app.c #{ld_flags} -o build/app.html"
+          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 -s "\
+          "#{if assets_dir then "--preload-file #{assets_dir}@" end} "\
+          "--use-preload-plugins -s ALLOW_MEMORY_GROWTH=1 "\
+          "build/app.c #{ld_flags} -o build/web/app.js "\
+          "#{unless @debug then '&> /dev/null' end}"
 
-  # TODO: Copy HTML template from gem assets to build directory
-  # FileUtils.cp "#{wasm_assets}/template.html", 'build/app.html'
-
-  exit(1) unless $?.success?
-end
-
-
-def doctor_native
-  # Check if MRuby exists; if not, quit
-  if `which mruby`.empty?
-    puts "#{'Error:'.error} Can't find `mruby`, which is needed to build native Ruby 2D applications.\n"
-    exit
-  end
-end
-
-
-# Check for problems with web build
-def doctor_web(mode = nil)
-
-  errors = false
-  mruby_errors = false
-  emscripten_errors = false
-
-  puts "\nChecking for mruby"
-
-  # Check for `mrbc`
-  print '  mrbc...'
-  if `which mrbc`.empty?
-    puts 'not found'.error
-    mruby_errors = true
-  else
-    puts 'found'.success
-  end
-
-  puts "\nChecking for Emscripten tools"
-
-  # Check for `emcc`
-  print '  emcc...'
-  if `which emcc`.empty?
-    puts 'not found'.error
-    emscripten_errors = true
-  else
-    puts 'found'.success
-  end
-
-  # Check for `emar`
-  print '  emar...'
-  if `which emar`.empty?
-    puts 'not found'.error
-    emscripten_errors = true
-  else
-    puts 'found'.success
-  end
-
-  if mruby_errors || emscripten_errors then errors = true end
-
-  if errors
-    puts "\nErrors were found!\n\n"
-    if mruby_errors
-      puts "* Did you install mruby?"
-    end
-    if emscripten_errors
-      puts "* Did you run \`./emsdk_env.sh\` ?", "  For help, check out the \"Getting Started\" guide on webassembly.org"
-    end
-    puts "\n"
-    exit(1)
-  else
-    puts "\n👍 Everything looks good!\n\n"
-  end
+  # Copy HTML template from gem assets to build directory
+  FileUtils.cp "#{wasm_assets}/template.html", 'build/web/app.html'
 end
 
 
 # Build an app bundle for macOS
-def create_macos_bundle
+def create_macos_bundle(assets_dir)
 
   # Property list source for the bundle
   info_plist = %(
@@ -329,66 +309,21 @@ def create_macos_bundle
 </plist>
 )
 
+  build_dir = 'build/macos'
+
   # Create directories
-  FileUtils.mkpath 'build/App.app/Contents/MacOS'
-  FileUtils.mkpath 'build/App.app/Contents/Resources'
+  FileUtils.mkpath "#{build_dir}/App.app/Contents/MacOS"
+  FileUtils.mkpath "#{build_dir}/App.app/Contents/Resources"
 
   # Create Info.plist and copy over assets
-  File.open('build/App.app/Contents/Info.plist', 'w') { |f| f.write(info_plist) }
-  FileUtils.cp 'build/app', 'build/App.app/Contents/MacOS/'
+  File.open("#{build_dir}/App.app/Contents/Info.plist", 'w') { |f| f.write(info_plist) }
+  FileUtils.cp "#{build_dir}/app", "#{build_dir}/App.app/Contents/MacOS/"
+
+  # TODO: Copy assets if provided
+  # FileUtils.cp_r("#{assets_dir}/.", "#{build_dir}/App.app/Contents/MacOS/") if assets_dir
+
   # Consider using an icon:
   #   FileUtils.cp "#{@gem_dir}/assets/app.icns", 'build/App.app/Contents/Resources'
-
-  # Clean up
-  # FileUtils.rm_f 'build/app' unless @debug
-
-  # Success!
-  # puts 'macOS app bundle created: `build/App.app`'
-end
-
-
-# Build an iOS or tvOS app
-def build_ios_tvos(rb_file, device)
-  check_build_src_file(rb_file)
-
-  # Check if MRuby exists; if not, quit
-  if `which mruby`.empty?
-    puts "#{'Error:'.error} Can't find MRuby, which is needed to build native Ruby 2D applications.\n"
-    exit
-  end
-
-  # Add debugging information to produce backtrace
-  if @debug then debug_flag = '-g' end
-
-  # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
-  make_lib
-  `mrbc #{debug_flag} -Bruby2d_lib -obuild/lib.c build/lib.rb`
-
-  # Read the provided Ruby source file, copy to build dir and compile to bytecode
-  File.open('build/src.rb', 'w') { |file| file << strip_require(rb_file) }
-  `mrbc #{debug_flag} -Bruby2d_app -obuild/src.c build/src.rb`
-
-  # Copy over iOS project
-  FileUtils.cp_r "#{@gem_dir}/assets/#{device}", "build"
-
-  # Combine contents of C source files and bytecode into one file
-  File.open("build/#{device}/main.c", 'w') do |f|
-    f << "#define RUBY2D_IOS_TVOS 1" << "\n\n"
-    f << "#define MRUBY 1" << "\n\n"
-    f << File.read("build/lib.c") << "\n\n"
-    f << File.read("build/src.c") << "\n\n"
-    f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
-  end
-
-  # TODO: Need add this functionality to the gem
-  # Build the Xcode project
-  `simple2d build --#{device} build/#{device}/MyApp.xcodeproj`
-
-  # Clean up
-  clean_up unless @debug
-
-  # Success!
-  puts "App created: `build/#{device}`"
 end
 
 
@@ -398,12 +333,41 @@ def clean_up(cmd = nil)
     Dir.glob('build/*.{rb,c,js}')
   )
   if cmd == :all
-    puts "cleaning up..."
-    FileUtils.rm_f 'build/app'
-    FileUtils.rm_f 'build/app.js'
-    FileUtils.rm_f 'build/app.html'
-    FileUtils.rm_rf 'build/App.app'
-    FileUtils.rm_rf 'build/ios'
-    FileUtils.rm_rf 'build/tvos'
+    FileUtils.rm_rf 'build/macos'
+    FileUtils.rm_rf 'build/linux'
+    FileUtils.rm_rf 'build/windows'
+    FileUtils.rm_rf 'build/web'
   end
+end
+
+
+# Start a local server and open a built web app
+def serve(html_file)
+
+  # Check if file provided is good
+  if !html_file
+    puts "Provide an HTML file to serve"
+    exit 1
+  elsif !File.exist? html_file
+    puts "Can't find file: #{html_file}"
+    exit 1
+  elsif File.extname(html_file) != '.html'
+    puts "File must be of type `.html`"
+    exit 1
+  end
+
+  case $RUBY2D_PLATFORM
+  when :macos
+  open_cmd = 'open'
+  when :linux
+    open_cmd = 'xdg-open'
+  when :windows
+    open_cmd = 'start'
+  end
+
+  pid = Process.spawn "ruby -rwebrick -e 'WEBrick::HTTPServer.new(:Port => 4001, :DocumentRoot => Dir.pwd).start'", err: '/dev/null'
+  sleep 0.5
+  system "#{open_cmd} http://localhost:4001/#{html_file}"
+  sleep 1
+  Process.kill 'QUIT', pid
 end
