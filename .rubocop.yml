@@ -1,0 +1,36 @@
+Naming/MethodParameterName:
+  inherit_mode:
+    override:
+      - Include
+  AllowedNames:
+    - x
+    - y
+    - z
+    - x1
+    - y1
+    - x2
+    - y2
+    - x3
+    - y3
+    - x4
+    - y4
+    - dx
+    - dy
+    - dz
+    - as
+
+Metrics/ClassLength:
+  Exclude:
+    - 'test/**/*'
+  Max: 1024
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+
+Metrics/MethodLength:
+  Max: 32
+
+Metrics/ParameterLists:
+  Max: 16
+  
