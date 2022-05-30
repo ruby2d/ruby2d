@@ -75,19 +75,36 @@ def set_rpi_flags
 end
 
 
+# Set flags for Linux and BSD
+def set_linux_bsd_flags
+  check_sdl
+  set_rpi_flags
+  add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
+  if $RUBY2D_PLATFORM == :linux then add_flags(:ld, '-lGL') end
+end
+
+
 # Use SDL and other libraries installed by the user (not those bundled with the gem)
 def use_usr_libs
-  # Add flags
-  set_rpi_flags
-  add_flags(:c, '-I/usr/local/include')
+  case $RUBY2D_PLATFORM
+  when :macos
+    add_flags(:c, `sdl2-config --cflags`)
+    add_flags(:c, '-I/opt/homebrew/include/')
+    add_flags(:ld, `sdl2-config --libs`)
+    add_flags(:ld, '-lSDL2_image -lSDL2_mixer -lSDL2_ttf')
+  when :windows
+    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf")
+  when :linux_rpi
+    set_linux_bsd_flags
+  end
 end
 
 
 # Configure native extension ###################################################
 
 # Build Ruby 2D native extention using libraries installed by user
-# To use install flag: `gem install ruby2d -- libs`
-if ARGV.include? 'libs'
+# To use install flag: `gem install ruby2d -- dev`
+if ARGV.include? 'dev'
   use_usr_libs
 
 # Use libraries provided by the gem (default)
@@ -105,17 +122,6 @@ else
     add_flags(:ld, "#{ldir}/libmpg123.a #{ldir}/libogg.a #{ldir}/libFLAC.a #{ldir}/libvorbis.a #{ldir}/libvorbisfile.a #{ldir}/libmodplug.a")
     add_flags(:ld, "#{ldir}/libfreetype.a #{ldir}/libharfbuzz.a #{ldir}/libgraphite2.a")
     add_flags(:ld, "-Wl,-framework,Cocoa -Wl,-framework,GameController -Wl,-framework,ForceFeedback")
-
-    # Delete the quarantine attribute on the mruby compiler executable
-    # (This may not be needed)
-    #   system "xattr -d com.apple.quarantine #{Dir.pwd}/../../assets/macos/universal/bin/mrbc"
-
-  when :linux, :linux_rpi, :bsd
-    check_sdl
-
-    set_rpi_flags
-    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm")
-    if $RUBY2D_PLATFORM == :linux then add_flags(:ld, '-lGL') end
 
   when :windows
     add_flags(:c, '-I../../assets/include')
@@ -154,12 +160,16 @@ else
     # End linker flags
     add_flags(:ld, "-Wl,--end-group")
 
+  when :linux, :linux_rpi, :bsd
+    set_linux_bsd_flags
+
   # If can't detect the platform, use libraries installed by the user
   else
     use_usr_libs
   end
 end
 
+$CFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they can cause problems
 $LDFLAGS.gsub!(/\n/, ' ')  # remove newlines in flags, they can cause problems
 
 # Create Makefile

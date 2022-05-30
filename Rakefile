@@ -3,6 +3,8 @@ require 'rubocop/rake_task'
 require_relative 'lib/ruby2d/cli/colorize'
 require_relative 'lib/ruby2d/version'
 
+$RUBY2D_DEV_MODE = true
+
 # Helpers ######################################################################
 
 def get_args
@@ -29,9 +31,10 @@ end
 task default: 'all'
 
 desc "Run default tasks using user-installed libraries"
-task :dev do
-  puts 'Building using user-installed libraries'.info
-  $libs = '-- libs'
+task :release do
+  puts '📦 Building gem release'.info
+  exit
+  $RUBY2D_DEV_MODE = false
   Rake::Task['all'].invoke
 end
 
@@ -44,13 +47,13 @@ end
 desc "Build gem"
 task :build do
   print_task "Building"
-  run_cmd "gem build ruby2d.gemspec --verbose"
+  run_cmd "gem build ruby2d.gemspec --verbose #{if $RUBY2D_DEV_MODE then '-- dev' end}"
 end
 
 desc "Install gem"
 task :install do
   print_task "Installing"
-  run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose #{$libs}"
+  run_cmd "gem install ruby2d-#{Ruby2D::VERSION}.gem --local --verbose #{if $RUBY2D_DEV_MODE then '-- dev' end}"
 end
 
 desc "Update submodules"
@@ -68,6 +71,9 @@ desc "Run the RSpec tests"
 RSpec::Core::RakeTask.new do |t|
   print_task "Running RSpec"
   t.pattern = "test/*spec.rb"
+  if $RUBY2D_DEV_MODE
+    ENV['RUBY2D_DEV_MODE'] = 'true'
+  end
 end
 
 task :test => 'test:cruby'
