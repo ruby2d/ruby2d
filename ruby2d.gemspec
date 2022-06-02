@@ -12,6 +12,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 2.0.0'
   s.add_development_dependency 'rspec', '~> 3.10'
+  s.add_development_dependency 'rubocop', '~> 1.30'
 
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('assets/include/**/*') +

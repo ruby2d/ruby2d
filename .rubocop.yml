@@ -1,3 +1,13 @@
+AllCops:
+  Exclude:
+    - 'assets/**/*'
+    - 'test/**/*'
+    - 'bin/**/*'
+    - 'build/**/*'
+    - 'ext/**/*'
+    - '**/Rakefile'
+    - '**/*.gemspec'
+
 Naming/MethodParameterName:
   inherit_mode:
     override:

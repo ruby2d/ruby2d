@@ -1,4 +1,5 @@
 require 'rspec/core/rake_task'
+require 'rubocop/rake_task'
 require_relative 'lib/ruby2d/cli/colorize'
 require_relative 'lib/ruby2d/version'
 
@@ -55,6 +56,12 @@ end
 desc "Update submodules"
 task :update do
   run_cmd "git submodule update --remote"
+end
+
+desc 'Run a Rubocop lint'
+RuboCop::RakeTask.new(:lint) do |t|
+  print_task 'Running Rubocop'
+  t.options = ['--parallel', '--display-cop-names']
 end
 
 desc "Run the RSpec tests"
