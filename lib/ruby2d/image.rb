@@ -1,6 +1,11 @@
+# frozen_string_literal: true
+
 # Ruby2D::Image
 
 module Ruby2D
+  # Images in many popular formats can be drawn in the window.
+  # To draw an image in the window, use the following, providing the image file path:
+  # +Image.new('star.png')+
   class Image
     include Renderable
 
@@ -19,35 +24,45 @@ module Ruby2D
       pixmap.texture
     end
 
-    def initialize(path, opts = {})
+    # Create an Image
+    # @param path The location of the file to load as an image.
+    # @param [Numeric] width The +width+ of image, or default is width from image file
+    # @param [Numeric] height The +height+ of image, or default is height from image file
+    # @param [Numeric] x
+    # @param [Numeric] y
+    # @param [Numeric] z
+    # @param [Numeric] rotate Angle, default is 0
+    # @param [Numeric] color or +colour+ Tint the image when rendering
+    # @param [Numeric] opacity Opacity of the image when rendering
+    # @param [true, false] show If +true+ the image is added to +Window+ automatically.
+    def initialize(path, atlas: nil,
+                   width: nil, height: nil, x: 0, y: 0, z: 0,
+                   rotate: 0, color: nil, colour: nil,
+                   opacity: nil, show: true)
       @path = path
 
       # Consider input pixmap atlas if supplied to load image file
-      @texture = Image.load_image_as_texture path, atlas: opts[:atlas]
-      @width = opts[:width] || @texture.width
-      @height = opts[:height] || @texture.height
+      @texture = Image.load_image_as_texture path, atlas: atlas
+      @width = width || @texture.width
+      @height = height || @texture.height
 
-      @x = opts[:x] || 0
-      @y = opts[:y] || 0
-      @z = opts[:z] || 0
-      @rotate = opts[:rotate] || 0
-      self.color = opts[:color] || 'white'
-      self.color.opacity = opts[:opacity] if opts[:opacity]
+      @x = x
+      @y = y
+      @z = z
+      @rotate = rotate
+      self.color = color || colour || 'white'
+      self.color.opacity = opacity unless opacity.nil?
 
-      unless opts[:show] == false then add end
+      add if show
     end
 
-    def draw(opts = {})
+    def draw(x: 0, y: 0, width: nil, height: nil, rotate: 0, color: nil, colour: nil)
       Window.render_ready_check
 
-      opts[:width] = opts[:width] || @width
-      opts[:height] = opts[:height] || @height
-      opts[:rotate] = opts[:rotate] || @rotate
-      unless opts[:color]
-        opts[:color] = [1.0, 1.0, 1.0, 1.0]
-      end
-
-      render(x: opts[:x], y: opts[:y], width: opts[:width], height: opts[:height], color: Color.new(opts[:color]), rotate: opts[:rotate])
+      render(x: x, y: y, width:
+        width || @width, height: height || @height,
+             color: Color.new(color || colour || 'white'),
+             rotate: rotate || @rotate)
     end
 
     private

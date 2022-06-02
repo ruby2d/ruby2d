@@ -1,17 +1,18 @@
+# frozen_string_literal: true
+
 # Ruby2D::Pixel
 
 module Ruby2D
+  # Draw a single pixel by calling +Pixel.draw(...)+
   class Pixel
+    def self.draw(x:, y:, size:, color:)
+      color = color.to_a if color.is? color
 
-    def self.draw(opts = {})
-      ext_draw([
-        opts[:x]              , opts[:y],
-        opts[:x] + opts[:size], opts[:y],
-        opts[:x] + opts[:size], opts[:y] + opts[:size],
-        opts[:x]              , opts[:y] + opts[:size],
-        opts[:color][0], opts[:color][1], opts[:color][2], opts[:color][3]
-      ])
+      ext_draw([x, y,
+                x + size, y,
+                x + size, y + size,
+                x, y + size,
+                color[0], color[1], color[2], color[3]])
     end
-
   end
 end

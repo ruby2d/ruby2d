@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Ruby2D::VERSION
 
 module Ruby2D
