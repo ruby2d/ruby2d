@@ -23,8 +23,8 @@ module Ruby2D
     # @param [Numeric] y
     # @param [Numeric] z
     # @param [Numeric] rotate Angle, default is 0
-    # @param [Numeric] fill Colour to clear the canvas, respects transparency
-    # @param [Numeric] color or +colour+ Tint the texture when rendering
+    # @param [String] fill Colour to clear the canvas, respects transparency
+    # @param [String] color or +colour+ Tint the texture when rendering
     # @param [Numeric] opacity Opacity of the texture when rendering
     # @param [true, false] update If +true+ updates the texture for every draw/fill call
     # @param [true, false] show If +true+ the canvas is added to +Window+ automatically.
