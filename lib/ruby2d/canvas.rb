@@ -1,9 +1,33 @@
+# frozen_string_literal: true
+
 # Ruby2D::Canvas
 
 module Ruby2D
+  #
+  # Canvas provides a surface into which you can draw using primitives and render the contents
+  # as if it were an image/texture.
+  #
+  # @example A basic Canvas positioned at (0, 0)
+  #   Canvas.new width: 320, height: 240
+  # @example A Canvas that doesn't update texture on every draw method
+  #   Canvas.new width: 320, height: 240, update: false
+  #
   class Canvas
     include Renderable
 
+    # Create a Canvas.
+    #
+    # @param [Numeric] width The +width+ of the canvas in pixels
+    # @param [Numeric] height The +height+ of the canvas in pixels
+    # @param [Numeric] x
+    # @param [Numeric] y
+    # @param [Numeric] z
+    # @param [Numeric] rotate Angle, default is 0
+    # @param [String] fill Colour to clear the canvas, respects transparency
+    # @param [String] color or +colour+ Tint the texture when rendering
+    # @param [Numeric] opacity Opacity of the texture when rendering
+    # @param [true, false] update If +true+ updates the texture for every draw/fill call
+    # @param [true, false] show If +true+ the canvas is added to +Window+ automatically.
     def initialize(width:, height:, x: 0, y: 0, z: 0, rotate: 0,
                    fill: [0, 0, 0, 0], color: nil, colour: nil, opacity: nil,
                    update: true, show: true)

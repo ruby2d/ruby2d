@@ -1,19 +1,22 @@
+# frozen_string_literal: true
+
 # Ruby2D::Sound
 
 module Ruby2D
+  # Sounds are intended to be short samples, played without interruption, like an effect.
   class Sound
-
     attr_reader :path
     attr_accessor :data
 
+    #
+    # Load a sound from a file
+    # @param [String] path File to load the sound from
+    # @raise [Error] if file cannot be found or music could not be successfully loaded.
     def initialize(path)
-      unless File.exist? path
-        raise Error, "Cannot find audio file `#{path}`"
-      end
+      raise Error, "Cannot find audio file `#{path}`" unless File.exist? path
+
       @path = path
-      unless ext_init(@path)
-        raise Error, "Sound `#{@path}` cannot be created"
-      end
+      raise Error, "Sound `#{@path}` cannot be created" unless ext_init(@path)
     end
 
     # Play the sound
@@ -32,11 +35,9 @@ module Ruby2D
     end
 
     # Set the volume of the sound
-    def volume=(v)
+    def volume=(volume)
       # Clamp value to between 0-100
-      if v < 0 then v = 0 end
-      if v > 100 then v = 100 end
-      ext_set_volume(v)
+      ext_set_volume(volume.clamp(0, 100))
     end
 
     # Get the volume of the sound mixer
@@ -45,11 +46,9 @@ module Ruby2D
     end
 
     # Set the volume of the sound mixer
-    def self.mix_volume=(v)
+    def self.mix_volume=(volume)
       # Clamp value to between 0-100
-      if v < 0 then v = 0 end
-      if v > 100 then v = 100 end
-      ext_set_mix_volume(v)
+      ext_set_mix_volume(volume.clamp(0, 100))
     end
   end
 end

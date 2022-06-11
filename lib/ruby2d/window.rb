@@ -234,7 +234,7 @@ module Ruby2D
     def set(opts)
       # Store new window attributes, or ignore if nil
       @title           = opts[:title]           || @title
-      if Color.is_valid? opts[:background]
+      if Color.valid? opts[:background]
         @background    = Color.new(opts[:background])
       end
       @icon            = opts[:icon]            || @icon
