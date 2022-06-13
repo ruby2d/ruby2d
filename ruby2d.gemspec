@@ -13,16 +13,17 @@ Gem::Specification.new do |s|
   s.required_ruby_version = '>= 2.0.0'
   s.add_development_dependency 'rspec', '~> 3.10'
   s.add_development_dependency 'rubocop', '~> 1.30'
-
   s.files = Dir.glob('lib/**/*') +
-            Dir.glob('assets/include/**/*') +
-            Dir.glob('assets/macos/universal/**/*') +
-            Dir.glob('assets/windows/**/*') +
-            Dir.glob('assets/test_media/**/*') +
-            Dir.glob('assets/wasm/**/*') +
-            Dir.glob('assets/xcode/**/*') +
-            Dir.glob('assets/app.icns') +
-            Dir.glob('ext/**/*.{h,c,rb}')
+            Dir.glob('ext/**/*.{h,c,rb}') +
+            Dir.glob('assets/test_media/**/*')
+  unless ARGV.include? 'dev'
+    s.files += Dir.glob('assets/include/**/*') +
+               Dir.glob('assets/macos/universal/**/*') +
+               Dir.glob('assets/windows/**/*') +
+               Dir.glob('assets/wasm/**/*') +
+               Dir.glob('assets/xcode/**/*') +
+               Dir.glob('assets/app.icns')
+  end
   s.extensions = ['ext/ruby2d/extconf.rb']
   s.executables << 'ruby2d'
 end

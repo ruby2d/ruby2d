@@ -10,4 +10,4 @@ before_test:
   - ruby -v
   - bundle install
 test_script:
-  - rake
+  - rake release

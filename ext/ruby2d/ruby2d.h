@@ -129,7 +129,7 @@ extern "C" {
   #define GL_GLEXT_PROTOTYPES 1
   #if WINDOWS
     #define GLEW_STATIC
-    #include <glew.h>
+    #include <GL/glew.h>
   #endif
   #include <SDL2/SDL_opengl.h>
 #endif

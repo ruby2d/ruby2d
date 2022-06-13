@@ -76,5 +76,5 @@ In order to achieve such simplicity, a lot has to happen under the hood. Whether
 1. Run tests on all supported platforms
 2. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
 3. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`, and write a little release note
-4. Run `rake` to build the gem, then push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
+4. Run `rake release` to build the gem, then push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
 5. 🎉
