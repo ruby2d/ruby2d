@@ -89,11 +89,12 @@ def use_usr_libs
   case $RUBY2D_PLATFORM
   when :macos
     add_flags(:c, `sdl2-config --cflags`)
-    add_flags(:c, '-I/opt/homebrew/include/')
+    add_flags(:c, '-I/opt/homebrew/include')
     add_flags(:ld, `sdl2-config --libs`)
-    add_flags(:ld, '-lSDL2_image -lSDL2_mixer -lSDL2_ttf')
+    add_flags(:ld, '-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf')
   when :windows
-    add_flags(:ld, "-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf")
+    add_flags(:ld, '-lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf')
+    add_flags(:ld, '-lopengl32 -lglew32')
   when :linux_rpi
     set_linux_bsd_flags
   end

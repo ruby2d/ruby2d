@@ -33,7 +33,6 @@ task default: 'all'
 desc "Run default tasks using user-installed libraries"
 task :release do
   puts '📦 Building gem release'.info
-  exit
   $RUBY2D_DEV_MODE = false
   Rake::Task['all'].invoke
 end
