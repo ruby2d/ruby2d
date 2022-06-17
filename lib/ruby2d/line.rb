@@ -72,13 +72,13 @@ module Ruby2D
     # @param [Numeric] y2
     # @param [Numeric] width The +width+ or thickness of the line
     # @param [Array] colors An array or 4 arrays of colour components.
-    def self.draw(x1:, y1:, x2:, y2:, width:, colors:)
+    def self.draw(x1:, y1:, x2:, y2:, width:, color:)
       Window.render_ready_check
 
       ext_draw([
                  x1, y1, x2, y2, width,
                  # splat each colour's components
-                 *colors[0], *colors[1], *colors[2], *colors[3]
+                 *color[0], *color[1], *color[2], *color[3]
                ])
     end
 
