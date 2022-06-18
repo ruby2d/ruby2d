@@ -36,6 +36,7 @@ module Ruby2D
       self.color = color || colour || 'white'
       self.color.opacity = opacity unless opacity.nil?
       @font_path = font
+      @texture = nil
       create_font
       create_texture
 
