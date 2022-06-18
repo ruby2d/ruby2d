@@ -99,6 +99,7 @@ module Ruby2D
 
     # Return colours as a memoized flattened array of 4 x colour components
     def color_components
+      check_if_opacity_changed
       @color_components ||= if @color.is_a? Color::Set
                               # Splat the colours from the set; see +def color=+ where colour set
                               # size is enforced
@@ -112,6 +113,11 @@ module Ruby2D
                                 *c_a, *c_a, *c_a, *c_a
                               ]
                             end
+    end
+
+    # Invalidate memoized colour components if opacity has been changed via +color=+
+    def check_if_opacity_changed
+      @color_components = nil if @color_components && @color_components[3] != @color.opacity
     end
 
     # Invalidate the memoized colour components. Called when Line's colour is changed

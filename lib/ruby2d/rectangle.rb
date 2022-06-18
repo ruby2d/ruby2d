@@ -55,5 +55,10 @@ module Ruby2D
             x3: x + width, y3: y + height,
             x4: x, y4: y + height, color: color)
     end
+
+    def contains?(x, y)
+      # Override the check from Quad since this is faster
+      x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
+    end
   end
 end
