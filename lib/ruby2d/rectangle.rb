@@ -1,18 +1,26 @@
+# frozen_string_literal: true
+
 # Ruby2D::Rectangle
 
 module Ruby2D
+  # A rectangle
   class Rectangle < Quad
-
-    def initialize(opts = {})
-      @x = opts[:x] || 0
-      @y = opts[:y] || 0
-      @z = opts[:z] || 0
-      @width = opts[:width] || 200
-      @height = opts[:height] || 100
-      self.color = opts[:color] || 'white'
-      self.color.opacity = opts[:opacity] if opts[:opacity]
-      update_coords(@x, @y, @width, @height)
-      add
+    # Create an rectangle
+    # @param [Numeric] x
+    # @param [Numeric] y
+    # @param [Numeric] width
+    # @param [Numeric] height
+    # @param [Numeric] z
+    # @param [String, Array] color A single colour or an array of exactly 4 colours
+    # @param [Numeric] opacity Opacity of the image when rendering
+    # @raise [ArgumentError] if an array of colours does not have 4 entries
+    def initialize(x: 0, y: 0, width: 200, height: 100, z: 0, color: nil, colour: nil, opacity: nil)
+      @width = width
+      @height = height
+      super(x1: @x = x, y1: @y = y,
+            x2: x + width, y2: y,
+            x3: x + width, y3: y + height,
+            x4: x, y4: y + height, z: z, color: color, colour: colour, opacity: opacity)
     end
 
     def x=(x)
@@ -29,37 +37,23 @@ module Ruby2D
       @y4 = y + @height
     end
 
-    def width=(w)
-      @width = w
-      update_coords(@x, @y, w, @height)
+    def width=(width)
+      @width = width
+      @x2 = @x1 + width
+      @x3 = @x1 + width
     end
 
-    def height=(h)
-      @height = h
-      update_coords(@x, @y, @width, h)
+    def height=(height)
+      @height = height
+      @y3 = @y1 + height
+      @y4 = @y1 + height
     end
 
-    def self.draw(opts = {})
-      ext_draw([
-        opts[:x]               , opts[:y]                , opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
-        opts[:x] + opts[:width], opts[:y]                , opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
-        opts[:x] + opts[:width], opts[:y] + opts[:height], opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
-        opts[:x]               , opts[:y] + opts[:height], opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
-      ])
+    def self.draw(x:, y:, width:, height:, color:)
+      super(x1: x, y1: y,
+            x2: x + width, y2: y,
+            x3: x + width, y3: y + height,
+            x4: x, y4: y + height, color: color)
     end
-
-    private
-
-    def update_coords(x, y, w, h)
-      @x1 = x
-      @y1 = y
-      @x2 = x + w
-      @y2 = y
-      @x3 = x + w
-      @y3 = y + h
-      @x4 = x
-      @y4 = y + h
-    end
-
   end
 end

@@ -1,9 +1,8 @@
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Rectangle do
-
-  describe "#new" do
-    it "creates a white rectangle by default" do
+  describe '#new' do
+    it 'creates a white rectangle by default' do
       rectangle = Rectangle.new
       expect(rectangle.color).to be_a(Ruby2D::Color)
       expect(rectangle.color.r).to eq(1)
@@ -12,7 +11,7 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.color.a).to eq(1)
     end
 
-    it "creates a rectangle with options" do
+    it 'creates a rectangle with options' do
       rectangle = Rectangle.new(
         x: 10, y: 20, z: 30,
         width: 40, height: 50,
@@ -24,26 +23,26 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.z).to eq(30)
       expect(rectangle.width).to eq(40)
       expect(rectangle.height).to eq(50)
-      expect(rectangle.color.r).to eq(2/3.0)
+      expect(rectangle.color.r).to eq(2 / 3.0)
       expect(rectangle.color.opacity).to eq(0.5)
     end
 
-    it "creates a new rectangle with one color via string" do
+    it 'creates a new rectangle with one color via string' do
       rectangle = Rectangle.new(color: 'red')
       expect(rectangle.color).to be_a(Ruby2D::Color)
     end
 
-    it "creates a new rectangle with one color via array of numbers" do
+    it 'creates a new rectangle with one color via array of numbers' do
       rectangle = Rectangle.new(color: [0.1, 0.3, 0.5, 0.7])
       expect(rectangle.color).to be_a(Ruby2D::Color)
     end
 
-    it "creates a new rectangle with 4 colors via array of 4 strings" do
-      rectangle = Rectangle.new(color: ['red', 'green', 'blue', 'black'])
+    it 'creates a new rectangle with 4 colors via array of 4 strings' do
+      rectangle = Rectangle.new(color: %w[red green blue black])
       expect(rectangle.color).to be_a(Ruby2D::Color::Set)
     end
 
-    it "creates a new rectangle with 4 colors via array of 4 arrays of arrays of numbers" do
+    it 'creates a new rectangle with 4 colors via array of 4 arrays of arrays of numbers' do
       rectangle = Rectangle.new(
         color: [
           [0.1, 0.3, 0.5, 0.7],
@@ -55,21 +54,21 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.color).to be_a(Ruby2D::Color::Set)
     end
 
-    it "throws an error when array of 3 strings is passed" do
+    it 'throws an error when array of 3 strings is passed' do
       expect do
-        Rectangle.new(color: ['red', 'green', 'blue'])
-      end.to raise_error("`Ruby2D::Rectangle` requires 4 colors, one for each vertex. 3 were given.")
+        Rectangle.new(color: %w[red green blue])
+      end.to raise_error('`Ruby2D::Rectangle` requires 4 colors, one for each vertex. 3 were given.')
     end
 
-    it "throws an error when array of 5 strings is passed" do
+    it 'throws an error when array of 5 strings is passed' do
       expect do
-        Rectangle.new(color: ['red', 'green', 'blue', 'black', 'fuchsia'])
-      end.to raise_error("`Ruby2D::Rectangle` requires 4 colors, one for each vertex. 5 were given.")
+        Rectangle.new(color: %w[red green blue black fuchsia])
+      end.to raise_error('`Ruby2D::Rectangle` requires 4 colors, one for each vertex. 5 were given.')
     end
   end
 
-  describe "attributes" do
-    it "can be set and read" do
+  describe 'attributes' do
+    it 'can be set and read' do
       rectangle = Rectangle.new
       rectangle.x = 10
       rectangle.y = 20
@@ -84,9 +83,8 @@ RSpec.describe Ruby2D::Rectangle do
       expect(rectangle.z).to eq(30)
       expect(rectangle.width).to eq(40)
       expect(rectangle.height).to eq(50)
-      expect(rectangle.color.r).to eq(2/3.0)
+      expect(rectangle.color.r).to eq(2 / 3.0)
       expect(rectangle.color.opacity).to eq(0.5)
     end
   end
-
 end
