@@ -1,6 +1,9 @@
+# frozen_string_literal: true
+
 # Ruby2D::Quad
 
 module Ruby2D
+  # A quadrilateral based on four points in clockwise order starting at the top left.
   class Quad
     include Renderable
 
@@ -14,24 +17,50 @@ module Ruby2D
                   :x3, :y3, :c3,
                   :x4, :y4, :c4
 
-    def initialize(opts = {})
-      @x1 = opts[:x1] || 0
-      @y1 = opts[:y1] || 0
-      @x2 = opts[:x2] || 100
-      @y2 = opts[:y2] || 0
-      @x3 = opts[:x3] || 100
-      @y3 = opts[:y3] || 100
-      @x4 = opts[:x4] || 0
-      @y4 = opts[:y4] || 100
-      @z  = opts[:z]  || 0
-      self.color = opts[:color] || 'white'
-      self.color.opacity = opts[:opacity] if opts[:opacity]
+    # Create an quadrilateral
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] x4
+    # @param [Numeric] y4
+    # @param [Numeric] z
+    # @param [String, Array] color A single colour or an array of exactly 4 colours
+    # @param [Numeric] opacity Opacity of the image when rendering
+    # @raise [ArgumentError] if an array of colours does not have 4 entries
+    def initialize(x1: 0, y1: 0, x2: 100, y2: 0, x3: 100, y3: 100, x4: 0, y4: 100,
+                   z: 0, color: nil, colour: nil, opacity: nil)
+      @x1 = x1
+      @y1 = y1
+      @x2 = x2
+      @y2 = y2
+      @x3 = x3
+      @y3 = y3
+      @x4 = x4
+      @y4 = y4
+      @z  = z
+      self.color = color || colour || 'white'
+      self.color.opacity = opacity unless opacity.nil?
       add
     end
 
-    def color=(c)
-      @color = Color.set(c)
-      update_color(@color)
+    # Change the colour of the line
+    # @param [String, Array] color A single colour or an array of exactly 4 colours
+    # @raise [ArgumentError] if an array of colours does not have 4 entries
+    def color=(color)
+      # convert to Color or Color::Set
+      color = Color.set(color)
+
+      # require 4 colours if multiple colours provided
+      if color.is_a?(Color::Set) && color.length != 4
+        raise ArgumentError,
+              "`#{self.class}` requires 4 colors, one for each vertex. #{color.length} were given."
+      end
+
+      @color = color # converted above
+      invalidate_color_components
     end
 
     # The logic is the same as for a triangle
@@ -48,49 +77,68 @@ module Ruby2D
       questioned_area <= self_area
     end
 
-    def self.draw(opts = {})
+    # Draw a line without creating a Line
+    # @param [Numeric] x1
+    # @param [Numeric] y1
+    # @param [Numeric] x2
+    # @param [Numeric] y2
+    # @param [Numeric] x3
+    # @param [Numeric] y3
+    # @param [Numeric] x4
+    # @param [Numeric] y4
+    # @param [Array] colors An array of 4 arrays of colour components.
+    def self.draw(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color:)
       Window.render_ready_check
-
       ext_draw([
-        opts[:x1], opts[:y1], opts[:color][0][0], opts[:color][0][1], opts[:color][0][2], opts[:color][0][3],
-        opts[:x2], opts[:y2], opts[:color][1][0], opts[:color][1][1], opts[:color][1][2], opts[:color][1][3],
-        opts[:x3], opts[:y3], opts[:color][2][0], opts[:color][2][1], opts[:color][2][2], opts[:color][2][3],
-        opts[:x4], opts[:y4], opts[:color][3][0], opts[:color][3][1], opts[:color][3][2], opts[:color][3][3]
-      ])
+                 x1, y1, *color[0], # splat the colour components
+                 x2, y2, *color[1],
+                 x3, y3, *color[2],
+                 x4, y4, *color[3]
+               ])
     end
 
     private
 
     def render
+      color_comp_arrays = color_components
       self.class.ext_draw([
-        @x1, @y1, @c1.r, @c1.g, @c1.b, @c1.a,
-        @x2, @y2, @c2.r, @c2.g, @c2.b, @c2.a,
-        @x3, @y3, @c3.r, @c3.g, @c3.b, @c3.a,
-        @x4, @y4, @c4.r, @c4.g, @c4.b, @c4.a
-      ])
+                            @x1, @y1, *color_comp_arrays[0], # splat the colour components
+                            @x2, @y2, *color_comp_arrays[1],
+                            @x3, @y3, *color_comp_arrays[2],
+                            @x4, @y4, *color_comp_arrays[3]
+                          ])
     end
 
     def triangle_area(x1, y1, x2, y2, x3, y3)
-      (x1*y2 + x2*y3 + x3*y1 - x3*y2 - x1*y3 - x2*y1).abs / 2
+      (x1 * y2 + x2 * y3 + x3 * y1 - x3 * y2 - x1 * y3 - x2 * y1).abs / 2
     end
 
-    def update_color(c)
-      if c.is_a? Color::Set
-        if c.length == 4
-          @c1 = c[0]
-          @c2 = c[1]
-          @c3 = c[2]
-          @c4 = c[3]
-        else
-          raise ArgumentError, "`#{self.class}` requires 4 colors, one for each vertex. #{c.length} were given."
-        end
-      else
-        @c1 = c
-        @c2 = c
-        @c3 = c
-        @c4 = c
-      end
+    # Return colours as a memoized array of 4 x colour component arrays
+    def color_components
+      check_if_opacity_changed
+      @color_components ||= if @color.is_a? Color::Set
+                              # Extract colour component arrays; see +def color=+ where colour set
+                              # size is enforced
+                              [
+                                @color[0].to_a, @color[1].to_a, @color[2].to_a, @color[3].to_a
+                              ]
+                            else
+                              # All vertex colours are the same
+                              c_a = @color.to_a
+                              [
+                                c_a, c_a, c_a, c_a
+                              ]
+                            end
     end
 
+    # Invalidate memoized colour components if opacity has been changed via +color=+
+    def check_if_opacity_changed
+      @color_components = nil if @color_components && @color_components.first[3] != @color.opacity
+    end
+
+    # Invalidate the memoized colour components. Called when Line's colour is changed
+    def invalidate_color_components
+      @color_components = nil
+    end
   end
 end

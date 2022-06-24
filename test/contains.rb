@@ -1,6 +1,6 @@
 require 'ruby2d'
 
-set title: "Ruby 2D — Contains", height: 350
+set title: 'Ruby 2D — Contains', height: 350
 
 font = "#{Ruby2D.test_media}/bitstream_vera/vera.ttf"
 
@@ -20,7 +20,7 @@ end
 
 update do
   objects.each do |o|
-    o.contains?(get(:mouse_x), get(:mouse_y)) ? o.opacity = 1.0 : o.opacity = 0.5
+    o.color.opacity = (o.contains?(get(:mouse_x), get(:mouse_y)) ? 1.0 : 0.5)
   end
 end
 

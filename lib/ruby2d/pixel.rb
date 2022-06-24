@@ -6,7 +6,7 @@ module Ruby2D
   # Draw a single pixel by calling +Pixel.draw(...)+
   class Pixel
     def self.draw(x:, y:, size:, color:)
-      color = color.to_a if color.is? color
+      color = color.to_a if color.is_a? Color
 
       ext_draw([x, y,
                 x + size, y,

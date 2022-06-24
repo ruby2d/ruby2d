@@ -1,16 +1,18 @@
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Renderable do
-
   # Create and use a fresh class to ensure nothing is overridden
   class SomeShape
     include Renderable
     def initialize(x: 0, y: 0, width: 100, height: 100)
-      @x, @y, @width, @height = x, y, width, height
+      @x = x
+      @y = y
+      @width = width
+      @height = height
     end
   end
 
-  it "allows colors to be set on objects" do
+  it 'allows colors to be set on objects' do
     shape = SomeShape.new
 
     shape.color = 'red'
@@ -32,7 +34,7 @@ RSpec.describe Ruby2D::Renderable do
     expect(shape.color.a).to eq(0.4)
   end
 
-  it "allows British English spelling of color (colour)" do
+  it 'allows British English spelling of color (colour)' do
     shape = SomeShape.new
 
     shape.colour = 'blue'
@@ -58,8 +60,7 @@ RSpec.describe Ruby2D::Renderable do
     expect(shape.color.a).to eq(0.6)
   end
 
-  describe "#contains?" do
-
+  describe '#contains?' do
     shape = SomeShape.new(x: 1, y: 1, width: 2, height: 2)
 
     # Grid looks like this, 2x2 square at point (1, 1):
@@ -75,7 +76,7 @@ RSpec.describe Ruby2D::Renderable do
     #   |  |  |  |  |
     # 4 +--+--+--+--+
 
-    it "returns true if point is inside the shape" do
+    it 'returns true if point is inside the shape' do
       expect(shape.contains?(1, 1)).to be true
       expect(shape.contains?(2, 1)).to be true
       expect(shape.contains?(3, 1)).to be true
@@ -87,7 +88,7 @@ RSpec.describe Ruby2D::Renderable do
       expect(shape.contains?(3, 3)).to be true
     end
 
-    it "returns false if point is outside the shape" do
+    it 'returns false if point is outside the shape' do
       # Clockwise around the shape
       expect(shape.contains?(0, 0)).to be false
       expect(shape.contains?(1, 0)).to be false
@@ -107,5 +108,4 @@ RSpec.describe Ruby2D::Renderable do
       expect(shape.contains?(0, 1)).to be false
     end
   end
-
 end

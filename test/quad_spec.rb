@@ -1,9 +1,10 @@
+# frozen_string_literal: true
+
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Quad do
-
-  describe "#new" do
-    it "creates a white quad by default" do
+  describe '#new' do
+    it 'creates a white quad by default' do
       quad = Quad.new
       expect(quad.color).to be_a(Ruby2D::Color)
       expect(quad.color.r).to eq(1)
@@ -12,7 +13,7 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.color.a).to eq(1)
     end
 
-    it "creates a quad with options" do
+    it 'creates a quad with options' do
       quad = Quad.new(
         x1: 10, y1: 20,
         x2: 30, y2: 40,
@@ -31,26 +32,26 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.x4).to eq(70)
       expect(quad.y4).to eq(80)
       expect(quad.z).to eq(90)
-      expect(quad.color.r).to eq(2/3.0)
+      expect(quad.color.r).to eq(2 / 3.0)
       expect(quad.color.opacity).to eq(0.5)
     end
 
-    it "creates a new quad with one color via string" do
+    it 'creates a new quad with one color via string' do
       quad = Quad.new(color: 'red')
       expect(quad.color).to be_a(Ruby2D::Color)
     end
 
-    it "creates a new quad with one color via array of numbers" do
+    it 'creates a new quad with one color via array of numbers' do
       quad = Quad.new(color: [0.1, 0.3, 0.5, 0.7])
       expect(quad.color).to be_a(Ruby2D::Color)
     end
 
-    it "creates a new quad with 4 colors via array of 4 strings" do
-      quad = Quad.new(color: ['red', 'green', 'blue', 'black'])
+    it 'creates a new quad with 4 colors via array of 4 strings' do
+      quad = Quad.new(color: %w[red green blue black])
       expect(quad.color).to be_a(Ruby2D::Color::Set)
     end
 
-    it "creates a new quad with 4 colors via array of 4 arrays of arrays of numbers" do
+    it 'creates a new quad with 4 colors via array of 4 arrays of arrays of numbers' do
       quad = Quad.new(
         color: [
           [0.1, 0.3, 0.5, 0.7],
@@ -62,21 +63,21 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.color).to be_a(Ruby2D::Color::Set)
     end
 
-    it "throws an error when array of 3 strings is passed" do
+    it 'throws an error when array of 3 strings is passed' do
       expect do
-        Quad.new(color: ['red', 'green', 'blue'])
-      end.to raise_error("`Ruby2D::Quad` requires 4 colors, one for each vertex. 3 were given.")
+        Quad.new(color: %w[red green blue])
+      end.to raise_error('`Ruby2D::Quad` requires 4 colors, one for each vertex. 3 were given.')
     end
 
-    it "throws an error when array of 5 strings is passed" do
+    it 'throws an error when array of 5 strings is passed' do
       expect do
-        Quad.new(color: ['red', 'green', 'blue', 'black', 'fuchsia'])
-      end.to raise_error("`Ruby2D::Quad` requires 4 colors, one for each vertex. 5 were given.")
+        Quad.new(color: %w[red green blue black fuchsia])
+      end.to raise_error('`Ruby2D::Quad` requires 4 colors, one for each vertex. 5 were given.')
     end
   end
 
-  describe "attributes" do
-    it "can be set and read" do
+  describe 'attributes' do
+    it 'can be set and read' do
       quad = Quad.new
       quad.x1 = 10
       quad.y1 = 20
@@ -99,13 +100,13 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.x4).to eq(70)
       expect(quad.y4).to eq(80)
       expect(quad.z).to eq(90)
-      expect(quad.color.r).to eq(2/3.0)
+      expect(quad.color.r).to eq(2 / 3.0)
       expect(quad.color.opacity).to eq(0.5)
     end
   end
 
   # Quads define their own `contains?` method
-  describe "#contains?" do
+  describe '#contains?' do
     quad = Quad.new(
       x1: 1, y1: 1,
       x2: 3, y2: 1,
@@ -126,7 +127,7 @@ RSpec.describe Ruby2D::Quad do
     #   |  |  |  |  |
     # 4 +--+--+--+--+
 
-    it "returns true if point is inside the quad" do
+    it 'returns true if point is inside the quad' do
       expect(quad.contains?(1, 1)).to be true
       expect(quad.contains?(2, 1)).to be true
       expect(quad.contains?(3, 1)).to be true
@@ -138,7 +139,7 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.contains?(3, 3)).to be true
     end
 
-    it "returns false if point is outside the quad" do
+    it 'returns false if point is outside the quad' do
       # Clockwise around the quad
       expect(quad.contains?(0, 0)).to be false
       expect(quad.contains?(1, 0)).to be false
@@ -158,5 +159,4 @@ RSpec.describe Ruby2D::Quad do
       expect(quad.contains?(0, 1)).to be false
     end
   end
-
 end
