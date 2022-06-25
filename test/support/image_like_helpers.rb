@@ -1,4 +1,5 @@
 require 'ruby2d'
+require 'pathname'
 
 # Image and Sprite are very similar. This helper defines  tests
 # so that specs for objects that are "image like" can share tests.
@@ -51,6 +52,17 @@ shared_examples 'image-loading tests' do
     let(:path) { not_found_path }
     it 'fails' do
       expect { subject }.to raise_error(Ruby2D::Error)
+    end
+  end
+
+  context 'using pathname' do
+    let(:path) { Pathname.new(test_media('image.png')) }
+    it 'converts path to string' do
+      expect(subject.path.is_a?(String)).to be true
+    end
+
+    it 'succeeds' do
+      expect(subject.path).to end_with test_media('image.png')
     end
   end
 end

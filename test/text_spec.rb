@@ -2,6 +2,15 @@ require 'ruby2d'
 
 RSpec.describe Ruby2D::Text do
   describe '#new' do
+    context 'using pathname' do
+      it 'succeeds' do
+        expect do
+          Text.new('hello',
+                   font: Pathname.new("#{Ruby2D.test_media}/bitstream_vera/vera.ttf"))
+        end.not_to raise_error
+      end
+    end
+
     it "raises exception if font file doesn't exist" do
       expect { Text.new('hello', font: 'bad_font.ttf') }.to raise_error(Ruby2D::Error)
     end
@@ -68,7 +77,7 @@ RSpec.describe Ruby2D::Text do
 
       txt.size = 20
       expect(txt.width).to be > original_width
-      expect(txt.height).to be > original_width
+      expect(txt.height).to be > original_height
     end
   end
 

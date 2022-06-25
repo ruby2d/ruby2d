@@ -20,12 +20,13 @@ module Ruby2D
     class << self
       # Return a font by +path+, +size+ and +style+, loading the font if not already in the cache.
       #
-      # @param [String] path Full path to the font file
-      # @param [Numeric] size Size of font to setup
-      # @param [String] style Font style
+      # @param path [#to_s] Full path to the font file
+      # @param size [Numeric] Size of font to setup
+      # @param style [String] Font style
       #
       # @return [Font]
       def load(path, size, style = nil)
+        path = path.to_s
         raise Error, "Cannot find font file `#{path}`" unless File.exist? path
 
         (@loaded_fonts[[path, size, style]] ||= Font.send(:new, path, size, style)).tap do |_font|
@@ -133,7 +134,7 @@ module Ruby2D
 
     # Private constructor, called internally using +Font.send(:new,...)+
     def initialize(path, size, style = nil)
-      @ttf_font = Font.ext_load(path, size, style.to_s)
+      @ttf_font = Font.ext_load(path.to_s, size, style.to_s)
     end
   end
 end

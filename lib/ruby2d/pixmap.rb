@@ -23,6 +23,7 @@ module Ruby2D
     attr_reader :width, :height, :path
 
     def initialize(file_path)
+      file_path = file_path.to_s
       raise UnknownImageFileError, file_path unless File.exist? file_path
 
       ext_load_pixmap(file_path)

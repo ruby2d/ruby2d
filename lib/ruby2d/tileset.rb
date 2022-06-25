@@ -7,11 +7,11 @@ module Ruby2D
     include Renderable
 
     def initialize(path, opts = {})
-      @path = path
+      @path = path.to_s
 
       # Initialize the tileset texture
       # Consider input pixmap atlas if supplied to load image file
-      @texture = Image.load_image_as_texture path, atlas: opts[:atlas]
+      @texture = Image.load_image_as_texture @path, atlas: opts[:atlas]
       @width = opts[:width] || @texture.width
       @height = opts[:height] || @texture.height
       @z = opts[:z] || 0

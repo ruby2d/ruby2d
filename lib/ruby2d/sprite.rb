@@ -9,11 +9,11 @@ module Ruby2D
 
     def initialize(path, opts = {})
       # Sprite image file path
-      @path = path
+      @path = path.to_s
 
       # Initialize the sprite texture
       # Consider input pixmap atlas if supplied to load image file
-      @texture = Image.load_image_as_texture path, atlas: opts[:atlas]
+      @texture = Image.load_image_as_texture @path, atlas: opts[:atlas]
       @img_width = @texture.width
       @img_height = @texture.height
 
