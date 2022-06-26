@@ -13,7 +13,8 @@ module Ruby2D
     attr_accessor :x, :y, :width, :height, :rotate, :data
 
     # Load an image +path+ and return a Texture, using a pixmap atlas if provided
-    # @param [PixmapAtlas] Optional pixmap atlas to use to manage the image file
+    # @param path [#to_s] The location of the file to load as an image.
+    # @param atlas [PixmapAtlas] Pixmap atlas to use to manage the image file
     # @return [Texture] loaded
     def self.load_image_as_texture(path, atlas:)
       pixmap = if atlas
@@ -25,24 +26,24 @@ module Ruby2D
     end
 
     # Create an Image
-    # @param path The location of the file to load as an image.
-    # @param [Numeric] width The +width+ of image, or default is width from image file
-    # @param [Numeric] height The +height+ of image, or default is height from image file
-    # @param [Numeric] x
-    # @param [Numeric] y
-    # @param [Numeric] z
-    # @param [Numeric] rotate Angle, default is 0
-    # @param [Numeric] color or +colour+ Tint the image when rendering
-    # @param [Numeric] opacity Opacity of the image when rendering
-    # @param [true, false] show If +true+ the image is added to +Window+ automatically.
+    # @param path [#to_s] The location of the file to load as an image.
+    # @param width [Numeric] The +width+ of image, or default is width from image file
+    # @param height [Numeric] The +height+ of image, or default is height from image file
+    # @param x [Numeric]
+    # @param y [Numeric]
+    # @param z [Numeric]
+    # @param rotate [Numeric] Angle, default is 0
+    # @param color [Numeric] (or +colour+) Tint the image when rendering
+    # @param opacity [Numeric] Opacity of the image when rendering
+    # @param show [Boolean] If +true+ the image is added to +Window+ automatically.
     def initialize(path, atlas: nil,
                    width: nil, height: nil, x: 0, y: 0, z: 0,
                    rotate: 0, color: nil, colour: nil,
                    opacity: nil, show: true)
-      @path = path
+      @path = path.to_s
 
       # Consider input pixmap atlas if supplied to load image file
-      @texture = Image.load_image_as_texture path, atlas: atlas
+      @texture = Image.load_image_as_texture @path, atlas: atlas
       @width = width || @texture.width
       @height = height || @texture.height
 
