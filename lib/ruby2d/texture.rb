@@ -1,6 +1,10 @@
+# frozen_string_literal: true
+
 # Ruby2D::Texture
 
 module Ruby2D
+  # This internal class is used to hold raw pixel data which in turn is used to
+  # render textures via openGL rendering code.
   class Texture
     attr_reader :width, :height, :texture_id
 
@@ -12,7 +16,7 @@ module Ruby2D
     end
 
     def draw(coordinates, texture_coordinates, color)
-      if @texture_id == 0
+      if @texture_id.zero?
         @texture_id = ext_create(@pixel_data, @width, @height)
         @pixel_data = nil
       end
