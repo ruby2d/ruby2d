@@ -118,7 +118,7 @@ module Ruby2D
 
       return unless @flip == :vertical || @flip == :both
 
-      @y = y + @height
+      @y += @height
       @height = -@height
     end
   end
