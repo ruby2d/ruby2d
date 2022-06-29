@@ -1,105 +1,85 @@
+# frozen_string_literal: true
+
 # Ruby2D::Sprite
 
 module Ruby2D
+  # Sprites are special images that can be used to create animations, kind of like a flip book.
+  # To create a sprite animation, first you’ll need an image which contains each frame of your animation.
   class Sprite
     include Renderable
 
     attr_reader :path
     attr_accessor :rotate, :loop, :clip_x, :clip_y, :clip_width, :clip_height, :data, :x, :y, :width, :height
 
-    def initialize(path, opts = {})
-      # Sprite image file path
+    # Create a sprite via single image or sprite-sheet.
+    # @param path [#to_s] The location of the file to load as an image.
+    # @param width [Numeric] The +width+ of drawn image, or default is width from image file
+    # @param height [Numeric] The +height+ of drawn image, or default is height from image file
+    # @param x [Numeric]
+    # @param y [Numeric]
+    # @param z [Numeric]
+    # @param rotate [Numeric] Angle, default is 0
+    # @param color [Numeric] (or +colour+) Tint the image when rendering
+    # @param opacity [Numeric] Opacity of the image when rendering
+    # @param show [Boolean] If +true+ the image is added to +Window+ automatically.
+    # @param loop [Boolean] Sets whether animations loop by default when played (can be overridden by +play+ method)
+    # @param time [Numeric] The default time in millisecond for each frame (unless overridden animation within frames)
+    # @param animations [Hash{String => Range}, Hash{String=>Array<Hash>}] Sprite sheet map to animations using
+    #                                                                      frame ranges or individual frames
+    # @param default [Numeric] The default initial frame for the sprite
+    # @param clip_x [Numeric]
+    # @param clip_x [Numeric]
+    # @param clip_width [Numeric]
+    # @param clip_height [Numeric]
+    def initialize(path, atlas: nil, show: true, width: nil, height: nil,
+                   x: 0, y: 0, z: 0, rotate: 0, color: nil, colour: nil, opacity: nil,
+                   loop: false, time: 300, animations: {}, default: 0,
+                   clip_x: 0, clip_y: 0, clip_width: nil, clip_height: nil)
       @path = path.to_s
 
-      # Initialize the sprite texture
-      # Consider input pixmap atlas if supplied to load image file
-      @texture = Image.load_image_as_texture @path, atlas: opts[:atlas]
-      @img_width = @texture.width
-      @img_height = @texture.height
-
       # Coordinates, size, and rotation of the sprite
-      @x = opts[:x] || 0
-      @y = opts[:y] || 0
-      @z = opts[:z] || 0
-      @rotate = opts[:rotate] || 0
-      self.color = opts[:color] || 'white'
-      self.color.opacity = opts[:opacity] if opts[:opacity]
+      @x = x
+      @y = y
+      @z = z
+      @rotate = rotate
+      self.color = color || colour || 'white'
+      self.color.opacity = opacity unless opacity.nil?
+
+      # Dimensions
+      @width  = width
+      @height = height
 
       # Flipping status
       @flip = nil
 
       # Animation attributes
-      @start_time = 0.0
-      @loop = opts[:loop] || false
-      @frame_time = opts[:time] || 300
-      @animations = opts[:animations] || {}
-      @playing = false
-      @current_frame = opts[:default] || 0
-      @last_frame = 0
-      @done_proc = nil
+      @loop = loop
+      @frame_time = time
+      @animations = animations
+      @current_frame = default
 
-      # The clipping rectangle
-      @clip_x = opts[:clip_x] || 0
-      @clip_y = opts[:clip_y] || 0
-      @clip_width  = opts[:clip_width]  || @img_width
-      @clip_height = opts[:clip_height] || @img_height
-
-      # Dimensions
-      @width  = opts[:width]  || nil
-      @height = opts[:height] || nil
-
-      # Set the default animation
-      @animations[:default] = 0..(@img_width / @clip_width) - 1
-
-      # Set the sprite defaults
-      @defaults = {
-        animation:   @animations.first[0],
-        frame:       @current_frame,
-        frame_time:  @frame_time,
-        clip_x:      @clip_x,
-        clip_y:      @clip_y,
-        clip_width:  @clip_width,
-        clip_height: @clip_height,
-        loop:        @loop
-      }
+      _setup_texture_and_clip_box atlas, clip_x, clip_y, clip_width, clip_height
+      _setup_animation
 
       # Add the sprite to the window
-      unless opts[:show] == false then add end
+      add if show
     end
 
-    # Play an animation
-    def play(opts = {}, &done_proc)
-
-      animation = opts[:animation]
-      loop = opts[:loop]
-      flip = opts[:flip]
-
-      if !@playing || (animation != @playing_animation && animation != nil) || flip != @flip
+    # Start playing an animation
+    # @param animation [String] Name of the animation to play
+    # @param loop [Boolean] Set the animation to loop or not
+    # @param flip [nil, :vertical, :horizontal, :both] Direction to flip the sprite if desired
+    def play(animation: :default, loop: nil, flip: nil, &done_proc)
+      unless @playing && animation == @playing_animation && flip == @flip
         @playing = true
         @playing_animation = animation || :default
-        frames = @animations[@playing_animation]
-        flip_sprite(flip)
         @done_proc = done_proc
 
-        case frames
-        # When animation is a range, play through frames horizontally
-        when Range
-          @first_frame   = frames.first || @defaults[:frame]
-          @current_frame = frames.first || @defaults[:frame]
-          @last_frame    = frames.last
-        # When array...
-        when Array
-          @first_frame   = 0
-          @current_frame = 0
-          @last_frame    = frames.length - 1
-        end
+        flip_sprite(flip)
+        _reset_playing_animation
 
-        @loop =
-          if loop != nil
-            loop
-          else
-            @defaults[:loop] ? true : false
-          end
+        loop = @defaults[:loop] if loop.nil?
+        @loop = loop ? true : false
 
         set_frame
         restart_time
@@ -109,22 +89,22 @@ module Ruby2D
 
     # Stop the current animation and set to the default frame
     def stop(animation = nil)
-      if !animation || animation == @playing_animation
-        @playing = false
-        @playing_animation = @defaults[:animation]
-        @current_frame = @defaults[:frame]
-        set_frame
-      end
+      return unless !animation || animation == @playing_animation
+
+      @playing = false
+      @playing_animation = @defaults[:animation]
+      @current_frame = @defaults[:frame]
+      set_frame
     end
 
     # Flip the sprite
+    # @param flip [nil, :vertical, :horizontal, :both] Direction to flip the sprite if desired
     def flip_sprite(flip)
-
       # The sprite width and height must be set for it to be flipped correctly
       if (!@width || !@height) && flip
         raise Error,
-         "Sprite width and height must be set in order to flip; " +
-         "occured playing animation `:#{@playing_animation}` with image `#{@path}`"
+              "Sprite width/height required to flip; occured playing animation `:#{@playing_animation}`
+               with image `#{@path}`"
       end
 
       @flip = flip
@@ -146,12 +126,7 @@ module Ruby2D
         reset_clipping_rect
         @clip_x = @current_frame * @clip_width
       when Array
-        f = frames[@current_frame]
-        @clip_x      = f[:x]      || @defaults[:clip_x]
-        @clip_y      = f[:y]      || @defaults[:clip_y]
-        @clip_width  = f[:width]  || @defaults[:clip_width]
-        @clip_height = f[:height] || @defaults[:clip_height]
-        @frame_time  = f[:time]   || @defaults[:frame_time]
+        _set_explicit_frame frames[@current_frame]
       end
     end
 
@@ -167,75 +142,137 @@ module Ruby2D
 
     # Update the sprite animation, called by `render`
     def update
-      if @playing
+      return unless @playing
 
-        # Advance the frame
-        unless elapsed_time <= (@frame_time || @defaults[:frame_time])
-          @current_frame += 1
-          restart_time
-        end
+      # Advance the frame
+      unless elapsed_time <= (@frame_time || @defaults[:frame_time])
+        @current_frame += 1
+        restart_time
+      end
 
-        # Reset to the starting frame if all frames played
-        if @current_frame > @last_frame
-          @current_frame = @first_frame
-          unless @loop
-            # Stop animation and play block, if provided
-            stop
-            if @done_proc
-              # allow proc to make nested `play/do` calls to sequence multiple
-              # animations by clearing `@done_proc` before the call
-              kept_done_proc = @done_proc
-              @done_proc = nil
-              kept_done_proc.call
-            end
+      # Reset to the starting frame if all frames played
+      if @current_frame > @last_frame
+        @current_frame = @first_frame
+        unless @loop
+          # Stop animation and play block, if provided
+          stop
+          if @done_proc
+            # allow proc to make nested `play/do` calls to sequence multiple
+            # animations by clearing `@done_proc` before the call
+            kept_done_proc = @done_proc
+            @done_proc = nil
+            kept_done_proc.call
           end
         end
-
-        set_frame
       end
+
+      set_frame
     end
 
-    def draw(opts = {})
+    # @param width [Numeric] The +width+ of drawn image
+    # @param height [Numeric] The +height+ of drawn image
+    # @param x [Numeric]
+    # @param y [Numeric]
+    # @param rotate [Numeric] Angle, default is 0
+    # @param color [Numeric] (or +colour+) Tint the image when rendering
+    # @param clip_x [Numeric]
+    # @param clip_x [Numeric]
+    # @param clip_width [Numeric]
+    # @param clip_height [Numeric]
+    def draw(x:, y:, width: (@width || @clip_width), height: (@height || @clip_height), rotate: @rotate,
+             clip_x: @clip_x, clip_y: @clip_y, clip_width: @clip_width, clip_height: @clip_height,
+             color: [1.0, 1.0, 1.0, 1.0])
+
       Window.render_ready_check
-
-      opts[:width] = opts[:width] || (@width || @clip_width)
-      opts[:height] = opts[:height] || (@height || @clip_height)
-      opts[:rotate] = opts[:rotate] || @rotate
-      opts[:clip_x] = opts[:clip_x] || @clip_x
-      opts[:clip_y] = opts[:clip_y] || @clip_y
-      opts[:clip_width] = opts[:clip_width] || @clip_width
-      opts[:clip_height] = opts[:clip_height] || @clip_height
-      unless opts[:color]
-        opts[:color] = [1.0, 1.0, 1.0, 1.0]
-      end
-
-      render(x: opts[:x], y: opts[:y], width: opts[:width], height: opts[:height], color: Color.new(color), rotate: opts[:rotate], crop: {
-        x: opts[:clip_x],
-        y: opts[:clip_y],
-        width: opts[:clip_width],
-        height: opts[:clip_height],
-        image_width: @img_width,
-        image_height: @img_height,
-      })
+      render(x: x, y: y, width: width, height: height, color: Color.new(color), rotate: rotate, crop: {
+               x: clip_x,
+               y: clip_y,
+               width: clip_width,
+               height: clip_height,
+               image_width: @img_width,
+               image_height: @img_height
+             })
     end
 
     private
 
-    def render(x: @x, y: @y, width: (@width || @clip_width), height: (@height || @clip_height) , color: @color, rotate: @rotate, flip: @flip, crop: {
-      x: @clip_x,
-      y: @clip_y,
-      width: @clip_width,
-      height: @clip_height,
-      image_width: @img_width,
-      image_height: @img_height,
-    })
+    def render(x: @x, y: @y, width: (@width || @clip_width), height: (@height || @clip_height),
+               color: @color, rotate: @rotate, flip: @flip,
+               crop: {
+                 x: @clip_x,
+                 y: @clip_y,
+                 width: @clip_width,
+                 height: @clip_height,
+                 image_width: @img_width,
+                 image_height: @img_height
+               })
       update
-
       vertices = Vertices.new(x, y, width, height, rotate, crop: crop, flip: flip)
+      @texture.draw vertices.coordinates, vertices.texture_coordinates, color
+    end
 
-      @texture.draw(
-        vertices.coordinates, vertices.texture_coordinates, color
-      )
+    # Reset the playing animation to the first frame
+    def _reset_playing_animation
+      frames = @animations[@playing_animation]
+      case frames
+      # When animation is a range, play through frames horizontally
+      when Range
+        @first_frame   = frames.first || @defaults[:frame]
+        @current_frame = frames.first || @defaults[:frame]
+        @last_frame    = frames.last
+      # When array...
+      when Array
+        @first_frame   = 0
+        @current_frame = 0
+        @last_frame    = frames.length - 1
+      end
+    end
+
+    # Set the current frame based on the region/portion of image
+    def _set_explicit_frame(frame)
+      @clip_x      = frame[:x]      || @defaults[:clip_x]
+      @clip_y      = frame[:y]      || @defaults[:clip_y]
+      @clip_width  = frame[:width]  || @defaults[:clip_width]
+      @clip_height = frame[:height] || @defaults[:clip_height]
+      @frame_time  = frame[:time]   || @defaults[:frame_time]
+    end
+
+    # initialize texture and clipping, called by constructor
+    def _setup_texture_and_clip_box(atlas, clip_x, clip_y, clip_width, clip_height)
+      # Initialize the sprite texture
+      # Consider input pixmap atlas if supplied to load image file
+      @texture = Image.load_image_as_texture @path, atlas: atlas
+      @img_width = @texture.width
+      @img_height = @texture.height
+
+      # The clipping rectangle
+      @clip_x = clip_x
+      @clip_y = clip_y
+      @clip_width  = clip_width  || @img_width
+      @clip_height = clip_height || @img_height
+    end
+
+    # initialize animation, called by constructor
+    def _setup_animation
+      @start_time = 0.0
+      @playing = false
+      @last_frame = 0
+      @done_proc = nil
+
+      # Set the default animation
+      @animations[:default] = 0..(@img_width / @clip_width) - 1
+
+      # Set the sprite defaults
+      @defaults = {
+        animation: @animations.first[0],
+        frame: @current_frame,
+        frame_time: @frame_time,
+        clip_x: @clip_x,
+        clip_y: @clip_y,
+        clip_width: @clip_width,
+        clip_height: @clip_height,
+        loop: @loop
+      }
     end
   end
 end
