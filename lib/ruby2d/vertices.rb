@@ -19,7 +19,7 @@ module Ruby2D
       @crop = crop
       @coordinates = nil
       @texture_coordinates = nil
-      _apply_flip
+      _apply_flip unless @flip.nil?
     end
 
     def coordinates
@@ -30,14 +30,16 @@ module Ruby2D
                        end
     end
 
+    TEX_UNCROPPED_COORDS = [
+      0.0, 0.0, # top left
+      1.0, 0.0,   # top right
+      1.0, 1.0,   # bottom right
+      0.0, 1.0    # bottom left
+    ].freeze
+
     def texture_coordinates
       @texture_coordinates ||= if @crop.nil?
-                                 [
-                                   0.0, 0.0, # top left
-                                   1.0, 0.0,   # top right
-                                   1.0, 1.0,   # bottom right
-                                   0.0, 1.0    # bottom left
-                                 ]
+                                 TEX_UNCROPPED_COORDS
                                else
                                  _calculate_texture_coordinates
                                end
