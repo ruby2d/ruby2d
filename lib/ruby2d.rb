@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Ruby2D module and native extension loader, adds DSL
 
 unless RUBY_ENGINE == 'mruby'
@@ -27,10 +29,11 @@ unless RUBY_ENGINE == 'mruby'
   require 'ruby2d/music'
   require 'ruby2d/texture'
   require 'ruby2d/vertices'
-  require 'ruby2d/ruby2d'  # load native extension
+  require 'ruby2d/ruby2d' # load native extension
 end
 
-
+# Create 2D applications, games, and visualizations with ease. Just a few lines of code is enough to get started.
+# Visit https://www.ruby2d.com for more information.
 module Ruby2D
   def self.gem_dir
     # mruby doesn't define `Gem`
@@ -50,6 +53,14 @@ module Ruby2D
   end
 end
 
+unless ENV.key? 'DISABLE_RUBY2D_AUTO_MIXIN'
+  # Mixin by default.
+  # Allow apps to avoid that via environment variable
 
-include Ruby2D
-extend  Ruby2D::DSL
+  # --- start lint exception
+  # rubocop:disable Style/MixinUsage
+  include Ruby2D
+  extend Ruby2D::DSL
+  # rubocop:enable Style/MixinUsage
+  # --- end lint exception
+end
