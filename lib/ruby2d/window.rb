@@ -811,7 +811,7 @@ module Ruby2D
 
       # Console mode, enabled at command line
       @console = if RUBY_ENGINE == 'ruby'
-                   ENV['ENABLE_CONSOLE'] == 'true'
+                   ENV['RUBY2D_ENABLE_CONSOLE'] == 'true'
                  else
                    false
                  end

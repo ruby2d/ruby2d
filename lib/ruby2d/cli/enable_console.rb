@@ -4,4 +4,4 @@
 
 require 'io/wait'
 
-ENV['ENABLE_CONSOLE'] = 'true'
+ENV['RUBY2D_ENABLE_CONSOLE'] = 'true'
