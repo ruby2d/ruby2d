@@ -11,9 +11,6 @@ module Ruby2D
 
     attr_reader :ttf_font
 
-    # Font cannot be instantiated directly; use +Font.load+ instead.
-    private_class_method :new
-
     # Cache loaded fonts in a class variable
     @loaded_fonts = {}
 
@@ -54,6 +51,9 @@ module Ruby2D
           all_paths.first
         end
       end
+
+      # Font cannot be instantiated directly; use +Font.load+ instead.
+      private :new
 
       private
 
