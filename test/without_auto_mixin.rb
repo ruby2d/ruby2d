@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
-require 'ruby2d'
+#
+# Requiring just the core avoids the auto-mixin of DSL into
+# global namespace
+require 'ruby2d/core'
 
 #
 # Test Ruby2D without global mixin
