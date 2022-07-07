@@ -12,10 +12,10 @@ module Ruby2D
     # x2,y2 == top right
     # x3,y3 == bottom right
     # x4,y4 == bottom left
-    attr_accessor :x1, :y1, :c1,
-                  :x2, :y2, :c2,
-                  :x3, :y3, :c3,
-                  :x4, :y4, :c4
+    attr_accessor :x1, :y1,
+                  :x2, :y2,
+                  :x3, :y3,
+                  :x4, :y4
 
     # Create an quadrilateral
     # @param [Numeric] x1
@@ -86,7 +86,8 @@ module Ruby2D
     # @param [Numeric] y3
     # @param [Numeric] x4
     # @param [Numeric] y4
-    # @param [Array] colors An array of 4 arrays of colour components.
+    # @param color [Array<Array<float,float,float,float>>] An array of 4 array of colour components
+    #                                       (e.g. [[1.0, 0, 0, 1.0], ...])
     def self.draw(x1:, y1:, x2:, y2:, x3:, y3:, x4:, y4:, color:)
       Window.render_ready_check
       ext_draw([
