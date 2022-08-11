@@ -5,7 +5,6 @@ require 'fileutils'
 require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/platform'
 
-
 # The Ruby 2D library files
 @ruby2d_lib_files = [
   'cli/colorize',
@@ -14,7 +13,6 @@ require 'ruby2d/cli/platform'
   'color',
   'window',
   'dsl',
-  'entity',
   'quad',
   'line',
   'circle',
@@ -37,7 +35,6 @@ require 'ruby2d/cli/platform'
   '../ruby2d'
 ]
 
-
 # Helpers ######################################################################
 
 def run_cmd(cmd)
@@ -45,16 +42,14 @@ def run_cmd(cmd)
   system cmd
 end
 
-
 # Remove `require 'ruby2d'` from source file
 def strip_require(file)
   output = ''
   File.foreach(file) do |line|
     output << line unless line =~ /require ('|")ruby2d('|")/
   end
-  return output
+  output
 end
-
 
 # Add linker flags
 def add_ld_flags(ld_flags, name, type, dir = nil)
@@ -66,15 +61,13 @@ def add_ld_flags(ld_flags, name, type, dir = nil)
   end
 end
 
-
 # Build Tasks ##################################################################
 
 # Build the user's application
 def build(target, ruby2d_app)
-
   # Check if source file provided is good
   if !ruby2d_app
-    puts "Please provide a Ruby file to build"
+    puts 'Please provide a Ruby file to build'
     exit
   elsif !File.exist? ruby2d_app
     puts "Can't find file: #{ruby2d_app}"
@@ -82,7 +75,7 @@ def build(target, ruby2d_app)
   end
 
   # Add debugging information to produce backtrace
-  if @debug then debug_flag = '-g' end
+  debug_flag = '-g' if @debug
 
   # Create build directory
   FileUtils.mkdir_p 'build'
@@ -102,7 +95,7 @@ def build(target, ruby2d_app)
 
   ruby2d_ext_dir = "#{Ruby2D.gem_dir}/ext/ruby2d/"
 
-  ruby2d_ext = "#define MRUBY 1" << "\n\n"
+  ruby2d_ext = '#define MRUBY 1' << "\n\n"
   Dir["#{ruby2d_ext_dir}*.c"].each do |c_file|
     ruby2d_ext << File.read(c_file)
   end
@@ -110,14 +103,14 @@ def build(target, ruby2d_app)
   File.write('build/ruby2d_ext.c', ruby2d_ext)
 
   # Select `mrbc` executable based on platform
-  case $RUBY2D_PLATFORM
-  when :macos
-    mrbc = "#{Ruby2D.assets}/macos/universal/bin/mrbc"
-  when :windows
-    mrbc = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/bin/mrbc.exe"
-  else
-    mrbc = 'mrbc'
-  end
+  mrbc = case $RUBY2D_PLATFORM
+         when :macos
+           "#{Ruby2D.assets}/macos/universal/bin/mrbc"
+         when :windows
+           "#{Ruby2D.assets}/windows/mingw-w64-x86_64/bin/mrbc.exe"
+         else
+           'mrbc'
+         end
 
   # Compile the Ruby 2D lib (`.rb` files) to mruby bytecode
   run_cmd "#{mrbc} #{debug_flag} -Bruby2d_lib -obuild/ruby2d_lib.c build/ruby2d_lib.rb"
@@ -128,7 +121,7 @@ def build(target, ruby2d_app)
 
   # Combine contents of C source files and bytecode into one file
   open('build/app.c', 'w') do |f|
-    ['ruby2d_app', 'ruby2d_lib', 'ruby2d_ext'].each do |c_file|
+    %w[ruby2d_app ruby2d_lib ruby2d_ext].each do |c_file|
       f << File.read("build/#{c_file}.c") << "\n\n"
     end
   end
@@ -143,13 +136,10 @@ def build(target, ruby2d_app)
 
   # Remove files used in the build process
   clean_up unless @debug
-
 end
-
 
 # Create a native executable using the available C compiler
 def compile_native
-
   # Get include directories
   incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
   incl_dir_deps = "#{Ruby2D.assets}/include/"
@@ -163,16 +153,16 @@ def compile_native
     c_flags = '-arch arm64 -arch x86_64'
 
     ld_flags = ''
-    ['mruby', 'SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf',
-     'jpeg', 'png16', 'tiff', 'webp',
-     'mpg123', 'ogg', 'FLAC', 'vorbis', 'vorbisfile', 'modplug',
-     'freetype', 'harfbuzz', 'graphite2'].each do |name|
+    %w[mruby SDL2 SDL2_image SDL2_mixer SDL2_ttf
+       jpeg png16 tiff webp
+       mpg123 ogg FLAC vorbis vorbisfile modplug
+       freetype harfbuzz graphite2].each do |name|
       add_ld_flags(ld_flags, name, :archive, ld_dir)
     end
 
-    ld_flags << "-lz -lbz2 -liconv -lstdc++ "
-    ['Cocoa', 'Carbon', 'CoreVideo', 'OpenGL', 'Metal', 'CoreAudio', 'AudioToolbox',
-     'IOKit', 'GameController', 'ForceFeedback', 'CoreHaptics'].each do |name|
+    ld_flags << '-lz -lbz2 -liconv -lstdc++ '
+    %w[Cocoa Carbon CoreVideo OpenGL Metal CoreAudio AudioToolbox
+       IOKit GameController ForceFeedback CoreHaptics].each do |name|
       add_ld_flags(ld_flags, name, :framework)
     end
 
@@ -182,11 +172,11 @@ def compile_native
 
   when :windows
 
-    if RUBY_PLATFORM =~ /ucrt/
-      ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-ucrt-x86_64/lib"
-    else
-      ld_dir = "#{Ruby2D.assets}/windows/mingw-w64-x86_64/lib"
-    end
+    ld_dir = if RUBY_PLATFORM =~ /ucrt/
+               "#{Ruby2D.assets}/windows/mingw-w64-ucrt-x86_64/lib"
+             else
+               "#{Ruby2D.assets}/windows/mingw-w64-x86_64/lib"
+             end
 
     ld_flags = '-static -Wl,--start-group '
     ['mruby',
@@ -194,8 +184,7 @@ def compile_native
      'SDL2_image', 'jpeg', 'png16', 'tiff', 'webp', 'jbig', 'deflate', 'lzma', 'zstd', 'Lerc',
      'SDL2_mixer', 'mpg123', 'FLAC', 'vorbis', 'vorbisfile', 'ogg', 'modplug', 'opus', 'opusfile', 'sndfile',
      'SDL2_ttf', 'freetype', 'harfbuzz', 'graphite2', 'bz2', 'brotlicommon', 'brotlidec',
-     'glew32', 'stdc++', 'z', 'ssp'
-    ].each do |name|
+     'glew32', 'stdc++', 'z', 'ssp'].each do |name|
       add_ld_flags(ld_flags, name, :archive, ld_dir)
     end
     ld_flags << '-lmingw32 -lopengl32 -lole32 -loleaut32 -limm32 -lversion -lwinmm -lrpcrt4 -mwindows -lsetupapi -ldwrite '\
@@ -209,14 +198,10 @@ def compile_native
   create_macos_bundle if $RUBY2D_PLATFORM == :macos
 end
 
-
 # Create a WebAssembly executable using Emscripten
 def compile_web
-
   # Check for compiler toolchain issues
-  if doctor_web(:building)
-    puts "Fix errors before building.\n\n"
-  end
+  puts "Fix errors before building.\n\n" if doctor_web(:building)
 
   wasm_assets = "#{Ruby2D.assets}/wasm"
 
@@ -229,7 +214,7 @@ def compile_web
 
   # Compile using Emscripten
   run_cmd "emcc -s WASM=1 -I#{incl_dir_ruby2d} -I#{incl_dir_deps} "\
-          "-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 "\
+          '-s USE_SDL=2 -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_TTF=2 '\
           "build/app.c #{ld_flags} -o build/app.html"
 
   # TODO: Copy HTML template from gem assets to build directory
@@ -237,7 +222,6 @@ def compile_web
 
   exit(1) unless $?.success?
 end
-
 
 def doctor_native
   # Check if MRuby exists; if not, quit
@@ -247,10 +231,8 @@ def doctor_native
   end
 end
 
-
 # Check for problems with web build
-def doctor_web(mode = nil)
-
+def doctor_web(_mode = nil)
   errors = false
   mruby_errors = false
   emscripten_errors = false
@@ -286,15 +268,14 @@ def doctor_web(mode = nil)
     puts 'found'.success
   end
 
-  if mruby_errors || emscripten_errors then errors = true end
+  errors = true if mruby_errors || emscripten_errors
 
   if errors
     puts "\nErrors were found!\n\n"
-    if mruby_errors
-      puts "* Did you install mruby?"
-    end
+    puts '* Did you install mruby?' if mruby_errors
     if emscripten_errors
-      puts "* Did you run \`./emsdk_env.sh\` ?", "  For help, check out the \"Getting Started\" guide on webassembly.org"
+      puts "* Did you run \`./emsdk_env.sh\` ?",
+           '  For help, check out the "Getting Started" guide on webassembly.org'
     end
     puts "\n"
     exit(1)
@@ -303,10 +284,8 @@ def doctor_web(mode = nil)
   end
 end
 
-
 # Build an app bundle for macOS
 def create_macos_bundle
-
   # Property list source for the bundle
   info_plist = %(
 <?xml version="1.0" encoding="UTF-8"?>
@@ -346,7 +325,6 @@ def create_macos_bundle
   # puts 'macOS app bundle created: `build/App.app`'
 end
 
-
 # Build an iOS or tvOS app
 def build_ios_tvos(rb_file, device)
   check_build_src_file(rb_file)
@@ -358,7 +336,7 @@ def build_ios_tvos(rb_file, device)
   end
 
   # Add debugging information to produce backtrace
-  if @debug then debug_flag = '-g' end
+  debug_flag = '-g' if @debug
 
   # Assemble the Ruby 2D library in one `.rb` file and compile to bytecode
   make_lib
@@ -369,14 +347,14 @@ def build_ios_tvos(rb_file, device)
   `mrbc #{debug_flag} -Bruby2d_app -obuild/src.c build/src.rb`
 
   # Copy over iOS project
-  FileUtils.cp_r "#{@gem_dir}/assets/#{device}", "build"
+  FileUtils.cp_r "#{@gem_dir}/assets/#{device}", 'build'
 
   # Combine contents of C source files and bytecode into one file
   File.open("build/#{device}/main.c", 'w') do |f|
-    f << "#define RUBY2D_IOS_TVOS 1" << "\n\n"
-    f << "#define MRUBY 1" << "\n\n"
-    f << File.read("build/lib.c") << "\n\n"
-    f << File.read("build/src.c") << "\n\n"
+    f << '#define RUBY2D_IOS_TVOS 1' << "\n\n"
+    f << '#define MRUBY 1' << "\n\n"
+    f << File.read('build/lib.c') << "\n\n"
+    f << File.read('build/src.c') << "\n\n"
     f << File.read("#{@gem_dir}/ext/ruby2d/ruby2d.c")
   end
 
@@ -391,14 +369,13 @@ def build_ios_tvos(rb_file, device)
   puts "App created: `build/#{device}`"
 end
 
-
 # Clean up unneeded build files
 def clean_up(cmd = nil)
   FileUtils.rm(
     Dir.glob('build/*.{rb,c,js}')
   )
   if cmd == :all
-    puts "cleaning up..."
+    puts 'cleaning up...'
     FileUtils.rm_f 'build/app'
     FileUtils.rm_f 'build/app.js'
     FileUtils.rm_f 'build/app.html'
