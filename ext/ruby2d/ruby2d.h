@@ -321,6 +321,7 @@ typedef struct {
 typedef struct {
   const char *path;
   Mix_Chunk *data;
+  int channel;
 } R2D_Sound;
 
 // R2D_Music
@@ -472,6 +473,11 @@ R2D_Sound *R2D_CreateSound(const char *path);
  * Play the sound
  */
 void R2D_PlaySound(R2D_Sound *snd, bool loop);
+
+/*
+ * Stop the sound
+ */
+void R2D_StopSound(R2D_Sound *snd);
 
 /*
  * Get the sound's length

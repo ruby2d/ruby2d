@@ -1153,6 +1153,21 @@ static R_VAL ruby2d_sound_ext_play(R_VAL self) {
 
 
 /*
+ * Ruby2D::Sound#ext_stop
+ */
+#if MRUBY
+static R_VAL ruby2d_sound_ext_stop(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_sound_ext_stop(R_VAL self) {
+#endif
+  R2D_Sound *snd;
+  r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
+  R2D_StopSound(snd);
+  return R_NIL;
+}
+
+
+/*
  * Ruby2D::Sound#ext_length
  */
 #if MRUBY
@@ -1921,6 +1936,9 @@ void Init_ruby2d() {
   // Ruby2D::Sound#ext_play
   r_define_method(ruby2d_sound_class, "ext_play", ruby2d_sound_ext_play, r_args_none);
   
+  // Ruby2D::Sound#ext_stop
+  r_define_method(ruby2d_sound_class, "ext_stop", ruby2d_sound_ext_stop, r_args_none);
+
   // Ruby2D::Sound#ext_get_volume
   r_define_method(ruby2d_sound_class, "ext_get_volume", ruby2d_sound_ext_get_volume, r_args_none);
   

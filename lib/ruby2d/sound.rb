@@ -26,6 +26,11 @@ module Ruby2D
       ext_play
     end
 
+    # Stop the sound
+    def stop
+      ext_stop
+    end
+
     # Returns the length in seconds
     def length
       ext_length

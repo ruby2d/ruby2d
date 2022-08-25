@@ -47,7 +47,16 @@ void R2D_PlaySound(R2D_Sound *snd, bool loop) {
   int times = loop ? -1 : 0;
 
   // times: 0 == once, -1 == forever
-  Mix_PlayChannel(-1, snd->data, times);
+  snd->channel = Mix_PlayChannel(-1, snd->data, times);
+}
+
+/*
+ * Stop the sound
+ */
+void R2D_StopSound(R2D_Sound *snd) {
+  if (!snd) return;
+
+  Mix_HaltChannel(snd->channel);
 }
 
 
