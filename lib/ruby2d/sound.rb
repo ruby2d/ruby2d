@@ -6,16 +6,18 @@ module Ruby2D
   # Sounds are intended to be short samples, played without interruption, like an effect.
   class Sound
     attr_reader :path
-    attr_accessor :data
+    attr_accessor :loop, :data
 
     #
     # Load a sound from a file
     # @param [String] path File to load the sound from
+    # @param [true, false] loop If +true+ playback will loop automatically, default is +false+
     # @raise [Error] if file cannot be found or music could not be successfully loaded.
-    def initialize(path)
+    def initialize(path, loop: false)
       raise Error, "Cannot find audio file `#{path}`" unless File.exist? path
 
       @path = path
+      @loop = loop
       raise Error, "Sound `#{@path}` cannot be created" unless ext_init(@path)
     end
 

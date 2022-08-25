@@ -1147,7 +1147,7 @@ static R_VAL ruby2d_sound_ext_play(R_VAL self) {
 #endif
   R2D_Sound *snd;
   r_data_get_struct(self, "@data", &sound_data_type, R2D_Sound, snd);
-  R2D_PlaySound(snd);
+  R2D_PlaySound(snd, r_test(r_iv_get(self, "@loop")));
   return R_NIL;
 }
 
