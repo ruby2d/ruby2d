@@ -471,7 +471,7 @@ R2D_Sound *R2D_CreateSound(const char *path);
 /*
  * Play the sound
  */
-void R2D_PlaySound(R2D_Sound *snd);
+void R2D_PlaySound(R2D_Sound *snd, bool loop);
 
 /*
  * Get the sound's length

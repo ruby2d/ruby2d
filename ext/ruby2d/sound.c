@@ -40,9 +40,14 @@ R2D_Sound *R2D_CreateSound(const char *path) {
 /*
  * Play the sound
  */
-void R2D_PlaySound(R2D_Sound *snd) {
+void R2D_PlaySound(R2D_Sound *snd, bool loop) {
   if (!snd) return;
-  Mix_PlayChannel(-1, snd->data, 0);
+
+  // If looping, set to -1 times; else 0
+  int times = loop ? -1 : 0;
+
+  // times: 0 == once, -1 == forever
+  Mix_PlayChannel(-1, snd->data, times);
 }
 
 
