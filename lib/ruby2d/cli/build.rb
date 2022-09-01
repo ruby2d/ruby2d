@@ -14,7 +14,6 @@ require 'ruby2d/cli/platform'
   'color',
   'window',
   'dsl',
-  'entity',
   'quad',
   'line',
   'circle',
