@@ -60,7 +60,7 @@ module Ruby2D
     # @raise ArgumentError if called more than once, or if block already supplied when initializing Window.
     def run_once
       return unless block_given?
-      raise(ArgumentError, 'Already initialized') if @run_once
+      return if @run_once
 
       @run_once = true
       yield self

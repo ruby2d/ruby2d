@@ -25,11 +25,10 @@ RSpec.describe Ruby2D::DSL do
         end
       end
       it 'fails' do
-        expect do
-          initialize_once do |w|
-            w.set title: 'Ruby 2D twice'
-          end
-        end.to raise_error
+        # second attempt should get ignored
+        initialize_once do |w|
+          w.set title: 'Ruby 2D twice'
+        end
         expect(get(:title)).not_to eq('Ruby 2D twice')
       end
     end
