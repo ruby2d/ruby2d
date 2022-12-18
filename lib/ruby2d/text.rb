@@ -68,6 +68,18 @@ module Ruby2D
       render(x: x, y: y, color: Color.new(color), rotate: rotate)
     end
 
+    class << self
+      # Create a texture for the specified text
+      # @param text The text to show
+      # @param [Numeric] size The font +size+
+      # @param [String] font Path to font file to use to draw the text
+      # @param [String] style Font style
+      def create_texture(text, size: 20, style: nil, font: Font.default)
+        font = Font.load(font, size, style)
+        Texture.new(*Text.ext_load_text(font.ttf_font, text))
+      end
+    end
+
     private
 
     def render(x: @x, y: @y, color: @color, rotate: @rotate)
