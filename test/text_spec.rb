@@ -1,6 +1,23 @@
 require 'ruby2d'
 
 RSpec.describe Ruby2D::Text do
+  describe 'Text#create_texture' do
+    context 'using default font' do
+      it 'succeeds' do
+        expect { Text.create_texture('Text as Texture') }.not_to raise_error
+      end
+    end
+
+    context 'using pathname' do
+      it 'succeeds' do
+        expect do
+          Text.create_texture('hello',
+                              font: Pathname.new("#{Ruby2D.test_media}/bitstream_vera/vera.ttf"))
+        end.not_to raise_error
+      end
+    end
+  end
+
   describe '#new' do
     context 'using pathname' do
       it 'succeeds' do

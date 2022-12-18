@@ -8,6 +8,8 @@ module Ruby2D
   class Texture
     attr_reader :width, :height, :texture_id
 
+    WHITE_OPAQUE_AR = [1.0, 1.0, 1.0, 1.0].freeze
+
     def initialize(pixel_data, width, height)
       @pixel_data = pixel_data
       @width = width
@@ -15,13 +17,17 @@ module Ruby2D
       @texture_id = 0
     end
 
-    def draw(coordinates, texture_coordinates, color)
+    # Draw the texture
+    # @param coordinates [Array(x1, y1, x2, y2, x3, y3, x4, y4)] Destination coordinates
+    # @param texture_coordinates [Array(tx1, ty1, tx2, ty2, tx3, ty3, tx1, ty3)] Source (texture) coordinates
+    # @param color [Ruby2D::Color] Tint/blend the texture when it's drawn
+    def draw(coordinates, texture_coordinates, color = nil)
       if @texture_id.zero?
         @texture_id = ext_create(@pixel_data, @width, @height)
         @pixel_data = nil
       end
 
-      color = [color.r, color.g, color.b, color.a]
+      color = color.nil? ? WHITE_OPAQUE_AR : [color.r, color.g, color.b, color.a]
       ext_draw(coordinates, texture_coordinates, color, @texture_id)
     end
 
