@@ -3,10 +3,16 @@
 module Ruby2D
   # Ruby2D::DSL
   module DSL
-    @window = Ruby2D::Window.new
+    @window = nil
+
+    # Call this with a block to perform one-time initialization using
+    # the current window. E.g. `initialize_once do |win| ... end`
+    def initialize_once(&block)
+      DSL.window.run_once(&block) if block
+    end
 
     def self.window
-      @window
+      @window ||= Ruby2D::Window.new
     end
 
     def self.window=(window)
