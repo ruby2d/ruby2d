@@ -817,7 +817,7 @@ static R_VAL ruby2d_canvas_ext_draw_polyline(R_VAL self, R_VAL config, R_VAL coo
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  int coord_count = RARRAY_LEN(coords);
+  long coord_count = RARRAY_LEN(coords);
   int thickness = NUM2INT(r_ary_entry(config, 0)); 
   if (thickness == 1) {
     // use the SDL_Renderer's draw line for single pixel lines
@@ -888,7 +888,7 @@ static R_VAL ruby2d_canvas_ext_draw_polygon(R_VAL self, R_VAL config, R_VAL coor
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  int coord_count = RARRAY_LEN(coords);
+  long coord_count = RARRAY_LEN(coords);
   int thickness = NUM2INT(r_ary_entry(config, 0)); 
   if (thickness == 1) {
     // use the SDL_Renderer's draw line for single pixel lines
@@ -970,8 +970,8 @@ static R_VAL ruby2d_canvas_ext_fill_polygon(R_VAL self, R_VAL coords, R_VAL rgba
   SDL_Renderer *render;
   r_data_get_struct(self, "@ext_renderer", &renderer_data_type, SDL_Renderer, render);
 
-  int coord_len = RARRAY_LEN(coords);
-  int rgbas_len = RARRAY_LEN(rgbas);
+  long coord_len = RARRAY_LEN(coords);
+  long rgbas_len = RARRAY_LEN(rgbas);
 
   if (coord_len >= 6 && rgbas_len > 0) {
     SDL_FPoint points[MAX_POLY_POINTS];
@@ -1110,6 +1110,7 @@ static R_VAL ruby2d_canvas_ext_draw_ellipse(R_VAL self, R_VAL a) {
  * connecting the three points clock-wise. A negative value
  * means the angle "to the right" is > 180. 
  */
+/* Unused
 static inline int cross_product_corner(x1, y1, x2, y2, x3, y3) {
   register int vec1_x = x1 - x2;
   register int vec1_y = y1 - y2;
@@ -1118,6 +1119,7 @@ static inline int cross_product_corner(x1, y1, x2, y2, x3, y3) {
 
   return (vec1_x * vec2_y) - (vec1_y * vec2_x);
 }
+*/
 
 /*
  * Ruby2D::Sound#ext_init
@@ -1917,9 +1919,6 @@ void Init_ruby2d() {
 
   // Ruby2D::Pixmap#ext_load_pixmap
   r_define_method(ruby2d_pixmap_class, "ext_load_pixmap", ruby2d_pixmap_ext_load_pixmap, r_args_req(1));
-
-  // Ruby2D::Image
-  R_CLASS ruby2d_image_class = r_define_class(ruby2d_module, "Image");
 
   // Ruby2D::Text
   R_CLASS ruby2d_text_class = r_define_class(ruby2d_module, "Text");

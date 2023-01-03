@@ -34,6 +34,7 @@ desc "Run default tasks using user-installed libraries"
 task :release do
   puts '📦 Building gem release'.info
   $RUBY2D_DEV_MODE = false
+  FileUtils.rm_rf Dir.glob('*.gem')
   Rake::Task['all'].invoke
 end
 

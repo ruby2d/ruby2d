@@ -41,12 +41,14 @@ static vector_t *vector_minus_vector(vector_t *vec, const vector_t *other)
   return vec;
 }
 
+/* Unused
 static vector_t *vector_minus_xy(vector_t *vec, float other_x, float other_y)
 {
   vec->x -= other_x;
   vec->y -= other_y;
   return vec;
 }
+*/
 
 static vector_t *vector_plus_vector(vector_t *vec, const vector_t *other)
 {
@@ -55,12 +57,14 @@ static vector_t *vector_plus_vector(vector_t *vec, const vector_t *other)
   return vec;
 }
 
+/* Unused
 static vector_t *vector_plus_xy(vector_t *vec, float other_x, float other_y)
 {
   vec->x += other_x;
   vec->y += other_y;
   return vec;
 }
+*/
 
 typedef enum { CONCAVE = -1, INVALID, CONVEX } poly_type_e;
 

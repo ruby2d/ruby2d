@@ -163,7 +163,7 @@ def compile_native
 
     ld_flags = ''
     ['mruby', 'SDL2', 'SDL2_image', 'SDL2_mixer', 'SDL2_ttf',
-     'jpeg', 'png16', 'tiff', 'webp',
+     'jpeg', 'jxl', 'avif', 'png', 'tiff', 'webp',
      'mpg123', 'ogg', 'FLAC', 'vorbis', 'vorbisfile', 'modplug',
      'freetype', 'harfbuzz', 'graphite2'].each do |name|
       add_ld_flags(ld_flags, name, :archive, ld_dir)
@@ -190,7 +190,7 @@ def compile_native
     ld_flags = '-static -Wl,--start-group '
     ['mruby',
      'SDL2',
-     'SDL2_image', 'jpeg', 'png16', 'tiff', 'webp', 'jbig', 'deflate', 'lzma', 'zstd', 'Lerc',
+     'SDL2_image', 'jpeg', 'png', 'tiff', 'webp', 'jxl', 'hwy', 'jbig', 'deflate', 'lzma', 'zstd', 'Lerc',
      'SDL2_mixer', 'mpg123', 'FLAC', 'vorbis', 'vorbisfile', 'ogg', 'modplug', 'opus', 'opusfile', 'sndfile',
      'SDL2_ttf', 'freetype', 'harfbuzz', 'graphite2', 'bz2', 'brotlicommon', 'brotlidec',
      'glew32', 'stdc++', 'z', 'ssp'

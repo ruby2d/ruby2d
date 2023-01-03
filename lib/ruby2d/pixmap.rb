@@ -27,7 +27,7 @@ module Ruby2D
       raise UnknownImageFileError, file_path unless File.exist? file_path
 
       ext_load_pixmap(file_path)
-      raise InvalidImageFileError, file_name unless @ext_pixel_data
+      raise InvalidImageFileError, file_path unless @ext_pixel_data
 
       @path = file_path
     end

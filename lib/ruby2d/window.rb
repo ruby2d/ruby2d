@@ -5,6 +5,9 @@
 module Ruby2D
   # Represents a window on screen, responsible for storing renderable graphics,
   # event handlers, the update loop, showing and closing the window.
+
+  attr_reader :width, :height
+
   class Window
     # Event structures
     EventDescriptor       = Struct.new(:type, :id)
