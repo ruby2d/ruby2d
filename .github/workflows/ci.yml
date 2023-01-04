@@ -18,5 +18,8 @@ jobs:
         bundler-cache: true
     - run: sudo apt install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
     - run: bundle install
-    - run: mkdir -p $HOME/.gem
+    - run: pwd
+    - run: ls
     - run: bundle exec rake release
+    - run: pwd
+    - run: ls
