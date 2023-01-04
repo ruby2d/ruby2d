@@ -3,5 +3,5 @@
 # Ruby2D::VERSION
 
 module Ruby2D
-  VERSION = '0.12.0'
+  VERSION = '0.12.1'
 end
