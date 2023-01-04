@@ -1,10 +1,8 @@
 require 'ruby2d'
 
-RSpec.describe Ruby2D::Sound do
+require_relative 'support/ci'
 
-  # Skip tests that error on CI:
-  #   "(Mix_OpenAudio) WASAPI can't find requested audio endpoint: Element not found."
-  SKIP_CI = ENV['CI'] && ENV['RUNNER_OS'] == 'Windows'
+RSpec.describe Ruby2D::Sound do
 
   describe "#new" do
     it "raises exception if audio file doesn't exist" do

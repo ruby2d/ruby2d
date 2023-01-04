@@ -1,7 +1,7 @@
 require 'ruby2d'
 require 'pathname'
 
-# Image and Sprite are very similar. This helper defines  tests
+# Image and Sprite are very similar. This helper defines tests
 # so that specs for objects that are "image like" can share tests.
 #
 # Requires calling spec to
