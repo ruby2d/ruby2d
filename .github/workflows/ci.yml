@@ -4,7 +4,7 @@ on: [pull_request]
 jobs:
   test:
     strategy:
-      # fail-fast: false
+      fail-fast: false
       matrix:
         # os: [ubuntu-latest, macos-latest, windows-latest]
         os: [macos-latest]
@@ -18,9 +18,8 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-          # bundler-cache: true
       - run: bundle install
       - run: git submodule update --init --recursive --depth 1
-      - run: rake release
-      # - run: gem build ruby2d.gemspec --verbose
-      # - run: gem install ruby2d-*.gem --local --verbose
+      - run: gem build ruby2d.gemspec --verbose
+      - run: gem install ruby2d-*.gem --local --verbose
+      - run: rspec
