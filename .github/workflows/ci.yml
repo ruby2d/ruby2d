@@ -18,15 +18,6 @@ jobs:
         run: sudo apt install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 
       - if: runner.os == 'Linux'
-        run: sudo apt-get install build-essential git \
-             cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
-             libjack-dev libsndio-dev libsamplerate0-dev libx11-dev libxext-dev \
-             libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev \
-             libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
-             libdbus-1-dev libibus-1.0-dev libudev-dev fcitx-libs-dev \
-             libdecor-0-dev
-
-      - if: runner.os == 'Linux'
         run: export DISPLAY=:0 && rspec
 
       - run: bundle install
