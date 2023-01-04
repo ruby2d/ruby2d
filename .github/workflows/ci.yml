@@ -21,6 +21,6 @@ jobs:
           bundler-cache: true
       - run: bundle install
       - run: git submodule update --init --recursive --depth 1
-      - run: bundle exec rake release
+      - run: bundle exec rake release --verbose
       # - run: gem build ruby2d.gemspec --verbose
       # - run: gem install ruby2d-*.gem --local --verbose
