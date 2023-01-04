@@ -1,5 +1,9 @@
 require 'ruby2d'
 
+require_relative 'support/ci'
+
+unless SKIP_CI_LINUX
+
 RSpec.describe Ruby2D::Text do
   describe 'Text#create_texture' do
     context 'using default font' do
@@ -155,3 +159,5 @@ RSpec.describe Ruby2D::Text do
     end
   end
 end
+
+end  # SKIP_CI_LINUX
