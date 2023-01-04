@@ -23,5 +23,5 @@ jobs:
       - run: bundle install
       - run: git submodule update --init --recursive
       - run: ls assets/
-      # - run: gem build ruby2d.gemspec --verbose
-      # - run: gem install ruby2d-*.gem --local --verbose
+      - run: gem build ruby2d.gemspec --verbose
+      - run: gem install ruby2d-*.gem --local --verbose
