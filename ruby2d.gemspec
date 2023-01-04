@@ -11,8 +11,9 @@ Gem::Specification.new do |s|
   s.email       = 'tom@blacktm.com'
 
   s.required_ruby_version = '>= 2.7.0'
+  s.add_development_dependency 'rake' , '~> 13.0'
   s.add_development_dependency 'rspec', '~> 3.12'
-  s.add_development_dependency 'rubocop', '~> 1.40'
+  s.add_development_dependency 'rubocop', '~> 1.42'
   s.files = Dir.glob('lib/**/*') +
             Dir.glob('ext/**/*.{h,c,rb}') +
             Dir.glob('assets/test_media/**/*')
