@@ -19,9 +19,8 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - run: ls assets/
       - run: bundle install
       - run: git submodule update --init --recursive --depth 1
-      - run: ls assets/
+      - run: bundle exec rake release
       # - run: gem build ruby2d.gemspec --verbose
       # - run: gem install ruby2d-*.gem --local --verbose
