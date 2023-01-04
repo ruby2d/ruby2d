@@ -7,7 +7,7 @@ RSpec.describe Ruby2D::Sound do
       expect { Sound.new('no_sound_here.wav') }.to raise_error(Ruby2D::Error)
     end
 
-    # unless ENV['CI']  # audio cannot be opened on CI; see `music_spec.rb`
+    unless ENV['CI'] && ENV['Windows']
       it "creates sound in various formats" do
         Sound.new("#{Ruby2D.test_media}/music.wav")
         Sound.new("#{Ruby2D.test_media}/music.mp3")
@@ -19,10 +19,10 @@ RSpec.describe Ruby2D::Sound do
         snd = Sound.new("#{Ruby2D.test_media}/sound.wav")
         expect(snd.path).to eq("#{Ruby2D.test_media}/sound.wav")
       end
-    # end
+    end
   end
   describe "#volume" do
-    # unless ENV['CI']
+    unless ENV['CI'] && ENV['Windows']
       it "sets the volume on sound instances" do
         snd = Sound.new("#{Ruby2D.test_media}/music.wav")
         expect(snd.volume).to eq(100)
@@ -53,18 +53,18 @@ RSpec.describe Ruby2D::Sound do
         Sound.mix_volume = -1
         expect(Sound.mix_volume).to eq(0)
       end
-    # end
+    end
   end
 
   describe "#length" do
-    # unless ENV['CI']
+    unless ENV['CI'] && ENV['Windows']
       it "returns the length of the sound clip in seconds" do
         expect(Sound.new("#{Ruby2D.test_media}/sound.wav").length).to eq(1)
         expect(Sound.new("#{Ruby2D.test_media}/sound.mp3").length).to eq(1)
         expect(Sound.new("#{Ruby2D.test_media}/sound.ogg").length).to eq(1)
         expect(Sound.new("#{Ruby2D.test_media}/sound.flac").length).to eq(1)
       end
-    # end
+    end
   end
 
 end
