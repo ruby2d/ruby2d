@@ -40,10 +40,8 @@ end
 
 desc "Uninstall gem"
 task :uninstall do
-  unless ENV['CI']
-    print_task "Uninstalling"
-    run_cmd "gem uninstall ruby2d --executables"
-  end
+  print_task "Uninstalling"
+  run_cmd "gem uninstall ruby2d --executables"
 end
 
 desc "Build gem"
