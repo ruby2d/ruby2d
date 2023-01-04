@@ -14,11 +14,10 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-      - run: ruby -e "puts ENV.inspect"
-      # - if: runner.os == 'Linux'
-      #   run: sudo apt install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-      # - run: bundle install
-      # - run: git submodule update --init --recursive --depth 1
-      # - run: gem build ruby2d.gemspec --verbose
-      # - run: gem install ruby2d-*.gem --local --verbose
-      # - run: rspec
+      - if: runner.os == 'Linux'
+        run: sudo apt install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+      - run: bundle install
+      - run: git submodule update --init --recursive --depth 1
+      - run: gem build ruby2d.gemspec --verbose
+      - run: gem install ruby2d-*.gem --local --verbose
+      - run: rspec

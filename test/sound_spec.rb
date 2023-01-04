@@ -2,12 +2,16 @@ require 'ruby2d'
 
 RSpec.describe Ruby2D::Sound do
 
+  # Skip tests that error on CI:
+  #   "(Mix_OpenAudio) WASAPI can't find requested audio endpoint: Element not found."
+  SKIP_CI = ENV['CI'] && ENV['RUNNER_OS'] == 'Windows'
+
   describe "#new" do
     it "raises exception if audio file doesn't exist" do
       expect { Sound.new('no_sound_here.wav') }.to raise_error(Ruby2D::Error)
     end
 
-    unless ENV['CI'] && ENV['Windows']
+    unless SKIP_CI
       it "creates sound in various formats" do
         Sound.new("#{Ruby2D.test_media}/music.wav")
         Sound.new("#{Ruby2D.test_media}/music.mp3")
@@ -22,7 +26,7 @@ RSpec.describe Ruby2D::Sound do
     end
   end
   describe "#volume" do
-    unless ENV['CI'] && ENV['Windows']
+    unless SKIP_CI
       it "sets the volume on sound instances" do
         snd = Sound.new("#{Ruby2D.test_media}/music.wav")
         expect(snd.volume).to eq(100)
@@ -57,7 +61,7 @@ RSpec.describe Ruby2D::Sound do
   end
 
   describe "#length" do
-    unless ENV['CI'] && ENV['Windows']
+    unless SKIP_CI
       it "returns the length of the sound clip in seconds" do
         expect(Sound.new("#{Ruby2D.test_media}/sound.wav").length).to eq(1)
         expect(Sound.new("#{Ruby2D.test_media}/sound.mp3").length).to eq(1)
