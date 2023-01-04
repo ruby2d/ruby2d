@@ -21,5 +21,6 @@ jobs:
           bundler-cache: true
       - run: ls assets/
       - run: bundle install
-      - run: gem build ruby2d.gemspec --verbose
-      - run: gem install ruby2d-*.gem --local --verbose
+      - git submodule update --remote
+      # - run: gem build ruby2d.gemspec --verbose
+      # - run: gem install ruby2d-*.gem --local --verbose
