@@ -9,7 +9,7 @@ RSpec.describe Ruby2D::Music do
       expect { Music.new('no_music_here.mp3') }.to raise_error(Ruby2D::Error)
     end
 
-    unless SKIP_CI
+    unless SKIP_CI_WINDOWS_LINUX
       it "creates music in various formats" do
         Music.new("#{Ruby2D.test_media}/music.wav")
         Music.new("#{Ruby2D.test_media}/music.mp3")
@@ -26,7 +26,7 @@ RSpec.describe Ruby2D::Music do
   end
 
   describe "attributes" do
-    unless SKIP_CI
+    unless SKIP_CI_WINDOWS_LINUX
       it "can be set and read" do
         mus = Music.new("#{Ruby2D.test_media}/music.mp3")
         expect(mus.loop).to be false
@@ -37,7 +37,7 @@ RSpec.describe Ruby2D::Music do
   end
 
   describe "#volume" do
-    unless SKIP_CI
+    unless SKIP_CI_WINDOWS_LINUX
       it "sets the volume on music instances" do
         mus = Music.new("#{Ruby2D.test_media}/music.mp3")
         expect(mus.volume).to eq(100)
@@ -62,7 +62,7 @@ RSpec.describe Ruby2D::Music do
   end
 
   describe '#length' do
-    unless SKIP_CI
+    unless SKIP_CI_WINDOWS_LINUX
       it "returns the length of the music track in seconds" do
         expect(Music.new("#{Ruby2D.test_media}/music.wav").length).to eq(8)
         expect(Music.new("#{Ruby2D.test_media}/music.mp3").length).to eq(8)

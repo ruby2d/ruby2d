@@ -1,3 +1,12 @@
-# Skip tests that error on CI:
-#   "(Mix_OpenAudio) WASAPI can't find requested audio endpoint: Element not found."
-SKIP_CI = ENV['CI'] && ENV['RUNNER_OS'] == 'Windows'
+# Skip tests that error on CI
+
+if ENV['CI']
+  if ENV['RUNNER_OS'] == 'Linux'
+    SKIP_CI_LINUX = true
+  end
+
+  if ENV['RUNNER_OS'] == 'Linux' ||
+     ENV['RUNNER_OS'] == 'Windows'
+    SKIP_CI_WINDOWS_LINUX = true
+  end
+end
