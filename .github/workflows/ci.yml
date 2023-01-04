@@ -22,5 +22,6 @@ jobs:
       - run: ls assets/
       - run: bundle install
       - run: git submodule update --remote
+      - run: ls assets/
       # - run: gem build ruby2d.gemspec --verbose
       # - run: gem install ruby2d-*.gem --local --verbose
