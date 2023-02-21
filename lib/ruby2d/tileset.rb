@@ -60,6 +60,39 @@ module Ruby2D
       @tile_definitions[name] = { x: x, y: y, rotate: rotate, flip: flip }
     end
 
+    # Retrieve information about a stamped tile in the tileset by providing its
+    # x and y coordinates
+    # 
+    # @param x [Numeric] The x position of the tile to retrieve
+    # @param y [Numeric] The y position of the tile to retrieve
+    def get_tile(x, y)
+      @tiles.detect do |tile|
+        tile.fetch(:x) == x && tile.fetch(:y) == y
+      end
+    end
+
+    # Remove a single stamped tile at the location x,y, removing it from the tileset
+    # 
+    # @param x [Numeric] The x position of the tile to retrieve
+    # @param y [Numeric] The y position of the tile to retrieve
+    def remove_tile(x, y)
+      @tiles.delete_if do |tile|
+        tile.fetch(:x) == x && tile.fetch(:y) == y
+      end
+    end
+
+    # Remove tiles and replace them with new ones that are "stamped" in their place
+    #
+    # @param name [String] The name of the tile defined using +#define_tile+
+    # @param coordinates [Array<{"x", "y" => Numeric}>] one or more +{x:, y:}+ coordinates to draw the tile
+    def replace_tiles(name, coordinates)
+      coordinates.each do |coordinate|
+        remove_tile(coordinate.fetch(:x), coordinate.fetch(:y))
+      end
+
+      set_tile(name, coordinates)
+    end
+
     # Select and "stamp" or set/place a tile to be drawn
     # @param name [String] The name of the tile defined using +#define_tile+
     # @param coordinates [Array<{"x", "y" => Numeric}>] one or more +{x:, y:}+ coordinates to draw the tile
@@ -83,6 +116,9 @@ module Ruby2D
         # them all due to change to scale etc (currently n/a since
         # scale is immutable)
         @tiles.push({
+                      name: name,
+                      x: coordinate.fetch(:x),
+                      y: coordinate.fetch(:y),
                       tile_def: tile_def,
                       vertices: vertices
                     })
