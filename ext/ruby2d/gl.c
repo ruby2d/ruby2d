@@ -210,6 +210,14 @@ void R2D_GL_SetViewport(R2D_Window *window) {
  */
 int R2D_GL_Init(R2D_Window *window) {
 
+  const char* env_force_gl2 = getenv("FORCE_GL2");
+  if (env_force_gl2 != NULL){
+    if (strcmp(env_force_gl2, "true") == 0){
+      FORCE_GL2 = true;
+      R2D_GL2 = true;
+    }
+  }
+
   // Specify OpenGL contexts and set attributes
   #if GLES
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   8);
