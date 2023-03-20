@@ -18,13 +18,14 @@ module Ruby2D
     ControllerButtonEvent = Struct.new(:which, :button)
 
     #
-    # Create a Window
+    # Create a Window, and after any parameters optionally supply a do block for one-time initialization after the window
+    # is created. E.g `Window.new ... do |win| ... end`
     # @param title [String] Title for the window
     # @param width [Numeric] In pixels
     # @param height [Numeric] in pixels
     # @param fps_cap [Numeric] Over-ride the default (60fps) frames-per-second
     # @param vsync [Boolean] Enabled by default, use this to override it (Not recommended)
-    def initialize(title: 'Ruby 2D', width: 640, height: 480, fps_cap: 60, vsync: true)
+    def initialize(title: 'Ruby 2D', width: 640, height: 480, fps_cap: 60, vsync: true, &block)
       # Title of the window
       @title = title
 
@@ -49,6 +50,23 @@ module Ruby2D
       _init_event_stores
       _init_event_registrations
       _init_procs_dsl_console
+
+      # Allow for one-time initialization if block specified
+      @run_once = false
+      run_once(&block) if block
+    end
+
+    # Call this to run an initialization block once (and only once) for this
+    # Window. Can be called if initialization block wasn't specified when creating Window.
+    # E.g. `win.run_once do |win| ... end`
+    #
+    # @raise ArgumentError if called more than once, or if block already supplied when initializing Window.
+    def run_once
+      return unless block_given?
+      return if @run_once
+
+      @run_once = true
+      yield self
     end
 
     # Track open window state in a class instance variable
