@@ -13,7 +13,7 @@ module Ruby2D
     EventDescriptor       = Struct.new(:type, :id)
     MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
     KeyEvent              = Struct.new(:type, :key)
-    TextInputEvent             = Struct.new(:type, :text)
+    TextInputEvent        = Struct.new(:type, :text)
     ControllerEvent       = Struct.new(:which, :type, :axis, :value, :button)
     ControllerAxisEvent   = Struct.new(:which, :axis, :value)
     ControllerButtonEvent = Struct.new(:which, :button)
@@ -145,10 +145,10 @@ module Ruby2D
         DSL.window.set(opts)
       end
 
-      def start_input()
-        DSL.window.start_input()
+      def start_input
+        DSL.window.start_input
       end
-    
+
       def stop_input
         DSL.window.stop_input
       end
@@ -321,12 +321,12 @@ module Ruby2D
       @event_key = @event_key.next
     end
 
-    def start_input()
+    def start_input
       ext_start_text_input
     end
 
     def stop_input
-      ext_stop_text_input()
+      ext_stop_text_input
     end
 
     # Set an event handler
@@ -360,7 +360,7 @@ module Ruby2D
 
     # Text callback method, called by the native and web extensions
     def text_input_callback(type, text)
-      @events[:text_input].each do |id, e|
+      @events[:text_input].each do |_id, e|
         e.call(TextInputEvent.new(type, text))
       end
     end
