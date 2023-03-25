@@ -178,6 +178,9 @@ extern "C" {
 #define R2D_KEY_HELD 2  // key is held down
 #define R2D_KEY_UP   3  // key is released
 
+// Text input events
+#define R2D_TEXT_INPUT   1
+
 // Mouse events
 #define R2D_MOUSE_DOWN   1  // mouse button pressed
 #define R2D_MOUSE_UP     2  // mouse button released
@@ -238,6 +241,7 @@ typedef struct {
   int button;
   bool dblclick;
   const char *key;
+  const char *text;
   int x;
   int y;
   int delta_x;
@@ -250,6 +254,7 @@ typedef struct {
 typedef void (*R2D_Update)();
 typedef void (*R2D_Render)();
 typedef void (*R2D_On_Key)(R2D_Event e);
+typedef void (*R2D_On_TextInput)(R2D_Event e);
 typedef void (*R2D_On_Mouse)(R2D_Event e);
 typedef void (*R2D_On_Controller)(R2D_Event e);
 
@@ -302,6 +307,7 @@ typedef struct {
   int flags;
   R2D_Mouse mouse;
   R2D_On_Key on_key;
+  R2D_On_TextInput on_text_input;
   R2D_On_Mouse on_mouse;
   R2D_On_Controller on_controller;
   bool vsync;

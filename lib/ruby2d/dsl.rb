@@ -21,6 +21,14 @@ module Ruby2D
       DSL.window.set(opts)
     end
 
+    def start_input
+      DSL.window.start_input
+    end
+
+    def stop_input
+      DSL.window.stop_input
+    end
+
     def on(event, &proc)
       DSL.window.on(event, &proc)
     end

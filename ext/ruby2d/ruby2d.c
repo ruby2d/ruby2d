@@ -166,6 +166,29 @@ double normalize_controller_axis(int val) {
   return val > 0 ? val / 32767.0 : val / 32768.0;
 }
 
+/*
+ * Ruby2D#self.ext_start_text_input
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_start_text_input(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_ext_start_text_input(R_VAL self) {
+#endif
+  SDL_StartTextInput();
+  return R_NIL;
+}
+
+/*
+ * Ruby2D#self.ext_stop_text_input
+ */
+#if MRUBY
+static R_VAL ruby2d_ext_stop_text_input(mrb_state* mrb, R_VAL self) {
+#else
+static R_VAL ruby2d_ext_stop_text_input(R_VAL self) {
+#endif
+  SDL_StopTextInput();
+  return R_NIL;
+}
 
 /*
  * Ruby2D#self.ext_base_path
@@ -1491,6 +1514,22 @@ static void free_music(R2D_Music *mus) {
 
 
 /*
+ * Ruby 2D native `on_text_input` input callback function
+ */
+static void on_text_input(R2D_Event e) {
+
+  R_VAL type;
+
+  switch (e.type) {
+    case R2D_TEXT_INPUT:
+      type = r_char_to_sym("input");
+      break;
+  }
+
+  r_funcall(ruby2d_window, "text_input_callback", 2, type, r_str_new(e.text));
+}
+
+/*
  * Ruby 2D native `on_key` input callback function
  */
 static void on_key(R2D_Event e) {
@@ -1817,6 +1856,7 @@ static R_VAL ruby2d_window_ext_show(R_VAL self) {
   ruby2d_c_window->fps_cap         = fps_cap;
   ruby2d_c_window->icon            = icon;
   ruby2d_c_window->on_key          = on_key;
+  ruby2d_c_window->on_text_input   = on_text_input;
   ruby2d_c_window->on_mouse        = on_mouse;
   ruby2d_c_window->on_controller   = on_controller;
 
@@ -2039,6 +2079,12 @@ void Init_ruby2d() {
 
   // Ruby2D::Window
   R_CLASS ruby2d_window_class = r_define_class(ruby2d_module, "Window");
+
+  // Ruby2D::Window#start_text_input
+  r_define_method(ruby2d_window_class, "ext_start_text_input", ruby2d_ext_start_text_input, r_args_none);
+
+  // Ruby2D::Window#stop_text_input
+  r_define_method(ruby2d_window_class, "ext_stop_text_input", ruby2d_ext_stop_text_input, r_args_none);
 
   // Ruby2D::Window#ext_diagnostics
   r_define_method(ruby2d_window_class, "ext_diagnostics", ruby2d_ext_diagnostics, r_args_req(1));

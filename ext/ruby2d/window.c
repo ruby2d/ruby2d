@@ -34,6 +34,7 @@ R2D_Window *R2D_CreateWindow(const char *title, int width, int height,
   window->render          = render;
   window->flags           = flags;
   window->on_key          = NULL;
+  window->on_text_input   = NULL;
   window->on_mouse        = NULL;
   window->on_controller   = NULL;
   window->vsync           = true;
@@ -110,6 +111,15 @@ void main_loop() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
     switch (e.type) {
+
+      case SDL_TEXTINPUT:
+        if (window->on_text_input) {
+          R2D_Event event = {
+            .type = R2D_TEXT_INPUT, .text = e.text.text
+          };
+          window->on_text_input(event);
+        }
+        break;
 
       case SDL_KEYDOWN:
         if (window->on_key && e.key.repeat == 0) {

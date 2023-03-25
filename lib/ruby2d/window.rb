@@ -13,6 +13,7 @@ module Ruby2D
     EventDescriptor       = Struct.new(:type, :id)
     MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
     KeyEvent              = Struct.new(:type, :key)
+    TextInputEvent        = Struct.new(:type, :text)
     ControllerEvent       = Struct.new(:which, :type, :axis, :value, :button)
     ControllerAxisEvent   = Struct.new(:which, :axis, :value)
     ControllerButtonEvent = Struct.new(:which, :button)
@@ -142,6 +143,14 @@ module Ruby2D
 
       def set(opts)
         DSL.window.set(opts)
+      end
+
+      def start_input
+        DSL.window.start_input
+      end
+
+      def stop_input
+        DSL.window.stop_input
       end
 
       def on(event, &proc)
@@ -312,6 +321,14 @@ module Ruby2D
       @event_key = @event_key.next
     end
 
+    def start_input
+      ext_start_text_input
+    end
+
+    def stop_input
+      ext_stop_text_input
+    end
+
     # Set an event handler
     def on(event, &proc)
       raise Error, "`#{event}` is not a valid event type" unless @events.key? event
@@ -339,6 +356,13 @@ module Ruby2D
     # Key up event method for class pattern
     def key_up(key)
       @keys_up.include? key
+    end
+
+    # Text callback method, called by the native and web extensions
+    def text_input_callback(type, text)
+      @events[:text_input].each do |_id, e|
+        e.call(TextInputEvent.new(type, text))
+      end
     end
 
     # Key callback method, called by the native and web extentions
@@ -774,6 +798,7 @@ module Ruby2D
         key_down: {},
         key_held: {},
         key_up: {},
+        text_input: {},
         mouse: {},
         mouse_up: {},
         mouse_down: {},
