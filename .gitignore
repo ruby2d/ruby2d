@@ -1,6 +1,9 @@
 build/
+doc/
+.yardoc/
 test/screenshot*
 *.gem
 Gemfile.lock
 .DS_Store
 tmp*
+
