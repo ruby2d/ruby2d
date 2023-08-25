@@ -6,4 +6,3 @@ test/screenshot*
 Gemfile.lock
 .DS_Store
 tmp*
-
