@@ -1,4 +1,6 @@
 build/
+doc/
+.yardoc/
 test/screenshot*
 *.gem
 Gemfile.lock
