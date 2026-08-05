@@ -2,57 +2,482 @@
 
 #include "ruby2d.h"
 
+R2D_DEFINE_DATA_TYPE(R2D_Image);
 
-SDL_Surface *R2D_CreateImageSurface(const char *path) {
-  R2D_Init();
+// Image-specific ivar IDs. Shared ivar IDs (id_x, id_y, id_width, id_height,
+// id_rotate, id_color, id_r, id_g, id_b, id_a, id_ext_image, id_path) live in
+// ext.c; this file only caches what's unique to Image.
+static R_ID id_clipped, id_clip_x, id_clip_y, id_clip_width, id_clip_height;
+static R_ID id_orig_width, id_orig_height;
+static R_ID id_source_width, id_source_height, id_trim_x, id_trim_y;
+static R_ID id_user_rx, id_user_ry;
+static R_ID id_flip;
+static R_ID id_flip_horizontal, id_flip_vertical, id_flip_both;
 
-  // Check if image file exists
-  if (!R2D_FileExists(path)) {
-    R2D_Error("R2D_CreateImageSurface", "Image file `%s` not found", path);
-    return NULL;
-  }
 
-  // Load image from file as SDL_Surface
-  SDL_Surface *surface = IMG_Load(path);
-  if (surface != NULL) {
-    int bits_per_color = surface->format->Amask == 0 ?
-      surface->format->BitsPerPixel / 3 :
-      surface->format->BitsPerPixel / 4;
+/*
+ * Initialize — caches ivar IDs and registers Ruby2D::Ext image bindings.
+ * Bindings take the Image Ruby object as their first arg and read ivars off
+ * it; the C side reads ivars from that object via obj_* macros.
+ */
+void R2D_Image_Init() {
+  id_orig_width  = r_id("@orig_width");
+  id_orig_height = r_id("@orig_height");
+  id_clipped     = r_id("@clipped");
+  id_clip_x      = r_id("@clip_x");
+  id_clip_y      = r_id("@clip_y");
+  id_clip_width  = r_id("@clip_width");
+  id_clip_height = r_id("@clip_height");
+  id_source_width  = r_id("@source_width");
+  id_source_height = r_id("@source_height");
+  id_trim_x        = r_id("@trim_x");
+  id_trim_y        = r_id("@trim_y");
+  id_user_rx     = r_id("@_user_rx");
+  id_user_ry     = r_id("@_user_ry");
+  id_flip        = r_id("@flip");
+  id_flip_horizontal = r_id("horizontal");
+  id_flip_vertical   = r_id("vertical");
+  id_flip_both       = r_id("both");
 
-    if (bits_per_color < 8) {
-      R2D_Log(R2D_WARN, "`%s` has less than 8 bits per color and will likely not render correctly", path, bits_per_color);
-    }
-  }
-  return surface;
+  r_define_class_method(ruby2d_ext_module, "image_create",    ruby2d_ext_image_create,    r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "image_draw",      ruby2d_ext_image_draw,      r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "image_draw_quads", ruby2d_ext_image_draw_quads, r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "image_resize",    ruby2d_ext_image_resize,    r_args_variadic);
 }
 
-void R2D_ImageConvertToRGB(SDL_Surface *surface) {
-  Uint32 r = surface->format->Rmask;
-  Uint32 g = surface->format->Gmask;
-  Uint32 a = surface->format->Amask;
 
-  if (r&0xFF000000 || r&0xFF0000) {
-    char *p = (char *)surface->pixels;
-    int bpp = surface->format->BytesPerPixel;
-    int w = surface->w;
-    int h = surface->h;
-    char tmp;
-    for (int i = 0; i < bpp * w * h; i += bpp) {
-      if (a&0xFF) {
-        tmp = p[i];
-        p[i] = p[i+3];
-        p[i+3] = tmp;
-      }
-      if (g&0xFF0000) {
-        tmp = p[i+1];
-        p[i+1] = p[i+2];
-        p[i+2] = tmp;
-      }
-      if (r&0xFF0000) {
-        tmp = p[i];
-        p[i] = p[i+2];
-        p[i+2] = tmp;
+// Case-insensitive check for the `.svg` extension on a path.
+static bool path_is_svg(const char *path) {
+  if (!path) return false;
+  size_t len = strlen(path);
+  if (len < 4) return false;
+  const char *ext = path + len - 4;
+  return ext[0] == '.' &&
+         (ext[1] == 's' || ext[1] == 'S') &&
+         (ext[2] == 'v' || ext[2] == 'V') &&
+         (ext[3] == 'g' || ext[3] == 'G');
+}
+
+
+/*
+ * Ruby2D::Ext.image_create(image)
+ */
+R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.image_create expects 1 arg (image), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  const char *path = obj_str(obj, id_path);
+
+  if (!R2D_FileExists(path)) {
+    r_error("Image file `%s` not found", path);
+    return R_NIL;
+  }
+
+  R2D_Image *img = ALLOC(R2D_Image);
+  img->surface = NULL;
+
+  // SVGs rasterize at their intrinsic size via IMG_Load and then pixelate when
+  // drawn larger. If the user supplied a width and height, rasterize at 2× the
+  // requested size so small upscales and rotations stay crisp; downscales to
+  // the user's size are handled by SDL at draw time.
+  if (path_is_svg(path)) {
+    R_VAL w_val = r_ivar_get(obj, id_width);
+    R_VAL h_val = r_ivar_get(obj, id_height);
+    if (r_test(w_val) && r_test(h_val)) {
+      int w = (int)NUM2DBL(w_val);
+      int h = (int)NUM2DBL(h_val);
+      if (w > 0 && h > 0) {
+        SDL_IOStream *io = SDL_IOFromFile(path, "rb");
+        if (io) {
+          img->surface = IMG_LoadSizedSVG_IO(io, w * 2, h * 2);
+          SDL_CloseIO(io);
+        }
       }
     }
   }
+
+  if (!img->surface) img->surface = IMG_Load(path);
+  if (!img->surface) {
+    xfree(img);
+    r_error("Failed to load image `%s`: %s", path, SDL_GetError());
+    return R_NIL;
+  }
+
+  img->texture = NULL;
+
+  obj_set_struct(obj, id_ext_image, R2D_Image, img);
+  obj_set_int(obj, id_width, img->surface->w);
+  obj_set_int(obj, id_height, img->surface->h);
+  obj_set_int(obj, id_orig_width, img->surface->w);
+  obj_set_int(obj, id_orig_height, img->surface->h);
+  obj_set_bool(obj, id_clipped, false);
+  obj_set_float(obj, id_clip_x, 0.0);
+  obj_set_float(obj, id_clip_y, 0.0);
+  obj_set_int(obj, id_clip_width, img->surface->w);
+  obj_set_int(obj, id_clip_height, img->surface->h);
+  obj_set_int(obj, id_source_width, img->surface->w);
+  obj_set_int(obj, id_source_height, img->surface->h);
+  obj_set_int(obj, id_trim_x, 0);
+  obj_set_int(obj, id_trim_y, 0);
+  obj_set_float(obj, id_rotate, 0.0);
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Ext.image_draw(image)
+ */
+R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.image_draw expects 1 arg (image), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Image *img;
+  obj_struct(obj, id_ext_image, R2D_Image, img);
+
+  // Create texture from surface if not already done
+  if (img->texture == NULL) {
+    img->texture = SDL_CreateTextureFromSurface(R2D_GetRenderer(), img->surface);
+    if (!img->texture) {
+      r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
+      return R_NIL;
+    }
+    SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
+    // Keep the surface alive for canvas blitting; R2D_Image_free handles cleanup
+  }
+
+  // Determine flip mode early — affects trim-offset mirroring below.
+  SDL_FlipMode flip_mode = SDL_FLIP_NONE;
+  R_VAL flip_val = r_ivar_get(obj, id_flip);
+  if (r_test(flip_val)) {
+    R_ID flip_sym = r_sym_to_id(flip_val);
+    if (flip_sym == id_flip_horizontal)
+      flip_mode = SDL_FLIP_HORIZONTAL;
+    else if (flip_sym == id_flip_vertical)
+      flip_mode = SDL_FLIP_VERTICAL;
+    else if (flip_sym == id_flip_both)
+      flip_mode = (SDL_FlipMode)(SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL);
+  }
+
+  float img_x = obj_float(obj, id_x);
+  float img_y = obj_float(obj, id_y);
+  float img_w = obj_float(obj, id_width);
+  float img_h = obj_float(obj, id_height);
+
+  SDL_FRect dst_rect;
+  SDL_FRect clip_rect;
+  SDL_FRect *src_rect = NULL;
+
+  if (obj_bool(obj, id_clipped)) {
+    // Source rect inside the texture, clamped to the area that actually
+    // remains after the clip offset. The public accessors (`clip_x=`,
+    // `clip_width=`, etc.) are unvalidated, so a zero-size, negative, or
+    // past-the-edge clip can reach here; an offset-aware clamp keeps the
+    // src rect inside the texture and the scale math finite.
+    int orig_width  = obj_int(obj, id_orig_width);
+    int orig_height = obj_int(obj, id_orig_height);
+    int clip_w_int  = obj_int(obj, id_clip_width);
+    int clip_h_int  = obj_int(obj, id_clip_height);
+
+    int clip_x = (int)obj_float(obj, id_clip_x);
+    int clip_y = (int)obj_float(obj, id_clip_y);
+    if (clip_x < 0) clip_x = 0;
+    if (clip_x > orig_width)  clip_x = orig_width;
+    if (clip_y < 0) clip_y = 0;
+    if (clip_y > orig_height) clip_y = orig_height;
+
+    int avail_w = orig_width  - clip_x;
+    int avail_h = orig_height - clip_y;
+    int clipped_w = clip_w_int > avail_w ? avail_w : clip_w_int;
+    int clipped_h = clip_h_int > avail_h ? avail_h : clip_h_int;
+
+    // Degenerate or fully out-of-bounds clip: nothing to draw. Bail before
+    // the source_w/source_h division so it can't produce Inf/NaN geometry.
+    if (clipped_w <= 0 || clipped_h <= 0) return R_TRUE;
+
+    clip_rect.x = clip_x;
+    clip_rect.y = clip_y;
+    clip_rect.w = clipped_w;
+    clip_rect.h = clipped_h;
+    src_rect = &clip_rect;
+
+    // Trim metadata: `source_width`/`source_height` is the original logical
+    // frame size, `trim_x`/`trim_y` is where the packed pixels live within
+    // it. With the no-trim defaults (source = clip, trim = 0), the math
+    // collapses to drawing the clip rect at (img_x, img_y).
+    int source_w = obj_int(obj, id_source_width);
+    int source_h = obj_int(obj, id_source_height);
+    int trim_x   = obj_int(obj, id_trim_x);
+    int trim_y   = obj_int(obj, id_trim_y);
+    if (source_w <= 0) source_w = clipped_w;
+    if (source_h <= 0) source_h = clipped_h;
+
+    // Mirror the trim offset for flipped sprites so the pose flips around
+    // the original frame's center, not around the trimmed rect's center.
+    if (flip_mode & SDL_FLIP_HORIZONTAL) trim_x = source_w - trim_x - clipped_w;
+    if (flip_mode & SDL_FLIP_VERTICAL)   trim_y = source_h - trim_y - clipped_h;
+
+    float scale_x = img_w / (float)source_w;
+    float scale_y = img_h / (float)source_h;
+
+    dst_rect.x = img_x + trim_x * scale_x;
+    dst_rect.y = img_y + trim_y * scale_y;
+    dst_rect.w = clipped_w * scale_x;
+    dst_rect.h = clipped_h * scale_y;
+  } else {
+    dst_rect.x = img_x;
+    dst_rect.y = img_y;
+    dst_rect.w = img_w;
+    dst_rect.h = img_h;
+  }
+
+  // Read color directly from the Color object
+  R_VAL color_obj = r_ivar_get(obj, id_color);
+  SDL_SetTextureColorModFloat(img->texture,
+    NUM2DBL(r_ivar_get(color_obj, id_r)),
+    NUM2DBL(r_ivar_get(color_obj, id_g)),
+    NUM2DBL(r_ivar_get(color_obj, id_b))
+  );
+  SDL_SetTextureAlphaModFloat(img->texture, NUM2DBL(r_ivar_get(color_obj, id_a)));
+
+  // Rotation center: world coords minus dst_rect's top-left. With trim,
+  // the dst rect shifts by (trim_x*scale_x, trim_y*scale_y), so the
+  // center-relative offset shifts by the same amount.
+  R_VAL urx = r_ivar_get(obj, id_user_rx);
+  R_VAL ury = r_ivar_get(obj, id_user_ry);
+  float center_rx = r_test(urx) ? NUM2DBL(urx) : img_x + img_w / 2.0f;
+  float center_ry = r_test(ury) ? NUM2DBL(ury) : img_y + img_h / 2.0f;
+
+  SDL_FPoint center = {
+    center_rx - dst_rect.x,
+    center_ry - dst_rect.y
+  };
+
+  R2D_CheckSDL(SDL_RenderTextureRotated(
+    R2D_GetRenderer(),
+    img->texture,
+    src_rect,
+    &dst_rect,
+    obj_float(obj, id_rotate),
+    &center,
+    flip_mode
+  ), "SDL_RenderTextureRotated");
+
+  return R_TRUE;
+}
+
+
+// Grow-only scratch buffers for image_draw_quads, reused across every call so a
+// per-frame tileset draw costs no malloc/free. Capacity is measured in quads:
+// quad_capacity quads back quad_capacity*4 vertices and quad_capacity*6 indices.
+// Safe as a single shared slot because the render path is single-threaded and
+// each call fully repopulates the vertices before drawing and retains nothing
+// after. Never freed — bounded by the largest tileset ever drawn, matching the
+// engine's no-teardown design. The index buffer is a pure function of quad
+// position (i*4 + {0,1,2,0,2,3}), so it is filled only for the newly grown
+// region and left untouched on every steady-state frame.
+static SDL_Vertex *quad_vertices = NULL;
+static int *quad_indices = NULL;
+static int quad_capacity = 0;
+
+/*
+ * Ruby2D::Ext.image_draw_quads
+ *
+ * Draws a batch of textured quads from one atlas texture in a single
+ * SDL_RenderGeometry call. Used by Tileset to render every placed tile at once
+ * rather than one draw call per tile.
+ *   coords_batch     - Array of N coordinate arrays, each 8 floats
+ *                      [x1,y1, x2,y2, x3,y3, x4,y4]
+ *   tex_coords_batch - Array of N texture-coordinate arrays, each 8 floats
+ *                      [u1,v1, u2,v2, u3,v3, u4,v4], paired with coords_batch
+ *   color            - Color object with @r, @g, @b, @a, applied to every quad
+ *
+ * The vertex buffer is fully repopulated on every call, even when no placement
+ * changed since the last frame. Don't add a dirty-flag skip: an A/B measured it
+ * ~9% slower on tiles_static (299 -> 272 fps) because the per-frame CPU write
+ * keeps the buffer hot in cache for SDL_RenderGeometry's immediate read — the
+ * "wasted" marshaling is prefetching. See "Tried and rejected" in
+ * benchmark/README.md.
+ */
+R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 4) r_raise("Ruby2D::Ext.image_draw_quads expects 4 args (image, coords_batch, tex_coords_batch, color), got %d", (int)argc);
+  R_VAL obj              = argv[0];
+  R_VAL coords_batch     = argv[1];
+  R_VAL tex_coords_batch = argv[2];
+  R_VAL color_obj        = argv[3];
+
+  R2D_Image *img;
+  obj_struct(obj, id_ext_image, R2D_Image, img);
+
+  int count = (int)r_ary_len(coords_batch);
+  if (count <= 0) return R_TRUE;
+
+  // Create texture from surface if not already done
+  if (img->texture == NULL) {
+    img->texture = SDL_CreateTextureFromSurface(
+      R2D_GetRenderer(), img->surface
+    );
+    if (!img->texture) {
+      r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
+      return R_NIL;
+    }
+    SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
+  }
+
+  // Extract color components (a single tint applied to every quad)
+  float cr = NUM2DBL(r_ivar_get(color_obj, id_r));
+  float cg = NUM2DBL(r_ivar_get(color_obj, id_g));
+  float cb = NUM2DBL(r_ivar_get(color_obj, id_b));
+  float ca = NUM2DBL(r_ivar_get(color_obj, id_a));
+
+  // One batch: 4 vertices and 6 indices per quad, drawn in a single call. Grow
+  // the shared scratch buffers if this batch is the largest seen so far; on the
+  // steady-state frame (count <= quad_capacity) this is a no-op.
+  if (count > quad_capacity) {
+    SDL_Vertex *nv = (SDL_Vertex *)realloc(quad_vertices, (size_t)count * 4 * sizeof(SDL_Vertex));
+    if (nv) quad_vertices = nv;
+    int *ni = (int *)realloc(quad_indices, (size_t)count * 6 * sizeof(int));
+    if (ni) quad_indices = ni;
+    if (!nv || !ni) {
+      r_raise("Ruby2D::Ext.image_draw_quads failed to allocate geometry for %d quads", count);
+      return R_NIL;
+    }
+    // Indices are address-independent and realloc preserves the prefix, so fill
+    // only the freshly grown quads [quad_capacity, count).
+    for (int i = quad_capacity; i < count; i++) {
+      int v = i * 4;
+      int x = i * 6;
+      quad_indices[x + 0] = v + 0;
+      quad_indices[x + 1] = v + 1;
+      quad_indices[x + 2] = v + 2;
+      quad_indices[x + 3] = v + 0;
+      quad_indices[x + 4] = v + 2;
+      quad_indices[x + 5] = v + 3;
+    }
+    quad_capacity = count;
+  }
+
+  for (int i = 0; i < count; i++) {
+    R_VAL coords = r_ary_entry(coords_batch, i);
+    R_VAL tex    = r_ary_entry(tex_coords_batch, i);
+    int v = i * 4;
+
+    quad_vertices[v + 0] = (SDL_Vertex){
+      .position  = { NUM2DBL(r_ary_entry(coords, 0)), NUM2DBL(r_ary_entry(coords, 1)) },
+      .color     = { cr, cg, cb, ca },
+      .tex_coord = { NUM2DBL(r_ary_entry(tex, 0)), NUM2DBL(r_ary_entry(tex, 1)) }
+    };
+    quad_vertices[v + 1] = (SDL_Vertex){
+      .position  = { NUM2DBL(r_ary_entry(coords, 2)), NUM2DBL(r_ary_entry(coords, 3)) },
+      .color     = { cr, cg, cb, ca },
+      .tex_coord = { NUM2DBL(r_ary_entry(tex, 2)), NUM2DBL(r_ary_entry(tex, 3)) }
+    };
+    quad_vertices[v + 2] = (SDL_Vertex){
+      .position  = { NUM2DBL(r_ary_entry(coords, 4)), NUM2DBL(r_ary_entry(coords, 5)) },
+      .color     = { cr, cg, cb, ca },
+      .tex_coord = { NUM2DBL(r_ary_entry(tex, 4)), NUM2DBL(r_ary_entry(tex, 5)) }
+    };
+    quad_vertices[v + 3] = (SDL_Vertex){
+      .position  = { NUM2DBL(r_ary_entry(coords, 6)), NUM2DBL(r_ary_entry(coords, 7)) },
+      .color     = { cr, cg, cb, ca },
+      .tex_coord = { NUM2DBL(r_ary_entry(tex, 6)), NUM2DBL(r_ary_entry(tex, 7)) }
+    };
+  }
+
+  bool ok = SDL_RenderGeometry(R2D_GetRenderer(), img->texture,
+                               quad_vertices, count * 4, quad_indices, count * 6);
+  R2D_CheckSDL(ok, "SDL_RenderGeometry");
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Image#ext_resize
+ *
+ * Re-rasterizes the source at a new pixel size. SVG sources reload via
+ * IMG_LoadSizedSVG_IO at 2× the requested size; raster sources reload and
+ * resample via SDL_ScaleSurface. The cached texture is freed and recreated
+ * lazily on the next draw.
+ */
+R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 3) r_raise("Ruby2D::Ext.image_resize expects 3 args (image, w, h), got %d", (int)argc);
+  R_VAL obj   = argv[0];
+  R_VAL w_val = argv[1];
+  R_VAL h_val = argv[2];
+
+  R2D_Image *img;
+  obj_struct(obj, id_ext_image, R2D_Image, img);
+
+  int new_w = (int)NUM2DBL(w_val);
+  int new_h = (int)NUM2DBL(h_val);
+  if (new_w <= 0 || new_h <= 0) {
+    r_raise("Image#resize! requires positive width and height");
+    return R_NIL;
+  }
+
+  const char *path = obj_str(obj, id_path);
+  SDL_Surface *new_surface = NULL;
+
+  if (path_is_svg(path)) {
+    SDL_IOStream *io = SDL_IOFromFile(path, "rb");
+    if (io) {
+      new_surface = IMG_LoadSizedSVG_IO(io, new_w * 2, new_h * 2);
+      SDL_CloseIO(io);
+    }
+  } else {
+    SDL_Surface *src = IMG_Load(path);
+    if (src) {
+      new_surface = SDL_ScaleSurface(src, new_w, new_h, SDL_SCALEMODE_LINEAR);
+      SDL_DestroySurface(src);
+    }
+  }
+
+  if (!new_surface) {
+    r_raise("Image#resize! failed: %s", SDL_GetError());
+    return R_NIL;
+  }
+
+  if (img->surface) SDL_DestroySurface(img->surface);
+  if (img->texture) {
+    SDL_DestroyTexture(img->texture);
+    img->texture = NULL;
+  }
+  img->surface = new_surface;
+
+  obj_set_int(obj, id_orig_width, new_surface->w);
+  obj_set_int(obj, id_orig_height, new_surface->h);
+  obj_set_bool(obj, id_clipped, false);
+  obj_set_float(obj, id_clip_x, 0.0);
+  obj_set_float(obj, id_clip_y, 0.0);
+  obj_set_int(obj, id_clip_width, new_surface->w);
+  obj_set_int(obj, id_clip_height, new_surface->h);
+  obj_set_int(obj, id_source_width, new_surface->w);
+  obj_set_int(obj, id_source_height, new_surface->h);
+  obj_set_int(obj, id_trim_x, 0);
+  obj_set_int(obj, id_trim_y, 0);
+
+  return R_TRUE;
+}
+
+
+/*
+ * Free the memory and resources associated with an R2D_Image object
+ */
+static void R2D_Image_free(void *p) {
+  if (!p) return;
+  R2D_Image *img = (R2D_Image *)p;
+  if (img->surface) {
+    SDL_DestroySurface(img->surface);
+    img->surface = NULL;
+  }
+  if (img->texture) {
+    if (R2D_RendererAlive()) SDL_DestroyTexture(img->texture);
+    img->texture = NULL;
+  }
+  xfree(img);
 }

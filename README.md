@@ -1,80 +1,141 @@
 # Welcome to Ruby 2D!
 
-[![Gem](https://img.shields.io/gem/v/ruby2d.svg?color=%23f63c38&style=for-the-badge)](https://rubygems.org/gems/ruby2d) [![Build Status](https://img.shields.io/travis/com/ruby2d/ruby2d.svg?style=for-the-badge)](https://travis-ci.com/ruby2d/ruby2d) [![Discord](https://img.shields.io/discord/807786505434693632?style=for-the-badge)](https://discord.com/invite/QBWguEasV7)
+[![Gem](https://img.shields.io/gem/v/ruby2d.svg?color=%23f63c38&style=for-the-badge)](https://rubygems.org/gems/ruby2d) [![Build Status](https://img.shields.io/github/actions/workflow/status/ruby2d/ruby2d/ci.yml?branch=main&style=for-the-badge)](https://github.com/ruby2d/ruby2d/actions/workflows/ci.yml) [![Discord](https://img.shields.io/discord/807786505434693632?style=for-the-badge)](https://discord.com/invite/QBWguEasV7)
 
-This is the [Ruby 2D gem](https://rubygems.org/gems/ruby2d). Check out the [Ruby 2D website](http://www.ruby2d.com) to learn how to get started building 2D apps in Ruby.
+**Ruby 2D** is a library for creating 2D applications, games, graphics, and interactive art in a way that's simple, natural, and joyful, in the spirit of [Ruby](https://www.ruby-lang.org) itself. The same code can run as an interpreted Ruby app, a native executable on macOS, Windows, and Linux, or a web app in the browser.
 
-## Development
+Install it with `gem install ruby2d`, then visit the [Ruby 2D website](https://www.ruby2d.com) to learn how to use the gem and build your first app.
 
-To work on the gem locally, first clone this repo using:
+## Hacking on Ruby 2D
 
-```bash
-git clone --recursive https://github.com/ruby2d/ruby2d.git
-```
-
-To keep the size of this source code repository small, [Git submodules](https://git-scm.com/book/en/Git-Tools-Submodules) are used to reference [assets](https://github.com/ruby2d/assets). The `--recursive` flag ensures submodules are initialized and updated when this repo is cloned. If you happened to clone this repo without the `--recursive` flag, you can still initialize and update submodules with:
+Want to build the gem from source, fix a bug, or explore how it works under the hood? Start by cloning the repo together with its [assets](https://github.com/ruby2d/assets) submodule:
 
 ```bash
-git submodule init
-git submodule update --remote
+git clone --recurse-submodules https://github.com/ruby2d/ruby2d.git
 ```
 
-Update these submodules at any time using `git submodule update --remote` or the `rake update` task.
+The assets submodule holds prebuilt binaries, so it's fetched shallow: a single commit, no history. If you've already cloned without `--recurse-submodules`, run `git submodule update --init` to fill it in. Once it's there, `rake update` syncs the assets to their latest upstream commit any time you want.
 
-Next, install dependencies with [Bundler](http://bundler.io) by running `bundle install` to get the development gems.
+Next, run `bundle install` to get the development gem dependencies. If you're on Linux, BSD, or an Intel Mac, you'll also need to build SDL3 yourself first with `rake deps:build` (see [building native dependencies](#building-native-dependencies) below).
 
-Finally, run `rake` to build and install the gem locally. Use `rake dev` to build referencing user-installed libraries (e.g. SDL).
+Finally, run `rake` — it reinstalls the gem from your working tree, compiling the C extension, then runs the automated test suite. You'll run this often while developing; it's the main loop for working on Ruby 2D.
+
+### Building native dependencies
+
+Ruby 2D ships with pre-built SDL3 static libraries for macOS (arm64) and Windows (UCRT, both x86_64 and arm64), bundled via the [assets](https://github.com/ruby2d/assets) submodule. A local `rake` build links those and nothing else: `rake build` packages `assets/platform/` into the gem, and the extension build links `SDL3`, `SDL3_image`, `SDL3_mixer`, and `SDL3_ttf` from there. What you test is what ships. On platforms with no pre-built libraries (Linux, BSD, Intel macOS) `rake` stops and tells you to build them, which is what the next section is for.
+
+The published gem is deliberately more forgiving, since someone installing from RubyGems has no working tree to build in: it falls back to a `ruby2d setup` cache build, then to system-installed SDL3, and installs without the native extension if it finds neither.
+
+#### Building dependencies from source
+
+`rake deps:build` compiles SDL3 and mruby from the pinned versions in the [assets](https://github.com/ruby2d/assets) submodule, plus the WebAssembly libraries if Emscripten is available. Make sure you have CMake installed, then run:
+
+```bash
+rake deps:build
+```
+
+The static libraries land in `assets/platform/<target>/lib/`, where `rake` picks them up from then on. This is the expected path on Linux, BSD, and Intel macOS: a one-time cost that builds the same pinned SDL3 the release gem bundles, so your build matches everyone else's.
+
+#### Using system libraries instead
+
+To test against your own SDL3 (a distro package, a Homebrew install, a local build), pass `--with-system-libs` to override the bundled or self-built static libraries:
+
+```bash
+CONFIGURE_ARGS=--with-system-libs rake
+```
+
+`rake install` composes its own `gem install` command line, so there's no slot to append your own arguments. `CONFIGURE_ARGS` is the environment variable mkmf reads them from instead. Installing the published gem, you pass the flag directly:
+
+```bash
+gem install ruby2d -- --with-system-libs
+```
+
+Either way you'll need the **development** packages (headers, not just the runtime libraries) for version 3 of SDL, SDL_image, SDL_mixer, and SDL_ttf. Names vary by system (`libsdl3-dev`, `SDL3-devel`, `sdl3`), and SDL3 is new enough that some distros don't carry it yet. If yours doesn't, use `rake deps:build` above.
 
 ## Tests
 
-Ruby 2D uses a combination of automated tests via [RSpec](http://rspec.info) and manual, interactive tests to verify the correctness of visual, audio, and input functionality. Build the gem and run all automated tests using the `rake` command. Build and run an interactive test in the [`test/`](test/) directory using `rake test:<target> <name_of_test>`, for example:
+Ruby 2D's test suite has two halves: automated [RSpec](https://rspec.info) tests for things a machine can verify, and interactive tests in [`test/`](test/) for things a person needs to see, hear, or click on.
+
+Run `rake` to build, install, and run the full automated suite. To run an interactive test, use `rake test <name_of_test>`.
 
 ```bash
-# Run `test/testcard.rb` using the standard Ruby interpreter, MRI (CRuby)
-rake test:cruby testcard  # `test:mri` or just `test` work also
+# Run `test/shapes.rb` with CRuby (the default)
+rake test shapes
+# ...or, equivalently, the explicit form:
+rake test:ruby shapes
 
-# Build `test/audio.rb` using mruby and run
-rake test:mruby audio
+# Run `test/audio.rb` as a native executable (built with mruby)
+rake test:native audio
 
-# Build `test/mouse.rb` for the web using WebAssembly and run in the default browser
-rake test:wasm mouse
+# Run `test/input.rb` as a web app (built with mruby and WebAssembly) in the browser
+rake test:web input
+
+# Run every interactive test sequentially; press Esc to close one and start the next
+rake test:all
+
+# Auto-run every interactive test for about a second each, exiting non-zero
+# if any crashes. Useful for CI and automated checks. Override the per-test
+# timeout via the RUBY2D_TEST_AUTO_TIMEOUT environment variable.
+rake test:auto
 ```
+
+The interactive tests are organized by domain, each one a comprehensive visual check for an area like `shapes`, `text`, or `audio`. They follow a shared visual style; see the [Style section of `test/README.md`](test/README.md#style).
+
+## Examples
+
+Demo apps that exercise the gem live in [`examples/`](examples/) — short, self-contained programs that double as Ruby 2D's visible portfolio. List them with `rake examples`, then run one with `rake examples <name_of_example>`.
+
+```bash
+# Run `examples/asteroids.rb` with CRuby (the default)
+rake examples asteroids
+# ...or, equivalently, the explicit form:
+rake examples:ruby asteroids
+
+# Run `examples/snake.rb` as a native executable (built with mruby)
+rake examples:native snake
+
+# Run `examples/boids.rb` as a web app (built with mruby and WebAssembly) in the browser
+rake examples:web boids
+
+# Run every example sequentially; press Esc to close one and start the next
+rake examples:all
+
+# Auto-run every example for about a second each, exiting non-zero if any
+# crashes. Useful for CI and automated checks. Override the per-example
+# timeout via the RUBY2D_EXAMPLES_AUTO_TIMEOUT environment variable.
+rake examples:auto
+```
+
+The examples follow shared conventions for file layout, tunables, comments, and visual polish; see [`examples/README.md`](examples/README.md).
+
+## Benchmarks
+
+Performance benchmarks are in [`benchmark/`](benchmark/). List them with `rake benchmark`, run a specific one with `rake benchmark:<name>`, or run all with `rake benchmark:all`. To measure the WebAssembly build, `rake benchmark:web[<name>]` runs one in headless Chrome. See [`benchmark/README.md`](benchmark/README.md) for the full list and how to read the output.
 
 ## Contribute
 
-Ruby 2D is an entirely open-source project (including its dependencies) built by dedicated folks who believe creating 2D applications should be simple, natural, and joyful, in the spirit of the [Ruby language](https://www.ruby-lang.org/en/about) itself.
+Ruby 2D is built by a community that cares about making 2D programming approachable and fun. There are many ways to pitch in:
 
-If you'd like to get involved, there are a number of ways to do so:
+- **Suggest a new feature.** 🌟 Got an idea, a new API, a DSL tweak, anything else? [Open an issue](https://github.com/ruby2d/ruby2d/issues/new) or come chat on [Discord](https://chat.ruby2d.com).
 
-- **Suggest and implement new features.** 🌟 Ruby 2D already does a lot, but there are plenty of new things it could do. If you have a feature request, or a suggestion on how to improve the domain-specific language, or something else to add, remove, or change, [open a new issue](https://github.com/ruby2d/ruby2d/issues/new) and tell us about it. If you just want to casually talk through an idea without the pressure of opening an issue, send a note to the [mailing list](https://groups.google.com/d/forum/ruby2d) or chat with us on [Gitter](https://gitter.im/ruby2d/ruby2d).
+- **Help support more platforms.** 💻 Ruby 2D aims to run anywhere. Test it on yours and help us improve the experience, or [file an issue](https://github.com/ruby2d/ruby2d/issues) for one we don't yet support.
 
-- **Add support for more platforms.** 💻 Ruby 2D aims to be entirely cross platform. Help us test and improve the developer experience on existing platforms and add new ones.
+- **Fix bugs and squeeze out more performance.** 🐛 Help others have a solid experience: pick something from the [issue tracker](https://github.com/ruby2d/ruby2d/issues) or have a go at improving benchmark results.
 
-- **Find and fix issues.** 🐛 Your help identifying and fixing bugs, and improving performance along the way, will be critical to ensuring others have a solid experience using the library. Check out the [issue tracker](https://github.com/ruby2d/ruby2d/issues) and have at it!
+- **Improve the docs.** 📚 Spot something unclear or missing on the [Ruby 2D website](https://www.ruby2d.com)? Most pages have a "suggest an edit" link that takes you straight to the source in the [website repo](https://github.com/ruby2d/ruby2d.com).
 
-- **Write and review documentation.** 📚 Vitally important to the success of every open-source project is documentation. We're off to a decent start, but there's always more to write and edit. Browse through the [Ruby 2D website](http://www.ruby2d.com) and help us identify areas to add clarity or fill in gaps. At the top of most pages, you'll see a link to "suggest an edit" which goes directly to the source file in the [website repo](https://github.com/ruby2d/ruby2d.com).
+### Writing code
 
-- **Create and improve examples.** 👾 We're currently a little light on sample applications to help folks get started. We'd love to get your ideas for small, single-file apps to guide users through specific features or techniques, which we collect in the [examples repository](https://github.com/ruby2d/examples). [Check out the showcase](http://www.ruby2d.com/showcase) to see what people are building and get some inspiration.
+Ruby 2D's simple surface hides a fair bit of moving parts underneath. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for an overview, and [`AGENTS.md`](AGENTS.md) for the code conventions: naming, comments, string quoting, and commit-message format. It's written for AI coding agents, but it applies to everyone. When you're ready to contribute code, a few things will help your PR land smoothly:
 
-### Technical contributions
+- **Start with an issue.** Search for an existing one or open a new one before writing code. Let's align on direction and strategy first, so the effort doesn't go to waste.
 
-In order to achieve such simplicity, a lot has to happen under the hood. Whether adding a feature or fixing a bug, try to do the following to ensure your pull request gets merged. Some of these might seem daunting, but we're happy to help along the way!
+- **Use a subset of Ruby that works everywhere.** Ruby 2D apps run unchanged on both CRuby (the standard interpreter) and [mruby](https://mruby.org) (which powers the native and [WebAssembly](https://webassembly.org) builds), so your contribution must stick to language and standard-library features supported by both. When in doubt, try snippets in their respective REPLs: `irb` for CRuby, `mirb` for mruby.
 
-- **Check if there is an existing issue, and if not, open a new one to start a discussion.** Before dedicating time and energy to an idea or fix, let's make sure it's consistent with the principles and goals of the project, and that we have a solid strategy in place to implement and test.
+- **Comprehensively test your change.** Unit tests alone won't catch everything here. Visuals must look right, audio must sound right, inputs must respond, and behavior must hold across every supported platform.
 
-- **Use a subset of Ruby that works everywhere.** Ruby 2D applications are, of course, written in Ruby. Some users may choose to harness the full power of the language, standard library, and ecosystem of gems by writing interpreted apps targeting the standard implementation, [MRI](https://en.wikipedia.org/wiki/Ruby_MRI). Others may want to target the web via [WebAssembly](https://webassembly.org), mobile devices, or build native desktop applications, all which make use of a different Ruby implementation called [mruby](http://mruby.org). Ruby 2D aims to support all of these use cases, even with the same app codebase. Your contribution must support a subset of Ruby that is compatible with and behaves similarly across MRI/CRuby and mruby. Beyond reading the documentation for each Ruby implementation, you can also try out code snippets on the command line using their respective REPLs: `irb` for MRI, and `mirb` for mruby.
-
-- **Comprehensively test your change.** Unlike other Ruby libraries, not everything here can be easily covered with unit tests alone. We also need to make sure things look and sound right, inputs work as expected, and behavior is consistent across all platforms Ruby 2D supports.
-
-## Updating Ruby 2D
-
-1. Update the [assets](https://github.com/ruby2d/assets) repo, follow the instructions in the README
-2. Run `rake update` to update the submodules
+Don't worry if any of it sounds daunting. We're happy to help along the way.
 
 ## Preparing a release
 
-1. Run tests on all supported platforms
-2. Update the version number in [`version.rb`](lib/ruby2d/version.rb), commit changes
-3. Create a [new release](https://github.com/ruby2d/ruby2d/releases) in GitHub, with tag in the form `v#.#.#`, and write a little release note
-4. Run `rake release` to build the gem, then push it to [rubygems.org](https://rubygems.org) with `gem push ruby2d-#.#.#.gem`
-5. 🎉
+Maintainers: run `rake release`, which prints the release checklist, marks off every step it can verify, and walks the rest with you. See [`RELEASING.md`](RELEASING.md) for what it does on your behalf and the platforms to test on before cutting a release.

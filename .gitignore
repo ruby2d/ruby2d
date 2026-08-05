@@ -1,6 +1,13 @@
+.ruby-lsp/
 build/
+docs/
+test/build/
 test/screenshot*
+try/build/
 *.gem
-Gemfile.lock
+benchmark/web/.build/
+.clangd
+.release-state
+.claude/settings.local.json
 .DS_Store
-tmp*
+Gemfile.lock

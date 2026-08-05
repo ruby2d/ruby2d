@@ -1,59 +1,34 @@
-# frozen_string_literal: true
-
 # Ruby2D::Font
 
 module Ruby2D
-  #
-  # Font represents a single typeface in a specific size and style.
-  # Use +Font.load+ to load/retrieve a +Font+ instance by path, size and style.
+  # System-font discovery: list the available fonts, resolve a name to a file
+  # path, and locate the bundled default. Font *files* are opened and cached
+  # natively (see `R2D_FontCacheGet` in the C extension), keyed by path, size,
+  # and style — there are no Ruby-side `Font` instances.
   class Font
-    FONT_CACHE_LIMIT = 100
-
-    attr_reader :ttf_font
-
-    # Cache loaded fonts in a class variable
-    @loaded_fonts = {}
-
     class << self
-      # Return a font by +path+, +size+ and +style+, loading the font if not already in the cache.
-      #
-      # @param path [#to_s] Full path to the font file
-      # @param size [Numeric] Size of font to setup
-      # @param style [String] Font style
-      #
-      # @return [Font]
-      def load(path, size, style = nil)
-        path = path.to_s
-        raise Error, "Cannot find font file `#{path}`" unless File.exist? path
-
-        (@loaded_fonts[[path, size, style]] ||= Font.send(:new, path, size, style)).tap do |_font|
-          @loaded_fonts.shift if @loaded_fonts.size > FONT_CACHE_LIMIT
-        end
-      end
-
       # List all fonts, names only
       def all
         all_paths.map { |path| path.split('/').last.chomp('.ttf').downcase }.uniq.sort
       end
 
-      # Find a font file path from its name, if it exists in the platforms list of fonts
-      # @return [String] full path if +font_name+ is known
-      # @return [nil] if +font_name+ is unknown
+      # Find a font file path from its name (case-insensitive, matching `all`)
       def path(font_name)
-        all_paths.find { |path| path.downcase.include?(font_name) }
+        font_name = font_name.to_s.downcase
+        # Match against the file's basename (as `all` computes names), not the
+        # whole path — otherwise a directory component like 'fonts' matches.
+        all_paths.find { |path| path.split('/').last.chomp('.ttf').downcase.include?(font_name) }
       end
 
       # Get full path to the default font
       def default
-        if all.include? 'arial'
-          path 'arial'
+        if RUBY_ENGINE == 'mruby'
+          # Native and WASM builds bundle fonts at ruby2d/fonts/ relative to the binary
+          'ruby2d/fonts/outfit/outfit.ttf'
         else
-          all_paths.first
+          File.expand_path('../../assets/resources/fonts/outfit/outfit.ttf', __dir__)
         end
       end
-
-      # Font cannot be instantiated directly; use +Font.load+ instead.
-      private :new
 
       private
 
@@ -77,11 +52,13 @@ module Ruby2D
 
       # Return all font files in the platform's font location
       def find_os_font_files
+        return [] unless directory
+
         if RUBY_ENGINE == 'mruby'
           # MRuby does not have `Dir` defined
           `find #{directory} -name *.ttf`.split("\n")
         else
-          # If MRI and/or non-Bash shell (like cmd.exe)
+          # If CRuby and/or non-Bash shell (like cmd.exe)
           Dir["#{directory}/**/*.ttf"]
         end
       end
@@ -96,45 +73,28 @@ module Ruby2D
 
       # Get the fonts directory for the current platform
       def directory
-        # If MRI and/or non-Bash shell (like cmd.exe)
-        # memoize so we only calculate once
-        @directory ||= OS_FONT_PATHS[ruby_platform_osname || sys_uname_osname]
+        @directory ||= OS_FONT_PATHS[host_os]
       end
 
-      # Uses RUBY_PLATFORM to identify OS
-      def ruby_platform_osname
-        return unless Object.const_defined? :RUBY_PLATFORM
-
-        case RUBY_PLATFORM
-        when /darwin/ # macOS
-          :macos
-        when /linux/
-          :linux
-        when /mingw/
-          :windows
-        when /openbsd/
-          :openbsd
+      # Identify the host OS, mirroring AssetsTarget.host_os but returning a symbol.
+      # Uses RbConfig when available (CRuby), falls back to uname (mruby).
+      def host_os
+        if Object.const_defined?(:RbConfig)
+          host = RbConfig::CONFIG['host_os'].downcase
+          return :windows if host.match?(/mswin|mingw|cygwin/)
+          return :macos   if host.include?('darwin')
+          return :linux   if host.include?('linux')
+          return :openbsd if host.include?('openbsd')
+        else
+          uname = `uname`.strip
+          return :macos   if uname.include?('Darwin')
+          return :linux   if uname.include?('Linux')
+          return :windows if uname.include?('MINGW')
+          return :openbsd if uname.include?('OpenBSD')
         end
+      rescue IOError
+        nil
       end
-
-      # Uses uname command to identify OS
-      def sys_uname_osname
-        uname = `uname`
-        if uname.include? 'Darwin' # macOS
-          :macos
-        elsif uname.include? 'Linux'
-          :linux
-        elsif uname.include? 'MINGW'
-          :windows
-        elsif uname.include? 'OpenBSD'
-          :openbsd
-        end
-      end
-    end
-
-    # Private constructor, called internally using +Font.send(:new,...)+
-    def initialize(path, size, style = nil)
-      @ttf_font = Font.ext_load(path.to_s, size, style.to_s)
     end
   end
 end

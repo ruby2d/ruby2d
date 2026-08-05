@@ -1,3 +1,4 @@
 [submodule "assets"]
 	path = assets
 	url = https://github.com/ruby2d/assets.git
+	shallow = true
