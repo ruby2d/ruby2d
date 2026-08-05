@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruby 2D - Try It!</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #c22;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  header span { font-weight: 400; opacity: 0.85; margin-left: 8px; font-size: 16px; }
+
+  .container {
+    display: flex;
+    max-width: 1200px;
+    margin: 24px auto;
+    gap: 24px;
+    padding: 0 24px;
+  }
+
+  /* Left panel */
+  .left-panel {
+    width: 280px;
+    flex-shrink: 0;
+  }
+  .left-panel h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+  .left-panel p {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .left-panel a { color: #c22; }
+  .example-list { list-style: none; }
+  .example-list li {
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+  .example-list li:hover { background: #e8e8e8; }
+  .example-list li.active { background: #c22; color: #fff; font-weight: 600; }
+
+  /* Right panel */
+  .right-panel { flex: 1; min-width: 0; }
+
+  canvas {
+    display: block;
+    width: 640px;
+    height: 480px;
+    background: #000;
+    border-radius: 6px;
+  }
+  /* The canvas is focusable (tabindex="0"), so a right-click can leave it
+     focused; WebKit then reads the next keypress as keyboard interaction and
+     paints a focus ring mid-game. SDL listens for keys page-wide rather than
+     on the canvas, so hiding the ring costs nothing. */
+  canvas:focus, canvas:focus-visible { outline: none; }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+    align-items: center;
+  }
+  .btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-run { background: #c22; color: #fff; }
+  .btn-console { background: #e0e0e0; color: #555; margin-left: auto; }
+
+  .editor {
+    width: 100%;
+    min-height: 200px;
+    padding: 14px;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border: 4px solid transparent;
+    border-radius: 6px;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+  }
+  .editor.error { border-color: #f00; }
+
+  .console-panel {
+    margin-top: 8px;
+    display: none;
+  }
+  .console-panel.visible { display: block; }
+  .console-output {
+    width: 100%;
+    min-height: 100px;
+    max-height: 200px;
+    padding: 10px 14px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    background: #181825;
+    color: #a6adc8;
+    border: none;
+    border-radius: 6px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 16px;
+    border-radius: 6px;
+    z-index: 10;
+  }
+
+  .canvas-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<header>Ruby 2D<span>Try It!</span></header>
+
+<div class="container">
+  <div class="left-panel">
+    <h2>Examples</h2>
+    <ul class="example-list" id="exampleList"></ul>
+  </div>
+
+  <div class="right-panel">
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
+      <div class="loading-overlay" id="loadingOverlay">Loading WebAssembly...</div>
+    </div>
+
+    <textarea class="editor" id="editor" spellcheck="false" placeholder="Write your Ruby 2D code here..."></textarea>
+
+    <div class="controls">
+      <button class="btn btn-run" id="runBtn" disabled onclick="runCode()">Run</button>
+      <button class="btn btn-console" id="consoleBtn" onclick="toggleConsole()">Show Console</button>
+    </div>
+
+    <div class="console-panel" id="consolePanel">
+      <div class="console-output" id="consoleOutput"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Examples
+var examples = [
+  {
+    name: 'Hello Triangle',
+    code:
+      "set background: 'navy'\n" +
+      "\n" +
+      "Triangle.new(\n" +
+      "  x1: 320, y1:  50,\n" +
+      "  x2: 540, y2: 430,\n" +
+      "  x3: 100, y3: 430,\n" +
+      "  color: ['red', 'green', 'blue']\n" +
+      ")\n" +
+      "\n" +
+      "show\n"
+  },
+  {
+    name: 'Shapes',
+    code:
+      "set background: 'white'\n" +
+      "\n" +
+      "Square.new(x: 50, y: 50, size: 100, color: 'red')\n" +
+      "Rectangle.new(x: 200, y: 50, width: 150, height: 100, color: 'blue')\n" +
+      "Triangle.new(\n" +
+      "  x1: 450, y1: 50,\n" +
+      "  x2: 550, y2: 150,\n" +
+      "  x3: 400, y3: 150,\n" +
+      "  color: 'green'\n" +
+      ")\n" +
+      "Circle.new(x: 150, y: 300, radius: 80, color: 'orange')\n" +
+      "Line.new(x1: 300, y1: 250, x2: 550, y2: 400, stroke_width: 4, color: 'purple')\n" +
+      "Quad.new(\n" +
+      "  x1: 350, y1: 250,\n" +
+      "  x2: 500, y2: 280,\n" +
+      "  x3: 480, y3: 400,\n" +
+      "  x4: 330, y4: 370,\n" +
+      "  color: ['#ff6347', '#4682b4', '#32cd32', '#ffd700']\n" +
+      ")\n" +
+      "\n" +
+      "show\n"
+  },
+  {
+    name: 'Animation',
+    code:
+      "set background: 'navy'\n" +
+      "\n" +
+      "s = Square.new(x: 0, y: 190, size: 50, color: 'red')\n" +
+      "speed = 3\n" +
+      "\n" +
+      "update do\n" +
+      "  s.x += speed\n" +
+      "  if s.x > Window.width\n" +
+      "    s.x = -50\n" +
+      "    s.color = [rand, rand, rand, 1.0]\n" +
+      "  end\n" +
+      "end\n" +
+      "\n" +
+      "show\n"
+  },
+  {
+    name: 'Keyboard Input',
+    code:
+      "set background: '#2d2d2d'\n" +
+      "\n" +
+      "s = Square.new(x: 295, y: 215, size: 50, color: 'lime')\n" +
+      "speed = 5\n" +
+      "\n" +
+      "on :key_held do |event|\n" +
+      "  case event.key\n" +
+      "  when 'up'    then s.y -= speed\n" +
+      "  when 'down'  then s.y += speed\n" +
+      "  when 'left'  then s.x -= speed\n" +
+      "  when 'right' then s.x += speed\n" +
+      "  end\n" +
+      "end\n" +
+      "\n" +
+      "show\n"
+  },
+  {
+    name: 'Mouse Drawing',
+    code:
+      "set background: 'white'\n" +
+      "\n" +
+      "on :mouse_down do |event|\n" +
+      "  c = Circle.new(\n" +
+      "    x: event.x, y: event.y,\n" +
+      "    radius: 10 + rand(30),\n" +
+      "    color: [rand, rand, rand, 0.8]\n" +
+      "  )\n" +
+      "end\n" +
+      "\n" +
+      "show\n"
+  },
+  {
+    name: 'Text',
+    code:
+      "set background: 'navy'\n" +
+      "\n" +
+      "Text.new('Hello, Ruby 2D!', x: 160, y: 200, size: 40, color: 'white')\n" +
+      "Text.new('Write code. Make things.', x: 190, y: 260, size: 20, color: '#aaa')\n" +
+      "\n" +
+      "show\n"
+  }
+];
+
+// Build example list
+var exampleList = document.getElementById('exampleList');
+examples.forEach(function(ex, i) {
+  var li = document.createElement('li');
+  li.textContent = ex.name;
+  li.onclick = function() { loadExample(i); };
+  exampleList.appendChild(li);
+});
+
+// Console
+var consoleOutput = document.getElementById('consoleOutput');
+var consolePanel = document.getElementById('consolePanel');
+var consoleBtnEl = document.getElementById('consoleBtn');
+var consoleVisible = false;
+
+function appendConsole(text) {
+  consoleOutput.textContent += text + '\n';
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function clearConsole() {
+  consoleOutput.textContent = '';
+}
+
+function toggleConsole() {
+  consoleVisible = !consoleVisible;
+  consolePanel.classList.toggle('visible', consoleVisible);
+  consoleBtnEl.textContent = consoleVisible ? 'Hide Console' : 'Show Console';
+}
+
+// Emscripten Module
+var Module = {
+  canvas: document.getElementById('canvas'),
+  print: function(text) { appendConsole(text); },
+  printErr: function(text) {
+    // Filter benign Emscripten warnings from SDL_SetRenderVSync calling
+    // emscripten_set_main_loop_timing before the main loop is set up
+    if (text.indexOf('emscripten_set_main_loop_timing') !== -1) return;
+    appendConsole(text);
+    // Auto-show the console so the user sees the error
+    if (!consoleVisible) toggleConsole();
+    // Red border on the editor to signal something went wrong
+    document.getElementById('editor').classList.add('error');
+    // Restore canvas display size in case SDL shrank it before the error
+    var canvas = document.getElementById('canvas');
+    canvas.style.width = '640px';
+    canvas.style.height = '480px';
+  }
+};
+
+// WASM ready callback
+window.onWasmReady = function() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+  document.getElementById('runBtn').disabled = false;
+  // Load and auto-run the first example
+  loadExample(0);
+};
+
+// Run user code
+function runCode() {
+  clearConsole();
+  var editor = document.getElementById('editor');
+  editor.classList.remove('error');
+  var code = editor.value;
+  // Strip require 'ruby2d' / require "ruby2d" / require 'ruby2d/core' / etc.
+  code = code.replace(/^[ \t]*require\s+['"]ruby2d(?:\/\w+)*['"]\s*$/mg, '');
+  Module.ccall('try_run_code', null, ['string'], [code]);
+}
+
+// Load an example into the editor and run it
+function loadExample(index) {
+  var editor = document.getElementById('editor');
+  editor.value = examples[index].code;
+
+  // Update active state in example list
+  var items = exampleList.getElementsByTagName('li');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.toggle('active', i === index);
+  }
+
+  // Auto-run if WASM is ready
+  if (!document.getElementById('runBtn').disabled) {
+    runCode();
+  }
+}
+
+// Keep the browser's context menu off the canvas. A right-click there is game
+// input, not a request for "Save Image As", and the menu lands on top of
+// whatever is running. SDL still sees the right button either way.
+document.getElementById('canvas').addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+});
+
+// Prevent keyboard events from reaching SDL when the editor is focused.
+// SDL3's Emscripten backend registers listeners on `window`, so without this,
+// every keystroke in the editor also triggers game input (e.g. arrow keys move
+// a sprite while the user is editing code). stopPropagation prevents the event
+// from bubbling up to window where SDL would catch it.
+var editorEl = document.getElementById('editor');
+editorEl.addEventListener('keydown', function(e) {
+  e.stopPropagation();
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var start = this.selectionStart;
+    var end = this.selectionEnd;
+    this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+    this.selectionStart = this.selectionEnd = start + 2;
+  }
+});
+editorEl.addEventListener('keyup', function(e) {
+  e.stopPropagation();
+});
+</script>
+<script async src="app.js"></script>
+</body>
+</html>

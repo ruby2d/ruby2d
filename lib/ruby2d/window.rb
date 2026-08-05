@@ -1,30 +1,56 @@
-# frozen_string_literal: true
-
 # Ruby2D::Window
 
 module Ruby2D
-  # Represents a window on screen, responsible for storing renderable graphics,
-  # event handlers, the update loop, showing and closing the window.
-
-  attr_reader :width, :height
-
+  # The application window
   class Window
     # Event structures
     EventDescriptor       = Struct.new(:type, :id)
-    MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y)
-    KeyEvent              = Struct.new(:type, :key)
-    ControllerEvent       = Struct.new(:which, :type, :axis, :value, :button)
-    ControllerAxisEvent   = Struct.new(:which, :axis, :value)
-    ControllerButtonEvent = Struct.new(:which, :button)
+    ObjectEventDescriptor = Struct.new(:object, :type, :id)
+    MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y) do
+      def button?(name) = button == name
+      def position      = [x, y]
+      def delta         = [delta_x, delta_y]
+    end
+    KeyEvent              = Struct.new(:type, :key) do
+      def key?(name) = key == name.to_s.downcase
+    end
 
-    #
-    # Create a Window
-    # @param title [String] Title for the window
-    # @param width [Numeric] In pixels
-    # @param height [Numeric] in pixels
-    # @param fps_cap [Numeric] Over-ride the default (60fps) frames-per-second
-    # @param vsync [Boolean] Enabled by default, use this to override it (Not recommended)
-    def initialize(title: 'Ruby 2D', width: 640, height: 480, fps_cap: 60, vsync: true)
+    include KeyEvents
+    include MouseEvents
+    include GamepadEvents
+    include ObjectEventDispatch
+    extend ClassMethods
+
+    attr_reader :title, :width, :height, :fps_cap, :fps, :frames, :delta_time,
+                :background, :icon, :resizable,
+                :highdpi, :pixel_scale,
+                :viewport_width, :viewport_height, :viewport_mode,
+                :render_mode,
+                :mouse_x, :mouse_y, :diagnostics, :show_fps, :close_on_esc
+
+    # Accepted `fps_cap` values, shared by the strict constructor check and the
+    # lenient runtime setter so the two messages can't drift apart.
+    FPS_CAP_VALUES = 'nil, a positive number, :infinity, or Float::INFINITY'
+
+    # Recognized `viewport:` modes. The native parser silently falls back to
+    # letterbox for anything else, so validate here to surface typos rather than
+    # let `viewport_mode` report a value the renderer never applied. Must match
+    # R2D_ParseViewportMode in ext/ruby2d/window.c.
+    VIEWPORT_MODES = %i[letterbox stretch integer overscan expand fixed].freeze
+
+    # Create a window
+    def initialize(title: 'Ruby 2D', width: 640, height: 480, fps_cap: nil)
+      # Ruby 2D is single-window by design: per-object events and the top-level
+      # DSL all route through one shared `DSL.window`. A second window would
+      # silently steal that pointer and strand the first window's objects and
+      # event handlers, so refuse to create one.
+      if Ruby2D::DSL.window?
+        raise Error,
+              'A window already exists. Ruby 2D supports a single window per ' \
+              'process (it may have been created automatically on first use of ' \
+              'a Window class method or the top-level DSL).'
+      end
+
       # Title of the window
       @title = title
 
@@ -32,246 +58,128 @@ module Ruby2D
       @width  = width
       @height = height
 
-      # Frames per second upper limit, and the actual FPS
+      # Frames per second upper limit, and the actual FPS. Valid: nil (no cap),
+      # a positive number, or Float::INFINITY (uncapped). The constructor is
+      # strict; the runtime setter (#set) warns and falls back instead.
+      fps_cap = normalize_fps_cap(fps_cap)
+      unless fps_cap_valid?(fps_cap)
+        raise Error, "fps_cap must be #{FPS_CAP_VALUES}, got #{fps_cap.inspect}"
+      end
       @fps_cap = fps_cap
-      @fps = @fps_cap
-
-      # Vertical synchronization, set to prevent screen tearing (recommended)
-      @vsync = vsync
+      @fps = 0
 
       # Total number of frames that have been rendered
       @frames = 0
 
+      # Whether the frame loop is running, i.e. between `show` and the window
+      # closing. Frame-scoped work like `screenshot` needs an end-of-frame to
+      # land on, so it consults this rather than doing nothing at all.
+      @running = false
+
       # Renderable objects currently in the window, like a linear scene graph
       @objects = []
+      @object_set = {}
 
-      _init_window_defaults
-      _init_event_stores
-      _init_event_registrations
-      _init_procs_dsl_console
+      init_window_defaults
+      init_event_stores
+      init_event_registrations
+      init_procs_and_dsl
+
+      Ext.window_create(self)
+
+      Ruby2D::DSL.window = self
     end
 
-    # Track open window state in a class instance variable
-    @open_window = false
+    # Track window shown state in a class instance variable
+    @shown = false
 
-    # Class methods for convenient access to properties
     class << self
-      def current
-        get(:window)
-      end
+      attr_reader :shown
+      alias_method :shown?, :shown
 
-      def title
-        get(:title)
-      end
-
-      def background
-        get(:background)
-      end
-
-      def width
-        get(:width)
-      end
-
-      def height
-        get(:height)
-      end
-
-      def viewport_width
-        get(:viewport_width)
-      end
-
-      def viewport_height
-        get(:viewport_height)
-      end
-
-      def display_width
-        get(:display_width)
-      end
-
-      def display_height
-        get(:display_height)
-      end
-
-      def resizable
-        get(:resizable)
-      end
-
-      def borderless
-        get(:borderless)
-      end
-
-      def fullscreen
-        get(:fullscreen)
-      end
-
-      def highdpi
-        get(:highdpi)
-      end
-
-      def frames
-        get(:frames)
-      end
-
-      def fps
-        get(:fps)
-      end
-
-      def fps_cap
-        get(:fps_cap)
-      end
-
-      def mouse_x
-        get(:mouse_x)
-      end
-
-      def mouse_y
-        get(:mouse_y)
-      end
-
-      def diagnostics
-        get(:diagnostics)
-      end
-
-      def screenshot(opts = nil)
-        get(:screenshot, opts)
-      end
-
-      def get(sym, opts = nil)
-        DSL.window.get(sym, opts)
-      end
-
-      def set(opts)
-        DSL.window.set(opts)
-      end
-
-      def on(event, &proc)
-        DSL.window.on(event, &proc)
-      end
-
-      def off(event_descriptor)
-        DSL.window.off(event_descriptor)
-      end
-
-      def add(object)
-        DSL.window.add(object)
-      end
-
-      def remove(object)
-        DSL.window.remove(object)
-      end
-
-      def clear
-        DSL.window.clear
-      end
-
-      def update(&proc)
-        DSL.window.update(&proc)
-      end
-
-      def render(&proc)
-        DSL.window.render(&proc)
-      end
-
-      def show
-        DSL.window.show
-      end
-
-      def close
-        DSL.window.close
-      end
-
-      def render_ready_check
-        return if opened?
-
-        raise Error,
-              'Attempting to draw before the window is ready. Please put calls to draw() inside of a render block.'
-      end
-
-      def opened?
-        @open_window
-      end
-
-      private
-
-      def opened!
-        @open_window = true
-      end
+      attr_writer :shown
     end
 
-    # Public instance methods
+    def display_width
+      Ext.window_get_display_dimensions(self)
+      @display_width
+    end
 
-    # --- start exception
-    # Exception from lint check for the #get method which is what it is. :)
-    #
-    # rubocop:disable Metrics/CyclomaticComplexity
-    # rubocop:disable Metrics/AbcSize
+    def display_height
+      Ext.window_get_display_dimensions(self)
+      @display_height
+    end
 
-    # Retrieve an attribute of the window
-    # @param sym [Symbol] The name of an attribute to retrieve.
-    def get(sym, opts = nil)
+    def display_pixel_width
+      Ext.window_get_display_dimensions(self)
+      @display_pixel_width
+    end
+
+    def display_pixel_height
+      Ext.window_get_display_dimensions(self)
+      @display_pixel_height
+    end
+
+    # Get a window attribute by name. `:window` returns the Window itself (the
+    # DSL escape hatch to the full API); any other symbol reads that attribute.
+    def get(sym)
       case sym
-      when :window then          self
-      when :title then           @title
-      when :background then      @background
-      when :width then           @width
-      when :height then          @height
-      when :viewport_width then  @viewport_width
-      when :viewport_height then @viewport_height
-      when :display_width, :display_height
-        ext_get_display_dimensions
-        if sym == :display_width
-          @display_width
-        else
-          @display_height
-        end
-      when :resizable then       @resizable
-      when :borderless then      @borderless
-      when :fullscreen then      @fullscreen
-      when :highdpi then         @highdpi
-      when :frames then          @frames
-      when :fps then             @fps
-      when :fps_cap then         @fps_cap
-      when :mouse_x then         @mouse_x
-      when :mouse_y then         @mouse_y
-      when :diagnostics then     @diagnostics
-      when :screenshot then      screenshot(opts)
+      when :window then self
+      else public_send(sym)
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
-    # rubocop:enable Metrics/AbcSize
-    # --- end exception
 
-    # Set a window attribute
-    # @param opts [Hash] The attributes to set
-    # @option opts [Color] :background
-    # @option opts [String] :title
-    # @option opts [Numeric] :width
-    # @option opts [Numeric] :height
-    # @option opts [Numeric] :viewport_width
-    # @option opts [Numeric] :viewport_height
-    # @option opts [Boolean] :highdpi
-    # @option opts [Boolean] :resizable
-    # @option opts [Boolean] :borderless
-    # @option opts [Boolean] :fullscreen
-    # @option opts [Numeric] :fps_cap
-    # @option opts [Numeric] :diagnostics
+    # Set window attributes
     def set(opts)
       # Store new window attributes, or ignore if nil
-      _set_any_window_properties opts
-      _set_any_window_dimensions opts
+      set_any_window_properties opts
+      set_any_window_dimensions opts
 
-      @fps_cap = opts[:fps_cap] if opts[:fps_cap]
-      return if opts[:diagnostics].nil?
+      Ext.window_set_size(self) if Window.shown? && (opts[:width] || opts[:height])
 
-      @diagnostics = opts[:diagnostics]
-      ext_diagnostics(@diagnostics)
+      if Window.shown? && (opts[:viewport] || opts[:viewport_width] || opts[:viewport_height] || !opts[:pixel_scale].nil?)
+        Ext.window_set_viewport_mode(self)
+      end
+
+      if opts.key?(:fps_cap)
+        cap = normalize_fps_cap(opts[:fps_cap])
+        if fps_cap_valid?(cap)
+          @fps_cap = cap
+        else
+          Ruby2D.warn "fps_cap must be #{FPS_CAP_VALUES}, got #{opts[:fps_cap].inspect}; ignoring (no cap)."
+          @fps_cap = nil
+        end
+        Ext.window_set_fps_cap(self, @fps_cap) if Window.shown?
+      end
+
+      unless opts[:render_mode].nil?
+        unless %i[continuous on_demand].include?(opts[:render_mode])
+          raise Error, "`render_mode` must be :continuous or :on_demand, got #{opts[:render_mode].inspect}"
+        end
+        @render_mode = opts[:render_mode]
+        Ext.window_set_render_mode(self) if Window.shown?
+      end
+
+      @close_on_esc = opts[:close_on_esc] unless opts[:close_on_esc].nil?
+
+      self.cursor = opts[:cursor] unless opts[:cursor].nil?
+
+      unless opts[:show_fps].nil?
+        @show_fps = opts[:show_fps]
+        Ext.window_show_fps(self, @show_fps)
+      end
+
+      unless opts[:diagnostics].nil?
+        @diagnostics = opts[:diagnostics]
+        Ext.window_diagnostics(self, @diagnostics)
+      end
     end
 
     # Add an object to the window
     def add(object)
       case object
       when nil
-        raise Error, "Cannot add '#{object.class}' to window!"
+        raise Error, "Cannot add `#{object.class}` to window!"
       when Array
         object.each { |x| add_object(x) }
       else
@@ -281,425 +189,556 @@ module Ruby2D
 
     # Remove an object from the window
     def remove(object)
-      raise Error, "Cannot remove '#{object.class}' from window!" if object.nil?
+      raise Error, "Cannot remove `#{object.class}` from window!" if object.nil?
+      return false unless @objects.delete(object)
 
-      ix = @objects.index(object)
-      return false if ix.nil?
-
-      @objects.delete_at(ix)
+      @object_set.delete(object)
+      unregister_interactive(object)
       true
     end
 
     # Clear all objects from the window
     def clear
       @objects.clear
+      @object_set.clear
+      init_object_event_stores
     end
 
     # Set the update callback
     def update(&proc)
+      raise Error, '`update` requires a block' unless proc
       @update_proc = proc
+      # Cache whether the block takes a delta-time arg; the arity never changes
+      # after assignment, so the per-frame loop reads this instead of recomputing.
+      @update_wants_dt = !proc.arity.zero?
       true
     end
 
-    # Set the render callback
-    def render(&proc)
+    # Set the render callback. `z:` places the block in the scene's z-order:
+    # `:foreground` (default) draws it on top of every object, `:background`
+    # behind them, or a number interleaves it at that depth on the same scale
+    # as object `z` (objects with `z` at or below it draw first, then the
+    # block, then the rest).
+    def render(z: :foreground, &proc)
+      raise Error, '`render` requires a block' unless proc
       @render_proc = proc
+      @render_z = render_z_for(z)
       true
     end
 
-    # Generate a new event key (ID)
-    def new_event_key
-      @event_key = @event_key.next
+    # Monotonic seconds since engine start — a cross-platform, overflow-safe
+    # clock for cooldowns, scheduling, and "time since" math. Unlike `Time.now`
+    # it never jumps or jitters, and reads the same on CRuby and mruby/web.
+    # For per-frame motion, prefer the `dt` argument to `update`.
+    def elapsed
+      Ext.now
     end
 
-    # Set an event handler
-    def on(event, &proc)
+    # Maps event types to the predicate used in the kwarg form of `on` —
+    # e.g. `on key_down: :escape` filters via `event.key?(:escape)`. For
+    # gamepad events the entries map to the *primary* predicate (the one a
+    # bare scalar matcher targets); hash matchers like
+    # `{ gamepad: pad1, button: :south }` derive the predicate from each key.
+    EVENT_FILTER_PREDICATES = {
+      key_down: :key?, key_held: :key?, key_up: :key?,
+      mouse_down: :button?, mouse_held: :button?, mouse_up: :button?,
+      gamepad_button_down: :button?, gamepad_button_held: :button?,
+      gamepad_button_up:   :button?, gamepad_axis: :axis?
+    }.freeze
+
+    # Gamepad events dispatch an internal data struct, but user blocks
+    # receive the unpacked args (gamepad / button / axis / value). This map
+    # describes the unpack for each gamepad event type.
+    GAMEPAD_EVENT_UNPACK = {
+      gamepad_connect:     ->(d) { [d.gamepad] },
+      gamepad_disconnect:  ->(d) { [d.gamepad] },
+      gamepad_button_down: ->(d) { [d.gamepad, d.button] },
+      gamepad_button_held: ->(d) { [d.gamepad, d.button] },
+      gamepad_button_up:   ->(d) { [d.gamepad, d.button] },
+      gamepad_axis:        ->(d) { [d.gamepad, d.axis, d.value] }
+    }.freeze
+
+    # Set an event handler. Forms:
+    #
+    #   on(:key_down) { |event| ... }                              # all events of type
+    #   on(key_down: :escape) { ... }                              # filtered by value
+    #   on(key_down: [:left, :a]) { ... }                          # array → match any
+    #   on(key_down: :left, gamepad_button_down: :dpad_left) { }   # multi-event
+    #   on(gamepad_button_down: { gamepad: pad1, button: :south }) # hash → AND match
+    def on(event = nil, **filters, &proc)
+      raise Error, '`on` requires a block' unless proc
+      if event.is_a?(Symbol) && filters.empty?
+        register_event_handler(event, wrap_for_event(event, proc))
+      elsif event.nil? && !filters.empty?
+        descriptors = filters.map do |type, matcher|
+          register_event_handler(type, build_filter_wrapper(type, matcher, proc))
+        end
+        descriptors.size == 1 ? descriptors.first : descriptors
+      else
+        raise Error, '`on` requires either an event symbol or event filters'
+      end
+    end
+
+    private def register_event_handler(event, proc)
       raise Error, "`#{event}` is not a valid event type" unless @events.key? event
+
+      # Only one close handler is allowed; registering a new one replaces the old
+      @events[:close].clear if event == :close
 
       event_id = new_event_key
       @events[event][event_id] = proc
       EventDescriptor.new(event, event_id)
     end
 
-    # Remove an event handler
+    # Wrap a user proc for direct (no-filter) registration. Gamepad events
+    # unpack the dispatch struct into multi-arg form; everything else passes
+    # the event struct straight through.
+    private def wrap_for_event(type, proc)
+      unpack = GAMEPAD_EVENT_UNPACK[type]
+      return proc unless unpack
+
+      ->(d) { proc.call(*unpack.call(d)) }
+    end
+
+    # Wrap a user proc with a filter matcher. Hash matchers AND every
+    # `key?(value)` predicate; scalar/array matchers fall through to the
+    # event type's primary predicate. Gamepad event handlers also unpack
+    # the dispatch struct into multi-arg form.
+    private def build_filter_wrapper(type, matcher, proc)
+      unpack = GAMEPAD_EVENT_UNPACK[type]
+      args = unpack ? ->(e) { unpack.call(e) } : ->(e) { [e] }
+
+      if matcher.is_a?(Hash)
+        unless unpack
+          raise Error, "`#{type}` does not support hash filters with `on event: { ... }`"
+        end
+        ->(e) {
+          if matcher.all? { |k, v| e.send(:"#{k}?", v) }
+            proc.call(*args.call(e))
+          end
+        }
+      else
+        predicate = EVENT_FILTER_PREDICATES[type] or
+          raise Error, "`#{type}` does not support filtering with `on event: value`"
+        values = Array(matcher)
+        ->(e) {
+          if values.any? { |v| e.send(predicate, v) }
+            proc.call(*args.call(e))
+          end
+        }
+      end
+    end
+
+    # Remove an event handler (or several). Accepts a descriptor returned by
+    # `on`, or an array of them (as `on` returns when given multiple filters).
     def off(event_descriptor)
-      @events[event_descriptor.type].delete(event_descriptor.id)
-    end
+      return event_descriptor.each { |d| off(d) } if event_descriptor.is_a?(Array)
 
-    # Key down event method for class pattern
-    def key_down(key)
-      @keys_down.include? key
-    end
-
-    # Key held event method for class pattern
-    def key_held(key)
-      @keys_held.include? key
-    end
-
-    # Key up event method for class pattern
-    def key_up(key)
-      @keys_up.include? key
-    end
-
-    # Key callback method, called by the native and web extentions
-    def key_callback(type, key)
-      key = key.downcase
-
-      # All key events
-      @events[:key].each do |_id, e|
-        e.call(KeyEvent.new(type, key))
-      end
-
-      case type
-      # When key is pressed, fired once
-      when :down
-        _handle_key_down type, key
-      # When key is being held down, fired every frame
-      when :held
-        _handle_key_held type, key
-      # When key released, fired once
-      when :up
-        _handle_key_up type, key
-      end
-    end
-
-    # Mouse down event method for class pattern
-    def mouse_down(btn)
-      @mouse_buttons_down.include? btn
-    end
-
-    # Mouse up event method for class pattern
-    def mouse_up(btn)
-      @mouse_buttons_up.include? btn
-    end
-
-    # Mouse scroll event method for class pattern
-    def mouse_scroll
-      @mouse_scroll_event
-    end
-
-    # Mouse move event method for class pattern
-    def mouse_move
-      @mouse_move_event
-    end
-
-    # Mouse callback method, called by the native and web extentions
-    def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
-      # All mouse events
-      @events[:mouse].each do |_id, e|
-        e.call(MouseEvent.new(type, button, direction, x, y, delta_x, delta_y))
-      end
-
-      case type
-      # When mouse button pressed
-      when :down
-        _handle_mouse_down type, button, x, y
-      # When mouse button released
-      when :up
-        _handle_mouse_up type, button, x, y
-      # When mouse motion / movement
-      when :scroll
-        _handle_mouse_scroll type, direction, delta_x, delta_y
-      # When mouse scrolling, wheel or trackpad
-      when :move
-        _handle_mouse_move type, x, y, delta_x, delta_y
-      end
-    end
-
-    # Add controller mappings from file
-    def add_controller_mappings
-      ext_add_controller_mappings(@controller_mappings) if File.exist? @controller_mappings
-    end
-
-    # Controller axis event method for class pattern
-    def controller_axis(axis)
-      @controller_axes_moved.include? axis
-    end
-
-    # Controller button down event method for class pattern
-    def controller_button_down(btn)
-      @controller_buttons_down.include? btn
-    end
-
-    # Controller button up event method for class pattern
-    def controller_button_up(btn)
-      @controller_buttons_up.include? btn
-    end
-
-    # Controller callback method, called by the native and web extentions
-    def controller_callback(which, type, axis, value, button)
-      # All controller events
-      @events[:controller].each do |_id, e|
-        e.call(ControllerEvent.new(which, type, axis, value, button))
-      end
-
-      case type
-      # When controller axis motion, like analog sticks
-      when :axis
-        _handle_controller_axis which, axis, value
-      # When controller button is pressed
-      when :button_down
-        _handle_controller_button_down which, button
-      # When controller button is released
-      when :button_up
-        _handle_controller_button_up which, button
+      case event_descriptor
+      when ObjectEventDescriptor
+        event_descriptor.object.off(event_descriptor)
+      when EventDescriptor
+        @events[event_descriptor.type].delete(event_descriptor.id)
+      else
+        raise Error,
+              "Cannot remove event handler: expected a descriptor returned by `on`, got #{event_descriptor.inspect}"
       end
     end
 
     # Update callback method, called by the native and web extentions
     def update_callback
-      update unless @using_dsl
+      # Monotonic seconds since the previous update. Clamped to 0.1s so a paused
+      # window or stalled frame doesn't teleport the simulation when updates
+      # resume; zero on the first frame. `Ext.now` (SDL_GetTicksNS, and
+      # performance.now on web) is the single clock used on every runtime — the
+      # same source as the public `elapsed`. A wall clock like Time.now would
+      # jitter and stutter dt-scaled motion.
+      now = Ext.now
+      if @last_update_time
+        dt = now - @last_update_time
+        @delta_time = dt > 0.1 ? 0.1 : dt
+      else
+        @delta_time = 0.0
+      end
+      @last_update_time = now
 
-      @update_proc.call
+      update if @overrides_update
 
-      # Accept and eval commands if in console mode
-      _handle_console_input if @console && $stdin.ready?
+      if @update_wants_dt
+        @update_proc.call(@delta_time)
+      else
+        @update_proc.call
+      end
 
-      # Clear inputs if using class pattern
-      _clear_event_stores unless @using_dsl
+      # Frame-scoped polling state (pressed/released, axes_moved, scroll/move
+      # flags) lives one frame and is cleared here every tick — independent of
+      # whether the user is on the DSL or class pattern, so both can poll.
+      clear_event_stores
     end
 
-    # Render callback method, called by the native and web extentions
+    # Iterate the z-sorted scene graph and render each visible object, splicing
+    # the user's render block into the same z-order at `@render_z`: objects with
+    # `z` at or below it draw first, then the block, then the rest. The default
+    # `:foreground` (+∞) draws the block last, on top of everything; `:background`
+    # (-∞) draws it first. Called from the native extension once per frame via
+    # `tick`. Each object draws via its zero-arg `_render_scene` hook, not the
+    # public keyword `render`: on wasm mruby a zero-arg call into a
+    # keyword-heavy method still pays ~5µs of keyword setup, so 100 sprites
+    # would burn half a millisecond per frame on pure dispatch.
+    def render_objects
+      # Fast paths for the symbolic block positions: with the block pinned at
+      # +∞ (`:foreground`, the default) or -∞ (`:background`) no object can
+      # ever sort after (resp. before) it, so the per-object `z` read and
+      # compare in the interleaving loop below could never fire — skip them.
+      if @render_z == Float::INFINITY
+        @objects.each { |obj| obj._render_scene if obj.visible? }
+        render_callback
+      elsif @render_z == -Float::INFINITY
+        render_callback
+        @objects.each { |obj| obj._render_scene if obj.visible? }
+      else
+        block_drawn = false
+        @objects.each do |obj|
+          if !block_drawn && obj.z > @render_z
+            render_callback
+            block_drawn = true
+          end
+          obj._render_scene if obj.visible?
+        end
+        render_callback unless block_drawn
+      end
+    end
+
+    # Run the user's render block (and the overridden `render` method under the
+    # class pattern). Spliced into the scene by `render_objects`.
     def render_callback
-      render unless @using_dsl
+      render if @overrides_render
 
       @render_proc.call
     end
 
-    # Show the window
-    def show
-      raise Error, 'Window#show called multiple times, Ruby2D only supports a single open window' if Window.opened?
-
-      Window.send(:opened!)
-      ext_show
+    # Close callback method, called by the native extension
+    def close_callback
+      @events[:close].each_value(&:call)
     end
 
-    # Take screenshot
-    def screenshot(path)
-      if path
-        ext_screenshot(path)
+    # One frame: poll events, update, render.
+    def tick
+      Ext.poll_events(self)
+      # drain_events returns nil (not an empty array) on event-less frames
+      raw = Ext.drain_events(self)
+      dispatch_events(raw) if raw
+
+      update_callback
+
+      if Ext.begin_frame(self)
+        render_objects
+      end
+
+      Ext.end_frame(self)
+    end
+
+    # Show the window
+    def show
+      raise Error, 'Window#show called multiple times; Ruby 2D supports a single window per process' if Window.shown?
+
+      @close = false
+      load_default_gamepad_mappings
+
+      if RUBY_ENGINE == 'ruby'
+        # CRuby: window_show creates the window and returns — Ruby owns the loop.
+        # Mark shown only after it succeeds; on failure it raises, so shown? stays
+        # false and no frame dereferences a NULL renderer.
+        Ext.window_show(self)
+        Window.shown = true
+        @running = true
+        tick until @close
       else
-        time = if RUBY_ENGINE == 'ruby'
-                 Time.now.utc.strftime '%Y-%m-%d--%H-%M-%S'
-               else
-                 Time.now.utc.to_i
-               end
-        ext_screenshot("./screenshot-#{time}.png")
+        # mruby/WASM: window_show creates the window AND runs the loop, blocking
+        # until close. Mark shown first so live updates (request_render, set title,
+        # etc.) work during the run; a creation failure raises before the loop.
+        Window.shown = true
+        @running = true
+        Ext.window_show(self)
+      end
+
+      @running = false
+    end
+
+    # Take a screenshot, saving to `path` (or a timestamped file if omitted).
+    #
+    # The write is deferred to the end of the current frame, after the scene is
+    # drawn but before it is presented, so the capture is this frame rather than
+    # the last one. `path` therefore comes back before the file exists; it lands
+    # by the time the next `update` runs. Requesting one also forces the frame to
+    # render, so a capture in `:on_demand` mode never grabs a parked frame, and
+    # capturing and closing in the same tick still writes the file.
+    #
+    # A closed window has no end-of-frame left to write on, so that raises rather
+    # than returning a path to a file that will never appear.
+    #
+    # A no-op on the web, returning nil: the only filesystem there is Emscripten's
+    # in-memory one, so a capture would cost a framebuffer read and a PNG encode
+    # to produce a file nobody can open, and that vanishes on reload.
+    def screenshot(path = nil)
+      return if Ruby2D.web?
+
+      if Window.shown? && !@running
+        raise Error, '`screenshot` called after the window closed; the file is ' \
+                     'written at the end of a frame, so nothing would be saved'
+      end
+
+      path ||= "./screenshot-#{Time.now.utc.strftime('%Y-%m-%d--%H-%M-%S')}.png"
+      Ext.window_screenshot(self, path)
+    end
+
+    # Get the current cursor state
+    def cursor
+      return :hidden unless Ext.window_cursor_visible(self)
+
+      @cursor_style || :default
+    end
+
+    # Set the cursor: `:visible`, `:hidden`, or a system cursor name
+    def cursor=(name)
+      case name
+      when :visible
+        @cursor_style = :default
+        Ext.window_show_cursor(self)
+      when :hidden
+        @cursor_style = nil
+        Ext.window_hide_cursor(self)
+      else
+        name = name.to_sym
+        @cursor_style = name
+        Ext.window_set_system_cursor(self, name.to_s)
       end
     end
 
-    # Close the window
+    # Close the window. A no-op on the web, where a page can't close itself —
+    # only the person viewing it can — so there's nothing to shut down: the
+    # `:close` handler doesn't fire, the window isn't marked closed, and the
+    # loop keeps running. The user's own quit still arrives as a `:close`
+    # event, which is handled in the event loop rather than here.
     def close
-      ext_close
+      return if Ruby2D.web?
+
+      close_callback
+      Ext.window_close(self)
+      @close = true
+    end
+
+    # Request that the next tick render a frame. No-op in :continuous mode.
+    # Safe to call from any thread.
+    def request_render
+      Ext.window_request_render(self) if Window.shown?
     end
 
     # Private instance methods
 
     private
 
-    # An an object to the window, used by the public `add` method
-    def add_object(object)
-      if !@objects.include?(object)
-        index = @objects.index do |obj|
-          obj.z > object.z
-        end
-        if index
-          @objects.insert(index, object)
-        else
-          @objects.push(object)
-        end
-        true
+    # Resolve a render-block `z:` to a numeric depth. `:foreground` puts the
+    # block on top of every object, `:background` behind them; a number places
+    # it at that depth on the same scale as object `z`.
+    def render_z_for(z)
+      case z
+      when :foreground then Float::INFINITY
+      when :background then -Float::INFINITY
+      when Numeric then z
       else
-        false
+        raise Error, "render `z:` must be a number, :foreground, or :background, got #{z.inspect}"
       end
     end
 
-    def _set_any_window_properties(opts)
-      @background = Color.new(opts[:background]) if Color.valid? opts[:background]
-      @title           = opts[:title]           if opts[:title]
-      @icon            = opts[:icon]            if opts[:icon]
-      @resizable       = opts[:resizable]       if opts[:resizable]
-      @borderless      = opts[:borderless]      if opts[:borderless]
-      @fullscreen      = opts[:fullscreen]      if opts[:fullscreen]
+    # Event buffer stride and category/type constants (match C-side defines)
+    EVT_STRIDE  = 12
+    EVT_KEY     = 1
+    EVT_MOUSE   = 2
+    EVT_GAMEPAD = 3
+    EVT_CLOSE   = 4
+
+    KEY_TYPE_MAP   = { 1 => :down, 2 => :held, 3 => :up }.freeze
+    MOUSE_TYPE_MAP = { 1 => :down, 2 => :up, 3 => :scroll, 4 => :move,
+                       5 => :held, 6 => :enter, 7 => :leave }.freeze
+    MOUSE_BTN_MAP  = { 1 => :left, 2 => :middle, 3 => :right, 4 => :x1, 5 => :x2 }.freeze
+    SCROLL_DIR_MAP = { 0 => :normal, 1 => :inverted }.freeze
+    GP_AXIS_MAP    = { 0 => :left_x, 1 => :left_y, 2 => :right_x, 3 => :right_y,
+                       4 => :left_trigger, 5 => :right_trigger }.freeze
+    GP_BUTTON_MAP  = { 0 => :south, 1 => :east, 2 => :west, 3 => :north,
+                       4 => :back, 5 => :guide, 6 => :start,
+                       7 => :left_stick, 8 => :right_stick,
+                       9 => :left_shoulder, 10 => :right_shoulder,
+                       11 => :dpad_up, 12 => :dpad_down,
+                       13 => :dpad_left, 14 => :dpad_right,
+                       15 => :misc1, 16 => :paddle1, 17 => :paddle2,
+                       18 => :paddle3, 19 => :paddle4, 20 => :touchpad,
+                       21 => :misc2, 22 => :misc3, 23 => :misc4,
+                       24 => :misc5, 25 => :misc6 }.freeze
+
+    def dispatch_events(raw)
+      i = 0
+      while i < raw.size
+        cat = raw[i]
+        case cat
+        when EVT_KEY
+          key_callback(KEY_TYPE_MAP[raw[i + 1]], key_name(raw[i + 2]))
+        when EVT_MOUSE
+          mouse_callback(
+            MOUSE_TYPE_MAP[raw[i + 1]], MOUSE_BTN_MAP[raw[i + 3]],
+            SCROLL_DIR_MAP[raw[i + 4]],
+            raw[i + 6], raw[i + 7], raw[i + 8], raw[i + 9]
+          )
+        when EVT_GAMEPAD
+          gp_type = raw[i + 1]
+          gp_id   = raw[i + 2]
+          case gp_type
+          when 1 then gamepad_callback(gp_id, :connect, nil, nil, raw[i + 11])
+          when 2 then gamepad_callback(gp_id, :disconnect, nil, nil, nil)
+          when 3
+            axis_sym = GP_AXIS_MAP[raw[i + 5]]
+            raw_val  = raw[i + 10]
+            value    = raw_val > 0 ? raw_val / 32767.0 : raw_val / 32768.0
+            gamepad_callback(gp_id, :axis, axis_sym, value, nil)
+          when 4 then gamepad_callback(gp_id, :button_down, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
+          when 5 then gamepad_callback(gp_id, :button_up, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
+          when 6 then gamepad_callback(gp_id, :button_held, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
+          end
+        when EVT_CLOSE
+          close_callback
+          Ext.window_close(self)
+          @close = true
+        end
+        i += EVT_STRIDE
+      end
     end
 
-    def _set_any_window_dimensions(opts)
-      @width           = opts[:width]           if opts[:width]
-      @height          = opts[:height]          if opts[:height]
+    # Fire every handler registered for `type`, building a fresh event object
+    # per handler via the block (a handler may mutate the event it receives, so
+    # handlers don't share one). Skips the values-array allocation when no
+    # handlers are registered — the common case on per-event hot paths, where
+    # it costs ~1µs per empty event type on wasm mruby.
+    def fire_event_handlers(type)
+      handlers = @events[type]
+      return if handlers.empty?
+
+      handlers.values.each { |e| e.call(yield) }
+    end
+
+    # Resolve an SDL scancode to its cached, frozen, lowercased name. The
+    # held-key path sends only the integer scancode each frame; the name is
+    # looked up (and downcased + frozen) once per distinct key and reused, so
+    # no per-frame key-name string is allocated.
+    def key_name(code)
+      @key_names[code] ||= Ext.scancode_name(code).downcase.freeze
+    end
+
+    # Generate a new event key (ID)
+    def new_event_key
+      @event_key += 1
+    end
+
+    # Add an object to the window, used by the public `add` method
+    def add_object(object)
+      return false if @object_set.key?(object)
+
+      index = @objects.bsearch_index { |obj| obj.z > object.z }
+      @objects.insert(index || @objects.size, object)
+      @object_set[object] = true
+
+      # Re-register for correct z-order if the object is interactive
+      if object.respond_to?(:interactive?) && object.interactive?
+        @interactive_objects.delete(object)
+        register_interactive(object)
+      end
+
+      true
+    end
+
+    def set_any_window_properties(opts)
+      @background = Color.new(opts[:background]) if Color.valid? opts[:background]
+      if opts[:title]
+        @title = opts[:title]
+        Ext.window_set_title(self) if Window.shown?
+      end
+      if opts[:icon]
+        @icon = opts[:icon]
+        Ext.window_set_icon(self) if Window.shown?
+      end
+      unless opts[:resizable].nil?
+        @resizable = opts[:resizable]
+        Ext.window_set_resizable(self) if Window.shown?
+      end
+    end
+
+    def set_any_window_dimensions(opts)
+      # Before `show`, the viewport auto-follows width/height (its documented
+      # default of "same as width/height"). After `show`, a bare `set width:` is
+      # a live resize: leave the fixed logical viewport alone so it letterboxes
+      # into the new window size instead of being silently overwritten. Only
+      # `:expand` tracks the window on resize, and that is handled C-side.
+      if opts[:width]
+        @width = opts[:width]
+        @viewport_width = @width unless opts[:viewport_width] || Window.shown?
+      end
+      if opts[:height]
+        @height = opts[:height]
+        @viewport_height = @height unless opts[:viewport_height] || Window.shown?
+      end
       @viewport_width  = opts[:viewport_width]  if opts[:viewport_width]
       @viewport_height = opts[:viewport_height] if opts[:viewport_height]
-      @highdpi         = opts[:highdpi] unless opts[:highdpi].nil?
+      if opts[:viewport]
+        unless VIEWPORT_MODES.include?(opts[:viewport])
+          raise Error, "Invalid viewport mode #{opts[:viewport].inspect}; expected one of #{VIEWPORT_MODES.inspect}"
+        end
+        @viewport_mode = opts[:viewport]
+      end
+      # highdpi is baked into the native window at creation and re-read once at
+      # `show`; it cannot change afterward. Keep the reader honest — never mutate
+      # @highdpi post-show — and warn only when the call would actually differ.
+      unless opts[:highdpi].nil?
+        if Window.shown?
+          if opts[:highdpi] != @highdpi
+            Ruby2D.warn 'highdpi is fixed when the window is created and cannot change after `show`; ignoring.'
+          end
+        else
+          @highdpi = opts[:highdpi]
+        end
+      end
+      @pixel_scale     = opts[:pixel_scale] unless opts[:pixel_scale].nil?
     end
 
-    def _handle_key_down(type, key)
-      # For class pattern
-      @keys_down << key if !@using_dsl && !(@keys_down.include? key)
-
-      # Call event handler
-      @events[:key_down].each do |_id, e|
-        e.call(KeyEvent.new(type, key))
-      end
+    # The symbol :infinity is an ergonomic alias for Float::INFINITY (uncapped);
+    # normalize it so the rest of the pipeline only sees nil / number / INFINITY.
+    def normalize_fps_cap(value)
+      value == :infinity ? Float::INFINITY : value
     end
 
-    def _handle_key_held(type, key)
-      # For class pattern
-      @keys_held << key if !@using_dsl && !(@keys_held.include? key)
-
-      # Call event handler
-      @events[:key_held].each do |_id, e|
-        e.call(KeyEvent.new(type, key))
-      end
+    # A valid (normalized) fps_cap is nil (no cap) or a positive number —
+    # including Float::INFINITY, which is positive. 0, negatives, NaN, and other
+    # types are rejected.
+    def fps_cap_valid?(value)
+      value.nil? || (value.is_a?(Numeric) && value > 0)
     end
 
-    def _handle_key_up(type, key)
-      # For class pattern
-      @keys_up << key if !@using_dsl && !(@keys_up.include? key)
-
-      # Call event handler
-      @events[:key_up].each do |_id, e|
-        e.call(KeyEvent.new(type, key))
-      end
-    end
-
-    def _handle_mouse_down(type, button, x, y)
-      # For class pattern
-      @mouse_buttons_down << button if !@using_dsl && !(@mouse_buttons_down.include? button)
-
-      # Call event handler
-      @events[:mouse_down].each do |_id, e|
-        e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
-      end
-    end
-
-    def _handle_mouse_up(type, button, x, y)
-      # For class pattern
-      @mouse_buttons_up << button if !@using_dsl && !(@mouse_buttons_up.include? button)
-
-      # Call event handler
-      @events[:mouse_up].each do |_id, e|
-        e.call(MouseEvent.new(type, button, nil, x, y, nil, nil))
-      end
-    end
-
-    def _handle_mouse_scroll(type, direction, delta_x, delta_y)
-      # For class pattern
-      unless @using_dsl
-        @mouse_scroll_event     = true
-        @mouse_scroll_direction = direction
-        @mouse_scroll_delta_x   = delta_x
-        @mouse_scroll_delta_y   = delta_y
-      end
-
-      # Call event handler
-      @events[:mouse_scroll].each do |_id, e|
-        e.call(MouseEvent.new(type, nil, direction, nil, nil, delta_x, delta_y))
-      end
-    end
-
-    def _handle_mouse_move(type, x, y, delta_x, delta_y)
-      # For class pattern
-      unless @using_dsl
-        @mouse_move_event   = true
-        @mouse_move_delta_x = delta_x
-        @mouse_move_delta_y = delta_y
-      end
-
-      # Call event handler
-      @events[:mouse_move].each do |_id, e|
-        e.call(MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y))
-      end
-    end
-
-    def _handle_controller_axis(which, axis, value)
-      # For class pattern
-      unless @using_dsl
-        @controller_id = which
-        @controller_axes_moved << axis unless @controller_axes_moved.include? axis
-        _set_controller_axis_value axis, value
-      end
-
-      # Call event handler
-      @events[:controller_axis].each do |_id, e|
-        e.call(ControllerAxisEvent.new(which, axis, value))
-      end
-    end
-
-    def _set_controller_axis_value(axis, value)
-      case axis
-      when :left_x
-        @controller_axis_left_x = value
-      when :left_y
-        @controller_axis_left_y = value
-      when :right_x
-        @controller_axis_right_x = value
-      when :right_y
-        @controller_axis_right_y = value
-      end
-    end
-
-    def _handle_controller_button_down(which, button)
-      # For class pattern
-      unless @using_dsl
-        @controller_id = which
-        @controller_buttons_down << button unless @controller_buttons_down.include? button
-      end
-
-      # Call event handler
-      @events[:controller_button_down].each do |_id, e|
-        e.call(ControllerButtonEvent.new(which, button))
-      end
-    end
-
-    def _handle_controller_button_up(which, button)
-      # For class pattern
-      unless @using_dsl
-        @controller_id = which
-        @controller_buttons_up << button unless @controller_buttons_up.include? button
-      end
-
-      # Call event handler
-      @events[:controller_button_up].each do |_id, e|
-        e.call(ControllerButtonEvent.new(which, button))
-      end
-    end
-
-    # --- start exception
-    # Exception from lint check for this method only
-    #
-    # rubocop:disable Lint/RescueException
-    # rubocop:disable Security/Eval
-    def _handle_console_input
-      cmd = $stdin.gets
-      begin
-        res = eval(cmd, TOPLEVEL_BINDING)
-        $stdout.puts "=> #{res.inspect}"
-        $stdout.flush
-      rescue SyntaxError => e
-        $stdout.puts e
-        $stdout.flush
-      rescue Exception => e
-        $stdout.puts e
-        $stdout.flush
-      end
-    end
-    # rubocop:enable Lint/RescueException
-    # rubocop:enable Security/Eval
-    # ---- end exception
-
-    def _clear_event_stores
+    def clear_event_stores
       @keys_down.clear
       @keys_held.clear
       @keys_up.clear
       @mouse_buttons_down.clear
       @mouse_buttons_up.clear
-      @mouse_scroll_event = false
-      @mouse_move_event = false
-      @controller_axes_moved.clear
-      @controller_buttons_down.clear
-      @controller_buttons_up.clear
+      @mouse_buttons_held.clear
+      @mouse_scroll_event     = false
+      @mouse_scroll_direction = nil
+      @mouse_scroll_delta_x   = 0
+      @mouse_scroll_delta_y   = 0
+      @mouse_move_event   = false
+      @mouse_move_delta_x = 0
+      @mouse_move_delta_y = 0
+      clear_gamepad_frame_state
     end
 
-    def _init_window_defaults
+    def init_window_defaults
       # Window background color
       @background = Color.new([0.0, 0.0, 0.0, 1.0])
 
@@ -708,62 +747,38 @@ module Ruby2D
 
       # Window characteristics
       @resizable = false
-      @borderless = false
-      @fullscreen = false
-      @highdpi = false
+      @highdpi = true
+      @pixel_scale = false
 
       # Size of the window's viewport (the drawable area)
-      @viewport_width = nil
-      @viewport_height = nil
+      @viewport_width = @width
+      @viewport_height = @height
+
+      # Viewport scaling mode for resizable windows
+      @viewport_mode = :letterbox
+
+      # Render mode: :continuous renders every tick up to fps_cap; :on_demand
+      # only renders when request_render is called or the OS signals a redraw.
+      @render_mode = :continuous
 
       # Size of the computer's display
       @display_width = nil
       @display_height = nil
+      @display_pixel_width = nil
+      @display_pixel_height = nil
     end
 
-    def _init_event_stores
-      _init_key_event_stores
-      _init_mouse_event_stores
-      _init_controller_event_stores
+    def init_event_stores
+      init_key_event_stores
+      init_mouse_event_stores
+      init_gamepad_event_stores
+      init_object_event_stores
     end
 
-    def _init_key_event_stores
-      # Event stores for class pattern
-      @keys_down = []
-      @keys_held = []
-      @keys_up   = []
-    end
-
-    def _init_mouse_event_stores
-      @mouse_buttons_down = []
-      @mouse_buttons_up   = []
-      @mouse_scroll_event     = false
-      @mouse_scroll_direction = nil
-      @mouse_scroll_delta_x   = 0
-      @mouse_scroll_delta_y   = 0
-      @mouse_move_event   = false
-      @mouse_move_delta_x = 0
-      @mouse_move_delta_y = 0
-    end
-
-    def _init_controller_event_stores
-      @controller_id = nil
-      @controller_axes_moved   = []
-      @controller_axis_left_x  = 0
-      @controller_axis_left_y  = 0
-      @controller_axis_right_x = 0
-      @controller_axis_right_y = 0
-      @controller_buttons_down = []
-      @controller_buttons_up   = []
-    end
-
-    def _init_event_registrations
+    def init_event_registrations
       # Mouse X and Y position in the window
       @mouse_x = 0
       @mouse_y = 0
-
-      # Controller axis and button mappings file
-      @controller_mappings = "#{File.expand_path('~')}/.ruby2d/controllers.txt"
 
       # Unique ID for the input event being registered
       @event_key = 0
@@ -777,34 +792,66 @@ module Ruby2D
         mouse: {},
         mouse_up: {},
         mouse_down: {},
+        mouse_held: {},
         mouse_scroll: {},
         mouse_move: {},
-        controller: {},
-        controller_axis: {},
-        controller_button_down: {},
-        controller_button_up: {}
+        mouse_enter: {},
+        mouse_leave: {},
+        gamepad_connect: {},
+        gamepad_disconnect: {},
+        gamepad_button_down: {},
+        gamepad_button_held: {},
+        gamepad_button_up: {},
+        gamepad_axis: {},
+        close: {}
       }
     end
 
-    def _init_procs_dsl_console
+    def init_procs_and_dsl
       # The window update block
       @update_proc = proc {}
+      @update_wants_dt = false
 
-      # The window render block
+      # The window render block, and where it sits in the z-order (see `render`)
       @render_proc = proc {}
+      @render_z = Float::INFINITY
 
-      # Detect if window is being used through the DSL or as a class instance
-      @using_dsl = !(method(:update).parameters.empty? || method(:render).parameters.empty?)
+      # Per-frame delta-time state, populated each `update_callback`.
+      @last_update_time = nil
+      @delta_time = 0.0
+
+      # Detect the "class pattern": a Window subclass overriding `update` and/or
+      # `render`. Each is detected independently so overriding only one still
+      # works — an overridden `update` runs even when `render` is left alone, and
+      # vice versa. The base `update`/`render` are the DSL setters defined on
+      # Ruby2D::Window, so an un-overridden method finds that owner and is
+      # skipped in the frame loop (its DSL proc still runs).
+      @overrides_update = overrides?(:update)
+      @overrides_render = overrides?(:render)
 
       # Whether diagnostic messages should be printed
       @diagnostics = false
+      @show_fps = false
+      @close_on_esc = false
+    end
 
-      # Console mode, enabled at command line
-      @console = if RUBY_ENGINE == 'ruby'
-                   ENV['RUBY2D_ENABLE_CONSOLE'] == 'true'
-                 else
-                   false
-                 end
+    # Whether `name` (`:update` or `:render`) is a class-pattern override rather
+    # than Ruby 2D's own DSL setter.
+    #
+    # This asks which *class* in the ancestry defines the method, skipping any
+    # module Window itself drags along. A module prepended to Window fronts the
+    # setter the same way a subclass override does, so reading the immediate
+    # owner would mistake instrumentation — wrapping `update` to count frames or
+    # hook a screenshot into someone else's app — for the class pattern, and
+    # call the setter with no block every frame, which raises. A module mixed
+    # into a subclass still counts: that side of the chain is the user's own
+    # code, so an `update` there is an override like any other.
+    def overrides?(name)
+      wrappers = Window.ancestors - [Window]
+      owner = self.class.ancestors.find do |mod|
+        !wrappers.include?(mod) && mod.instance_methods(false).include?(name)
+      end
+      owner != Window
     end
   end
 end

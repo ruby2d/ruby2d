@@ -8,97 +8,181 @@ require 'ruby2d/version'
 
 # Usage ########################################################################
 
-usage = "Ruby 2D: Make cross-platform 2D applications in Ruby".bold + "\n
-Usage: ruby2d <command> <options>
-              [-v|--version]
+r = "\e[38;2;246;60;56m"
+x = "\e[0m"
 
-Summary of commands and options:
-  console       Run script in an interactive console
-  build         Build a Ruby source file
-  launch        Launch a built Ruby 2D application
-  simulator     Interact with iOS and tvOS simulators
-  -v|--version  Prints the installed version\n\n"
+usage = "
+#{r}      ◆#{x}
+#{r}     ◆ ◆#{x}       #{'Ruby 2D'.ruby2d_red.bold}  #{('v' + Ruby2D::VERSION).dim}
+#{r}    ◆   ◆#{x}
+#{r}     ◆ ◆#{x}       Make 2D applications with Ruby
+#{r}      ◆#{x}
+
+  #{'Commands:'.bold}
+    build          Build a Ruby source file
+    launch         Launch a built Ruby 2D application
+    setup          Build the native libraries (SDL3 + mruby) for your platform
+    usage          Browse the Ruby 2D usage guide by section
+    examples       Browse and run the bundled example apps
+    agents         Print the usage guide for AI coding agents
+
+  #{'Options:'.bold}
+    -h, --help     Show this help (or use after a command for its help)
+    -v, --version  Print the installed version
+
+  #{'ruby2d.com'.dim}
+\n"
 
 usage_build = "
 Use the #{'build'.bold} command to compile or build Ruby 2D apps.
 
-To compile and create a native executable, use:
-  build --native <ruby_file>
+Usage: ruby2d build [options] <ruby_file>
 
-To build for the web with WebAssembly, use:
-  build --web <ruby_file>
+Targets:
+  --native      Build a native executable only
+  --web         Build for the web with WebAssembly only
+  (default)     Build for all platforms
 
-To build a macOS app bundle, use:
-  build --macos <ruby_file>
+Options:
+  --assets <dir>    Bundle a directory of media files (native and web)
+  --template <file> Use a custom HTML template for the web build (web only)
+  --single-file     Produce a single self-contained HTML file (web only)
+  --debug           Print debugging info and keep intermediate files
+  --clean           Clean up the build directory
 
-To build an iOS or tvOS app, use:
-  build --ios <ruby_file>
-  build --tvos <ruby_file>
-
-To build for every platform supported by the current system, use:
-  build --all <ruby_file>
-
-To clean up the build directory, use:
-  build --clean
-
-Add the #{'--debug'.bold} option to print debugging info
-and keep all intermediate files generated.\n\n"
+An app can bundle its own asset directories without the --assets flag by
+declaring them in its source: #{'# ruby2d:assets <dir>'.bold} (one per line).\n\n"
 
 usage_launch = "
 Use the #{'launch'.bold} command to run a Ruby 2D app that has been built.
 Choose one of the following options to select the kind of app to run:
 
   --native
-  --web
-  --ios
-  --tvos\n\n"
+  --web\n\n"
 
-usage_simulator = "
-Choose an option with the #{'simulator'.bold} command:
+usage_setup = "
+Use the #{'setup'.bold} command to build Ruby 2D's native libraries (SDL3 and
+mruby) for your platform, so you can compile native apps with #{'ruby2d build'.bold}.
 
-  --list      List available devices
-  --booted    Show currently booted devices
+The gem bundles these for common platforms; run #{'setup'.bold} when yours isn't
+bundled (e.g. Linux or Intel macOS). It needs git, CMake, and a C compiler (on
+Linux, also pkg-config and X11 or Wayland dev libraries), and builds into a
+per-user cache outside the gem.
 
-  --open <device_name>    Open a simulator device with a given device name
+It prints what it's about to do and asks before starting.
 
-  --install <app_file>    Install an app on the booted simulator given the path
-                          to the app e.g. \"Release-iphonesimulator/MyApp.app\"
+Usage: ruby2d setup [options]
 
-  --launch <bundle_id>    Launch an app given the app bundle's identifier,
-                          e.g. \"Ruby2D.MyApp\"
+Options:
+  --force    Rebuild even if the libraries already exist
+  --clean    Remove the built libraries for this platform
+  -y, --yes  Skip the confirmation prompt\n\n"
 
-  --log           Stream log of the booted simulator
-  --log <app>     Stream log for the app only, given the app name
-  --log-errors    Stream log containing only error messages\n\n"
+usage_usage = "
+Use the #{'usage'.bold} command to browse the Ruby 2D usage guide by section.
+
+Usage: ruby2d usage [<name|number>|list|all]
+
+  (no args)   Open the interactive browser
+  <name>      View a section by name (e.g. shapes)
+  <number>    View a section by its number in the list
+  list        Print the full list and exit
+  all         View the entire guide\n\n"
+
+usage_examples = "
+Use the #{'examples'.bold} command to browse and run the bundled example apps.
+
+Usage: ruby2d examples [<name|number>|list|source <name>]
+
+  (no args)      Open the interactive browser
+  <name>         Run an example by file name (e.g. snake)
+  <number>       Run an example by its number in the list
+  list           Print the full list and exit
+  source <name>  Print the source of an example\n\n"
 
 # Check Command-line Arguments #################################################
 
 case ARGV[0]
-when 'console'
-  require 'ruby2d/cli/console'
 when 'build'
   require 'ruby2d/cli/build'
   if ARGV.delete '--debug' then @debug = true end
-  case ARGV[1]
-  when '--native'
-    build(:native, ARGV[2])
-  when '--web'
-    build(:web, ARGV[2])
-  when '--macos'
-    build_macos(ARGV[2])
-  when '--ios'
-    build_ios_tvos(ARGV[2], 'ios')
-  when '--tvos'
-    build_ios_tvos(ARGV[2], 'tvos')
-  when '--all'
-    build_native(ARGV[2])
-    build_web(ARGV[2])
-    build_ios_tvos(ARGV[2], 'ios')
-    build_ios_tvos(ARGV[2], 'tvos')
-  when '--clean'
+  if ARGV.delete '--single-file' then @single_file = true end
+  if idx = ARGV.index('--assets')
+    value = ARGV[idx + 1]
+    # `--assets DIR` takes a directory. Without a valid one (missing, another
+    # flag, or — the common slip — the source file), fail loud instead of
+    # silently swallowing the next token (e.g. the .rb to build).
+    if value.nil? || value.start_with?('-') || !Dir.exist?(value)
+      puts "#{'Error:'.error} --assets requires a directory path"
+      exit 1
+    end
+    ARGV.delete_at(idx)  # remove '--assets'
+    ARGV.delete_at(idx)  # remove the directory value (now shifted into idx)
+    @assets_dir = value
+  end
+  if idx = ARGV.index('--template')
+    value = ARGV[idx + 1]
+    # `--template FILE` takes an HTML file. Without a valid one (missing, another
+    # flag, or the source file slipped in), fail loud rather than swallow the
+    # next token — same contract as `--assets`.
+    if value.nil? || value.start_with?('-') || !File.file?(value)
+      puts "#{'Error:'.error} --template requires an HTML file path"
+      exit 1
+    end
+    ARGV.delete_at(idx)  # remove '--template'
+    ARGV.delete_at(idx)  # remove the file value (now shifted into idx)
+    @template = value
+  end
+  # Target flags are position-independent: `build app.rb --native` honors
+  # --native the same as `build --native app.rb`.
+  native = ARGV.delete('--native')
+  web    = ARGV.delete('--web')
+  # Whether web was requested explicitly (vs. implied by the all-platforms
+  # default), so a missing `emcc` fails loudly for `--web` but skips quietly otherwise.
+  @web_explicit = !web.nil?
+  if ARGV.delete('--help') || ARGV.delete('-h')
+    puts usage_build
+  elsif ARGV.delete('--clean')
+    # `--clean` is standalone: it only empties the build directory. Warn if it
+    # was combined with build arguments so the skipped build isn't silent.
+    leftover = (ARGV[1..] || []).reject { |a| a.start_with?('-') }
+    if native || web || !leftover.empty?
+      puts "#{'Note:'.bold} `--clean` only cleans the build directory; other build arguments were ignored."
+    end
     clean_up(:all)
   else
-    puts usage_build
+    targets = if native && !web then :native
+              elsif web && !native then :web
+              else [:native, :web]
+              end
+    # `--template`/`--single-file` are web-only; reject them on a native-only
+    # build instead of silently dropping the request. (`--assets` bundles for
+    # both native and web, so it's allowed here.)
+    if targets == :native
+      offenders = []
+      offenders << '--template' if @template
+      offenders << '--single-file' if @single_file
+      unless offenders.empty?
+        verb = offenders.size == 1 ? 'is' : 'are'
+        puts "#{'Error:'.error} #{offenders.join(' and ')} #{verb} web-only and can't be used with --native"
+        puts usage_build
+        exit 1
+      end
+    end
+    # Everything after `build`; the known flags were deleted above, so any
+    # remaining `-`-prefixed token is an unrecognized option, not the source file.
+    rest = ARGV[1..] || []
+    if (unknown = rest.find { |a| a.start_with?('-') })
+      puts "#{'Error:'.error} unknown option `#{unknown}`"
+      puts usage_build
+      exit 1
+    end
+    ruby_file = rest.first
+    if ruby_file
+      build(targets, ruby_file)
+    else
+      puts usage_build
+    end
   end
 when 'launch'
   require 'ruby2d/cli/launch'
@@ -107,32 +191,147 @@ when 'launch'
     launch_native
   when '--web'
     launch_web
-  when '--ios'
-    launch_apple('ios')
-  when '--tvos'
-    launch_apple('tvos')
+  when '--help', '-h'
+    puts usage_launch
   else
     puts usage_launch
   end
-# TODO: Need add this functionality to the gem
-when 'simulator'
-  case ARGV[1]
-  when '--list'
-    puts `simple2d simulator --list`
-  when '--booted'
-    puts `simple2d simulator --booted`
-  when '--open'
-    puts `simple2d simulator --open "#{ARGV[2]}"`
-  when '--install'
-    puts `simple2d simulator --install "#{ARGV[2]}"`
-  when '--launch'
-    puts `simple2d simulator --launch "#{ARGV[2]}"`
-  when '--log'
-    puts `simple2d simulator --log`
-  when '--log-errors'
-    puts `simple2d simulator --log-errors`
+when 'setup'
+  require 'ruby2d/cli/setup'
+  if ARGV.delete('--help') || ARGV.delete('-h')
+    puts usage_setup
   else
-    puts usage_simulator
+    force = !ARGV.delete('--force').nil?
+    clean = !ARGV.delete('--clean').nil?
+    yes   = !(ARGV.delete('--yes') || ARGV.delete('-y')).nil?
+    # The known flags were deleted above, so any remaining `-`-prefixed token is
+    # an unrecognized option.
+    if (unknown = (ARGV[1..] || []).find { |a| a.start_with?('-') })
+      puts "#{'Error:'.error} unknown option `#{unknown}`"
+      puts usage_setup
+      exit 1
+    end
+    begin
+      setup(force: force, clean: clean, yes: yes)
+    rescue Interrupt
+      # Ctrl-C reaches the whole foreground process group, so it lands here
+      # rather than in `system`'s return value — and it can arrive at the
+      # confirmation prompt, mid-build, or during `gem pristine`. Report the
+      # cancel plainly instead of letting Ruby print an Interrupt backtrace;
+      # a build leaves no version stamp, so re-running resumes from the
+      # sources already cloned.
+      puts "\n\n  Cancelled. Re-run #{'ruby2d setup'.bold} to pick up where this left off.\n\n"
+      exit 130
+    end
+  end
+when 'usage'
+  require 'ruby2d/cli/usage'
+  case ARGV[1]
+  when nil
+    Ruby2D::CLI::Usage.browse
+  when 'list'
+    Ruby2D::CLI::Usage.print_list
+  when 'all'
+    Ruby2D::CLI::Usage.view(Ruby2D::CLI::Usage.content)
+  when '--help', '-h'
+    puts usage_usage
+  else
+    section = Ruby2D::CLI::Usage.find(ARGV[1])
+    if section
+      Ruby2D::CLI::Usage.view(section)
+    else
+      puts "#{'Error:'.error} No section matching '#{ARGV[1]}'."
+      Ruby2D::CLI::Usage.print_list
+      exit 1
+    end
+  end
+when 'examples'
+  require 'ruby2d/cli/examples'
+  case ARGV[1]
+  when nil
+    Ruby2D::CLI::Examples.browse
+  when 'list'
+    Ruby2D::CLI::Examples.print_list
+  when 'source'
+    name = ARGV[2]
+    if name.nil?
+      puts "#{'Error:'.error} Specify an example: ruby2d examples source <name>"
+      Ruby2D::CLI::Examples.print_list
+      exit 1
+    end
+    example = Ruby2D::CLI::Examples.find(name)
+    if example
+      puts File.read(example[:path])
+    else
+      puts "#{'Error:'.error} No example matching '#{name}'."
+      Ruby2D::CLI::Examples.print_list
+      exit 1
+    end
+  when '--help', '-h'
+    puts usage_examples
+  else
+    example = Ruby2D::CLI::Examples.find(ARGV[1])
+    if example
+      puts
+      puts "  #{'Ruby 2D'.ruby2d_red.bold} — Examples"
+      puts
+      puts "  Running #{example[:title].bold} #{"(#{example[:name]}.rb)".dim}"
+      puts
+      Ruby2D::CLI::Examples.print_header(example)
+      # Run from the gem root so an example's relative asset paths (e.g.
+      # `assets/resources/spritesheets`) resolve against the bundled assets.
+      exec(Gem.ruby, example[:path], chdir: Ruby2D::CLI::Examples::ROOT_DIR)
+    else
+      puts "#{'Error:'.error} No example matching '#{ARGV[1]}'."
+      Ruby2D::CLI::Examples.print_list
+      exit 1
+    end
+  end
+when 'agents'
+  require 'ruby2d/cli/usage'
+  sections = Ruby2D::CLI::Usage.all
+
+  print_help = lambda do
+    size_kb = (Ruby2D::CLI::Usage.content.bytesize / 1024.0).round
+    puts "Ruby 2D v#{Ruby2D::VERSION} — API reference for AI coding agents"
+    puts
+    puts 'The canonical source for using Ruby 2D. Output is plain Markdown.'
+    puts
+    puts 'Usage:'
+    puts "  ruby2d agents all                  Print the full guide (~#{size_kb} KB)"
+    puts '  ruby2d agents <section>            Print one section'
+    puts '  ruby2d agents all | grep -i <kw>   Search across sections'
+    puts
+    puts 'Section names are case-insensitive and accept partial matches;'
+    puts 'spaces, hyphens, and underscores are interchangeable. Examples:'
+    puts
+    puts '  ruby2d agents shape-basics'
+    puts '  ruby2d agents getting-started'
+    puts '  ruby2d agents "Lines and Polygons"'
+    puts
+    puts 'For working code samples, see also:'
+    puts '  ruby2d examples list            List all bundled examples'
+    puts '  ruby2d examples source <name>   Print an example to stdout'
+    puts
+    puts 'Sections:'
+    sections.each { |s| puts "  #{s[:title]}" }
+  end
+
+  case ARGV[1]
+  when nil, '--help', '-h'
+    print_help.call
+  when 'all'
+    puts Ruby2D::CLI::Usage.content
+  else
+    section = Ruby2D::CLI::Usage.find(ARGV[1])
+    if section
+      puts section[:content]
+    else
+      puts "No section matching '#{ARGV[1]}'."
+      puts
+      print_help.call
+      exit 1
+    end
   end
 when '-v', '--version'
   puts Ruby2D::VERSION

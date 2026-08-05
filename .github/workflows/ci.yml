@@ -1,22 +1,65 @@
-name: Ruby
-on: [push, pull_request]
+name: CI
+
+# PRs cover branch work; `push` is main-only so a PR'd commit runs once.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# `contents: read` is enough — the `assets` submodule is public.
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        ruby: ['3.2']
+        # Linux is out until an Ubuntu image ships `libsdl3-mixer-dev` — 26.04
+        # LTS has the other three, and building SDL3 from source would cost a
+        # compile per run. Add such an image here to re-enable; the steps below
+        # already handle Linux.
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
+        with:
+          # The bundled SDL3 + mruby static libs live in the `assets` submodule.
+          submodules: recursive
+
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby }}
-      - if: runner.os == 'Linux'
-        run: sudo apt install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-      - run: bundle install
-      - run: git submodule update --init --recursive --depth 1
-      - run: gem build ruby2d.gemspec --verbose
-      - run: gem install ruby2d-*.gem --local --verbose
-      - run: rspec
+          ruby-version: '4.0' # matches required_ruby_version in the gemspec
+
+      # Not via Bundler: the Gemfile's `gemspec` directive makes `ruby2d` a path
+      # source, which would shadow the installed gem the specs are meant to test.
+      - name: Install RSpec
+        run: gem install rspec -v '~> 3.13' # matches the gemspec's dev dependency
+
+      # Dormant while Linux is out of the matrix. Linux has no bundled static
+      # libs, so it links system SDL3 instead; contributors use `rake deps:build`.
+      - name: Install system SDL3 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl3-dev libsdl3-image-dev libsdl3-mixer-dev libsdl3-ttf-dev
+
+      # The exact command README gives contributors: build, install (compiling
+      # the C extension), and run the specs against the installed gem.
+      - name: Build, install, and test
+        run: rake
+        env:
+          # Link the system SDL3 above; empty elsewhere, so those use bundled libs.
+          CONFIGURE_ARGS: ${{ runner.os == 'Linux' && '--with-system-libs' || '' }}
+          # Windows runners have no sound hardware, and Ruby 2D treats a missing
+          # audio device as a hard error. macOS has a real one, so it keeps
+          # exercising the actual driver; empty here means SDL picks the default.
+          SDL_AUDIO_DRIVER: ${{ runner.os == 'Windows' && 'dummy' || '' }}
