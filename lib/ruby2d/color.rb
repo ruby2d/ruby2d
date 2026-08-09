@@ -213,7 +213,10 @@ module Ruby2D
                                 colors.length == 4 ? colors[3] : 1.0)
           scratch
         else
-          set(colors)
+          # Qualified: Ruby 2D also has a top-level `set` in the DSL, so a bare
+          # call here reads ambiguously — and resolves to the wrong one under a
+          # build that puts the DSL methods at the top level (see SPINEL.md).
+          Color.set(colors)
         end
       end
 

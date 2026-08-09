@@ -62,7 +62,7 @@ module Ruby2D
     # path joins at every vertex (no open ends).
     def contains?(x, y)
       return false unless @stroke_width.positive?
-      x, y = _unrotate(x, y) if @rotate != 0
+      x, y = Renderable._unrotate(self, x, y) if @rotate != 0
       n = vertex_count
       outer, inner = compute_stroke_outline
       edges = @closed ? n : n - 1
@@ -169,8 +169,12 @@ module Ruby2D
 
     # Get opacity. Returns the per-vertex array when set, otherwise the
     # uniform alpha from the first vertex color.
+    #
+    # The nil check is spelled out rather than written `@color&.opacity`: on the
+    # right of an `||`, an ahead-of-time compiler mistypes the safe-navigation
+    # form and yields NaN instead of nil when both sides are nil (see SPINEL.md).
     def opacity
-      @_per_vertex_opacity || @color&.opacity
+      @_per_vertex_opacity || (@color.nil? ? nil : @color.opacity)
     end
 
     # Render a polyline without creating an instance

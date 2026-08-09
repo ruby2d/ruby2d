@@ -115,7 +115,7 @@ module Ruby2D
     # would otherwise lose.
     def contains?(x, y)
       return false if @radius.negative?
-      x, y = _unrotate(x, y) if @rotate != 0
+      x, y = Renderable._unrotate(self, x, y) if @rotate != 0
       dx = x - @x
       dy = y - @y
       dx * dx + dy * dy <= @radius * @radius

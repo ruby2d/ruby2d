@@ -61,7 +61,7 @@ module Ruby2D
     # concave); self-intersecting input isn't fully supported by the renderer, so
     # the test can diverge from the drawn pixels there.
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       _point_in_polygon?(@coordinates, x, y)
     end
 

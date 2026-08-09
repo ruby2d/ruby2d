@@ -99,7 +99,7 @@ module Ruby2D
 
     # Check if the rectangle contains the given point
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
     end
 

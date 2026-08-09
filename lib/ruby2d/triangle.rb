@@ -118,7 +118,7 @@ module Ruby2D
 
     # Check if the triangle contains the given point (inside the rendered fill)
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       _point_in_polygon?([@x1, @y1, @x2, @y2, @x3, @y3], x, y)
     end
 

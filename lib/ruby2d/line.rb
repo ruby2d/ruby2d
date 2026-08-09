@@ -73,7 +73,7 @@ module Ruby2D
     # Shares the segment test with `Polyline`.
     def contains?(x, y)
       return false if @stroke_width.negative?
-      x, y = _unrotate(x, y) if @rotate != 0
+      x, y = Renderable._unrotate(self, x, y) if @rotate != 0
       half = @stroke_width / 2.0
       _point_on_segment?(x, y, @x1, @y1, @x2, @y2, half * half)
     end

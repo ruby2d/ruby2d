@@ -182,14 +182,18 @@ module Ruby2D
 
     # Set horizontal alignment intent (`:left`, `:center`, `:right`, or `nil`).
     # Resolution is deferred to draw time against `Window.viewport_width`.
+    #
+    # The nil check is spelled out rather than written `sym&.to_sym`: both yield
+    # a Symbol or nil, but an ahead-of-time compiler types the safe-navigation
+    # form as a plain Symbol and then miscompiles the nil case (see SPINEL.md).
     def x_align=(sym)
-      @x_align = sym&.to_sym
+      @x_align = sym.nil? ? nil : sym.to_sym
     end
 
     # Set vertical alignment intent (`:top`, `:center`, `:bottom`, or `nil`).
     # Resolution is deferred to draw time against `Window.viewport_height`.
     def y_align=(sym)
-      @y_align = sym&.to_sym
+      @y_align = sym.nil? ? nil : sym.to_sym
     end
 
     # Resolve symbolic alignment to numeric x/y. Called from the render path of
@@ -372,11 +376,18 @@ module Ruby2D
     # before drawing; `contains?` calls this first so hit-testing matches what
     # the user sees. Returns the point unchanged when there's no rotation (or
     # the object has no rotation pivot, e.g. `BitmapText`).
-    def _unrotate(px, py)
-      rotate = instance_variable_defined?(:@rotate) ? @rotate : nil
+    # Takes the object explicitly, as a module function, rather than reading it
+    # off `self` as an instance method. Both work under CRuby, but an
+    # ahead-of-time compiler resolves a module instance method against the
+    # module itself — where `rx` / `ry`, which only the includers define, cannot
+    # be resolved — and silently emits a call to a function it never defines.
+    # `Renderable`'s other helpers are module functions for related reasons.
+    # See SPINEL.md.
+    def self._unrotate(obj, px, py)
+      rotate = obj.instance_variable_get(:@rotate)
       return [px, py] if rotate.nil? || rotate == 0
 
-      cx = rx; cy = ry
+      cx = obj.rx; cy = obj.ry
       rad = -rotate * Math::PI / 180.0
       sa = Math.sin(rad); ca = Math.cos(rad)
       dx = px - cx; dy = py - cy
@@ -433,7 +444,7 @@ module Ruby2D
 
     # Check if the object contains the given point
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
     end
 

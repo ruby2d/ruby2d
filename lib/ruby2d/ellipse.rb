@@ -111,7 +111,7 @@ module Ruby2D
 
     # Check if the ellipse contains the given point
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       dx = x - @x
       dy = y - @y
       rx = @xradius.to_f

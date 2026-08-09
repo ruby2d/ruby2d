@@ -133,7 +133,7 @@ module Ruby2D
     # quads. Self-intersecting (bow-tie) quads aren't fully supported by the fill
     # renderer, so the test can diverge from the drawn pixels there.
     def contains?(x, y)
-      x, y = _unrotate(x, y)
+      x, y = Renderable._unrotate(self, x, y)
       _point_in_polygon?([@x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4], x, y)
     end
 
@@ -271,6 +271,10 @@ module Ruby2D
       elsif explicit_stroke
         Renderable.flatten_color(explicit_stroke, 4, opacity, label: self)
       end
+
+      # Drawn for effect; the branches above otherwise return either nothing or
+      # an incidental flattened color array, and a caller has no use for either.
+      nil
     end
     private_class_method :draw_immediate
 
