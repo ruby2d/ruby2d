@@ -70,27 +70,164 @@ def spinel_expand_window_singleton(src)
 end
 
 
-# `Window.<m>(object)` fails to resolve through `extend ClassMethods` (issue 6 in
-# SPINEL.md — cause still unknown, seven reductions all passed in isolation).
-# Each of these class methods is defined as exactly `DSL.window.<m>(object)`, so
-# calling that directly is the same code with one delegation hop inlined.
+# `Window.<m>` fails to resolve when `m` reaches the class through
+# `extend ClassMethods` (issue 6 in SPINEL.md — cause still unknown after ten
+# reductions, every one of which passed in isolation).
 #
-# This is a partial workaround: it fixes the library's internal call sites, which
-# is what shapes use (`add: true` auto-registers on construction). A user app
-# calling `Window.add(obj)` directly still hits the bug.
-def spinel_bypass_window_class_methods(src)
-  rewritten = 0
-  %w[add remove register_interactive unregister_interactive].each do |m|
-    src = src.gsub(/\bWindow\.#{m}\(/) do
-      rewritten += 1
-      "DSL.window.#{m}("
-    end
+# It is systemic rather than a fixed list of call sites: Spinel's whole-program
+# inference only analyzes reachable code, so each newly-exercised path surfaces
+# more of them. Rather than chase sites, rewrite by *method*: nearly every
+# ClassMethods entry is exactly `DSL.window.<same name>(...)`, so calling that
+# directly is the same code with one delegation hop inlined. The delegating
+# methods are read out of `window/class_methods.rb` so the list cannot go stale.
+#
+# Methods that are not pure delegations (`shown?`, `render_ready_check`) are
+# handled separately — see spinel_window_guards.
+def spinel_bypass_window_class_methods(src, class_methods_source)
+  # `def NAME(args)` whose entire body is `DSL.window.NAME(...)`.
+  delegating = class_methods_source.scan(
+    /^      def ([a-z_][\w]*[?!=]?)(?:\([^)]*\))?\n\s*DSL\.window\.\1[\s(]/
+  ).flatten.uniq
+
+  if delegating.empty?
+    raise SpinelCompatDrift, 'Spinel compat `Window class-method bypass` found no delegating methods. See SPINEL.md.'
   end
-  if rewritten.zero?
-    raise SpinelCompatDrift, 'Spinel compat `Window class-method bypass` matched nothing. See SPINEL.md.'
+
+  delegating.each do |m|
+    # Method call or bare reference, but never a definition or a longer name.
+    src = src.gsub(/\bWindow\.#{Regexp.escape(m)}\b(?!\s*=[^=])/, "DSL.window.#{m}")
   end
 
   src
+end
+
+
+# Two ClassMethods entries are not `DSL.window` delegations, so the bypass above
+# cannot reach them, and both hit the same issue-6 resolution failure.
+#
+# `render_ready_check` is a self-contained guard: route it through a module
+# function, which Spinel does resolve. `shown?` is called with an implicit
+# receiver from inside the extended module, which Spinel cannot resolve either,
+# so make that call explicit — `class << self` methods work by constant receiver.
+def spinel_window_guards(src)
+  src = spinel_sub(src, "        return if shown?\n", "        return if Window.shown?\n",
+                   'render_ready_check implicit shown?')
+
+  helper = +"module Ruby2D\n" \
+            "  # See spinel_window_guards.\n" \
+            "  def self.render_ready_check\n" \
+            "    return if Window.shown?\n\n" \
+            "    raise Error, 'Attempting to draw before the window is ready. " \
+            "Please put calls to render() inside of a render block.'\n" \
+            "  end\n" \
+            "end\n\n"
+
+  unless src.include?('Window.render_ready_check')
+    raise SpinelCompatDrift, 'Spinel compat `render_ready_check` matched nothing. See SPINEL.md.'
+  end
+
+  src.gsub('Window.render_ready_check', 'Ruby2D.render_ready_check') + helper
+end
+
+
+# `Ruby2D.web?` is registered from C (`ruby2d.c`), so it disappears along with
+# the binding layer under RUBY2D_NO_RUBY. The Spinel target is native.
+def spinel_web_predicate
+  "module Ruby2D\n  def self.web?\n    false\n  end\nend\n\n"
+end
+
+
+# Spinel rejects `return` in expression position, so the `x = expr or return`
+# guard idiom has to become a statement. Rewritten rather than changed in `lib/`
+# because the idiom is idiomatic Ruby and reads better than the expansion.
+def spinel_expand_or_return(src)
+  rewritten = 0
+  src = src.gsub(/^(\s*)([a-z_][\w]*) = (.+?) or return( nil)?$/) do
+    indent, name, expr = Regexp.last_match(1), Regexp.last_match(2), Regexp.last_match(3)
+    rewritten += 1
+    "#{indent}#{name} = #{expr}\n#{indent}return #{Regexp.last_match(4) ? 'nil' : ''}".rstrip +
+      " if #{name}.nil?"
+  end
+  if rewritten.zero?
+    raise SpinelCompatDrift, 'Spinel compat `or return` matched nothing. See SPINEL.md.'
+  end
+
+  src
+end
+
+
+# Whether `expr` has a comma outside any bracket or quote — i.e. whether it is
+# a list rather than a single expression. Deliberately a scanner and not a
+# regex: `f(a, b)` and `@x, @y` are indistinguishable without tracking depth.
+def spinel_top_level_comma?(expr)
+  depth = 0
+  quote = nil
+  chars = expr.chars
+  chars.each_with_index do |c, i|
+    escaped = i.positive? && chars[i - 1] == '\\'
+    if quote
+      quote = nil if c == quote && !escaped
+    elsif ['"', "'"].include?(c)
+      quote = c
+    elsif ['(', '[', '{'].include?(c)
+      depth += 1
+    elsif [')', ']', '}'].include?(c)
+      depth -= 1
+    elsif c == ',' && depth.zero?
+      return true
+    end
+  end
+  false
+end
+
+
+# Destructuring assignment from a polymorphic expression emits invalid C: the
+# poly result lands in locals Spinel typed `mrb_int`, with no unboxing. The
+# polymorphism usually comes from an optional keyword argument (`points: nil`
+# makes the parameter `NilClass | Array`), so it is pervasive rather than local.
+#
+# Rewriting `a, b = expr` to an indexed temporary sidesteps it. Kept here rather
+# than in `lib/` because three lines per site, at ~40 sites, is a real
+# readability cost for what should be a compiler fix — see "To report upstream".
+#
+# Deliberately NOT rewritten:
+#   - parallel assignment (`a, b = @x, @y`) — no array is indexed, and it works
+#   - block parameters (`|a, b|`) — a different construct entirely
+#   - anything with a splat, which the indexed form can't express
+def spinel_expand_massign(src)
+  rewritten = 0
+  out = src.lines.map do |line|
+    m = line.match(/\A(\s*)([a-z_]\w*), ([a-z_]\w*)(?:, ([a-z_]\w*))? = (\S.*?)\s*\z/)
+    next line unless m
+    # A comma at bracket depth zero means parallel assignment (`a, b = @x, @y`),
+    # which compiles fine and must be left alone. A comma *inside* parens is
+    # just an argument list (`x, y = f(a, b)`) and should still be rewritten.
+    next line if spinel_top_level_comma?(m[5])
+    next line if m[5].include?('*') || m[5].end_with?('=')
+
+    indent, names, rhs = m[1], [m[2], m[3], m[4]].compact, m[5]
+    tmp = "_sp_#{names.first}"
+    rewritten += 1
+    ["#{indent}#{tmp} = #{rhs}\n",
+     *names.each_with_index.map { |n, i| "#{indent}#{n} = #{tmp}[#{i}]\n" }].join
+  end.join
+
+  if rewritten.zero?
+    raise SpinelCompatDrift, 'Spinel compat `multiple assignment` matched nothing. See SPINEL.md.'
+  end
+
+  out
+end
+
+
+# `Hash#delete_if` isn't implemented. Rewrite the one use to primitive ops.
+def spinel_expand_delete_if(src)
+  spinel_sub(src,
+             "        @pressed_objects.delete_if { |_btn, info| info[:object] == object }\n",
+             "        @pressed_objects.keys.each do |btn|\n" \
+             "          @pressed_objects.delete(btn) if @pressed_objects[btn][:object] == object\n" \
+             "        end\n",
+             'Hash#delete_if')
 end
 
 
@@ -116,10 +253,17 @@ end
 
 
 # Apply every compatibility transformation to the assembled library source.
-def spinel_compat(src)
+# `class_methods_source` is `lib/ruby2d/window/class_methods.rb`, read for the
+# list of delegating class methods rather than hardcoding it.
+def spinel_compat(src, class_methods_source)
   src = spinel_expand_renderable(src)
   src = spinel_expand_window_singleton(src)
-  spinel_bypass_window_class_methods(src)
+  src = spinel_bypass_window_class_methods(src, class_methods_source)
+  src = spinel_window_guards(src)
+  src = spinel_expand_or_return(src)
+  src = spinel_expand_delete_if(src)
+  src = spinel_expand_massign(src)
+  src + spinel_web_predicate
 end
 
 

@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 and 2026-08-08 against Spinel `8b029022e663` on macOS arm64; mruby stays the default for `ruby2d build`.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-09 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `0199f5e0f226` (2026-08-09)** — same results, no workaround yet droppable.
 
 ## Why Spinel fits
 
@@ -60,17 +60,59 @@ The workaround is partial. It unblocks the internal path — which is what matte
 
 Seven hand-reductions have now all *passed* in isolation: extend-with-object-argument, module-before-class ordering, extend delegating to another object, class/instance name collision, polymorphic argument types, class-to-instance self-delegation, and a single shared call site in an included module fanning out to five including classes. The last of those was the leading hypothesis and it did not hold. The trigger needs `bin/spinel-reduce` (run it with `SPINEL=/path/to/bin/spinel` in the environment) against the full concatenated lib, not more guessing.
 
+## To report upstream
+
+Every workaround in this document exists because of one of these. Spinel's contributing notes ask for "a 5-line Ruby that fails in Spinel but passes in CRuby", so the table separates the ones already in that shape from the ones that still need work. Filing the top group costs little and could clear whole categories at once.
+
+**Ready to file — minimal reproducer in hand:**
+
+| Bug | Reproducer |
+|---|---|
+| `attr_reader` / `attr_accessor` in a module body don't reach the including class | `module M; attr_reader :x; end; class C; include M; def initialize; @x = 1; end; end; C.new.x` → `undefined method 'x'` |
+| `alias_method` in a module body likewise doesn't reach it | same shape, `alias_method :x?, :x` |
+| `alias_method` inside `class << self` produces no callable class method (`attr_reader` in the same position works) | `class C; class << self; def a; 1; end; alias_method :b, :a; end; end; C.b` |
+| Top-level `include`/`extend` of a module with instance methods emits a call with the wrong arity — a C compile error, not a Ruby one | `module M; def f(n); n; end; end; include M; f(1)` → generated C calls `sp_M_f(1LL)` against a 2-parameter function |
+| `return` in expression position is rejected (`x = expr or return`) | `def f(h, k); v = h[k] or return; v; end` |
+| `Hash#delete_if` unimplemented | `{a: 1}.delete_if { |k, _| k == :a }` |
+| `ffi_func` rejects a computed type array | `ffi_func :f, [:double] * 2, :void` vs the spelled-out list |
+| `-Wl,-dead_strip` is chosen by **host** OS, so an Emscripten cross-build from macOS fails at link (`wasm-ld` wants `--gc-sections`) | `spinel prog.rb --cc=emcc` on macOS, against an emcc-built runtime |
+| `spinel-reduce --oracle unsupported` reports "the input is not interesting" on a program that does fail with an unsupported-call error | any of the above under that oracle |
+
+**Needs more work before filing:**
+
+| Bug | State |
+|---|---|
+| **Poly value assigned into a monomorphic slot.** A poly expression (e.g. indexing a parameter that an optional kwarg made `NilClass \| Array`) is assigned straight into an `mrb_int` / `sp_sym` local with no unboxing. Assigning `sp_RbVal` to `mrb_int` is never valid C | No minimal case — plain destructuring compiles fine; it needs the polymorphism. But the emitted C is self-evidently wrong, so this is probably filable as-is with the generated snippet. **Highest value: it is the single largest source of failures here** |
+| **A module method is called but never emitted.** `sp_Renderable__unrotate` appears once as a call and zero times as a definition or declaration | Not isolated. Only shows in whole-program context |
+| **`extend`-provided class methods unresolvable through a constant receiver** (issue 6) | Not isolated after ten attempts, all of which passed standalone. Needs `spinel-reduce` with an oracle that runs the candidate under CRuby, not just greps compiler output |
+
+## Where fixes belong
+
+Two homes, and the choice is deliberate:
+
+- **`lib/`** — when the change is defensible Ruby on its own merits, it goes in the library, the way mruby accommodations already do. `@key_names = {}` instead of `[]` is the model: scancodes are sparse, so a Hash was the better structure anyway, and an empty Array literal gives an AOT compiler no element type to infer from. These changes stay correct under CRuby and mruby and need no build-time machinery.
+- **`cli/spinel.rb`** — only when the change would make `lib/` worse to read, or is pure build-time synthesis (the DSL top-level shims, `Ruby2D.web?`). Each transform asserts it still matches, so drift fails the build.
+
+Prefer `lib/`. The transforms are string matching against library source and are the fragile half.
+
+**Stopping rule:** grind through codegen failures, flagging each as an upstream candidate — but if one turns out to be a user-facing feature or a DSL form Ruby 2D cannot express under Spinel, stop and file upstream rather than degrade the public API.
+
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. Each row is pinned to the Spinel commit it was needed at; after a `git fetch` in the Spinel checkout, re-run the probe and delete the row if it passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `0199f5e0f226` on 2026-08-09 — all still needed.** After a `git fetch` in the Spinel checkout, re-run the probes and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
-| Workaround | Needed at | Re-check by |
-|---|---|---|
-| `DSL.window.<m>(obj)` instead of `Window.<m>(obj)` at 4 internal call sites (issue 6) | `8b029022e663` | Revert the 4 rewrites in `renderable.rb`/`interactive.rb`, recompile the MVP subset |
-| Top-level `def` shims instead of `include Ruby2D` + `extend Ruby2D::DSL` | `8b029022e663` | `include`/`extend` a module with instance methods at top level, call one |
-| Expand `attr_*`/`alias` out of `module Renderable` (issues 1-3) | `8b029022e663` | `attr_reader` in a module, `include` it, call the reader |
-| Spell out `ffi_func` type arrays instead of `[:double]*6` | `8b029022e663` | Declare an `ffi_func` with a computed type array |
-| `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `8b029022e663` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
+The probes live in the research scratchpad, which is disposable — recreate them from the "Re-check by" column, which describes each in one line.
+
+| Workaround | Re-check by |
+|---|---|
+| Rewrite `Window.<m>` → `DSL.window.<m>` for every delegating `ClassMethods` entry (issue 6) | Drop `spinel_bypass_window_class_methods` and recompile the smoke subset |
+| Top-level `def` shims instead of `include Ruby2D` + `extend Ruby2D::DSL` | `include`/`extend` a module with instance methods at top level, call one |
+| Expand `attr_*`/`alias` out of `module Renderable` (issues 1-3) | `attr_reader` in a module, `include` it, call the reader |
+| Define `Ruby2D.web?` and `Ruby2D.render_ready_check` in Ruby | Drop them and recompile the smoke subset |
+| Expand `x = expr or return` to a statement guard | `return` in expression position |
+| Rewrite `Hash#delete_if` to `keys.each` + `delete` | Call `delete_if` on a Hash |
+| Spell out `ffi_func` type arrays instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
+| `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
 Two of these are worth upstreaming rather than carrying: the `-dead_strip` host-vs-target flag bug, and issue 6 once reduced. The `attr_*`-in-module expansion is worth keeping regardless — it is a plain refactor that costs nothing under CRuby or mruby.
 
@@ -94,6 +136,63 @@ What that establishes, all of it previously unproven:
 `font.c` needed just one guard — it has a `// Ruby Bindings` section header with nothing Ruby-free after it. **`window.c` is the outlier here**: `text.c`, `image.c`, `canvas.c`, `audio.c`, and `ext.c` have no such header either, so they will need per-wrapper guards or a tidy-up when their turn comes.
 
 In `ruby2d.h`, `R_VAL` / `R_CLASS` / `R_ID` become placeholder types under `RUBY2D_NO_RUBY` so the ~91 binding *declarations* still parse — a declaration costs nothing, and guarding them all would bury the header. The accessor macros (`r_ivar_get` and friends) are deliberately left **undefined**, so a Ruby call that creeps into an `R2D_*` core fails to build rather than silently doing nothing on the Spinel target.
+
+## Stub-`Ext` smoke test: does `lib/` actually *run*? (2026-08-09)
+
+Compiling `lib/` proved nothing about running it, so the next step stubbed every `Ext` entry point as a no-op and asked whether the library itself works under Spinel — no C, no FFI, so a failure can only be Spinel or `lib/`. A CRuby run of the same generated source is the baseline, and it passes: objects construct, register, z-order, mutate, tick, and remove.
+
+The adapter's key assumption checks out: `instance_variable_set(:@mouse_x, v)` on *another* object with a literal name works, so the Ruby-side ivar sync that replaces C's is viable.
+
+Getting the subset to compile needed five more transforms beyond the original three, all now in `cli/spinel.rb`:
+
+| Issue | Sites | Fix |
+|---|---|---|
+| `Ruby2D.web?` is registered from C, so it vanishes with the binding layer | 1 | Define it in Ruby; the Spinel target is native |
+| `shown?` with an implicit receiver inside the extended `ClassMethods` | 1 | Make it `Window.shown?` |
+| `Window.render_ready_check` — a `ClassMethods` entry that is not a delegation | 13 call sites | Route through a module function |
+| `return` in expression position (`x = expr or return`) | 6 | Expand to a statement guard |
+| `Hash#delete_if` unimplemented | 1 | Rewrite to `keys.each` + `delete` |
+
+**Issue 6 is systemic, not a fixed list of sites.** The earlier MVP compile needed only four rewrites; the smoke test exercises more code and surfaced more, because Spinel's whole-program inference only analyzes *reachable* code. Chasing call sites is therefore wrong — `spinel_bypass_window_class_methods` now reads the delegating methods out of `window/class_methods.rb` and rewrites by method name, so the list cannot go stale as new paths become reachable.
+
+Hand-reduction of issue 6 is now abandoned at **ten attempts**, every one passing in isolation: extend-with-object-argument, module-before-class ordering, extend delegating to another object, class/instance name collision, polymorphic argument types, class-to-instance self-delegation, a shared call site in an included module fanning out to five classes, an extended method that always returns a value, one that only returns nil or raises, and the same body via `class << self`. The trigger exists only in whole-program context. It needs upstream eyes, not more guessing.
+
+### Root cause of the codegen failures (2026-08-09)
+
+**Not a user-facing blocker.** The suspicion that this was symbolic alignment (`x: :center` making a variable Integer-or-Symbol) was tested and is wrong.
+
+The actual pattern, from the generated C: an optional keyword argument like `points: nil` makes the parameter polymorphic (`NilClass | Array`), so Spinel types it `sp_RbVal` and cannot resolve `points[0]`. It emits a runtime tag dispatch instead — if Integer do a bit shift, if String char-at, if Set `Set#[]`, and so on — whose result is also `sp_RbVal`. That poly result is then assigned straight into locals Spinel typed `mrb_int`, which is the invalid C. The same shape explains the `sp_sym` cases and the `void`-return mismatches.
+
+So it is one bug with many symptoms: **a poly value assigned into a monomorphic slot with no unboxing**. Assigning `sp_RbVal` to `mrb_int` is never valid C, so this is squarely a Spinel codegen bug and a good upstream report even without a minimal reproducer — plain destructuring (`x, y = arr`) compiles fine in isolation; it only breaks when the source expression is polymorphic.
+
+**The workaround is proven**: replacing `x, y = expr` with an indexed temporary (`p = expr; x = p[0]; y = p[1]`) removed 18 of 60 errors in one pass. There are roughly 40 such sites in `lib/`. Because that rewrite is a real readability regression, it belongs in `cli/spinel.rb` rather than `lib/` — the exception to the prefer-`lib/` rule above.
+
+Error count trajectory:
+
+| Step | square-only (19 files) | full subset (25 files) |
+|---|---|---|
+| Baseline | — | 60 |
+| `_unrotate` destructuring rewritten by hand | — | 42 |
+| `@key_names = {}` (landed in `lib/`) | — | 41 |
+| Trim to square-only | 24 | — |
+| `spinel_expand_massign` — general destructuring transform | **8** | **15** |
+
+The destructuring transform is the single biggest lever, which follows from the root cause above: it is one bug reached from ~40 call sites. Its matcher tracks bracket depth rather than using a regex, because `x, y = f(a, b)` (rewrite) and `a, b = @x, @y` (leave alone — parallel assignment compiles fine) are otherwise indistinguishable; splats and block parameters are skipped too. Nine edge cases are covered by a unit test.
+
+Most errors live in gamepad handling, mouse dispatch, and shapes a square never touches — hence the gap between the two columns, and why the MVP trims the subset.
+
+Measure with `-ferror-limit=0`. Clang's default limit is 20, and it will silently cap the count — an early before/after comparison here read "20 → 20" while the real numbers were 60 → 42.
+
+### The current blocker: invalid generated C
+
+With those transforms the subset **passes Spinel's Ruby analysis** (`spinel -c` succeeds, 5,806 lines in) but the **emitted C does not compile** — 20 errors. This is a different and harder class than the API gaps above: not "Spinel rejects this Ruby" but "Spinel accepts it and emits bad C."
+
+Two distinct shapes, from `--no-line-map` output (the `#line` map points at misleading places, so disable it before reading these):
+
+- **A module method is called but never emitted.** `sp_Renderable__unrotate` is called from `Rectangle#contains?` and has no definition in the output. `Renderable#_unrotate` returns a two-element array destructured by the caller (`x, y = _unrotate(x, y)`), which is the likeliest trigger. This is the "module bodies" rule again in a more severe form — not a missing accessor, a missing function.
+- **Type confusion between `mrb_int`, `sp_RbVal`, and `const char *`** — 15 of the 20 errors are assignments of `sp_RbVal` to `mrb_int`, plus `void` returned from functions typed to return a value.
+
+Both are Spinel codegen bugs rather than anything a source transform can paper over, so this is where the MVP currently stands. The good news is that it is a *narrow* failure surface with the FFI and C layers already proven independently, and the smoke test is a much better reduction vehicle than the earlier attempts — it is pure Ruby, has a passing CRuby baseline, and needs no SDL.
 
 ## Blockers
 
