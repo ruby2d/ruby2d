@@ -11,6 +11,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
+| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/`; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
