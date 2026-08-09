@@ -103,19 +103,19 @@ Registration is switched off rather than worked around, so `on` / `off` on a sha
 
 Every workaround in this document exists because of one of these. Spinel's contributing notes ask for "a 5-line Ruby that fails in Spinel but passes in CRuby", so the table separates the ones already in that shape from the ones that still need work. Filing the top group costs little and could clear whole categories at once.
 
-**Drafted and ready to open** — full reports in `issues/`, each re-verified against `1c3d99897ef3` on 2026-08-10 with both CRuby and Spinel output captured:
+**Filed upstream on 2026-08-10** as #3771-#3777, each verified against `1c3d99897ef3` with both CRuby and Spinel output captured. The drafts stay here as the local record:
 
-| Draft | Bug |
-|---|---|
-| `issues/01-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent** |
-| `issues/02-forwarded-stored-block-loses-capture.md` | A block forwarded with `&b` and then stored loses its captured locals — **silent** |
-| `issues/03-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — the bug that blocked the MVP |
-| `issues/04-module-body-declarations.md` | `attr_accessor` / `alias_method` in a module body do not reach the including class |
-| `issues/05-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
-| `issues/06-alias-method-in-singleton-class.md` | `alias_method` inside `class << self` produces no callable class method |
-| `issues/07-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
+| Issue | Draft | Bug |
+|---|---|---|
+| [#3771](https://github.com/matz/spinel/issues/3771) | `issues/01-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent** |
+| [#3772](https://github.com/matz/spinel/issues/3772) | `issues/02-forwarded-stored-block-loses-capture.md` | A block forwarded with `&b` and then stored loses its captured locals — **silent** |
+| [#3773](https://github.com/matz/spinel/issues/3773) | `issues/03-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — the bug that blocked the MVP |
+| [#3774](https://github.com/matz/spinel/issues/3774) | `issues/04-module-body-declarations.md` | `attr_accessor` / `alias_method` in a module body do not reach the including class |
+| [#3775](https://github.com/matz/spinel/issues/3775) | `issues/05-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
+| [#3776](https://github.com/matz/spinel/issues/3776) | `issues/06-alias-method-in-singleton-class.md` | `alias_method` inside `class << self` produces no callable class method |
+| [#3777](https://github.com/matz/spinel/issues/3777) | `issues/07-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
 
-Numbered in suggested filing order. The ranking weighs three things:
+Filed in this order. The ranking weighs three things:
 
 **Silent first.** The top two produce wrong values with no error, no exception, and no diagnostic. They are worse than their frequency suggests because they generate no bug reports — a user hits one and sees a program that quietly misbehaves, so nothing ever reaches an issue tracker. Everything below them announces itself.
 
@@ -266,6 +266,8 @@ The square-only subset **compiles to zero C errors, links, and runs**. `Square.n
 Reduced to 15 lines and filed as `issues/03-self-escaping-superclass-method.md`.
 
 **The subset now runs.** Removing the mistyped call site — the `self.add if add` in `Quad#initialize` — and registering from `Square#initialize` instead gets the square-only subset all the way to completion under Spinel. Note it is not enough to *skip* the bad call site at run time by passing `add: false`: the site has to be gone. A single mistyped call poisons the inferred parameter type for everything flowing through that path, whether or not it ever executes.
+
+Progress is now visible directly: `gh issue list --repo matz/spinel --state all --search "3771..3777"`, or `gh issue view <n> --repo matz/spinel`. A closed issue is the signal to re-check the matching workaround.
 
 **Decision (2026-08-10): wait for upstream rather than work around this.** Moving registration out of `Quad#initialize` into each concrete shape class does fix it, but that is roughly 13 classes each repeating a line that exists only to dodge a compiler bug, in `lib/` where all three runtimes would carry it. The bug is filed, it is squarely Spinel's to fix, and the branch is cheap to resume — so the Spinel target stays blocked here on purpose. Re-check by restoring `self.add if add` to `Quad#initialize` and rebuilding the subset.
 

@@ -1,6 +1,6 @@
 # [Runtime] `self` escaping a superclass method is typed as the superclass, breaking later dispatch
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3773](https://github.com/matz/spinel/issues/3773). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

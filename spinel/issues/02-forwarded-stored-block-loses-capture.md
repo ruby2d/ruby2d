@@ -1,6 +1,6 @@
 # [Runtime] A block forwarded with `&b` and then stored loses its captured locals
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3772](https://github.com/matz/spinel/issues/3772). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

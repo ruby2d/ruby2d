@@ -1,6 +1,6 @@
 # [Compile] `alias_method` inside `class << self` produces no callable class method
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3776](https://github.com/matz/spinel/issues/3776). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

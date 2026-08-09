@@ -1,6 +1,6 @@
 # [Codegen] Top-level `include` of a module emits a call with the wrong arity, failing the C compile
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3775](https://github.com/matz/spinel/issues/3775). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

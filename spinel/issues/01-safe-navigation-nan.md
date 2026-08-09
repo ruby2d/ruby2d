@@ -1,6 +1,6 @@
 # [Runtime] Safe navigation on the right of `||` returns `NaN` instead of `nil`
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3771](https://github.com/matz/spinel/issues/3771). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 
