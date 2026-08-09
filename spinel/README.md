@@ -131,6 +131,8 @@ Ordered by suggested filing priority, not discovery (the filenames keep their or
 
 **Loud and narrow last.** #5 through #7 fail at compile time with a clear message and have simple rewrites.
 
+**Duplicate check (2026-08-10).** Searched the tracker before filing. No open issue covers any of the seven. One relevant piece of prior art: safe navigation returning a wrong value is the subject of two *closed* issues, [#701](https://github.com/matz/spinel/issues/701) (`&.` on nil returning `""` / `0`) and [#3269](https://github.com/matz/spinel/issues/3269) (`&.` on an ivar producing a wrong value). Both were read and are the same family as draft 01, which now cites them — ours is likely a variant those fixes missed, since the plain `&.` form is correct today and only the `||` case is wrong. The nearest module-related issues, [#3734](https://github.com/matz/spinel/issues/3734) (`module_function` private copy unavailable to an including class) and one on `Method#owner` naming the including class, are adjacent to draft 04 but not the same bug.
+
 Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) and [#3766](https://github.com/matz/spinel/issues/3766): a titled category, a short description, a minimal reproducer, CRuby and Spinel output side by side, an "Additional Findings" section contrasting what *does* work, and a pinned commit. The working/failing contrast is worth keeping — it is what makes each report actionable rather than just a complaint.
 
 **Not yet drafted — reproducer still missing:**

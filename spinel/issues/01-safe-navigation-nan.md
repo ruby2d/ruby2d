@@ -51,6 +51,15 @@ override005 || (@c005.nil? ? nil : @c005.opacity005)   # correct nil, explicit c
 
 The wrong value is `NaN` and the method returns a Float, which suggests the nil branch is coerced to the non-nil branch's type rather than kept polymorphic. A method returning a non-Float may show a different wrong value.
 
+## Related
+
+This looks like the same family as two closed issues, so it may be a variant the earlier fixes did not cover rather than something new:
+
+- [#701](https://github.com/matz/spinel/issues/701) — `&.` on nil returning `""` / `0` instead of `nil`. `NaN` is the Float analogue of those typed zero-values.
+- [#3269](https://github.com/matz/spinel/issues/3269) — `&.` on an instance variable producing a wrong value.
+
+What appears to be new here is that the plain form is now correct — `@c005&.opacity005` on its own returns `nil` — and the wrong value only appears on the right of `||`.
+
 ## Environment
 
 - Spinel commit: `1c3d99897ef3`
