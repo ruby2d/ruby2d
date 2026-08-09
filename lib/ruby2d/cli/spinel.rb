@@ -220,6 +220,22 @@ def spinel_expand_massign(src)
 end
 
 
+# An ivar first assigned inside a module body stays polymorphic, and a method
+# name that several core classes share then resolves to the wrong one:
+# `@gamepads_by_id.delete(id)` compiles to `String#delete`. Unambiguous methods
+# (`[]`, `[]=`, `key?`) are unaffected, which is why only `delete` needs this.
+#
+# In the compat layer rather than `lib/` because the replacement allocates a new
+# Hash and reads worse than `delete` — it is not defensible Ruby on its own.
+def spinel_expand_hash_delete(src)
+  spinel_sub(src,
+             "        pad = @gamepads_by_id.delete(id)\n",
+             "        pad = @gamepads_by_id[id]\n" \
+             "        @gamepads_by_id = @gamepads_by_id.reject { |k, _v| k == id }\n",
+             'Hash#delete on a poly ivar')
+end
+
+
 # `Hash#delete_if` isn't implemented. Rewrite the one use to primitive ops.
 def spinel_expand_delete_if(src)
   spinel_sub(src,
@@ -262,6 +278,7 @@ def spinel_compat(src, class_methods_source)
   src = spinel_window_guards(src)
   src = spinel_expand_or_return(src)
   src = spinel_expand_delete_if(src)
+  src = spinel_expand_hash_delete(src)
   src = spinel_expand_massign(src)
   src + spinel_web_predicate
 end

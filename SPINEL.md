@@ -175,11 +175,24 @@ Error count trajectory:
 | `_unrotate` destructuring rewritten by hand | — | 42 |
 | `@key_names = {}` (landed in `lib/`) | — | 41 |
 | Trim to square-only | 24 | — |
-| `spinel_expand_massign` — general destructuring transform | **8** | **15** |
+| `spinel_expand_massign` — general destructuring transform | 8 | 15 |
+| `Color.set(colors)` qualified (landed in `lib/`) | 7 | — |
+| `Quad.draw_immediate` returns `nil` explicitly (landed in `lib/`) | 5 | — |
+| `x_align=` / `y_align=` drop safe navigation (landed in `lib/`) | 3 | — |
+| `Hash#delete` on a poly ivar rewritten | **2** | **5** |
 
 The destructuring transform is the single biggest lever, which follows from the root cause above: it is one bug reached from ~40 call sites. Its matcher tracks bracket depth rather than using a regex, because `x, y = f(a, b)` (rewrite) and `a, b = @x, @y` (leave alone — parallel assignment compiles fine) are otherwise indistinguishable; splats and block parameters are skipped too. Nine edge cases are covered by a unit test.
 
 Most errors live in gamepad handling, mouse dispatch, and shapes a square never touches — hence the gap between the two columns, and why the MVP trims the subset.
+
+Four more Ruby shapes that trip codegen, each confirmed by fixing it and re-measuring:
+
+- **Safe navigation.** `@x_align = sym&.to_sym` is typed as returning a plain Symbol, then miscompiled for the nil case. Writing `sym.nil? ? nil : sym.to_sym` — identical semantics — types correctly. Only four `&.` uses exist in `lib/`; the other three are untested.
+- **A method returning different types on different paths.** `Quad.draw_immediate` returned a void `Ext` call on one branch and an incidental color array on another. It is called for effect, so an explicit trailing `nil` settles it.
+- **An ambiguous method name on a polymorphic receiver.** An ivar first assigned in a module body stays poly, and `@gamepads_by_id.delete(id)` then resolves to `String#delete`. Unambiguous methods (`[]`, `[]=`, `key?`) are fine, which is why only `delete` needed rewriting.
+- **A bare call colliding with a top-level DSL shim.** `Color.for_render` called `set(colors)`, which resolved to the generated top-level `set` rather than `Color.set`. Qualifying the receiver fixes it — and is clearer Ruby anyway, since Ruby 2D really does have both.
+
+**Remaining on the square-only subset: 2 errors, both from the single `sp_Renderable__unrotate` call** — one undeclared-function, one cascade from it. Three hypotheses have been tested and killed: multiple assignment, `instance_variable_defined?`, and the module-typed receiver being unable to resolve `rx`/`ry`. It is the last thing between the subset and clean C.
 
 Measure with `-ferror-limit=0`. Clang's default limit is 20, and it will silently cap the count — an early before/after comparison here read "20 → 20" while the real numbers were 60 → 42.
 
