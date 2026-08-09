@@ -1,4 +1,4 @@
-# `[Codegen] Top-level include of a module emits a call with the wrong arity, failing the C compile`
+# [Codegen] Top-level `include` of a module emits a call with the wrong arity, failing the C compile
 
 Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 

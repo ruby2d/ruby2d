@@ -1,4 +1,4 @@
-# `[Runtime] attr_accessor and alias_method in a module body do not reach the including class`
+# [Runtime] `attr_accessor` and `alias_method` in a module body do not reach the including class
 
 Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 

@@ -1,4 +1,4 @@
-# `[Compile] alias_method inside class << self produces no callable class method`
+# [Compile] `alias_method` inside `class << self` produces no callable class method
 
 Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 

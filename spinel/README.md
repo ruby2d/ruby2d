@@ -108,7 +108,7 @@ Every workaround in this document exists because of one of these. Spinel's contr
 | Draft | Bug |
 |---|---|
 | `issues/01-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent** |
-| `issues/02-forwarded-stored-block-loses-capture.md` | A block forwarded then stored loses its captured locals — **silent** |
+| `issues/02-forwarded-stored-block-loses-capture.md` | A block forwarded with `&b` and then stored loses its captured locals — **silent** |
 | `issues/03-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — the bug that blocked the MVP |
 | `issues/04-module-body-declarations.md` | `attr_accessor` / `alias_method` in a module body do not reach the including class |
 | `issues/05-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
