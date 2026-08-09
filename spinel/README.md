@@ -112,7 +112,8 @@ Every workaround in this document exists because of one of these. Spinel's contr
 | `issues/03-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
 | `issues/04-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent wrong answer** |
 | `issues/05-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
-| `issues/06-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — **the bug blocking the MVP** |
+| `issues/06-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — **the bug that blocked the MVP** |
+| `issues/07-forwarded-stored-block-loses-capture.md` | A block forwarded then stored loses its captured locals — **silent** |
 
 Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) and [#3766](https://github.com/matz/spinel/issues/3766): a titled category, a short description, a minimal reproducer, CRuby and Spinel output side by side, an "Additional Findings" section contrasting what *does* work, and a pinned commit. The working/failing contrast is worth keeping — it is what makes each report actionable rather than just a complaint.
 
@@ -245,6 +246,10 @@ The square-only subset **compiles to zero C errors, links, and runs**. `Square.n
 **Root cause found, and it is not what the symptom suggested.** It has nothing to do with polymorphic receivers. When a method defined on a *superclass* stores `self`, and that method is called on a subclass instance, the stored value is typed as the superclass and every later dispatch on it fails. The constructor is incidental — an ordinary inherited method behaves the same. Modules alone are fine; it is inheritance that loses the type, including a module included into a base class and called on a subclass instance, which is Ruby 2D's exact shape: `Renderable` is included by `Quad`, and every `Square` reaches `add` through it.
 
 Reduced to 15 lines and filed as `issues/06-self-escaping-superclass-method.md`.
+
+**The subset now runs.** Removing the mistyped call site — the `self.add if add` in `Quad#initialize` — and registering from `Square#initialize` instead gets the square-only subset all the way to completion under Spinel. Note it is not enough to *skip* the bad call site at run time by passing `add: false`: the site has to be gone. A single mistyped call poisons the inferred parameter type for everything flowing through that path, whether or not it ever executes.
+
+One behavioral difference survived: the per-frame `update` block ran but every counter it wrote to stayed at zero. That is a second silent bug — a block forwarded through the generated DSL shim and then stored loses its captured locals — filed as `issues/07-forwarded-stored-block-loses-capture.md`.
 
 **How it was found matters more than the bug.** Eleven attempts to reduce *down* from the failing program all passed in isolation. Scaling *up* from a passing probe — adding one structural feature at a time until it broke — found it on the first try, then bisected to two required ingredients (an inheritance chain, and self-registration from inside the constructor) in one more pass. For whole-program-context failures, build up rather than cut down.
 
