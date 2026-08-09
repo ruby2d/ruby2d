@@ -185,7 +185,7 @@ module Ruby2D
     #
     # The nil check is spelled out rather than written `sym&.to_sym`: both yield
     # a Symbol or nil, but an ahead-of-time compiler types the safe-navigation
-    # form as a plain Symbol and then miscompiles the nil case (see SPINEL.md).
+    # form as a plain Symbol and then miscompiles the nil case (see spinel/README.md).
     def x_align=(sym)
       @x_align = sym.nil? ? nil : sym.to_sym
     end
@@ -382,7 +382,7 @@ module Ruby2D
     # module itself — where `rx` / `ry`, which only the includers define, cannot
     # be resolved — and silently emits a call to a function it never defines.
     # `Renderable`'s other helpers are module functions for related reasons.
-    # See SPINEL.md.
+    # See spinel/README.md.
     def self._unrotate(obj, px, py)
       rotate = obj.instance_variable_get(:@rotate)
       return [px, py] if rotate.nil? || rotate == 0

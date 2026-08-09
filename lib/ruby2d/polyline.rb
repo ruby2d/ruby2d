@@ -172,7 +172,7 @@ module Ruby2D
     #
     # The nil check is spelled out rather than written `@color&.opacity`: on the
     # right of an `||`, an ahead-of-time compiler mistypes the safe-navigation
-    # form and yields NaN instead of nil when both sides are nil (see SPINEL.md).
+    # form and yields NaN instead of nil when both sides are nil (see spinel/README.md).
     def opacity
       @_per_vertex_opacity || (@color.nil? ? nil : @color.opacity)
     end

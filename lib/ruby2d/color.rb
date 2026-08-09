@@ -215,7 +215,7 @@ module Ruby2D
         else
           # Qualified: Ruby 2D also has a top-level `set` in the DSL, so a bare
           # call here reads ambiguously — and resolves to the wrong one under a
-          # build that puts the DSL methods at the top level (see SPINEL.md).
+          # build that puts the DSL methods at the top level (see spinel/README.md).
           Color.set(colors)
         end
       end

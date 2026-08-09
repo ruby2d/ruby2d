@@ -4,7 +4,7 @@
 # Everything in the "Compatibility" section below is a workaround for a current
 # Spinel limitation, applied to the assembled source rather than to `lib/` so
 # that the library stays idiomatic and each workaround can be deleted in one
-# place when upstream fixes it. `SPINEL.md` pins every one to the Spinel commit
+# place when upstream fixes it. `spinel/README.md` pins every one to the Spinel commit
 # it was needed at, with the probe to re-check it.
 #
 # Each transformation asserts that it matched. A `lib/` edit that invalidates
@@ -24,9 +24,9 @@ require_relative '../../../assets/target'
 class SpinelCompatDrift < StandardError; end
 
 # Apply `sub`, failing loudly if the pattern isn't found. `what` names the
-# workaround so the error points at the right entry in SPINEL.md.
+# workaround so the error points at the right entry in spinel/README.md.
 def spinel_sub(src, from, to, what)
-  raise SpinelCompatDrift, "Spinel compat `#{what}` no longer matches lib/. See SPINEL.md." unless src.include?(from)
+  raise SpinelCompatDrift, "Spinel compat `#{what}` no longer matches lib/. See spinel/README.md." unless src.include?(from)
 
   src.sub(from, to)
 end
@@ -71,7 +71,7 @@ end
 
 
 # `Window.<m>` fails to resolve when `m` reaches the class through
-# `extend ClassMethods` (issue 6 in SPINEL.md — cause still unknown after ten
+# `extend ClassMethods` (issue 6 in spinel/README.md — cause still unknown after ten
 # reductions, every one of which passed in isolation).
 #
 # It is systemic rather than a fixed list of call sites: Spinel's whole-program
@@ -90,7 +90,7 @@ def spinel_bypass_window_class_methods(src, class_methods_source)
   ).flatten.uniq
 
   if delegating.empty?
-    raise SpinelCompatDrift, 'Spinel compat `Window class-method bypass` found no delegating methods. See SPINEL.md.'
+    raise SpinelCompatDrift, 'Spinel compat `Window class-method bypass` found no delegating methods. See spinel/README.md.'
   end
 
   delegating.each do |m|
@@ -123,7 +123,7 @@ def spinel_window_guards(src)
             "end\n\n"
 
   unless src.include?('Window.render_ready_check')
-    raise SpinelCompatDrift, 'Spinel compat `render_ready_check` matched nothing. See SPINEL.md.'
+    raise SpinelCompatDrift, 'Spinel compat `render_ready_check` matched nothing. See spinel/README.md.'
   end
 
   src.gsub('Window.render_ready_check', 'Ruby2D.render_ready_check') + helper
@@ -149,7 +149,7 @@ def spinel_expand_or_return(src)
       " if #{name}.nil?"
   end
   if rewritten.zero?
-    raise SpinelCompatDrift, 'Spinel compat `or return` matched nothing. See SPINEL.md.'
+    raise SpinelCompatDrift, 'Spinel compat `or return` matched nothing. See spinel/README.md.'
   end
 
   src
@@ -213,7 +213,7 @@ def spinel_expand_massign(src)
   end.join
 
   if rewritten.zero?
-    raise SpinelCompatDrift, 'Spinel compat `multiple assignment` matched nothing. See SPINEL.md.'
+    raise SpinelCompatDrift, 'Spinel compat `multiple assignment` matched nothing. See spinel/README.md.'
   end
 
   out
@@ -236,14 +236,49 @@ def spinel_expand_hash_delete(src)
 end
 
 
-# `Hash#delete_if` isn't implemented. Rewrite the one use to primitive ops.
-def spinel_expand_delete_if(src)
+# `Window#overrides?` detects the class pattern — a `Ruby2D::Window` subclass
+# overriding `update` / `render` — by walking the ancestor chain and asking each
+# module which instance methods it defines. That is runtime reflection over the
+# class graph, which whole-program AOT compilation cannot provide: the graph is
+# baked at compile time and no metaobject survives into the binary.
+#
+# Unlike everything else here this is not a compiler bug and there is nothing to
+# report upstream. It is a real, permanent gap in what the Spinel target can
+# offer, so the class pattern is switched off there and the DSL pattern
+# (`update do ... end`) carries the whole API. See spinel/README.md.
+def spinel_disable_class_pattern(src)
   spinel_sub(src,
-             "        @pressed_objects.delete_if { |_btn, info| info[:object] == object }\n",
-             "        @pressed_objects.keys.each do |btn|\n" \
-             "          @pressed_objects.delete(btn) if @pressed_objects[btn][:object] == object\n" \
-             "        end\n",
-             'Hash#delete_if')
+             "    def overrides?(name)\n" \
+             "      wrappers = Window.ancestors - [Window]\n" \
+             "      owner = self.class.ancestors.find do |mod|\n" \
+             "        !wrappers.include?(mod) && mod.instance_methods(false).include?(name)\n" \
+             "      end\n" \
+             "      owner != Window\n" \
+             "    end\n",
+             "    def overrides?(_name)\n" \
+             "      # Always false on the Spinel target: detecting the class pattern needs\n" \
+             "      # ancestor reflection, which an AOT build has no way to answer.\n" \
+             "      false\n" \
+             "    end\n",
+             'Window#overrides? class-pattern detection')
+end
+
+
+# `Interactive` reaches the shapes through a nested include — `Renderable`
+# includes it, the shapes include `Renderable` — and that second hop does not
+# carry its methods across, so `object.interactive?` is undefined at run time.
+# The guard in front of it uses `respond_to?`, which an AOT build answers from
+# the compile-time class graph and gets wrong here.
+#
+# Per-object events are outside the current scope, so the registration is
+# switched off rather than worked around. This is a scope limit, not a fix:
+# `on` / `off` on a shape will not work on the Spinel target until the nested
+# include does. See spinel/README.md.
+def spinel_disable_object_interactivity(src)
+  spinel_sub(src,
+             "      if object.respond_to?(:interactive?) && object.interactive?\n",
+             "      if false # per-object events unsupported on this target\n",
+             'per-object interactivity registration')
 end
 
 
@@ -253,14 +288,14 @@ end
 # verbatim. `include Ruby2D` is kept — it only brings in constants, which works.
 def spinel_dsl_shims(dsl_source)
   body = dsl_source[/module DSL\n(.*)\n  end\n/m, 1] or
-    raise SpinelCompatDrift, 'Spinel compat `DSL shims` could not find the DSL module body. See SPINEL.md.'
+    raise SpinelCompatDrift, 'Spinel compat `DSL shims` could not find the DSL module body. See spinel/README.md.'
 
   # Instance methods only — `def self.window` and friends stay on the module and
   # are called by the shims.
   shims = body.scan(/^    def ([a-z_][\w]*[?=]?(?:\([^)]*\))?)\n(.*?)^    end$/m).reject do |sig, _|
     sig.start_with?('self.')
   end
-  raise SpinelCompatDrift, 'Spinel compat `DSL shims` found no DSL methods. See SPINEL.md.' if shims.empty?
+  raise SpinelCompatDrift, 'Spinel compat `DSL shims` found no DSL methods. See spinel/README.md.' if shims.empty?
 
   shims.map do |sig, inner|
     "def #{sig}\n#{inner.gsub(/^      /, '  ').gsub('DSL.window', 'Ruby2D::DSL.window')}end\n"
@@ -277,8 +312,9 @@ def spinel_compat(src, class_methods_source)
   src = spinel_bypass_window_class_methods(src, class_methods_source)
   src = spinel_window_guards(src)
   src = spinel_expand_or_return(src)
-  src = spinel_expand_delete_if(src)
   src = spinel_expand_hash_delete(src)
+  src = spinel_disable_class_pattern(src)
+  src = spinel_disable_object_interactivity(src)
   src = spinel_expand_massign(src)
   src + spinel_web_predicate
 end
