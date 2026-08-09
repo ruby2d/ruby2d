@@ -107,13 +107,29 @@ Every workaround in this document exists because of one of these. Spinel's contr
 
 | Draft | Bug |
 |---|---|
-| `issues/01-module-body-declarations.md` | `attr_accessor` / `alias_method` in a module body don't reach the including class |
-| `issues/02-alias-method-in-singleton-class.md` | `alias_method` inside `class << self` produces no callable class method |
-| `issues/03-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
-| `issues/04-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent wrong answer** |
-| `issues/05-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
-| `issues/06-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — **the bug that blocked the MVP** |
-| `issues/07-forwarded-stored-block-loses-capture.md` | A block forwarded then stored loses its captured locals — **silent** |
+| `issues/01-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent** |
+| `issues/02-forwarded-stored-block-loses-capture.md` | A block forwarded then stored loses its captured locals — **silent** |
+| `issues/03-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — the bug that blocked the MVP |
+| `issues/04-module-body-declarations.md` | `attr_accessor` / `alias_method` in a module body do not reach the including class |
+| `issues/05-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
+| `issues/06-alias-method-in-singleton-class.md` | `alias_method` inside `class << self` produces no callable class method |
+| `issues/07-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
+
+Numbered in suggested filing order. The ranking weighs three things:
+
+**Silent first.** The top two produce wrong values with no error, no exception, and no diagnostic. They are worse than their frequency suggests because they generate no bug reports — a user hits one and sees a program that quietly misbehaves, so nothing ever reaches an issue tracker. Everything below them announces itself.
+
+**Then breadth.** #3 blocks any object that registers itself through an inherited method, and carries the nastiest property of the set: a mistyped call site poisons inference for that path even when it never executes, so avoiding the pattern at run time does not help. #4 is `attr_accessor` in a module, which is everywhere in Ruby.
+
+**Loud and narrow last.** #5 through #7 fail at compile time with a clear message and have simple rewrites.
+
+Ordered by suggested filing priority, not discovery (the filenames keep their original numbers). The ranking weighs three things:
+
+**Silent first.** The top two produce wrong values with no error, no exception, and no diagnostic. They are worse than their frequency suggests because they generate no bug reports — a user hits one and sees a program that quietly misbehaves, so nothing ever reaches an issue tracker. Everything below them announces itself.
+
+**Then breadth.** #3 blocks any object that registers itself through an inherited method, and carries the nastiest property of the set: a mistyped call site poisons inference for that path even when it never executes, so avoiding the pattern at run time does not help. #4 is `attr_accessor` in a module, which is everywhere in Ruby.
+
+**Loud and narrow last.** #5 through #7 fail at compile time with a clear message and have simple rewrites.
 
 Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) and [#3766](https://github.com/matz/spinel/issues/3766): a titled category, a short description, a minimal reproducer, CRuby and Spinel output side by side, an "Additional Findings" section contrasting what *does* work, and a pinned commit. The working/failing contrast is worth keeping — it is what makes each report actionable rather than just a complaint.
 
@@ -245,11 +261,13 @@ The square-only subset **compiles to zero C errors, links, and runs**. `Square.n
 
 **Root cause found, and it is not what the symptom suggested.** It has nothing to do with polymorphic receivers. When a method defined on a *superclass* stores `self`, and that method is called on a subclass instance, the stored value is typed as the superclass and every later dispatch on it fails. The constructor is incidental — an ordinary inherited method behaves the same. Modules alone are fine; it is inheritance that loses the type, including a module included into a base class and called on a subclass instance, which is Ruby 2D's exact shape: `Renderable` is included by `Quad`, and every `Square` reaches `add` through it.
 
-Reduced to 15 lines and filed as `issues/06-self-escaping-superclass-method.md`.
+Reduced to 15 lines and filed as `issues/03-self-escaping-superclass-method.md`.
 
 **The subset now runs.** Removing the mistyped call site — the `self.add if add` in `Quad#initialize` — and registering from `Square#initialize` instead gets the square-only subset all the way to completion under Spinel. Note it is not enough to *skip* the bad call site at run time by passing `add: false`: the site has to be gone. A single mistyped call poisons the inferred parameter type for everything flowing through that path, whether or not it ever executes.
 
-One behavioral difference survived: the per-frame `update` block ran but every counter it wrote to stayed at zero. That is a second silent bug — a block forwarded through the generated DSL shim and then stored loses its captured locals — filed as `issues/07-forwarded-stored-block-loses-capture.md`.
+**Decision (2026-08-10): wait for upstream rather than work around this.** Moving registration out of `Quad#initialize` into each concrete shape class does fix it, but that is roughly 13 classes each repeating a line that exists only to dodge a compiler bug, in `lib/` where all three runtimes would carry it. The bug is filed, it is squarely Spinel's to fix, and the branch is cheap to resume — so the Spinel target stays blocked here on purpose. Re-check by restoring `self.add if add` to `Quad#initialize` and rebuilding the subset.
+
+One behavioral difference survived: the per-frame `update` block ran but every counter it wrote to stayed at zero. That is a second silent bug — a block forwarded through the generated DSL shim and then stored loses its captured locals — filed as `issues/02-forwarded-stored-block-loses-capture.md`.
 
 **How it was found matters more than the bug.** Eleven attempts to reduce *down* from the failing program all passed in isolation. Scaling *up* from a passing probe — adding one structural feature at a time until it broke — found it on the first try, then bisected to two required ingredients (an inheritance chain, and self-registration from inside the constructor) in one more pass. For whole-program-context failures, build up rather than cut down.
 
