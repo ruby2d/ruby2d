@@ -409,6 +409,7 @@ void R2D_DrawBitmapText(R2D_BitmapText *bt, SDL_Renderer *renderer,
 }
 
 
+#ifndef RUBY2D_NO_RUBY
 // Ruby Bindings ///////////////////////////////////////////////////////////////
 
 R2D_DEFINE_DATA_TYPE(R2D_BitmapText);
@@ -569,3 +570,5 @@ static void R2D_BitmapText_free(void *p) {
   free(bt->text);
   xfree(bt);
 }
+
+#endif  // RUBY2D_NO_RUBY

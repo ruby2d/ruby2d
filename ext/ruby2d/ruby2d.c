@@ -400,6 +400,7 @@ int R2D_GetGamepadCaps(SDL_JoystickID id) {
  * time: a native build reports false, as does the gem running under CRuby.
  * Apps use it to size work to the target, which the web needs less of.
  */
+#ifndef RUBY2D_NO_RUBY
 static R_VAL ruby2d_web_p(RUBY2D_METHOD_ARGS_VARIADIC) {
 #ifdef __EMSCRIPTEN__
   return R_TRUE;
@@ -407,6 +408,7 @@ static R_VAL ruby2d_web_p(RUBY2D_METHOD_ARGS_VARIADIC) {
   return R_FALSE;
 #endif
 }
+#endif
 
 
 // =============================================================================
@@ -462,6 +464,11 @@ static void R2D_ChdirToExeDir(void) {
 
 #endif
 
+
+// Engine entry points: mruby's `main`, or CRuby's `Init_ruby2d`. Neither exists
+// on the Spinel target — Spinel generates the program's own `main` and reaches
+// the engine through FFI — so the whole region is compiled out there.
+#ifndef RUBY2D_NO_RUBY
 
 #ifdef MRUBY
 /*
@@ -558,3 +565,5 @@ void Init_ruby2d() {
   return exit_code;
 #endif
 }
+
+#endif  // RUBY2D_NO_RUBY

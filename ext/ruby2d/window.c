@@ -8,13 +8,31 @@
 // Global Variables
 // =============================================================================
 
+#ifndef RUBY2D_NO_RUBY
 R2D_DEFINE_DATA_TYPE(R2D_Window);
+#endif
 
 // The single active window instance. Other files access it via R2D_Get*() functions.
 static R2D_Window *r2d_window = NULL;
 
+#ifndef RUBY2D_NO_RUBY
 // Ruby VALUE for the Window object — used by the mruby tick trampoline.
 R_VAL ruby2d_window;
+#endif
+
+// Message from the last R2D_CreateWindow / R2D_ShowWindow failure. The Ruby
+// bridge turns it into an exception; the Spinel build reads it over FFI,
+// having no `r_raise`.
+static char r2d_last_error[512] = {0};
+
+const char *R2D_LastError(void) { return r2d_last_error; }
+
+// Record a failure and return false, so callers can `return r2d_fail(...)`.
+static bool r2d_fail(const char *msg, const char *detail) {
+  SDL_snprintf(r2d_last_error, sizeof r2d_last_error, "%s%s%s",
+               msg, detail ? ": " : "", detail ? detail : "");
+  return false;
+}
 
 R2D_Window *R2D_GetWindow(void)     { return r2d_window; }
 SDL_Renderer *R2D_GetRenderer(void) { return r2d_window ? r2d_window->sdl_renderer : NULL; }
@@ -36,6 +54,7 @@ static R_ID id_frames, id_fps, id_close;
 /*
  * Initialize
  */
+#ifndef RUBY2D_NO_RUBY
 void R2D_Window_Init() {
   id_title      = r_id("@title");
   id_icon       = r_id("@icon");
@@ -94,6 +113,7 @@ void R2D_Window_Init() {
   r_define_class_method(ruby2d_ext_module, "window_set_scale_mode",             ruby2d_ext_window_set_scale_mode,             r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_request_render",             ruby2d_ext_window_request_render,             r_args_variadic);
 }
+#endif
 
 
 // =============================================================================
@@ -101,21 +121,35 @@ void R2D_Window_Init() {
 // =============================================================================
 
 /*
- * Parse a viewport mode symbol from Ruby into an R2D_VIEWPORT_* constant.
- * Returns R2D_VIEWPORT_LETTERBOX if the value is nil or unrecognized.
+ * Parse a viewport mode name into an R2D_VIEWPORT_* constant. Returns
+ * R2D_VIEWPORT_LETTERBOX for NULL or an unrecognized name. Ruby-free, so the
+ * Spinel build can pass the mode as a string; the Ruby bridge converts its
+ * symbol and calls through here, keeping one table of names.
  */
-static int R2D_ParseViewportMode(R_VAL vm_val) {
-  if (r_test(vm_val)) {
-    R_ID vm_id = r_sym_to_id(vm_val);
-    if (vm_id == r_id("letterbox"))      return R2D_VIEWPORT_LETTERBOX;
-    else if (vm_id == r_id("stretch"))   return R2D_VIEWPORT_STRETCH;
-    else if (vm_id == r_id("integer"))   return R2D_VIEWPORT_INTEGER;
-    else if (vm_id == r_id("overscan"))  return R2D_VIEWPORT_OVERSCAN;
-    else if (vm_id == r_id("expand"))    return R2D_VIEWPORT_EXPAND;
-    else if (vm_id == r_id("fixed"))     return R2D_VIEWPORT_FIXED;
+int R2D_ParseViewportModeName(const char *name) {
+  if (name) {
+    if (SDL_strcmp(name, "letterbox") == 0)     return R2D_VIEWPORT_LETTERBOX;
+    else if (SDL_strcmp(name, "stretch") == 0)  return R2D_VIEWPORT_STRETCH;
+    else if (SDL_strcmp(name, "integer") == 0)  return R2D_VIEWPORT_INTEGER;
+    else if (SDL_strcmp(name, "overscan") == 0) return R2D_VIEWPORT_OVERSCAN;
+    else if (SDL_strcmp(name, "expand") == 0)   return R2D_VIEWPORT_EXPAND;
+    else if (SDL_strcmp(name, "fixed") == 0)    return R2D_VIEWPORT_FIXED;
   }
   return R2D_VIEWPORT_LETTERBOX;
 }
+
+
+/*
+ * Parse a viewport mode symbol from Ruby into an R2D_VIEWPORT_* constant.
+ * Returns R2D_VIEWPORT_LETTERBOX if the value is nil or unrecognized.
+ */
+#ifndef RUBY2D_NO_RUBY
+static int R2D_ParseViewportMode(R_VAL vm_val) {
+  if (!r_test(vm_val)) return R2D_VIEWPORT_LETTERBOX;
+
+  return R2D_ParseViewportModeName(r_sym_name(vm_val));
+}
+#endif
 
 
 /*
@@ -230,16 +264,28 @@ static void R2D_ApplyPixelScale(R2D_Window *window) {
 // =============================================================================
 
 /*
+ * Parse a render mode name into an R2D_RENDER_* constant. Returns
+ * R2D_RENDER_CONTINUOUS for NULL or an unrecognized name. Ruby-free
+ * counterpart to R2D_ParseRenderMode, as for the viewport modes above.
+ */
+int R2D_ParseRenderModeName(const char *name) {
+  if (name && SDL_strcmp(name, "on_demand") == 0) return R2D_RENDER_ON_DEMAND;
+
+  return R2D_RENDER_CONTINUOUS;
+}
+
+
+/*
  * Parse a render mode symbol from Ruby into an R2D_RENDER_* constant.
  * Returns R2D_RENDER_CONTINUOUS if the value is nil or unrecognized.
  */
+#ifndef RUBY2D_NO_RUBY
 static int R2D_ParseRenderMode(R_VAL rm_val) {
-  if (r_test(rm_val)) {
-    R_ID rm_id = r_sym_to_id(rm_val);
-    if (rm_id == r_id("on_demand")) return R2D_RENDER_ON_DEMAND;
-  }
-  return R2D_RENDER_CONTINUOUS;
+  if (!r_test(rm_val)) return R2D_RENDER_CONTINUOUS;
+
+  return R2D_ParseRenderModeName(r_sym_name(rm_val));
 }
+#endif
 
 
 // =============================================================================
@@ -247,18 +293,31 @@ static int R2D_ParseRenderMode(R_VAL rm_val) {
 // =============================================================================
 
 /*
- * Parse a scale mode symbol from Ruby into an SDL_ScaleMode.
- * Returns `fallback` if the value is nil or unrecognized.
+ * Parse a scale mode name into an SDL_ScaleMode. Returns `fallback` for NULL
+ * or an unrecognized name. Ruby-free counterpart to R2D_ParseScaleMode, as for
+ * the viewport and render modes above.
  */
-static SDL_ScaleMode R2D_ParseScaleMode(R_VAL sm_val, SDL_ScaleMode fallback) {
-  if (r_test(sm_val)) {
-    R_ID sm_id = r_sym_to_id(sm_val);
-    if (sm_id == id_sm_linear)         return SDL_SCALEMODE_LINEAR;
-    else if (sm_id == id_sm_nearest)   return SDL_SCALEMODE_NEAREST;
-    else if (sm_id == id_sm_pixel_art) return SDL_SCALEMODE_PIXELART;
+SDL_ScaleMode R2D_ParseScaleModeName(const char *name, SDL_ScaleMode fallback) {
+  if (name) {
+    if (SDL_strcmp(name, "linear") == 0)         return SDL_SCALEMODE_LINEAR;
+    else if (SDL_strcmp(name, "nearest") == 0)   return SDL_SCALEMODE_NEAREST;
+    else if (SDL_strcmp(name, "pixel_art") == 0) return SDL_SCALEMODE_PIXELART;
   }
   return fallback;
 }
+
+
+/*
+ * Parse a scale mode symbol from Ruby into an SDL_ScaleMode.
+ * Returns `fallback` if the value is nil or unrecognized.
+ */
+#ifndef RUBY2D_NO_RUBY
+static SDL_ScaleMode R2D_ParseScaleMode(R_VAL sm_val, SDL_ScaleMode fallback) {
+  if (!r_test(sm_val)) return fallback;
+
+  return R2D_ParseScaleModeName(r_sym_name(sm_val), fallback);
+}
+#endif
 
 
 /*
@@ -307,15 +366,25 @@ SDL_ScaleMode R2D_ResolveSurfaceScaleMode(R_VAL obj) {
 /*
  * Ruby2D::Window#ext_create
  */
-R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.window_create expects 1 arg (window), got %d", (int)argc);
-  R_VAL obj = argv[0];
+/*
+ * Initialize the engine and allocate the window with default values. Returns
+ * false on failure, with the reason from R2D_LastError.
+ *
+ * Ruby-free core behind Ext.window_create. Only the values that must be right
+ * before R2D_ShowWindow runs are parameters — everything else it would read
+ * from Ruby (flags, render mode, pixel scale) is re-applied by R2D_ShowWindow
+ * anyway, so passing it twice would just be two chances to disagree.
+ *
+ * Width or height may be R2D_DISPLAY_WIDTH / R2D_DISPLAY_HEIGHT to mean "fill
+ * the display"; `title` and the viewport dimensions follow R2D_ShowWindow's
+ * conventions (NULL, and non-positive for "unset").
+ */
+bool R2D_CreateWindow(const char *title, int width, int height,
+                      int viewport_width, int viewport_height,
+                      const char *viewport_mode) {
+  r2d_last_error[0] = '\0';
 
-  if (!R2D_Init()) r_raise("Ruby2D: failed to initialize: %s", SDL_GetError());
-
-  int width = obj_int(obj, id_width);
-  int height = obj_int(obj, id_height);
+  if (!R2D_Init()) return r2d_fail("Ruby2D: failed to initialize", SDL_GetError());
 
   // Use display dimensions from init-time query if requested
   if (width == R2D_DISPLAY_WIDTH) width = R2D_GetInitDisplayWidth();
@@ -325,31 +394,19 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   // zeroed — defends against reads of any field not explicitly set below (e.g.
   // viewport.fixed_rect) and against future field additions.
   R2D_Window *window      = (R2D_Window *) calloc(1, sizeof(R2D_Window));
-  if (!window) r_raise("Ruby2D: failed to allocate window");
-  // Set the title from the Ruby instance variable so the native window
-  // gets the requested title.
-  window->title = obj_str(obj, id_title);
-  // Determine initial window flags from Ruby instance variables (resizable,
-  // highdpi) and store them on the native window.
-  int init_flags = 0;
-  if (r_test(r_ivar_get(obj, id_resizable)))  init_flags |= R2D_RESIZABLE;
-  if (r_test(r_ivar_get(obj, id_highdpi)))    init_flags |= R2D_HIGHDPI;
-  window->flags = init_flags;
+  if (!window) return r2d_fail("Ruby2D: failed to allocate window", NULL);
 
+  window->title           = title;
+  window->flags           = 0;  // re-applied by R2D_ShowWindow
   window->width           = width;
   window->height          = height;
   window->orig_width      = width;
   window->orig_height     = height;
-  // Read viewport dimensions from Ruby (fall back to width/height)
-  R_VAL vw_val = r_ivar_get(obj, id_viewport_width);
-  R_VAL vh_val = r_ivar_get(obj, id_viewport_height);
-  window->viewport.width  = r_test(vw_val) ? NUM2INT(vw_val) : width;
-  window->viewport.height = r_test(vh_val) ? NUM2INT(vh_val) : height;
+  window->viewport.width  = viewport_width  > 0 ? viewport_width  : width;
+  window->viewport.height = viewport_height > 0 ? viewport_height : height;
   window->viewport.base_width  = window->viewport.width;
   window->viewport.base_height = window->viewport.height;
-
-  // Parse viewport mode symbol from Ruby
-  window->viewport.mode = R2D_ParseViewportMode(r_ivar_get(obj, id_viewport_mode));
+  window->viewport.mode   = R2D_ParseViewportModeName(viewport_mode);
 
   window->fps_cap         = (int)R2D_GetInitRefreshRate();
   window->background.r    = 0.0;
@@ -358,9 +415,9 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   window->background.a    = 1.0;
   window->icon            = NULL;
   window->close           = true;
-  window->pixel_scale     = obj_bool(obj, id_pixel_scale);
-  window->render_mode     = R2D_ParseRenderMode(r_ivar_get(obj, id_render_mode));
-  window->scale_mode      = R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), SDL_SCALEMODE_LINEAR);
+  window->pixel_scale     = false;                 // re-applied by R2D_ShowWindow
+  window->render_mode     = R2D_RENDER_CONTINUOUS; // re-applied by R2D_ShowWindow
+  window->scale_mode      = SDL_SCALEMODE_LINEAR;  // re-applied by R2D_ShowWindow
 
   // Start with render_pending set so the first tick always presents a frame,
   // even in on-demand mode before the app calls request_render.
@@ -381,13 +438,43 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   window->show_fps = false;
   window->screenshot_path = NULL;
 
-  // SDL window and renderer are created later, in R2D_Show.
+  // SDL window and renderer are created later, in R2D_ShowWindow.
   r2d_window = window;
 
-  obj_set_struct(obj, id_ext_window, R2D_Window, window);
+  return true;
+}
+
+
+#ifndef RUBY2D_NO_RUBY
+/*
+ * Ruby2D::Window#ext_create
+ *
+ * Ruby bridge over R2D_CreateWindow, which also hands the allocated struct to
+ * the window object so the GC frees it with the window.
+ */
+R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.window_create expects 1 arg (window), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R_VAL vw_val = r_ivar_get(obj, id_viewport_width);
+  R_VAL vh_val = r_ivar_get(obj, id_viewport_height);
+  R_VAL vm_val = r_ivar_get(obj, id_viewport_mode);
+
+  if (!R2D_CreateWindow(
+    obj_str(obj, id_title), obj_int(obj, id_width), obj_int(obj, id_height),
+    r_test(vw_val) ? NUM2INT(vw_val) : 0,
+    r_test(vh_val) ? NUM2INT(vh_val) : 0,
+    r_test(vm_val) ? r_sym_name(vm_val) : NULL
+  )) {
+    r_raise("%s", R2D_LastError());
+  }
+
+  obj_set_struct(obj, id_ext_window, R2D_Window, r2d_window);
 
   return R_TRUE;
 }
+#endif
 
 
 // =============================================================================
@@ -432,14 +519,14 @@ static bool first_poll = true;
 /*
  * Ext.poll_events(window)
  *
- * Poll SDL events and held-input state, queue into the event buffer,
- * update timing, and sync C state to Ruby ivars.
+ * Poll SDL events and held-input state, queue into the event buffer, and
+ * update timing. Ruby-free: the resulting state lives on `r2d_window` and is
+ * read back by the caller — `ruby2d_ext_window_poll_events` syncs it to ivars
+ * for the mruby/CRuby bridge, while the Spinel build reads it through the flat
+ * `R2D_Poll*` accessors below. Keeping one body means the two bridges can't
+ * drift.
  */
-R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.poll_events expects 1 arg (window), got %d", (int)argc);
-  R_VAL obj = argv[0];
-
+void R2D_PollEvents(void) {
   frame_start = SDL_GetPerformanceCounter();
   event_count = 0;
 
@@ -660,6 +747,36 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
       SDL_free(pads);
     }
   }
+}
+
+
+/*
+ * Flat accessors for the state R2D_PollEvents leaves on `r2d_window`. The
+ * Ruby bridge reads it straight off the struct when syncing ivars; the Spinel
+ * build has no Ruby objects, so it calls these over FFI instead.
+ */
+int  R2D_PollMouseX(void)        { return r2d_window ? r2d_window->mouse.x : 0; }
+int  R2D_PollMouseY(void)        { return r2d_window ? r2d_window->mouse.y : 0; }
+int  R2D_PollWidth(void)         { return r2d_window ? r2d_window->orig_width : 0; }
+int  R2D_PollHeight(void)        { return r2d_window ? r2d_window->orig_height : 0; }
+int  R2D_PollViewportWidth(void) { return r2d_window ? r2d_window->viewport.width : 0; }
+int  R2D_PollViewportHeight(void){ return r2d_window ? r2d_window->viewport.height : 0; }
+bool R2D_PollClosed(void)        { return r2d_window ? r2d_window->close : true; }
+
+
+/*
+ * Ext.poll_events(window) → nil
+ *
+ * Ruby bridge over R2D_PollEvents: poll, then sync the resulting C state to the
+ * window's ivars.
+ */
+#ifndef RUBY2D_NO_RUBY
+R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.poll_events expects 1 arg (window), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_PollEvents();
 
   // Sync C state to Ruby ivars. Frame count and fps are deferred to begin_frame
   // so they track frames actually presented, not ticks — in :on_demand mode most
@@ -678,6 +795,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   return R_NIL;
 }
+#endif
 
 
 /*
@@ -689,6 +807,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
  * key's name Symbol — the scancode is translated here and never reaches Ruby.
  * Returns nil when no events are queued (the common case, every frame).
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   (void)argc; (void)argv;
@@ -731,25 +850,23 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   event_count = 0;
   return ary;
 }
+#endif
 
 
 /*
- * Ext.begin_frame(window) → true/false
+ * Take the background color as flat components, decide whether to render, and
+ * clear. Returns true if the caller should draw the scene this frame.
  *
- * Sync background color from Ruby, decide whether to render, and clear.
- * Returns true if Ruby should call render_objects + render_callback.
+ * Ruby-free core behind Ext.begin_frame: the Ruby bridge reads the background
+ * off the window's Color ivar and passes it in, while the Spinel build passes
+ * the components directly. Frame count and fps land on `r2d_window` and are
+ * read back via R2D_FrameCount / R2D_Fps.
  */
-R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.begin_frame expects 1 arg (window), got %d", (int)argc);
-  R_VAL obj = argv[0];
-
-  // Sync background color from Ruby to C
-  R_VAL bc = r_ivar_get(obj, id_background);
-  r2d_window->background.r = NUM2DBL(r_ivar_get(bc, id_r));
-  r2d_window->background.g = NUM2DBL(r_ivar_get(bc, id_g));
-  r2d_window->background.b = NUM2DBL(r_ivar_get(bc, id_b));
-  r2d_window->background.a = NUM2DBL(r_ivar_get(bc, id_a));
+bool R2D_BeginFrame(float bg_r, float bg_g, float bg_b, float bg_a) {
+  r2d_window->background.r = bg_r;
+  r2d_window->background.g = bg_g;
+  r2d_window->background.b = bg_b;
+  r2d_window->background.a = bg_a;
 
   int was_pending = SDL_SetAtomicInt(&r2d_window->render_pending, 0);
   current_frame_rendered =
@@ -765,8 +882,6 @@ R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
     frames++;
     r2d_window->frames = frames;
     r2d_window->fps    = R2D_GetFrameRate();
-    r_ivar_set(obj, id_frames, ULL2NUM(r2d_window->frames));
-    r_ivar_set(obj, id_fps, DBL2NUM(r2d_window->fps));
 
     if (r2d_window->viewport.mode == R2D_VIEWPORT_FIXED) {
       SDL_SetRenderViewport(r2d_window->sdl_renderer, NULL);
@@ -795,19 +910,52 @@ R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
     }
   }
 
-  return current_frame_rendered ? R_TRUE : R_FALSE;
+  return current_frame_rendered;
 }
 
 
-/*
- * Ext.end_frame(window)
- *
- * FPS overlay, deferred screenshot, present (if rendered), and frame cap.
- */
-R_VAL ruby2d_ext_window_end_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  (void)argc; (void)argv;
+// Frame count and fps for the frame R2D_BeginFrame just admitted. Deferred from
+// polling so they track frames actually presented, not ticks — in :on_demand
+// mode most ticks present nothing.
+unsigned long long R2D_FrameCount(void) { return r2d_window ? r2d_window->frames : 0; }
+double             R2D_Fps(void)        { return r2d_window ? r2d_window->fps : 0.0; }
 
+
+/*
+ * Ext.begin_frame(window) → true/false
+ *
+ * Ruby bridge over R2D_BeginFrame: read the background off the window's Color
+ * ivar, then sync the resulting frame count and fps back.
+ */
+#ifndef RUBY2D_NO_RUBY
+R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.begin_frame expects 1 arg (window), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R_VAL bc = r_ivar_get(obj, id_background);
+  bool rendered = R2D_BeginFrame(
+    NUM2DBL(r_ivar_get(bc, id_r)),
+    NUM2DBL(r_ivar_get(bc, id_g)),
+    NUM2DBL(r_ivar_get(bc, id_b)),
+    NUM2DBL(r_ivar_get(bc, id_a))
+  );
+
+  if (rendered) {
+    r_ivar_set(obj, id_frames, ULL2NUM(r2d_window->frames));
+    r_ivar_set(obj, id_fps, DBL2NUM(r2d_window->fps));
+  }
+
+  return rendered ? R_TRUE : R_FALSE;
+}
+#endif
+
+
+/*
+ * FPS overlay, deferred screenshot, present (if rendered), and frame cap.
+ * Ruby-free core behind Ext.end_frame, which never read the window object.
+ */
+void R2D_EndFrame(void) {
   if (current_frame_rendered) {
     if (r2d_window->diagnostics || r2d_window->show_fps) {
       R2D_DrawFrameRate(r2d_window);
@@ -835,9 +983,22 @@ R_VAL ruby2d_ext_window_end_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
     }
   }
   #endif
+}
+
+
+/*
+ * Ext.end_frame(window)
+ */
+#ifndef RUBY2D_NO_RUBY
+R_VAL ruby2d_ext_window_end_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  (void)argc; (void)argv;
+
+  R2D_EndFrame();
 
   return R_NIL;
 }
+#endif
 
 
 // Origin the Ext.now clock is measured from, so it reads zero when a program
@@ -863,11 +1024,13 @@ static Uint64 r2d_time_origin_ns = 0;
  * jittering frame pacing. This is the dt clock on mruby (native and web); CRuby
  * uses Process.clock_gettime(CLOCK_MONOTONIC), which is already monotonic.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_now(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   (void)argc; (void)argv;
   return DBL2NUM((double)(SDL_GetTicksNS() - r2d_time_origin_ns) / 1.0e9);
 }
+#endif
 
 
 // =============================================================================
@@ -968,32 +1131,39 @@ static void wasm_tick_trampoline(void) {
 
 
 /*
- * Ruby2D::Window#ext_show
+ * Create the SDL window and renderer, apply window/viewport/render settings,
+ * and reveal the window. Returns false on failure, with the reason available
+ * from R2D_LastError.
+ *
+ * Ruby-free core behind Ext.window_show, taking as flat arguments everything
+ * the bridge previously read off the window object. `fps_cap` is negative for
+ * "not set" (fall back to the display refresh rate) and infinite for uncapped;
+ * `icon` and the mode names may be NULL. Does *not* run a main loop — the
+ * caller owns that, as Window#show already does on CRuby.
  */
-R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.window_show expects 1 arg (window), got %d", (int)argc);
-  R_VAL obj = argv[0];
-
-  ruby2d_window = obj;
+bool R2D_ShowWindow(const char *title, int width, int height,
+                    bool resizable, bool highdpi, bool pixel_scale,
+                    double fps_cap,
+                    int viewport_width, int viewport_height,
+                    const char *viewport_mode, const char *render_mode,
+                    const char *scale_mode, const char *icon) {
+  r2d_last_error[0] = '\0';
 
   if (!r2d_window) {
-    r_raise("Ruby2D: window cannot be shown (native window is NULL)");
+    return r2d_fail("Ruby2D: window cannot be shown (native window is NULL)", NULL);
   }
 
-  // Re-read window flags from Ruby (user may have changed @resizable,
-  // @highdpi via set() after ext_create but before show)
   int flags = 0;
-  if (r_test(r_ivar_get(obj, id_resizable)))  flags |= R2D_RESIZABLE;
-  if (r_test(r_ivar_get(obj, id_highdpi)))    flags |= R2D_HIGHDPI;
+  if (resizable) flags |= R2D_RESIZABLE;
+  if (highdpi)   flags |= R2D_HIGHDPI;
   r2d_window->flags = flags;
 
   // Scale window dimensions by content_scale for correct visual size on all
   // platforms. On macOS content_scale is 1.0 (coordinates are already logical
   // points); on Windows with DPI scaling it compensates for physical pixels.
   float cs = r2d_window->display_content_scale;
-  int win_w = (int)(obj_int(obj, id_width)  * cs);
-  int win_h = (int)(obj_int(obj, id_height) * cs);
+  int win_w = (int)(width  * cs);
+  int win_h = (int)(height * cs);
 
   // Create the window hidden on native platforms so it can be centered before
   // its first paint; repositioning an already-visible window makes it visibly
@@ -1006,38 +1176,30 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // Create SDL window and renderer
   if (!SDL_CreateWindowAndRenderer(
-    obj_str(obj, id_title), win_w, win_h,
+    title, win_w, win_h,
     create_flags,
     &r2d_window->sdl_window, &r2d_window->sdl_renderer
   )) {
-    r_raise("Ruby2D: failed to create window and renderer: %s", SDL_GetError());
+    return r2d_fail("Ruby2D: failed to create window and renderer", SDL_GetError());
   }
 
   // Defensive check: ensure both window and renderer are non-NULL
   if (!r2d_window->sdl_window || !r2d_window->sdl_renderer) {
-    r_raise("Ruby2D: window or renderer is NULL after creation: %s", SDL_GetError());
+    return r2d_fail("Ruby2D: window or renderer is NULL after creation", SDL_GetError());
   }
 
   // Enable alpha blending for shape rendering (SDL_RenderGeometry)
   SDL_SetRenderDrawBlendMode(r2d_window->sdl_renderer, SDL_BLENDMODE_BLEND);
 
-  // Resolve the effective fps_cap. Float::INFINITY means "uncapped" → fps_cap 0,
-  // so target_frame stays 0 (no frame delay). Read as a double so an Integer or
-  // Float::INFINITY both work. Without a user cap, fall back to the display
-  // refresh rate.
-  R_VAL fps_cap_val = r_ivar_get(obj, id_fps_cap);
-  if (r_test(fps_cap_val)) {
-    double cap = NUM2DBL(fps_cap_val);
-    r2d_window->fps_cap = isinf(cap) ? 0 : (int)cap;
+  // Resolve the effective fps_cap. An infinite cap means "uncapped" → fps_cap 0,
+  // so target_frame stays 0 (no frame delay). A negative cap means the caller
+  // set none, so fall back to the display refresh rate.
+  bool capped = fps_cap >= 0.0;
+  if (capped) {
+    r2d_window->fps_cap = isinf(fps_cap) ? 0 : (int)fps_cap;
   } else {
     r2d_window->fps_cap = (int)r2d_window->display_refresh_rate;
   }
-
-  // On the web, pacing is applied by the tick trampoline instead of vsync or
-  // frame delays — map the cap onto a pace mode for it.
-  #ifdef __EMSCRIPTEN__
-  wasm_set_pace_mode(fps_cap_val);
-  #endif
 
   #ifndef __EMSCRIPTEN__
   // Native frame pacing: enable vsync for smooth display-synced rendering. A user
@@ -1051,45 +1213,33 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
   // main-loop timing (vsync 0 → free-running EM_TIMING_SETTIMEOUT, vsync 1 → an
   // EM_TIMING_RAF cadence that measured at half the refresh rate). We own that
   // timing directly instead — see emscripten_set_main_loop_timing below.
-  SDL_SetRenderVSync(r2d_window->sdl_renderer, r_test(fps_cap_val) ? 0 : 1);
+  SDL_SetRenderVSync(r2d_window->sdl_renderer, capped ? 0 : 1);
   #endif
 
-  // Re-read the logical (user-intended) viewport dimensions from Ruby (the user
-  // may have changed @width/@height or @viewport_* via set() after ext_create
-  // but before show). These are the unscaled base sizes; R2D_ApplyPixelScale
-  // derives the render dimensions from them.
-  R_VAL vw_val = r_ivar_get(obj, id_viewport_width);
-  R_VAL vh_val = r_ivar_get(obj, id_viewport_height);
-  r2d_window->viewport.base_width  = r_test(vw_val) ? NUM2INT(vw_val) : obj_int(obj, id_width);
-  r2d_window->viewport.base_height = r_test(vh_val) ? NUM2INT(vh_val) : obj_int(obj, id_height);
+  // Logical (user-intended) viewport dimensions — the unscaled base sizes, from
+  // which R2D_ApplyPixelScale derives the render dimensions. A non-positive
+  // viewport dimension means "unset", so fall back to the window size.
+  r2d_window->viewport.base_width  = viewport_width  > 0 ? viewport_width  : width;
+  r2d_window->viewport.base_height = viewport_height > 0 ? viewport_height : height;
 
-  // Re-read viewport mode from Ruby
-  r2d_window->viewport.mode = R2D_ParseViewportMode(r_ivar_get(obj, id_viewport_mode));
+  r2d_window->viewport.mode = R2D_ParseViewportModeName(viewport_mode);
+  r2d_window->render_mode   = R2D_ParseRenderModeName(render_mode);
 
-  // Re-read render mode from Ruby (user may have changed @render_mode via set()
-  // between new and show)
-  r2d_window->render_mode = R2D_ParseRenderMode(r_ivar_get(obj, id_render_mode));
-
-  // Same for the window-wide texture scale mode
-  r2d_window->scale_mode = R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), SDL_SCALEMODE_LINEAR);
+  r2d_window->scale_mode    = R2D_ParseScaleModeName(scale_mode, SDL_SCALEMODE_LINEAR);
 
   // Logical (user-intended) window dimensions on the C struct
-  r2d_window->orig_width  = obj_int(obj, id_width);
-  r2d_window->orig_height = obj_int(obj, id_height);
+  r2d_window->orig_width  = width;
+  r2d_window->orig_height = height;
 
   // Derive render (physical) dimensions from the logical sizes, scaling once
   // for pixel_scale on HiDPI so coordinates map 1:1 with physical pixels.
-  r2d_window->pixel_scale = obj_bool(obj, id_pixel_scale);
+  r2d_window->pixel_scale = pixel_scale;
   R2D_ApplyPixelScale(r2d_window);
 
   // Apply viewport scaling mode (logical presentation)
   R2D_ApplyViewportMode(r2d_window);
 
-  // Read icon path from Ruby and apply it
-  R_VAL icon_val = r_ivar_get(obj, id_icon);
-  if (r_test(icon_val)) {
-    R2D_SetIcon(r2d_window, RSTRING_PTR(icon_val));
-  }
+  if (icon) R2D_SetIcon(r2d_window, icon);
 
   // Reset first_poll so the initial gamepad scan runs on the first tick
   first_poll = true;
@@ -1119,6 +1269,60 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_ShowWindow(r2d_window->sdl_window);
   #endif
 
+  return true;
+}
+
+
+/*
+ * Ruby2D::Window#ext_show
+ *
+ * Ruby bridge over R2D_ShowWindow: read the window's settings off its ivars,
+ * create and reveal the window, then start whichever main loop this engine
+ * uses. CRuby returns and lets Ruby own the loop; the Spinel build does the
+ * same, calling R2D_ShowWindow directly.
+ */
+#ifndef RUBY2D_NO_RUBY
+R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.window_show expects 1 arg (window), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  ruby2d_window = obj;
+
+  // Re-read settings from Ruby: the user may have changed any of these via
+  // set() between ext_create and show.
+  R_VAL fps_cap_val = r_ivar_get(obj, id_fps_cap);
+  R_VAL vw_val      = r_ivar_get(obj, id_viewport_width);
+  R_VAL vh_val      = r_ivar_get(obj, id_viewport_height);
+  R_VAL vm_val      = r_ivar_get(obj, id_viewport_mode);
+  R_VAL rm_val      = r_ivar_get(obj, id_render_mode);
+  R_VAL sm_val      = r_ivar_get(obj, id_scale_mode);
+  R_VAL icon_val    = r_ivar_get(obj, id_icon);
+
+  if (!R2D_ShowWindow(
+    obj_str(obj, id_title), obj_int(obj, id_width), obj_int(obj, id_height),
+    r_test(r_ivar_get(obj, id_resizable)),
+    r_test(r_ivar_get(obj, id_highdpi)),
+    obj_bool(obj, id_pixel_scale),
+    // A negative cap tells the core none was set, so it falls back to the
+    // display refresh rate — matching what nil meant here before.
+    r_test(fps_cap_val) ? NUM2DBL(fps_cap_val) : -1.0,
+    r_test(vw_val) ? NUM2INT(vw_val) : 0,
+    r_test(vh_val) ? NUM2INT(vh_val) : 0,
+    r_test(vm_val) ? r_sym_name(vm_val) : NULL,
+    r_test(rm_val) ? r_sym_name(rm_val) : NULL,
+    r_test(sm_val) ? r_sym_name(sm_val) : NULL,
+    r_test(icon_val) ? RSTRING_PTR(icon_val) : NULL
+  )) {
+    r_raise("%s", R2D_LastError());
+  }
+
+  // On the web, pacing is applied by the tick trampoline instead of vsync or
+  // frame delays — map the cap onto a pace mode for it.
+  #ifdef __EMSCRIPTEN__
+  wasm_set_pace_mode(fps_cap_val);
+  #endif
+
   // Main Loop /////////////////////////////////////////////////////////////////
   // CRuby: return and let Ruby own the loop (Window#show calls tick in a loop).
   // mruby native: C drives the loop, calling Ruby's tick each frame.
@@ -1138,6 +1342,7 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   return R_TRUE;
 }
+#endif
 
 
 // =============================================================================
@@ -1323,6 +1528,7 @@ static void R2D_Window_free(void *p) {
 /*
  * Ruby2D::Window#ext_get_display_dimensions
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_get_display_dimensions(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_get_display_dimensions expects 1 arg (window), got %d", (int)argc);
@@ -1335,6 +1541,7 @@ R_VAL ruby2d_ext_window_get_display_dimensions(RUBY2D_METHOD_ARGS_VARIADIC) {
   r_iv_set(obj, "@display_pixel_height", INT2NUM(r2d_window->display_pixel_height));
   return R_NIL;
 }
+#endif
 
 
 /*
@@ -1343,6 +1550,7 @@ R_VAL ruby2d_ext_window_get_display_dimensions(RUBY2D_METHOD_ARGS_VARIADIC) {
  * Reads @viewport_mode, @viewport_width, @viewport_height from Ruby and
  * applies the new viewport mode at runtime.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_viewport_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_viewport_mode expects 1 arg (window), got %d", (int)argc);
@@ -1378,11 +1586,13 @@ R_VAL ruby2d_ext_window_set_viewport_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_set_icon
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_icon(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_icon expects 1 arg (window), got %d", (int)argc);
@@ -1395,11 +1605,13 @@ R_VAL ruby2d_ext_window_set_icon(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_set_title — push @title to the live window's title bar
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_title(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_title expects 1 arg (window), got %d", (int)argc);
@@ -1409,11 +1621,13 @@ R_VAL ruby2d_ext_window_set_title(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_SetWindowTitle(r2d_window->sdl_window, obj_str(obj, id_title));
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_set_resizable — toggle the live window's resizability
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_resizable(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_resizable expects 1 arg (window), got %d", (int)argc);
@@ -1426,6 +1640,7 @@ R_VAL ruby2d_ext_window_set_resizable(RUBY2D_METHOD_ARGS_VARIADIC) {
   else           r2d_window->flags &= ~R2D_RESIZABLE;
   return R_TRUE;
 }
+#endif
 
 
 /*
@@ -1434,6 +1649,7 @@ R_VAL ruby2d_ext_window_set_resizable(RUBY2D_METHOD_ARGS_VARIADIC) {
  * event path). The window manager may honor a different size; the resulting
  * SDL_EVENT_WINDOW_RESIZED reconciles orig_width/orig_height if so.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_size(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_size expects 1 arg (window), got %d", (int)argc);
@@ -1463,11 +1679,13 @@ R_VAL ruby2d_ext_window_set_size(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_ApplyViewportMode(r2d_window);
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_diagnostics
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_diagnostics(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_diagnostics expects 2 args, got %d", (int)argc);
@@ -1476,11 +1694,13 @@ R_VAL ruby2d_ext_window_diagnostics(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Diagnostics(r_test(enable));
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_set_fps_cap
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_fps_cap(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_set_fps_cap expects 2 args, got %d", (int)argc);
@@ -1512,11 +1732,13 @@ R_VAL ruby2d_ext_window_set_fps_cap(RUBY2D_METHOD_ARGS_VARIADIC) {
   target_frame = r2d_window->fps_cap > 0 ? 1.0 / (double)r2d_window->fps_cap : 0.0;
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_show_fps
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_show_fps(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_show_fps expects 2 args, got %d", (int)argc);
@@ -1524,11 +1746,13 @@ R_VAL ruby2d_ext_window_show_fps(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_ShowFPS(r_test(enable));
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_load_gamepad_mappings_file
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_load_gamepad_mappings_file(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_load_gamepad_mappings_file expects 2 args, got %d", (int)argc);
@@ -1537,11 +1761,13 @@ R_VAL ruby2d_ext_window_load_gamepad_mappings_file(RUBY2D_METHOD_ARGS_VARIADIC) 
   int n = R2D_AddGamepadMappingsFromFile(RSTRING_PTR(path));
   return INT2NUM(n);
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_add_gamepad_mapping
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_add_gamepad_mapping(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_add_gamepad_mapping expects 2 args, got %d", (int)argc);
@@ -1549,11 +1775,13 @@ R_VAL ruby2d_ext_window_add_gamepad_mapping(RUBY2D_METHOD_ARGS_VARIADIC) {
   int n = R2D_AddGamepadMapping(RSTRING_PTR(mapping));
   return INT2NUM(n);
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_rumble
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_rumble(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 5) r_raise("Ruby2D::Ext.window_gamepad_rumble expects 5 args, got %d", (int)argc);
@@ -1567,11 +1795,13 @@ R_VAL ruby2d_ext_window_gamepad_rumble(RUBY2D_METHOD_ARGS_VARIADIC) {
   );
   return ok ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_rumble_triggers
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_rumble_triggers(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 5) r_raise("Ruby2D::Ext.window_gamepad_rumble_triggers expects 5 args, got %d", (int)argc);
@@ -1585,11 +1815,13 @@ R_VAL ruby2d_ext_window_gamepad_rumble_triggers(RUBY2D_METHOD_ARGS_VARIADIC) {
   );
   return ok ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_set_led
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_set_led(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 5) r_raise("Ruby2D::Ext.window_gamepad_set_led expects 5 args, got %d", (int)argc);
@@ -1603,6 +1835,7 @@ R_VAL ruby2d_ext_window_gamepad_set_led(RUBY2D_METHOD_ARGS_VARIADIC) {
   );
   return ok ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
@@ -1610,6 +1843,7 @@ R_VAL ruby2d_ext_window_gamepad_set_led(RUBY2D_METHOD_ARGS_VARIADIC) {
  * exposes (`:xbox`, `:playstation`, `:nintendo`, `:generic`, `:unknown`).
  * Used both for the cached `pad.type` and the `real_type` debug field.
  */
+#ifndef RUBY2D_NO_RUBY
 static R_VAL ruby2d_gamepad_type_to_sym(SDL_GamepadType t) {
   switch (t) {
     case SDL_GAMEPAD_TYPE_XBOX360:
@@ -1631,11 +1865,13 @@ static R_VAL ruby2d_gamepad_type_to_sym(SDL_GamepadType t) {
       return r_char_to_sym("unknown");
   }
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_type
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_type(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_gamepad_type expects 2 args, got %d", (int)argc);
@@ -1644,6 +1880,7 @@ R_VAL ruby2d_ext_window_gamepad_type(RUBY2D_METHOD_ARGS_VARIADIC) {
   if (!pad) return r_char_to_sym("unknown");
   return ruby2d_gamepad_type_to_sym(SDL_GetGamepadType(pad));
 }
+#endif
 
 
 /*
@@ -1653,6 +1890,7 @@ R_VAL ruby2d_ext_window_gamepad_type(RUBY2D_METHOD_ARGS_VARIADIC) {
  * :wired / :on_battery / :unknown; percent is an Integer 0..100 or -1
  * if SDL did not report one.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_battery(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_gamepad_battery expects 2 args, got %d", (int)argc);
@@ -1670,11 +1908,13 @@ R_VAL ruby2d_ext_window_gamepad_battery(RUBY2D_METHOD_ARGS_VARIADIC) {
   r_ary_push(ary, INT2NUM(percent));
   return ary;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_has_button
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_has_button(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 3) r_raise("Ruby2D::Ext.window_gamepad_has_button expects 3 args, got %d", (int)argc);
@@ -1685,11 +1925,13 @@ R_VAL ruby2d_ext_window_gamepad_has_button(RUBY2D_METHOD_ARGS_VARIADIC) {
   );
   return ok ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_has_axis
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_has_axis(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 3) r_raise("Ruby2D::Ext.window_gamepad_has_axis expects 3 args, got %d", (int)argc);
@@ -1700,11 +1942,13 @@ R_VAL ruby2d_ext_window_gamepad_has_axis(RUBY2D_METHOD_ARGS_VARIADIC) {
   );
   return ok ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_caps
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_caps(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_gamepad_caps expects 2 args, got %d", (int)argc);
@@ -1712,6 +1956,7 @@ R_VAL ruby2d_ext_window_gamepad_caps(RUBY2D_METHOD_ARGS_VARIADIC) {
   int caps = R2D_GetGamepadCaps((SDL_JoystickID)NUM2INT(id));
   return INT2NUM(caps);
 }
+#endif
 
 
 /*
@@ -1722,6 +1967,7 @@ R_VAL ruby2d_ext_window_gamepad_caps(RUBY2D_METHOD_ARGS_VARIADIC) {
  *   [guid_str, vendor, product, version, serial_or_nil,
  *    connection_sym, real_type_sym, num_touchpads, mapping_or_nil]
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_debug_info(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_gamepad_debug_info expects 2 args, got %d", (int)argc);
@@ -1775,11 +2021,13 @@ R_VAL ruby2d_ext_window_gamepad_debug_info(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   return arr;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_gamepad_joystick_state
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_gamepad_joystick_state(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_gamepad_joystick_state expects 2 args, got %d", (int)argc);
@@ -1813,6 +2061,7 @@ R_VAL ruby2d_ext_window_gamepad_joystick_state(RUBY2D_METHOD_ARGS_VARIADIC) {
   r_ary_push(result, hats);
   return result;
 }
+#endif
 
 
 /*
@@ -1821,6 +2070,7 @@ R_VAL ruby2d_ext_window_gamepad_joystick_state(RUBY2D_METHOD_ARGS_VARIADIC) {
  * Defers the screenshot to the end of the current frame, after rendering but
  * before SDL_RenderPresent, so the back buffer contains the fully drawn scene.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_screenshot(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_screenshot expects 2 args, got %d", (int)argc);
@@ -1833,60 +2083,76 @@ R_VAL ruby2d_ext_window_screenshot(RUBY2D_METHOD_ARGS_VARIADIC) {
     return R_FALSE;
   }
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_show_cursor
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_show_cursor(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_show_cursor expects 1 arg (window), got %d", (int)argc);
   R2D_ShowCursor();
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_hide_cursor
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_hide_cursor(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_hide_cursor expects 1 arg (window), got %d", (int)argc);
   R2D_HideCursor();
   return R_TRUE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_cursor_visible
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_cursor_visible(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_cursor_visible expects 1 arg (window), got %d", (int)argc);
   return R2D_CursorVisible() ? R_TRUE : R_FALSE;
 }
+#endif
 
 
 /*
  * Ruby2D::Window#ext_set_system_cursor
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_system_cursor(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_set_system_cursor expects 2 args, got %d", (int)argc);
   R_VAL name = argv[1];
   return R2D_SetSystemCursor(RSTRING_PTR(name)) ? R_TRUE : R_FALSE;
 }
+#endif
+
+
+// Close the current window. R2D_Close itself is already Ruby-free but takes the
+// window pointer; the Spinel build has no handle to pass, so it calls this.
+void R2D_CloseWindow(void) { R2D_Close(r2d_window); }
 
 
 /*
  * Ruby2D::Window#ext_close
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_close(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_close expects 1 arg (window), got %d", (int)argc);
   R2D_Close(r2d_window);
   return R_NIL;
 }
+#endif
 
 
 /*
@@ -1897,6 +2163,7 @@ R_VAL ruby2d_ext_window_close(RUBY2D_METHOD_ARGS_VARIADIC) {
  * modes (particularly important when switching from on_demand → continuous or
  * changing modes mid-scene).
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_render_mode expects 1 arg (window), got %d", (int)argc);
@@ -1906,6 +2173,7 @@ R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_SetAtomicInt(&r2d_window->render_pending, 1);
   return R_TRUE;
 }
+#endif
 
 
 /*
@@ -1928,6 +2196,7 @@ R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
  * Marks the next tick as needing a rendered frame. Safe to call from any
  * thread (the dirty flag is an SDL atomic int).
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_request_render(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_request_render expects 1 arg (window), got %d", (int)argc);
@@ -1935,3 +2204,4 @@ R_VAL ruby2d_ext_window_request_render(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_SetAtomicInt(&r2d_window->render_pending, 1);
   return R_TRUE;
 }
+#endif

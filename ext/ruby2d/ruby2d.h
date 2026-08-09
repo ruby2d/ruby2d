@@ -6,7 +6,14 @@
 
 // Ruby Engine and Includes ////////////////////////////////////////////////////
 
-#ifdef MRUBY
+// RUBY2D_NO_RUBY builds the R2D_* core with no Ruby engine at all, for the
+// Spinel target: Spinel-compiled programs have no C extension API to bind to
+// and reach the engine through FFI instead. The Ruby binding layer (every
+// `ruby2d_ext_*` function and the `*_Init` registrations) is compiled out; the
+// SDL3-touching core is what remains. See SPINEL.md.
+#ifdef RUBY2D_NO_RUBY
+  #include <stdbool.h>
+#elif defined(MRUBY)
   #include <mruby.h>
   #include <mruby/array.h>
   #include <mruby/string.h>
@@ -83,7 +90,19 @@ extern "C" {
 
 // --- Core Value Types --------------------------------------------------------
 // Fundamental type aliases used everywhere in the abstraction layer.
-#ifdef MRUBY
+//
+// Under RUBY2D_NO_RUBY these are placeholders so the binding *declarations*
+// below still parse — a declaration costs nothing, and guarding all ~91 of them
+// would bury the header. The binding *definitions* are compiled out in the .c
+// files, and the accessor macros (r_ivar_get and friends) are deliberately left
+// undefined: a Ruby call that creeps into an R2D_* core must fail to build
+// rather than silently do nothing on the Spinel target.
+#ifdef RUBY2D_NO_RUBY
+  typedef void *r2d_no_ruby_value;
+  #define R_VAL    r2d_no_ruby_value
+  #define R_CLASS  r2d_no_ruby_value
+  #define R_ID     int
+#elif defined(MRUBY)
   #define R_VAL    mrb_value
   #define R_NIL    (mrb_nil_value())
   #define R_TRUE   (mrb_true_value())
@@ -147,14 +166,19 @@ extern "C" {
 // r_char_to_sym: C string → Ruby symbol value.
 // r_id: C string → interned ID for fast repeated lookups.
 // r_sym_to_id: Ruby symbol value → interned ID.
+// r_sym_name: Ruby symbol value → C string, for handing a symbol to a
+//   Ruby-free R2D_* function that takes the name (see R2D_ParseViewportModeName).
+//   The pointer is owned by the interpreter's symbol table — don't free it.
 #ifdef MRUBY
   #define r_char_to_sym(str)  mrb_symbol_value(mrb_intern_cstr(mrb, str))
   #define r_id(str)           mrb_intern_cstr(mrb, str)
   #define r_sym_to_id(val)    mrb_symbol(val)
+  #define r_sym_name(val)     mrb_sym_name(mrb, mrb_symbol(val))
 #else
   #define r_char_to_sym(str)  ID2SYM(rb_intern(str))
   #define r_id(str)           rb_intern(str)
   #define r_sym_to_id(val)    rb_sym2id(val)
+  #define r_sym_name(val)     rb_id2name(rb_sym2id(val))
 #endif
 
 // --- Arrays ------------------------------------------------------------------
@@ -758,6 +782,89 @@ bool R2D_Init(void);
  * Gets the primary display's dimensions
  */
 void R2D_GetDisplayDimensions(int *w, int *h);
+
+/*
+ * Polls SDL events and held-input state, queues them into the event buffer,
+ * and updates frame timing. The resulting state is read back through the
+ * R2D_Poll* accessors below (or straight off `r2d_window` by the Ruby bridge).
+ */
+void R2D_PollEvents(void);
+
+/*
+ * Read the state left by the last R2D_PollEvents. Used by the Spinel build,
+ * which has no Ruby objects to sync ivars onto.
+ */
+int  R2D_PollMouseX(void);
+int  R2D_PollMouseY(void);
+int  R2D_PollWidth(void);
+int  R2D_PollHeight(void);
+int  R2D_PollViewportWidth(void);
+int  R2D_PollViewportHeight(void);
+bool R2D_PollClosed(void);
+
+/*
+ * Takes the background color as flat components, decides whether to render
+ * this frame, and clears. Returns true if the caller should draw the scene.
+ */
+bool R2D_BeginFrame(float bg_r, float bg_g, float bg_b, float bg_a);
+
+/*
+ * Frame count and fps for the frame R2D_BeginFrame admitted
+ */
+unsigned long long R2D_FrameCount(void);
+double             R2D_Fps(void);
+
+/*
+ * Draws the FPS overlay, takes any deferred screenshot, presents the frame,
+ * and applies the frame cap
+ */
+void R2D_EndFrame(void);
+
+/*
+ * Closes the current window (R2D_Close without needing the window pointer)
+ */
+void R2D_CloseWindow(void);
+
+/*
+ * Parse a viewport or render mode by name into its R2D_VIEWPORT_* /
+ * R2D_RENDER_* constant, falling back to letterbox / continuous. The Ruby
+ * bridge converts its symbol and calls through these, so there is one table
+ * of names for both bridges.
+ */
+int R2D_ParseViewportModeName(const char *name);
+int R2D_ParseRenderModeName(const char *name);
+SDL_ScaleMode R2D_ParseScaleModeName(const char *name, SDL_ScaleMode fallback);
+
+/*
+ * Creates the SDL window and renderer, applies window/viewport/render
+ * settings, and reveals the window. Returns false on failure, with the reason
+ * from R2D_LastError. `fps_cap` is negative for "not set" (use the display
+ * refresh rate) and infinite for uncapped; a non-positive viewport dimension
+ * falls back to the window size; `icon` and the mode names may be NULL.
+ * Runs no main loop — the caller owns that.
+ */
+/*
+ * Initializes the engine and allocates the window with default values.
+ * Returns false on failure, with the reason from R2D_LastError. Width or
+ * height may be R2D_DISPLAY_WIDTH / R2D_DISPLAY_HEIGHT to fill the display.
+ * Settings R2D_ShowWindow re-applies (flags, render mode, pixel scale) are
+ * deliberately not parameters here.
+ */
+bool R2D_CreateWindow(const char *title, int width, int height,
+                      int viewport_width, int viewport_height,
+                      const char *viewport_mode);
+
+bool R2D_ShowWindow(const char *title, int width, int height,
+                    bool resizable, bool highdpi, bool pixel_scale,
+                    double fps_cap,
+                    int viewport_width, int viewport_height,
+                    const char *viewport_mode, const char *render_mode,
+                    const char *scale_mode, const char *icon);
+
+/*
+ * The reason the last R2D_ShowWindow failed
+ */
+const char *R2D_LastError(void);
 
 /*
  * Add gamepad mappings from a file. Returns the number of mappings added,
