@@ -112,6 +112,7 @@ Every workaround in this document exists because of one of these. Spinel's contr
 | `issues/03-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
 | `issues/04-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent wrong answer** |
 | `issues/05-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
+| `issues/06-self-escaping-inherited-constructor.md` | `self` stored from an inherited constructor loses its concrete type — **the bug blocking the MVP** |
 
 Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) and [#3766](https://github.com/matz/spinel/issues/3766): a titled category, a short description, a minimal reproducer, CRuby and Spinel output side by side, an "Additional Findings" section contrasting what *does* work, and a pinned commit. The working/failing contrast is worth keeping — it is what makes each report actionable rather than just a complaint.
 
@@ -237,15 +238,16 @@ Four more Ruby shapes that trip codegen, each confirmed by fixing it and re-meas
 - **An ambiguous method name on a polymorphic receiver.** An ivar first assigned in a module body stays poly, and `@gamepads_by_id.delete(id)` then resolves to `String#delete`. Unambiguous methods (`[]`, `[]=`, `key?`) are fine, which is why only `delete` needed rewriting.
 - **A bare call colliding with a top-level DSL shim.** `Color.for_render` called `set(colors)`, which resolved to the generated top-level `set` rather than `Color.set`. Qualifying the receiver fixes it — and is clearer Ruby anyway, since Ruby 2D really does have both.
 
-### Runtime: the scene graph is the current wall (2026-08-09)
+### Runtime: the scene graph, and the bug behind it (2026-08-10)
 
-The square-only subset now **compiles to zero C errors, links, and runs**. `Square.new` succeeds and the object registers with the window — the test prints its coordinates and `objects: 1`. Execution then fails in the render loop.
+The square-only subset **compiles to zero C errors, links, and runs**. `Square.new` succeeds and the object registers with the window. Execution then fails in `Window#render_objects` — `@objects.each { |obj| obj._render_scene if obj.visible? }` — with `NoMethodError`, reporting the object as `Ruby2D::Quad` when it is a `Square`.
 
-`Window#render_objects` is `@objects.each { |obj| obj._render_scene if obj.visible? }`. `@objects` starts as an untyped `[]`, so its elements are polymorphic, and dispatching either method off a poly receiver raises `NoMethodError` — reporting the object as `Ruby2D::Quad` when it is a `Square`. `visible?` comes from a module, `_render_scene` from a class-level `alias_method`, and the receiver's method is inherited two levels up; all three shapes dispatch correctly in isolation (probe `p51`), so this is the same whole-program-context failure as issue 6.
+**Root cause found, and it is not what the symptom suggested.** It has nothing to do with modules, `include`, or polymorphic receivers. When a subclass instance stores `self` into a collection from a constructor it *inherits*, the stored value is typed as the defining class rather than the actual one, and every later dispatch on it fails. Ruby 2D hits this because shapes default to `add: true` and self-register from `Renderable#add`, which `Quad#initialize` calls — so every object in the scene graph is mistyped the moment it is created.
 
-This matters more than the earlier ones. The scene graph *is* Ruby 2D's architecture: a heterogeneous collection iterated with dynamic dispatch. It is not something a source transform can route around the way `Window.<m>` was.
+Reduced to 15 lines and filed as `issues/06-self-escaping-inherited-constructor.md`.
 
-Two notes for whoever picks this up. Evaluation order misleads here: in `obj._render_scene if obj.visible?` the guard runs first, so fixing `_render_scene` looks like progress when it has only changed which of the two fails. And the reported class being `Quad` rather than `Square` is itself a clue worth chasing.
+**How it was found matters more than the bug.** Eleven attempts to reduce *down* from the failing program all passed in isolation. Scaling *up* from a passing probe — adding one structural feature at a time until it broke — found it on the first try, then bisected to two required ingredients (an inheritance chain, and self-registration from inside the constructor) in one more pass. For whole-program-context failures, build up rather than cut down.
+
 
 **Earlier, on compilation: 2 errors, both from the single `sp_Renderable__unrotate` call** — one undeclared-function, one cascade from it. Three hypotheses have been tested and killed: multiple assignment, `instance_variable_defined?`, and the module-typed receiver being unable to resolve `rx`/`ry`. It is the last thing between the subset and clean C.
 
