@@ -112,7 +112,7 @@ Every workaround in this document exists because of one of these. Spinel's contr
 | `issues/03-toplevel-include-arity.md` | Top-level `include` emits a call with the wrong arity, failing the C compile |
 | `issues/04-safe-navigation-nan.md` | Safe navigation on the right of `\|\|` returns `NaN` instead of `nil` — **silent wrong answer** |
 | `issues/05-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
-| `issues/06-self-escaping-inherited-constructor.md` | `self` stored from an inherited constructor loses its concrete type — **the bug blocking the MVP** |
+| `issues/06-self-escaping-superclass-method.md` | `self` escaping a superclass method is typed as the superclass — **the bug blocking the MVP** |
 
 Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) and [#3766](https://github.com/matz/spinel/issues/3766): a titled category, a short description, a minimal reproducer, CRuby and Spinel output side by side, an "Additional Findings" section contrasting what *does* work, and a pinned commit. The working/failing contrast is worth keeping — it is what makes each report actionable rather than just a complaint.
 
@@ -242,9 +242,9 @@ Four more Ruby shapes that trip codegen, each confirmed by fixing it and re-meas
 
 The square-only subset **compiles to zero C errors, links, and runs**. `Square.new` succeeds and the object registers with the window. Execution then fails in `Window#render_objects` — `@objects.each { |obj| obj._render_scene if obj.visible? }` — with `NoMethodError`, reporting the object as `Ruby2D::Quad` when it is a `Square`.
 
-**Root cause found, and it is not what the symptom suggested.** It has nothing to do with modules, `include`, or polymorphic receivers. When a subclass instance stores `self` into a collection from a constructor it *inherits*, the stored value is typed as the defining class rather than the actual one, and every later dispatch on it fails. Ruby 2D hits this because shapes default to `add: true` and self-register from `Renderable#add`, which `Quad#initialize` calls — so every object in the scene graph is mistyped the moment it is created.
+**Root cause found, and it is not what the symptom suggested.** It has nothing to do with polymorphic receivers. When a method defined on a *superclass* stores `self`, and that method is called on a subclass instance, the stored value is typed as the superclass and every later dispatch on it fails. The constructor is incidental — an ordinary inherited method behaves the same. Modules alone are fine; it is inheritance that loses the type, including a module included into a base class and called on a subclass instance, which is Ruby 2D's exact shape: `Renderable` is included by `Quad`, and every `Square` reaches `add` through it.
 
-Reduced to 15 lines and filed as `issues/06-self-escaping-inherited-constructor.md`.
+Reduced to 15 lines and filed as `issues/06-self-escaping-superclass-method.md`.
 
 **How it was found matters more than the bug.** Eleven attempts to reduce *down* from the failing program all passed in isolation. Scaling *up* from a passing probe — adding one structural feature at a time until it broke — found it on the first try, then bisected to two required ingredients (an inheritance chain, and self-registration from inside the constructor) in one more pass. For whole-program-context failures, build up rather than cut down.
 
