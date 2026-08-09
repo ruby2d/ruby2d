@@ -4,6 +4,7 @@ docs/
 test/build/
 test/screenshot*
 try/build/
+spinel/scratch/
 *.gem
 benchmark/web/.build/
 .clangd

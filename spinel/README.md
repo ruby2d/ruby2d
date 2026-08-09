@@ -10,9 +10,12 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 |---|---|
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
-| `issues/` | Drafted upstream bug reports, one file per issue |
+| `issues/` | The upstream bug reports, one file per issue |
+| `scratch/` | Working area for experiments — gitignored, safe to delete |
 
-Experiments live in a scratchpad outside the repo and are disposable; anything worth surviving belongs here.
+Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
+
+**The Spinel compiler itself stays outside the repo.** It is a large separate git repository that gets rebuilt on every upstream pull, so nesting it here would be awkward and would confuse tooling. Clone it wherever you like and point `RUBY2D_SPINEL` at `bin/spinel` — that is the resolution order `find_spinel` already implements. The recipes below assume it is on `$SPINEL` or `$PATH`.
 
 ## Why Spinel fits
 
