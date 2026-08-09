@@ -2,6 +2,66 @@
 
 Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `1c3d99897ef3` (2026-08-10)**.
 
+## Start here
+
+The rest of this document is a research log in discovery order. This section is the orientation; read it first.
+
+### Status
+
+The C side works. A Spinel-compiled binary drives Ruby 2D's real `R2D_*` core over FFI and renders — see `bouncing_balls.rb`, which runs at 60fps today.
+
+The `lib/` side is **blocked on [#3773](https://github.com/matz/spinel/issues/3773)**, and blocked deliberately: the workaround would put a line in ~13 shape classes that exists only to dodge a compiler bug. The square-only slice of `lib/` compiles to zero C errors and runs until the scene graph dispatches, then raises `NoMethodError`.
+
+Seven bugs are filed upstream, [#3771-#3777](https://github.com/matz/spinel/issues?q=is%3Aissue+3771..3777). Nothing here is waiting on Ruby 2D.
+
+### Setup
+
+Spinel is not vendored — clone it anywhere outside the repo and build:
+
+```sh
+git clone --depth 1 https://github.com/matz/spinel.git
+cd spinel && make deps && make      # builds bin/spinel; needs network for libprism
+export SPINEL="$PWD/bin/spinel"     # used by the tools below
+export RUBY2D_SPINEL="$SPINEL"      # used by cli/spinel.rb's find_spinel
+```
+
+`make deps` fetches libprism and rbs from RubyGems. A rebuild after `git fetch` is just `make -j8`.
+
+### Check where things stand
+
+```sh
+ruby spinel/tools/build_subset.rb     # assembles the square-only slice of lib/
+ruby spinel/scratch/subset.rb         # CRuby baseline — must print SUBSET OK
+$SPINEL spinel/scratch/subset.rb -o /tmp/subset && /tmp/subset
+```
+
+As of Spinel `1c3d99897ef3` the last line fails with `undefined method 'visible?' for an instance of Ruby2D::Quad` — that is #3773. **If it prints `SUBSET OK`, the blocker is gone** and the MVP is reachable again.
+
+The CRuby run is the control: it must pass, or the harness is broken rather than the compiler.
+
+### Resuming
+
+```sh
+gh issue list --repo matz/spinel --state all --search "3771..3777"
+```
+
+A closed issue is the cue to re-check the matching row in [Workarounds to re-check](#workarounds-to-re-check) — by rebuilding the subset, not by running a standalone probe. Those diverge: a nested-`include` bug was fixed in isolation while the real library still failed.
+
+Spinel ships many commits a day, so pull before trusting any measurement here.
+
+### Where to read next
+
+| If you want | Read |
+|---|---|
+| Why this is viable at all | [Why Spinel fits](#why-spinel-fits) |
+| What breaks and how it is worked around | [Workarounds to re-check](#workarounds-to-re-check), then `lib/ruby2d/cli/spinel.rb` |
+| What is filed upstream | [To report upstream](#to-report-upstream) and `issues/` |
+| How to rebuild the demo | [Building the demo](#building-the-demo) |
+| How to chase a new whole-program bug | [Reducing a whole-program failure](#reducing-a-whole-program-failure) |
+| What the MVP is and what is left | [MVP](#mvp) |
+
+Sections below are dated where it matters. Anything describing a "current" state is current **as of its date**, not necessarily now — the Status section above is the only place kept up to date.
+
 ## What's in this directory
 
 Everything worth keeping from the Spinel spike. Nothing here is a final home — it is a holding area for this branch.
@@ -284,7 +344,7 @@ One behavioral difference survived: the per-frame `update` block ran but every c
 
 Measure with `-ferror-limit=0`. Clang's default limit is 20, and it will silently cap the count — an early before/after comparison here read "20 → 20" while the real numbers were 60 → 42.
 
-### The current blocker: invalid generated C
+### Invalid generated C (2026-08-09, since resolved)
 
 With those transforms the subset **passes Spinel's Ruby analysis** (`spinel -c` succeeds, 5,806 lines in) but the **emitted C does not compile** — 20 errors. This is a different and harder class than the API gaps above: not "Spinel rejects this Ruby" but "Spinel accepts it and emits bad C."
 
@@ -383,7 +443,7 @@ Reusable without change: asset bundling, `ruby2d launch --native`, and the macOS
 
 Image, text, canvas, font, and audio bindings; the WebAssembly target; Windows and Linux (Spinel supports Linux and macOS, but not native Windows — Windows needs WSL); and any generated-binding tooling.
 
-## Getting Spinel
+## How the build path finds Spinel
 
 Spinel is **not** vendored into `assets/`. Two reasons beyond keeping the submodule clean: `assets/` is a shallow submodule of a separate repo (`ruby2d/assets`), so anything added there means a commit in that repo plus a pointer bump here; and the gem is already ~34 MB, while Spinel is a large repo that builds its own compiler and runtime archives. Taxing every user for a feature few opt into is what `ruby2d setup` already exists to avoid.
 
