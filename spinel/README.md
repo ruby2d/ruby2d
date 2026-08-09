@@ -402,6 +402,62 @@ Note that `make deps` fetches libprism and rbs from RubyGems, so `setup --spinel
 - Spinel string literals are always frozen and `--disable=frozen-string-literal` is rejected outright. `lib/ruby2d/text.rb` already does `.dup.freeze` deliberately, so this looks fine, but it is unverified against the real library.
 - How should `ruby2d build` report a Spinel compile error? Its diagnostics point at the concatenated source, so the path-rewriting trick used for `mrbc` (`build.rb:286-297`) likely needs an equivalent.
 
+## Building the demo
+
+`bouncing_balls.rb` needs a Ruby-free `libruby2d_core.a`. Build it from the tree with `RUBY2D_NO_RUBY`, which compiles out the binding layer and leaves the SDL3-touching core (~70 `R2D_*` symbols):
+
+```sh
+R2D=/path/to/ruby2d
+for f in ruby2d window shapes fps font; do
+  cc -c -O2 -DRUBY2D_NO_RUBY \
+     -I"$R2D/ext/ruby2d" -I"$R2D/assets/platform/include" \
+     "$R2D/ext/ruby2d/$f.c" -o "$f.o"
+done
+ar rcs libruby2d_core.a ruby2d.o window.o shapes.o fps.o font.o
+```
+
+`font.c` is in the list only because `fps.c`'s overlay calls its bitmap-text functions; the other four are what a shapes-only app needs.
+
+Then link, passing the macOS frameworks through `--cc` and the archives through `--link` — Spinel places `--link` inputs between the generated TU and its runtime, which is the order that resolves:
+
+```sh
+LIBS="$R2D/assets/platform/macos-arm64/lib"
+FW="cc -framework AVFoundation -framework AudioToolbox -framework Carbon \
+    -framework Cocoa -framework CoreAudio -framework CoreHaptics \
+    -framework CoreMedia -framework ForceFeedback -framework GameController \
+    -framework IOKit -framework Metal -framework QuartzCore \
+    -framework UniformTypeIdentifiers"
+
+spinel bouncing_balls.rb --cc="$FW" \
+  --link "$PWD/libruby2d_core.a" \
+  --link "$LIBS/libSDL3_ttf.a"   --link "$LIBS/libSDL3_image.a" \
+  --link "$LIBS/libSDL3_mixer.a" --link "$LIBS/libSDL3.a" \
+  -o bouncing_balls
+```
+
+Run it bare for an interactive window, or `./bouncing_balls 150 shot.png` to stop after 150 frames and write a screenshot — which is how the build gets checked without a human watching one.
+
+## Reducing a whole-program failure
+
+Two techniques earned their keep, both counter to the obvious approach.
+
+**Scale up, don't cut down.** Eleven attempts to reduce the failing program all passed in isolation, because the trigger *was* the surrounding structure. Starting from a passing probe and adding one structural feature at a time found it immediately, then bisected to the two required ingredients in one more pass.
+
+**Make the oracle two-sided.** `spinel-reduce` needs `SPINEL=/path/to/bin/spinel` exported and a custom `--oracle-cmd`; the built-in `unsupported` oracle reports "not interesting" and refuses to start. An oracle that only greps compiler output is worse than useless — the reducer deletes the program into something CRuby rejects too, producing a case no maintainer can act on. Require both sides:
+
+```sh
+#!/bin/sh
+f=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
+BIN="${f%.rb}.bin"
+ruby "$f" >/dev/null 2>&1 || exit 1                    # 1. still valid Ruby
+"$SPINEL" "$f" -o "$BIN" >/dev/null 2>&1 || exit 1     # 2. still compiles
+out=$("$BIN" 2>&1); rc=$?; rm -f "$BIN"                # 3. still fails at run time
+[ $rc -eq 0 ] && exit 1
+echo "$out" | grep -q "NoMethodError" || exit 1
+```
+
+Note the absolute path for the binary. A bare relative name gets searched on `PATH`, silently reports "command not found", and the oracle reads that as "not interesting" — rejecting a perfectly good input.
+
 ## Reproducing
 
 ```sh
