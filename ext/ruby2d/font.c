@@ -359,6 +359,7 @@ void R2D_UpdateBitmapText(R2D_BitmapText *bt, SDL_Renderer *renderer,
     R2D_CheckSDL(bt->texture != NULL, "SDL_CreateTexture");
     if (bt->texture) {
       SDL_SetTextureBlendMode(bt->texture, SDL_BLENDMODE_BLEND);
+      bt->applied_scale_mode = SDL_SCALEMODE_INVALID;
       bt->tex_w = new_w;
       bt->tex_h = new_h;
     } else {
@@ -378,6 +379,7 @@ void R2D_UpdateBitmapText(R2D_BitmapText *bt, SDL_Renderer *renderer,
   bt->texture = SDL_CreateTextureFromSurface(renderer, surface);
   R2D_CheckSDL(bt->texture != NULL, "SDL_CreateTextureFromSurface");
   if (bt->texture) {
+    bt->applied_scale_mode = SDL_SCALEMODE_INVALID;
     bt->content_w = surface_w;
     bt->content_h = surface_h;
   }
@@ -525,6 +527,10 @@ R_VAL ruby2d_ext_bitmap_text_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
   if (!bt->texture || bt->content_w <= 0) return R_NIL;
 
   SDL_SetTextureBlendMode(bt->texture, SDL_BLENDMODE_BLEND);
+
+  // The glyph grid is rasterized at the target scale, so this only applies
+  // when the renderer resamples the frame.
+  R2D_ApplyScaleMode(bt->texture, obj, &bt->applied_scale_mode);
 
   // Apply color and alpha modulation
   R_VAL color_obj = r_ivar_get(obj, id_color);

@@ -529,12 +529,14 @@ typedef struct {
   bool diagnostics;
   bool show_fps;
   char *screenshot_path;        // deferred screenshot request (consumed once per frame)
+  SDL_ScaleMode scale_mode;     // default when an object doesn't set its own
 } R2D_Window;
 
 // R2D_Image
 typedef struct {
   SDL_Surface *surface;
   SDL_Texture *texture;
+  SDL_ScaleMode applied_scale_mode;
 } R2D_Image;
 
 // R2D_FontCacheEntry (defined in text.c)
@@ -570,6 +572,7 @@ typedef struct {
   bool texture_stale;
   int tex_w;
   int tex_h;
+  SDL_ScaleMode applied_scale_mode;
 } R2D_Text;
 
 // R2D_Canvas
@@ -585,6 +588,7 @@ typedef struct {
   // ext_draw skips the upload entirely.
   bool dirty;
   SDL_Rect dirty_rect;
+  SDL_ScaleMode applied_scale_mode;
 } R2D_Canvas;
 
 // R2D_BitmapText
@@ -604,6 +608,7 @@ typedef struct {
   int tex_h;
   int content_w;
   int content_h;
+  SDL_ScaleMode applied_scale_mode;
 } R2D_BitmapText;
 
 // R2D_Audio
@@ -627,6 +632,26 @@ SDL_Renderer *R2D_GetRenderer(void);
 float R2D_GetAssetScale(void);
 float R2D_GetDisplayScale(void);
 void R2D_SetWindow(R2D_Window *window);
+
+// Texture scale mode (`scale_mode:`) — owned by window.c
+
+/*
+ * A renderable's scale mode: its own `scale_mode:` when set, otherwise the
+ * window's default.
+ */
+SDL_ScaleMode R2D_ResolveScaleMode(R_VAL obj);
+
+/*
+ * Set that mode on the renderable's texture, `applied` being the caller's
+ * record of what it last pushed.
+ */
+void R2D_ApplyScaleMode(SDL_Texture *texture, R_VAL obj, SDL_ScaleMode *applied);
+
+/*
+ * The equivalent for the CPU surface paths (SDL_ScaleSurface,
+ * SDL_BlitSurfaceScaled).
+ */
+SDL_ScaleMode R2D_ResolveSurfaceScaleMode(R_VAL obj);
 
 // Mixer — owned by audio.c
 void R2D_SetMixer(MIX_Mixer *mixer);
@@ -806,6 +831,7 @@ extern R_ID id_color, id_r, id_g, id_b, id_a;
 extern R_ID id_ext_image, id_ext_text;
 extern R_ID id_path, id_content;
 extern R_ID id_viewport_width, id_viewport_height;
+extern R_ID id_scale_mode;
 
 /*
  * Initialize Ruby2D::Ext — creates the module and registers shape bindings.
@@ -1132,6 +1158,7 @@ R_VAL ruby2d_ext_window_cursor_visible(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_set_system_cursor(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_close(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC);
+R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_request_render(RUBY2D_METHOD_ARGS_VARIADIC);
 
 

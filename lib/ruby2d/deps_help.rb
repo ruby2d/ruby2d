@@ -81,6 +81,34 @@ module Ruby2D
       body << ''
       body << "See #{'ruby2d.com'.bold} for help."
 
+      framed(body)
+    end
+
+    # The variant for system SDL3 that's present but older than Ruby 2D
+    # requires. `ruby2d setup` leads here — the package manager that installed
+    # the old version may not carry a new enough one yet.
+    def notice_old_sdl(found = nil)
+      version = found ? "is #{found}" : 'is too old'
+
+      body = []
+      body << "Ruby 2D installed, but its native extension isn't built —"
+      body << "the system SDL3 #{version}, and Ruby 2D requires 3.4 or newer."
+      body << ''
+      body << 'To finish, choose one:'
+      body << ''
+      body << '• Build current libraries locally (no system packages needed):'
+      body << "    #{'ruby2d setup'.bold}"
+      body << ''
+      body << '• Upgrade the SDL3 packages to 3.4+, then rebuild:'
+      body << "    #{'gem pristine ruby2d'.bold}"
+      body << ''
+      body << "See #{'ruby2d.com'.bold} for help."
+
+      framed(body)
+    end
+
+    # Frame a message body like the install banner.
+    def framed(body)
       header = '== Ruby 2D: native extension not built '.ljust(70, '=')
       lines = ['', header, '', *body.map { |l| l.empty? ? '' : "  #{l}" }, '', '=' * 70, '']
       lines.join("\n")

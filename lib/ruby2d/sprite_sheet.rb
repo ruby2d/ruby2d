@@ -7,10 +7,17 @@ module Ruby2D
   class SpriteSheet
     attr_reader :path, :image_path, :texture
 
+    # The sampling mode Sprites built from this sheet start with. Each copies
+    # it at construction, so change it per Sprite after that.
+    def scale_mode
+      @texture.scale_mode
+    end
+
     # Load a sprite sheet. `path` is the atlas file (`.xml` or `.json`); the
     # texture image referenced inside the atlas is resolved relative to that
-    # file's directory.
-    def initialize(path)
+    # file's directory. `scale_mode:` becomes the default for every Sprite
+    # built from the sheet; a Sprite can still override it.
+    def initialize(path, scale_mode: nil)
       @path = path.to_s
       raise Error, "SpriteSheet file `#{@path}` not found" unless File.exist?(@path)
 
@@ -21,7 +28,7 @@ module Ruby2D
       raise Error, "SpriteSheet `#{@path}` does not specify an image path" unless atlas_image
 
       @image_path = resolve_image_path(@path, atlas_image)
-      @texture = Image.new(@image_path, add: false)
+      @texture = Image.new(@image_path, add: false, scale_mode: scale_mode)
     end
 
     # All frame names, in declaration order

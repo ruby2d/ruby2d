@@ -139,6 +139,7 @@ R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
       return R_NIL;
     }
     SDL_SetTextureBlendMode(can->texture, SDL_BLENDMODE_BLEND);
+    can->applied_scale_mode = SDL_SCALEMODE_INVALID;
     canvas_mark_dirty_all(can);  // populate with a full first upload
     // Don't destroy the surface — Canvas needs it for future draw operations
   }
@@ -154,6 +155,8 @@ R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
                  "SDL_UpdateTexture");
     can->dirty = false;
   }
+
+  R2D_ApplyScaleMode(can->texture, obj, &can->applied_scale_mode);
 
   SDL_FRect dst_rect = {
     obj_float(obj, id_x),
@@ -1628,8 +1631,11 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   SDL_Rect dst_rect = { dx, dy, dw, dh };
 
+  // The source image's mode, not the canvas's: a :nearest sprite stamped
+  // into a :linear canvas stays crisp.
   SDL_SetSurfaceBlendMode(img->surface, SDL_BLENDMODE_BLEND);
-  SDL_BlitSurfaceScaled(img->surface, NULL, can->surface, &dst_rect, SDL_SCALEMODE_LINEAR);
+  SDL_BlitSurfaceScaled(img->surface, NULL, can->surface, &dst_rect,
+                        R2D_ResolveSurfaceScaleMode(img_obj));
 
   canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
 
@@ -1689,7 +1695,8 @@ R_VAL ruby2d_ext_canvas_draw_text(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_SetSurfaceBlendMode(txt->surface, SDL_BLENDMODE_BLEND);
 
   SDL_Rect dst_rect = { dx, dy, dw, dh };
-  SDL_BlitSurfaceScaled(txt->surface, NULL, can->surface, &dst_rect, SDL_SCALEMODE_LINEAR);
+  SDL_BlitSurfaceScaled(txt->surface, NULL, can->surface, &dst_rect,
+                        R2D_ResolveSurfaceScaleMode(txt_obj));
 
   // Reset color/alpha mod to defaults so GPU rendering is unaffected
   SDL_SetSurfaceColorMod(txt->surface, 255, 255, 255);

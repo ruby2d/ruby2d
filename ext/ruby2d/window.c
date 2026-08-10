@@ -27,6 +27,8 @@ static R_ID id_title, id_icon, id_ext_window;
 static R_ID id_resizable, id_highdpi, id_pixel_scale;
 static R_ID id_viewport_mode;
 static R_ID id_fps_cap, id_render_mode;
+// Scale mode value symbols, not ivars.
+static R_ID id_sm_linear, id_sm_nearest, id_sm_pixel_art;
 static R_ID id_background, id_mouse_x, id_mouse_y;
 static R_ID id_frames, id_fps, id_close;
 
@@ -44,6 +46,9 @@ void R2D_Window_Init() {
   id_viewport_mode   = r_id("@viewport_mode");
   id_fps_cap         = r_id("@fps_cap");
   id_render_mode     = r_id("@render_mode");
+  id_sm_linear       = r_id("linear");
+  id_sm_nearest      = r_id("nearest");
+  id_sm_pixel_art    = r_id("pixel_art");
   id_background      = r_id("@background");
   id_mouse_x         = r_id("@mouse_x");
   id_mouse_y         = r_id("@mouse_y");
@@ -87,6 +92,7 @@ void R2D_Window_Init() {
   r_define_class_method(ruby2d_ext_module, "window_set_system_cursor",          ruby2d_ext_window_set_system_cursor,          r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_close",                      ruby2d_ext_window_close,                      r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_set_render_mode",            ruby2d_ext_window_set_render_mode,            r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "window_set_scale_mode",             ruby2d_ext_window_set_scale_mode,             r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_request_render",             ruby2d_ext_window_request_render,             r_args_variadic);
 }
 
@@ -238,6 +244,64 @@ static int R2D_ParseRenderMode(R_VAL rm_val) {
 
 
 // =============================================================================
+// Scale Mode
+// =============================================================================
+
+/*
+ * Parse a scale mode symbol from Ruby into an SDL_ScaleMode.
+ * Returns `fallback` if the value is nil or unrecognized.
+ */
+static SDL_ScaleMode R2D_ParseScaleMode(R_VAL sm_val, SDL_ScaleMode fallback) {
+  if (r_test(sm_val)) {
+    R_ID sm_id = r_sym_to_id(sm_val);
+    if (sm_id == id_sm_linear)         return SDL_SCALEMODE_LINEAR;
+    else if (sm_id == id_sm_nearest)   return SDL_SCALEMODE_NEAREST;
+    else if (sm_id == id_sm_pixel_art) return SDL_SCALEMODE_PIXELART;
+  }
+  return fallback;
+}
+
+
+/*
+ * Resolve a renderable's scale mode: its own `scale_mode:` when set, and the
+ * window-wide default when nil.
+ */
+SDL_ScaleMode R2D_ResolveScaleMode(R_VAL obj) {
+  SDL_ScaleMode fallback = r2d_window ? r2d_window->scale_mode : SDL_SCALEMODE_LINEAR;
+  return R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), fallback);
+}
+
+
+/*
+ * Set a renderable's resolved scale mode on its texture. Modes are resolved
+ * per draw rather than at texture creation, so a live `set scale_mode:`
+ * reaches objects that already exist and the texture rebuilds in text.c and
+ * font.c don't each have to re-apply. `applied` records the mode last pushed
+ * so SDL is called only on a change; reset it to SDL_SCALEMODE_INVALID
+ * wherever the texture is (re)created, since a fresh texture carries SDL's
+ * own default rather than the old one's mode.
+ */
+void R2D_ApplyScaleMode(SDL_Texture *texture, R_VAL obj, SDL_ScaleMode *applied) {
+  if (!texture) return;
+  SDL_ScaleMode mode = R2D_ResolveScaleMode(obj);
+  if (mode == *applied) return;
+  SDL_SetTextureScaleMode(texture, mode);
+  *applied = mode;
+}
+
+
+/*
+ * The CPU-surface equivalent. PIXELART is a shader technique with no
+ * software scaler behind it, so it degrades to nearest — which is what it
+ * does at integer scales anyway.
+ */
+SDL_ScaleMode R2D_ResolveSurfaceScaleMode(R_VAL obj) {
+  SDL_ScaleMode mode = R2D_ResolveScaleMode(obj);
+  return mode == SDL_SCALEMODE_PIXELART ? SDL_SCALEMODE_NEAREST : mode;
+}
+
+
+// =============================================================================
 // Window Creation and Setup
 // =============================================================================
 
@@ -297,6 +361,7 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   window->close           = true;
   window->pixel_scale     = obj_bool(obj, id_pixel_scale);
   window->render_mode     = R2D_ParseRenderMode(r_ivar_get(obj, id_render_mode));
+  window->scale_mode      = R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), SDL_SCALEMODE_LINEAR);
 
   // Start with render_pending set so the first tick always presents a frame,
   // even in on-demand mode before the app calls request_render.
@@ -1011,6 +1076,9 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
   // Re-read render mode from Ruby (user may have changed @render_mode via set()
   // between new and show)
   r2d_window->render_mode = R2D_ParseRenderMode(r_ivar_get(obj, id_render_mode));
+
+  // Same for the window-wide texture scale mode
+  r2d_window->scale_mode = R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), SDL_SCALEMODE_LINEAR);
 
   // Logical (user-intended) window dimensions on the C struct
   r2d_window->orig_width  = obj_int(obj, id_width);
@@ -1842,6 +1910,20 @@ R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   R_VAL obj = argv[0];
   if (!r2d_window) return R_FALSE;
   r2d_window->render_mode = R2D_ParseRenderMode(r_ivar_get(obj, id_render_mode));
+  SDL_SetAtomicInt(&r2d_window->render_pending, 1);
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Window#ext_set_scale_mode
+ */
+R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.window_set_scale_mode expects 1 arg (window), got %d", (int)argc);
+  R_VAL obj = argv[0];
+  if (!r2d_window) return R_FALSE;
+  r2d_window->scale_mode = R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), SDL_SCALEMODE_LINEAR);
   SDL_SetAtomicInt(&r2d_window->render_pending, 1);
   return R_TRUE;
 }

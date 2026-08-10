@@ -438,4 +438,29 @@ module Ruby2D
     end
 
   end
+
+  # How a texture is sampled when drawn at a size other than its own. Mixed
+  # into the texture-backed classes; shapes have nothing to sample.
+  module TextureScaling
+    # `:linear` smooths between texels, `:nearest` keeps hard pixel edges,
+    # `:pixel_art` is nearest at integer scales and antialiased at fractional.
+    SCALE_MODES = %i[linear nearest pixel_art].freeze
+
+    # nil means inherit the window's.
+    def self.validate(value)
+      return nil if value.nil?
+      unless SCALE_MODES.include?(value)
+        raise Error, "Invalid scale_mode #{value.inspect}; expected one of #{SCALE_MODES.inspect}"
+      end
+
+      value
+    end
+
+    # The object's sampling mode, or nil to follow the window.
+    attr_reader :scale_mode
+
+    def scale_mode=(value)
+      @scale_mode = TextureScaling.validate(value)
+    end
+  end
 end

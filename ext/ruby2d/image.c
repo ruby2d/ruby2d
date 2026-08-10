@@ -145,8 +145,11 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
       return R_NIL;
     }
     SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
+    img->applied_scale_mode = SDL_SCALEMODE_INVALID;
     // Keep the surface alive for canvas blitting; R2D_Image_free handles cleanup
   }
+
+  R2D_ApplyScaleMode(img->texture, obj, &img->applied_scale_mode);
 
   // Determine flip mode early — affects trim-offset mirroring below.
   SDL_FlipMode flip_mode = SDL_FLIP_NONE;
@@ -325,7 +328,10 @@ R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC) {
       return R_NIL;
     }
     SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
+    img->applied_scale_mode = SDL_SCALEMODE_INVALID;
   }
+
+  R2D_ApplyScaleMode(img->texture, obj, &img->applied_scale_mode);
 
   // Extract color components (a single tint applied to every quad)
   float cr = NUM2DBL(r_ivar_get(color_obj, id_r));
@@ -432,7 +438,7 @@ R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC) {
   } else {
     SDL_Surface *src = IMG_Load(path);
     if (src) {
-      new_surface = SDL_ScaleSurface(src, new_w, new_h, SDL_SCALEMODE_LINEAR);
+      new_surface = SDL_ScaleSurface(src, new_w, new_h, R2D_ResolveSurfaceScaleMode(obj));
       SDL_DestroySurface(src);
     }
   }

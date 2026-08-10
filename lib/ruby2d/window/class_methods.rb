@@ -44,6 +44,11 @@ module Ruby2D
         DSL.window.viewport_mode
       end
 
+      # Get the window-wide texture scaling mode
+      def scale_mode
+        DSL.window.scale_mode
+      end
+
       # Get the display width
       def display_width
         DSL.window.display_width

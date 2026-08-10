@@ -25,6 +25,7 @@ R_ID id_color, id_r, id_g, id_b, id_a;
 R_ID id_ext_image, id_ext_text;
 R_ID id_path, id_content;
 R_ID id_viewport_width, id_viewport_height;
+R_ID id_scale_mode;
 
 
 // Fixed-arity shape bindings //////////////////////////////////////////////////
@@ -518,6 +519,7 @@ void R2D_Ext_Init() {
   id_content    = r_id("@content");
   id_viewport_width  = r_id("@viewport_width");
   id_viewport_height = r_id("@viewport_height");
+  id_scale_mode      = r_id("@scale_mode");
 
   // Fixed-arity shape bindings
   r_define_class_method(ruby2d_ext_module, "draw_triangle",    ruby2d_ext_draw_triangle,    r_args_variadic);

@@ -33,7 +33,7 @@ Each device test focuses on raw events and per-device feedback. Higher-level abs
 - **`shapes.rb`** — every shape type × the universal modifiers (fill/stroke, opacity, rotation, z-index, contains?, gradients + dash) in a 3×2 grid, laid out in the technical style of the input tests.
 - **`text.rb`** — Text (TTF), BitmapText, and Fonts: sizes, available system fonts, modifiers, and ASCII coverage.
 - **`alignment.rb`** — symbolic `x:` / `y:` alignment + per-edge `padding:`, including a live frame readout that should stay centered as content changes.
-- **`image.rb`** — Image: PNG / JPG / BMP / SVG formats, tint, opacity, rotation, vector scaling.
+- **`image.rb`** — Image: PNG / JPG / BMP / SVG formats, tint, opacity, rotation, vector scaling, and `scale_mode` (`:linear` / `:nearest` / `:pixel_art`) at integer and fractional magnification.
 - **`sprite.rb`** — Sprite: clip-based animation, named animations from frame ranges, flip modes, atlas with explicit frames, Sparrow XML sprite sheets (shared texture, named frames, named animations), speed multiplier, one-shot callbacks, pause/resume.
 - **`tileset.rb`** — Tileset: define + place, rotate / flip per definition, multiplicative tint, scene composition, interactive cycle ([] / []=), clear / delete / refill.
 - **`canvas.rb`** — full Canvas drawing API: filled + stroked primitives, gradients, blending, joins, draw_image, draw_text.

@@ -32,8 +32,8 @@ end
 # user finishes with `ruby2d setup`, or a package-manager install + `gem pristine
 # ruby2d`. Far friendlier than aborting the whole install — and the `ruby2d` CLI
 # (including `setup`) keeps working without the extension.
-def skip_build(reason)
-  notice = "Ruby 2D: #{reason}\n#{Ruby2D::DepsHelp.notice}"
+def skip_build(reason, guidance: Ruby2D::DepsHelp.notice)
+  notice = "Ruby 2D: #{reason}\n#{guidance}"
 
   # RubyGems runs extconf via Open3.popen2e and hides the captured stdout/stderr
   # on a successful (exit-0) install, so a plain `puts` never reaches the user.
@@ -139,6 +139,24 @@ else
     # No static libs, no pkg-config, and not in the standard system paths —
     # install without the extension and tell the user how to finish.
     skip_build('no bundled, cached, or system SDL3 libraries found.')
+  end
+
+  # Ruby 2D requires SDL 3.4+ (e.g. `SDL_SCALEMODE_PIXELART`), and some distros
+  # still ship 3.2 — which would otherwise surface as bare compiler errors deep
+  # in `make`. Check the headers up front for a clear message instead. The
+  # bundled and cache libraries are pinned in assets/deps.yaml, so only system
+  # libraries need this.
+  unless try_compile(<<~SRC)
+    #include <SDL3/SDL_version.h>
+    #if !SDL_VERSION_ATLEAST(3, 4, 0)
+    #error SDL3 older than 3.4
+    #endif
+    int main(void) { return 0; }
+  SRC
+    found = `pkg-config --modversion sdl3 2>#{File::NULL}`.strip
+    found = nil if found.empty?
+    skip_build("system-installed SDL3 is older than the required 3.4#{" (#{found} found)" if found}.",
+               guidance: Ruby2D::DepsHelp.notice_old_sdl(found))
   end
 
   case AssetsTarget.host_os

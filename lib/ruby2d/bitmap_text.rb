@@ -4,6 +4,7 @@ module Ruby2D
   # Text drawn with the built-in bitmap font (no TTF file needed)
   class BitmapText
     include Renderable
+    include TextureScaling
 
     attr_reader :content, :scale, :x, :y
     attr_accessor :rotate
@@ -43,7 +44,8 @@ module Ruby2D
     def initialize(content, x: 0, y: 0, z: 0, scale: 3,
                    rotate: 0, rx: nil, ry: nil,
                    color: nil, colour: nil, opacity: nil,
-                   add: true, visible: true)
+                   add: true, visible: true, scale_mode: nil)
+      self.scale_mode = scale_mode
       self.x = x
       self.y = y
       @z = z
