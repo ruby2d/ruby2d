@@ -1,0 +1,41 @@
+# Tasks for the experimental Spinel AOT build path.
+#
+#   cd spinel && rake            # all three checks
+#   cd spinel && rake demo       # or subset, issues
+#
+# Deliberately separate from the root Rakefile. Everything about this branch
+# lives under spinel/ so it merges or disappears as one piece, without leaving
+# branch-conditional lines in files the rest of the project shares. See
+# README.md for what the checks actually do.
+
+ROOT = File.expand_path('..', __dir__)
+
+# The root Rakefile's banner style, minus its dependency on the assets
+# submodule and the gem's colorize helpers — this file has to run on its own.
+def print_task(title)
+  print "\n", "  \e[38;5;196m◆\e[0m \e[1m#{title}\e[0m", "\n"
+end
+
+def run_check(name)
+  print_task "Spinel: #{name}"
+  puts "  \e[2m$ ruby spinel/tools/check.rb #{name}\e[0m\n\n"
+  Dir.chdir(ROOT) { system('ruby', 'spinel/tools/check.rb', name) || exit(1) }
+rescue Interrupt
+  exit(130)
+end
+
+CHECKS = {
+  'subset' => 'compile the lib/ slice and diff it against CRuby',
+  'demo' => 'build the square demo and check it actually drew pixels',
+  'issues' => 're-run every filed reproducer to see what upstream has fixed'
+}.freeze
+
+CHECKS.each do |name, description|
+  desc "Spinel: #{description}"
+  task(name) { run_check(name) }
+end
+
+desc 'Run all Spinel checks'
+task(:all) { run_check('all') }
+
+task default: :all

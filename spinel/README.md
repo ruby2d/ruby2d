@@ -48,26 +48,31 @@ export RUBY2D_SPINEL=/wherever/spinel/bin/spinel   # also what cli/spinel.rb hon
 ### Check where things stand
 
 ```sh
-ruby spinel/tools/build_subset.rb     # assembles the square-only slice of lib/
-ruby spinel/tools/patch_next.rb       # steps around the Hash#each hang (issue 08)
-ruby spinel/scratch/subset.rb         # CRuby baseline — must print SUBSET OK
-. ./spinel/tools/spinel_path.sh    # resolves $SPINEL; no path to set
-$SPINEL spinel/scratch/subset.rb -o spinel/scratch/subset.bin --cc="cc -ferror-limit=0"
-./spinel/scratch/subset.bin
+cd spinel && rake     # all three checks; or `rake subset`, `rake demo`, `rake issues`
 ```
 
-Against `1aa42ab3` this prints `SUBSET OK`, with `ticks: 0` where CRuby gives `ticks: 5` — that difference is issue 09. Drop `patch_next.rb` and it hangs instead, which is issue 08. Add `ruby spinel/tools/patch_capture.rb` after `patch_next.rb` and the run matches CRuby exactly, `ticks: 5` included.
+```
+  subset   pass     matches CRuby (4 lines)
+  demo     pass     drew 2 distinct colors over 31 frames
+  issues   pass     7 fixed, 3 reproduce
+```
 
-Running it without the patches first is worth the extra minute: it is how you find out whether either bug has been fixed upstream.
+- **subset** compiles the `lib/` slice and diffs it against the same program run under CRuby. Any divergence is a compiler difference, because the control has to pass first.
+- **demo** builds the square and checks the **pixels**, not the exit status.
+- **issues** re-runs every filed reproducer. A `FIXED` row is the cue to drop the matching workaround with `SPINEL_SKIP=` and rebuild.
 
-Two habits worth keeping. The CRuby run is the control: it must pass, or the harness is broken rather than the compiler. And always pass `-ferror-limit=0` — clang stops at 20 by default, so a real count of 23 reads as 20 and progress looks like a plateau.
+`spinel/tools/check.rb` is what these run, and it encodes the things that wasted the most time when they were manual:
 
-Because two of the open bugs are infinite loops, run compiled binaries under a cap; `spinel/tools/run_capped.sh` is a five-second one (macOS has no `timeout(1)`).
+- **Delete the binary before compiling.** A failed compile leaves the previous one in place, so the old result reads as a fresh success. This produced a wrong conclusion once already.
+- **Always `-ferror-limit=0`.** clang stops at 20, so 23 errors reads as 20 and real progress looks like a plateau.
+- **Always run the CRuby control.** A Spinel result is only attributable against it.
+- **Cap every run.** Two open bugs are infinite loops (`tools/run_capped.sh` for one-offs; macOS has no `timeout(1)`).
+- **Check pixels, not exit codes.** A window that draws nothing exits cleanly, reports a healthy per-frame draw count, and looks identical to a correct one from every angle except its pixels. Verified by reintroducing the Integer-to-`:float` bug: the check reports `rendered a blank window (1 distinct color)`.
 
 ### Resuming
 
 ```sh
-ruby spinel/tools/verify_issues.rb
+(cd spinel && rake issues)
 gh issue list --repo matz/spinel --state all --search "3771..3777"
 ```
 
@@ -94,10 +99,11 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 
 | File | What it is |
 |---|---|
+| `Rakefile` | The checks, kept here rather than in the root Rakefile so this branch merges or disappears as one piece |
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `spinel_path.sh` resolves the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.

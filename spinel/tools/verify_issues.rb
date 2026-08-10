@@ -19,29 +19,9 @@
 # Do not run this while a `git bisect` is in flight in the Spinel checkout:
 # `bin/spinel` is then whatever commit is checked out, not HEAD.
 
-require 'open3'
+require_relative 'spinel_env'
 
 ISSUES = File.expand_path('../issues', __dir__)
-
-# Same order as `find_spinel` in lib/ruby2d/cli/spinel.rb, plus a checkout
-# beside this repo — so no recipe in ../README.md needs a machine-specific path.
-def resolve_spinel
-  [ENV['SPINEL'], ENV['RUBY2D_SPINEL'],
-   File.expand_path('../../../spinel/bin/spinel', __dir__)].each do |c|
-    return c if c && !c.empty? && File.executable?(c)
-  end
-  path = ENV['PATH'].to_s.split(File::PATH_SEPARATOR)
-                    .map { |d| File.join(d, 'spinel') }.find { |f| File.executable?(f) }
-  path or abort <<~MSG
-    No spinel binary found. Build one and either put it on PATH, clone it
-    beside this repo as ../spinel, or point SPINEL at it:
-
-      git clone https://github.com/matz/spinel.git ../spinel
-      (cd ../spinel && make deps && make)
-
-    See "Setup" in spinel/README.md.
-  MSG
-end
 
 SPINEL = resolve_spinel
 SCRATCH = File.expand_path('../scratch/verify', __dir__)
