@@ -1,6 +1,6 @@
 # [Codegen] A block's result type is unified across call sites, dispatching to the wrong class
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3784](https://github.com/matz/spinel/issues/3784). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

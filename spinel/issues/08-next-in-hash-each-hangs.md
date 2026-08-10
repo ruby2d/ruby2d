@@ -1,6 +1,6 @@
 # [Runtime] `next` inside a `Hash#each` block loops forever
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3782](https://github.com/matz/spinel/issues/3782). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

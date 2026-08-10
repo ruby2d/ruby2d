@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `1aa42ab3` (2026-08-10)**.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all three checks.
 
 ## Start here
 
@@ -12,9 +12,9 @@ The rest of this document is a research log in discovery order. This section is 
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
-**The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=is%3Aissue+3771..3777) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
+**The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-Three new bugs are open, drafted in `issues/` as 08-10 — one hang, two silent wrong answers:
+Three new bugs are open, filed as [#3782-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) and drafted in `issues/` as 08-10 — one hang, two silent wrong answers:
 
 | | What breaks | Effect on Ruby 2D |
 |---|---|---|
@@ -73,7 +73,7 @@ cd spinel && rake     # all three checks; or `rake subset`, `rake demo`, `rake i
 
 ```sh
 (cd spinel && rake issues)
-gh issue list --repo matz/spinel --state all --search "3771..3777"
+gh issue list --repo matz/spinel --state all --search '"porting Ruby 2D" in:body'
 ```
 
 A `FIXED` row is the cue to re-check the matching workaround with `SPINEL_SKIP=` and rebuild the subset — not to run a standalone probe. Those diverge in both directions: a nested-`include` bug was fixed in isolation while the real library still failed, and #3772's own reproducer passes today while the library shape it was filed for still breaks.
@@ -221,15 +221,15 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-**Open — drafted 2026-08-10 against `1aa42ab3`, not yet filed:**
+**Filed and open.** #3782-#3784 were filed on 2026-08-10 against `c70ed332`, re-verified against that commit first — including each draft's "Additional Findings" contrasts, which `verify_issues.rb` does not cover because it only runs the main reproducer:
 
-| Draft | Bug |
-|---|---|
-| `issues/08-next-in-hash-each-hangs.md` | `next` inside `Hash#each` never advances the iterator — **hangs**, and a regression (first bad `ffb0587c`) |
-| `issues/09-forwarded-block-stored-in-ivar.md` | A forwarded block stored in an ivar loses its captured locals — **silent**, and an incomplete fix of #3772 |
-| `issues/10-yield-result-type-unified-across-call-sites.md` | A block's result type is unified across `yield` call sites, dispatching to the wrong class — **silent** |
+| Issue | Draft | Bug |
+|---|---|---|
+| [#3782](https://github.com/matz/spinel/issues/3782) | `issues/08-next-in-hash-each-hangs.md` | `next` inside `Hash#each` never advances the iterator — **hangs**, and a regression (first bad `ffb0587c`) |
+| [#3783](https://github.com/matz/spinel/issues/3783) | `issues/09-forwarded-block-stored-in-ivar.md` | A forwarded block stored in an ivar loses its captured locals — **silent**, and an incomplete fix of #3772 |
+| [#3784](https://github.com/matz/spinel/issues/3784) | `issues/10-yield-result-type-unified-across-call-sites.md` | A block's result type is unified across `yield` call sites, dispatching to the wrong class — **silent** |
 
-**Filed and fixed.** #3771-#3777 were filed on 2026-08-10 against `1c3d99897ef3` and all seven were closed the same day; `verify_issues.rb` confirms each independently against `1aa42ab3`. The drafts stay here as the local record:
+**Filed and fixed.** #3771-#3777 were filed on 2026-08-10 against `1c3d99897ef3` and all seven were closed the same day; `verify_issues.rb` confirms each independently against `c70ed332`. The drafts stay here as the local record:
 
 | Issue | Draft | Bug |
 |---|---|---|
@@ -241,15 +241,7 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 | [#3776](https://github.com/matz/spinel/issues/3776) | `issues/06-alias-method-in-singleton-class.md` | `alias_method` inside `class << self` produces no callable class method |
 | [#3777](https://github.com/matz/spinel/issues/3777) | `issues/07-return-in-expression-position.md` | `return` in expression position rejected (`x = expr or return`) |
 
-Filed in this order. The ranking weighs three things:
-
-**Silent first.** The top two produce wrong values with no error, no exception, and no diagnostic. They are worse than their frequency suggests because they generate no bug reports — a user hits one and sees a program that quietly misbehaves, so nothing ever reaches an issue tracker. Everything below them announces itself.
-
-**Then breadth.** #3 blocks any object that registers itself through an inherited method, and carries the nastiest property of the set: a mistyped call site poisons inference for that path even when it never executes, so avoiding the pattern at run time does not help. #4 is `attr_accessor` in a module, which is everywhere in Ruby.
-
-**Loud and narrow last.** #5 through #7 fail at compile time with a clear message and have simple rewrites.
-
-Ordered by suggested filing priority, not discovery (the filenames keep their original numbers). The ranking weighs three things:
+Filed in this order — suggested priority, not discovery (the filenames keep their original numbers). The ranking weighs three things:
 
 **Silent first.** The top two produce wrong values with no error, no exception, and no diagnostic. They are worse than their frequency suggests because they generate no bug reports — a user hits one and sees a program that quietly misbehaves, so nothing ever reaches an issue tracker. Everything below them announces itself.
 
@@ -303,7 +295,7 @@ SPINEL_SKIP=all ruby spinel/tools/build_subset.rb        # what is still needed 
 
 Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still prints `SUBSET OK`. Both halves matter: dropping `disable_class_pattern` compiles clean and then fails at run time.
 
-**Still needed, re-checked against `1aa42ab3` (2026-08-10):**
+**Still needed, re-checked against `c70ed332` (2026-08-10):**
 
 | Workaround | Why it is still there |
 |---|---|
@@ -406,7 +398,7 @@ Reduced to 15 lines and filed as `issues/03-self-escaping-superclass-method.md`.
 
 **The subset now runs.** Removing the mistyped call site — the `self.add if add` in `Quad#initialize` — and registering from `Square#initialize` instead gets the square-only subset all the way to completion under Spinel. Note it is not enough to *skip* the bad call site at run time by passing `add: false`: the site has to be gone. A single mistyped call poisons the inferred parameter type for everything flowing through that path, whether or not it ever executes.
 
-Progress is now visible directly: `gh issue list --repo matz/spinel --state all --search "3771..3777"`, or `gh issue view <n> --repo matz/spinel`. A closed issue is the signal to re-check the matching workaround.
+Progress is now visible directly: `gh issue list --repo matz/spinel --state all --search '"porting Ruby 2D" in:body'`, or `gh issue view <n> --repo matz/spinel`. A closed issue is the signal to re-check the matching workaround.
 
 **Decision (2026-08-10): wait for upstream rather than work around this.** Moving registration out of `Quad#initialize` into each concrete shape class does fix it, but that is roughly 13 classes each repeating a line that exists only to dodge a compiler bug, in `lib/` where all three runtimes would carry it. The bug is filed, it is squarely Spinel's to fix, and the branch is cheap to resume — so the Spinel target stays blocked here on purpose. Re-check by restoring `self.add if add` to `Quad#initialize` and rebuilding the subset.
 

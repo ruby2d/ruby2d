@@ -1,6 +1,6 @@
 # [Runtime] A forwarded block stored in an instance variable still loses its captured locals
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3783](https://github.com/matz/spinel/issues/3783). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 
