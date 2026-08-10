@@ -36,7 +36,7 @@ A=1
 B=2
 ```
 
-**Spinel (1aa42ab3):**
+**Spinel (c70ed332):**
 ```
 A=1
 A=2
@@ -71,6 +71,6 @@ Every site was typed as the first one, producing 16 such warnings in one file.
 
 ## Environment
 
-- Spinel commit: `1aa42ab3` (also present at `1c3d998`)
+- Spinel commit: `c70ed332` (also present at `1c3d998`)
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

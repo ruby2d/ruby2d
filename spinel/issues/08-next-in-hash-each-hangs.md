@@ -25,7 +25,7 @@ puts 'ok'
 ok
 ```
 
-**Spinel (1aa42ab3):**
+**Spinel (c70ed332):**
 ```
 (hangs; no output, must be killed)
 ```
@@ -66,6 +66,6 @@ We hit this in a validation helper that skips non-numeric entries while iteratin
 
 ## Environment
 
-- Spinel commit: `1aa42ab3` (good at `1c3d998`)
+- Spinel commit: `c70ed332` (good at `1c3d998`)
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

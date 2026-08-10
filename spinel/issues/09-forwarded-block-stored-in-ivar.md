@@ -30,7 +30,7 @@ puts "n=#{n}"
 n=1
 ```
 
-**Spinel (1aa42ab3):**
+**Spinel (c70ed332):**
 ```
 n=0
 ```
@@ -67,6 +67,6 @@ This is the shape a per-frame callback takes in Ruby 2D: a top-level `update { }
 
 ## Environment
 
-- Spinel commit: `1aa42ab3`
+- Spinel commit: `c70ed332`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21
