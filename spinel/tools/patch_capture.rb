@@ -17,7 +17,7 @@
 #
 # Plain heredocs, not `<<~`: the indentation has to match the file exactly.
 
-path = 'spinel/scratch/subset.rb'
+path = ARGV[0] || 'spinel/scratch/subset.rb'
 src = File.read(path)
 
 edits = [

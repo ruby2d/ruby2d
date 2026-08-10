@@ -8,7 +8,9 @@ The rest of this document is a research log in discovery order. This section is 
 
 ### Status
 
-The C side works. A Spinel-compiled binary drives Ruby 2D's real `R2D_*` core over FFI and renders — see `bouncing_balls.rb`, which runs at 60fps today.
+**The MVP is done: a real Ruby 2D script compiles with Spinel and draws a square on screen.** `set title:`, `Square.new`, `show` — through `lib/`'s own scene graph into the real `R2D_*` core, 5.2 MB standalone binary. Build it with `SPINEL=… ./spinel/tools/link_square.sh`; see [MVP reached](#mvp-reached-a-ruby-2d-script-on-screen-2026-08-10). What remains for a shippable feature is CLI wiring (`ruby2d build --spinel`), not research.
+
+`bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=is%3Aissue+3771..3777) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
@@ -88,7 +90,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
@@ -454,6 +456,30 @@ Spinel documents no wasm support; the only "wasm" mention in the repo is a note 
 2. It emits `-Wl,-dead_strip` based on *host* OS (`src/main.c:585`), which `wasm-ld` rejects. Swapping to `--gc-sections` fixes it — a genuine host-vs-target bug worth reporting upstream.
 
 With those two, `hello.rb` built to a 132 KB wasm module running Ruby classes and loops under node. Wiring this to SDL3 and Emscripten is a separate lift and is explicitly out of MVP scope, but the path is real.
+
+## MVP reached: a Ruby 2D script on screen (2026-08-10)
+
+**A real Ruby 2D script, compiled by Spinel, opened a window and drew a square through Ruby 2D's own scene graph.** 5.2 MB binary, 31 frames, screenshot verified.
+
+```ruby
+set title: 'Ruby 2D on Spinel', width: 400, height: 300, background: 'navy'
+Square.new(x: 160, y: 110, size: 80, color: 'red')
+show
+```
+
+Build it with `SPINEL=… ./tools/link_square.sh`, then run `FRAMES=30 SHOT=out.png ./spinel/scratch/square.bin`. The frame cap and screenshot exist so the build checks itself without a human watching a window.
+
+This is the milestone the earlier one was not: `bouncing_balls.rb` proved the C path with hand-written FFI, and the subset proved the `lib/` path with stubs. This is both at once — `lib/`'s `Window`, `Renderable`, `Quad` and `Square` driving the real `R2D_*` core, with a Ruby-owned frame loop.
+
+`tools/build_square.rb` is the generator; the adapter lives in its `FFI` heredoc. Three things it had to get right, each of which failed silently or obscurely first:
+
+- **Qualify every FFI call.** `R2D_DrawQuad(...)` inside the declaring module is an "unsupported call"; `Ext.R2D_DrawQuad(...)` works. This is what `bouncing_balls.rb` already did as `R2D.R2D_DrawCircle(...)`.
+- **Spell out the type array.** `[:float] * 24` is rejected; the 24 entries have to be literal.
+- **Coerce to `Float` at the boundary.** `Square.new(x: 160, size: 80)` hands **Integers** to `:float` parameters. The call succeeds, the draw counter increments, and the window renders blank — no error anywhere. `.to_f` on every coordinate fixes it. This is the one to remember: it looks exactly like "the scene graph is broken".
+
+`R2D_ShowWindow` also learned that an empty icon string means "no icon" — a flattened caller has no NULL to pass, since Spinel's FFI has no nil for `:str`.
+
+**Still stubbed:** 31 of the 41 `Ext` entry points are inert. They have to exist, because Spinel compiles the whole reachable graph, but a static square never reaches them. `drain_events` returns `nil` on purpose, which is what keeps input — and therefore issue 10 — out of the picture entirely.
 
 ## What the `Ext` adapter has to solve (2026-08-10)
 

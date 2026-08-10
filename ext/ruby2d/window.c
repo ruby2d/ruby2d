@@ -1243,7 +1243,10 @@ bool R2D_ShowWindow(const char *title, int width, int height,
   // Apply viewport scaling mode (logical presentation)
   R2D_ApplyViewportMode(r2d_window);
 
-  if (icon) R2D_SetIcon(r2d_window, icon);
+  // An empty string means "no icon", not "load the file named ''". Callers that
+  // flatten a Ruby object into positional arguments have no NULL to pass — the
+  // Spinel FFI has no nil for a `:str` — so the empty string carries that here.
+  if (icon && icon[0] != '\0') R2D_SetIcon(r2d_window, icon);
 
   // Reset first_poll so the initial gamepad scan runs on the first tick
   first_poll = true;
