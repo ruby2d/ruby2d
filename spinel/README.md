@@ -455,6 +455,16 @@ Spinel documents no wasm support; the only "wasm" mention in the repo is a note 
 
 With those two, `hello.rb` built to a 132 KB wasm module running Ruby classes and loops under node. Wiring this to SDL3 and Emscripten is a separate lift and is explicitly out of MVP scope, but the path is real.
 
+## What the `Ext` adapter has to solve (2026-08-10)
+
+Mapping `lib/`'s `Ext` calls onto the `R2D_*` core is mostly mechanical — of the 41 the square slice references, 12 are gamepad and the rest are largely one-line window setters. Two are not mechanical, and both were found by reading the call sites rather than by compiling:
+
+**`Ext.window_show(self)` is a pass-self call.** The CRuby path hands the `Window` object to C, which reads its ivars. Spinel FFI cannot do that — there are no callbacks and no way to read a Ruby object from C. This is why `R2D_ShowWindow` takes twelve flattened parameters (title, size, flags, viewport and render mode, icon): the adapter reads the ivars **in Ruby** and passes them positionally. Any other pass-self call needs the same treatment, which is the pattern that will bite when images, text, and canvas are wired up.
+
+**`RUBY_ENGINE` is `"spinel"`, so `Window#show` takes the wrong branch.** The condition is `RUBY_ENGINE == 'ruby'`, so Spinel falls through to the mruby/WASM path where *C owns the loop* — precisely what FFI cannot support. Spinel needs the CRuby-shaped branch, where Ruby runs `tick until @close`.
+
+The honest fix is not a string comparison against a third engine name: the condition is really asking "does Ruby own the main loop?". Until the build path exists, `cli/spinel.rb` rewrites it; when the feature lands, `window.rb` should ask that question directly.
+
 ## MVP
 
 **Goal: a plain Ruby 2D script that draws a moving square, built with `ruby2d build --spinel`, that runs.** One binary, one shape, closeable.

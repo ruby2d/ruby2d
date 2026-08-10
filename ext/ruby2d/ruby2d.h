@@ -815,6 +815,13 @@ unsigned long long R2D_FrameCount(void);
 double             R2D_Fps(void);
 
 /*
+ * Monotonic, high-resolution time in seconds since the program started — the
+ * clock per-frame delta time is measured from. See `Ext.now` in window.c for
+ * why this rather than wall-clock time.
+ */
+double R2D_Now(void);
+
+/*
  * Draws the FPS overlay, takes any deferred screenshot, presents the frame,
  * and applies the frame cap
  */

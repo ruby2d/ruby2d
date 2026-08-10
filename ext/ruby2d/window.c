@@ -1024,11 +1024,15 @@ static Uint64 r2d_time_origin_ns = 0;
  * jittering frame pacing. This is the dt clock on mruby (native and web); CRuby
  * uses Process.clock_gettime(CLOCK_MONOTONIC), which is already monotonic.
  */
+double R2D_Now(void) {
+  return (double)(SDL_GetTicksNS() - r2d_time_origin_ns) / 1.0e9;
+}
+
 #ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_now(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   (void)argc; (void)argv;
-  return DBL2NUM((double)(SDL_GetTicksNS() - r2d_time_origin_ns) / 1.0e9);
+  return DBL2NUM(R2D_Now());
 }
 #endif
 
