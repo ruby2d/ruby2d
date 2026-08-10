@@ -4,6 +4,7 @@ module Ruby2D
   # An image drawn in the window
   class Image
     include Renderable
+    include TextureScaling
 
     # Image uses `tint` instead of `color` — the image already has its own
     # colors in the texture; tint modulates them.
@@ -55,9 +56,10 @@ module Ruby2D
                    opacity: nil, add: true, visible: true,
                    padding: nil, padding_top: nil, padding_right: nil,
                    padding_bottom: nil, padding_left: nil,
-                   _share_from: nil)
+                   scale_mode: nil, _share_from: nil)
       @width = width
       @height = height
+      self.scale_mode = scale_mode
 
       x, y = _extract_alignment(x, y)
       _apply_padding(padding, padding_top, padding_right, padding_bottom, padding_left)
@@ -75,6 +77,8 @@ module Ruby2D
         # without re-decoding the file or re-uploading to the GPU.
         @path        = _share_from.path
         @ext_image   = _share_from.instance_variable_get(:@ext_image)
+        # Inherit the sheet's sampling unless this Sprite asked for its own
+        @scale_mode ||= _share_from.scale_mode
         @orig_width  = _share_from.instance_variable_get(:@orig_width)
         @orig_height = _share_from.instance_variable_get(:@orig_height)
         @width     ||= @orig_width

@@ -3,6 +3,7 @@
 module Ruby2D
   class Canvas
     include Renderable
+    include TextureScaling
 
     # Canvas uses `tint` instead of `color` — the canvas has its own pixel
     # buffer; tint modulates the texture when drawn (white = untinted) and
@@ -16,7 +17,8 @@ module Ruby2D
     # Create a canvas with the given dimensions
     def initialize(width:, height:, x: 0, y: 0, z: 0, rotate: 0,
                    fill: [0, 0, 0, 0], tint: nil, opacity: nil,
-                   add: true, visible: true)
+                   add: true, visible: true, scale_mode: nil)
+      self.scale_mode = scale_mode
       self.x = x
       self.y = y
       @z = z

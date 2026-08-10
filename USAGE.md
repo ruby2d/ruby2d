@@ -132,6 +132,7 @@ set close_on_esc: true
 | `viewport_height` | Integer | Same as `height` | Drawable area height |
 | `viewport` | Symbol | `:letterbox` | How the viewport scales when the displayed size differs from the logical size (see [Viewport](#viewport)) |
 | `render_mode` | Symbol | `:continuous` | `:continuous` or `:on_demand` (see [Render Mode](#render-mode)) |
+| `scale_mode` | Symbol | `:linear` | How textures are sampled when drawn at a size other than their own (see [Scale Mode](#scale-mode)) |
 | `cursor` | Symbol | `:visible` | `:visible`, `:hidden`, or a system cursor name (see [Cursor Control](#cursor-control)) |
 | `show_fps` | Boolean | `false` | Display an FPS counter |
 | `diagnostics` | Boolean | `false` | Print diagnostic (`[INFO]`) messages; also displays the FPS counter (implies `show_fps`) |
@@ -184,10 +185,64 @@ The `viewport:` mode controls how the fixed logical drawing area (`viewport_widt
 |---|---|
 | `:letterbox` | (default) Scale to fit, preserving aspect ratio; uncovered area shows as letterbox bars. |
 | `:stretch` | Scale to fill the window, ignoring aspect ratio (content may distort). |
-| `:integer` | Scale by whole-number multiples only, preserving aspect ratio (pixel-perfect; may leave a border). |
+| `:integer` | Scale by whole-number multiples only, preserving aspect ratio (may leave a border). Constrains the frame, not how textures are sampled inside it, so pair it with `scale_mode:` for crisp pixel art. |
 | `:overscan` | Scale to fill the window preserving aspect ratio, cropping whatever overflows. |
 | `:expand` | Don't scale a fixed canvas — grow the logical drawing area to match the window, so more content becomes visible as it grows. `viewport_width`/`viewport_height` track the window size. |
 | `:fixed` | No scaling; draw the viewport 1:1 and center it in the window. |
+
+### Scale Mode
+
+When an image is drawn at a size other than its own (scaled up, scaled down, or rotated), `scale_mode:` decides how its pixels are sampled. The default smooths, which is wrong for pixel art:
+
+| Mode | Behavior |
+|---|---|
+| `:linear` | (default) Blend between neighboring pixels. Smooth, and blurry when magnified. |
+| `:nearest` | Take the closest pixel. Hard edges at every scale: the classic pixel-art look. |
+| `:pixel_art` | Nearest at whole-number scales, antialiased at fractional ones. Use when the scale isn't an integer, such as a letterboxed window. Needs a GPU renderer; on a software fallback it behaves as `:nearest`. |
+
+Set it window-wide so an entire pixel-art game is covered by one line:
+
+```ruby
+set scale_mode: :nearest
+```
+
+Any object can override the window:
+
+```ruby
+set scale_mode: :nearest                              # crisp by default
+Image.new('logo.png', scale_mode: :linear)            # …but smooth this one
+```
+
+Objects that don't set their own follow the window, and both ends are re-read every frame, so changing either takes effect on the next frame, including for objects that already exist.
+
+`scale_mode:` is accepted by `Image`, `Sprite`, `SpriteSheet`, `Tileset`, `Canvas`, `Text`, and `BitmapText`, and each exposes a matching `scale_mode` accessor. Shapes draw as flat-colored geometry with no texture to sample, so they don't take it.
+
+Per class:
+
+- **`Tileset`** is the common case for `:nearest`. `scale:` multiplies tiles on the way to the screen, so a 16×16 tile at `scale: 3` is the GPU magnifying by 3.
+- **`SpriteSheet`** passes its mode to every `Sprite` built from it; a `Sprite` can still override its own. The sheet's texture is shared, but each sprite is sampled with its own mode.
+- **`Image#resize!`** and **`Canvas#draw_image`** resample on the CPU rather than the GPU. They follow the source image's mode, so a `:nearest` image stays crisp through either. `:pixel_art` has no CPU equivalent and behaves as `:nearest` on these two paths.
+- **`BitmapText`** already renders its glyph grid at the target size, so its mode only matters when the window itself rescales the frame: a letterboxed `viewport:`, or `pixel_scale` on a HiDPI display.
+
+#### Pixel art
+
+Picking a scale mode is a separate decision from picking a coordinate system, and a pixel-art game makes both. Two common layouts:
+
+**Draw in art pixels.** Fix the viewport to the art's resolution and let the renderer scale the whole frame to the window. Game logic is written in art pixels, so a 16×16 tile is 16 units wide however large the window gets:
+
+```ruby
+set width: 1280, height: 720, viewport_width: 320, viewport_height: 180,
+    viewport: :integer, scale_mode: :nearest
+```
+
+**Draw in screen pixels.** Leave the viewport matching the window and size things up yourself, with `Tileset`'s `scale:` or an image's `width:`/`height:`:
+
+```ruby
+set width: 1280, height: 720, scale_mode: :nearest
+Tileset.new('tiles.png', tile_width: 16, tile_height: 16, scale: 4)
+```
+
+Either way it's `scale_mode:` that keeps the pixels hard — the viewport decides the coordinate space, not how textures are sampled within it. Pair `viewport: :integer` with `:nearest` for uniform pixels, or reach for `:pixel_art` when the scale can't be a whole number, as in a resizable or letterboxed window.
 
 ### Reading Window Attributes
 
@@ -1007,6 +1062,7 @@ img = Image.new('path/to/image.png')
 | `rotate` | `0` | Rotation in degrees |
 | `rx`, `ry` | Center | Rotation center |
 | `tint` | `'white'` | Tint color — modulates the image's texture colors |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 | `opacity` | `nil` | Alpha override |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
@@ -1072,6 +1128,7 @@ text = Text.new('Hello, Ruby 2D!')
 | `opacity` | `nil` | Alpha override |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 | `padding` | `0` | Inset from anchored edges (also `padding_top`/`padding_right`/`padding_bottom`/`padding_left`) |
 
 **Example:**
@@ -1138,6 +1195,7 @@ bt = BitmapText.new('Hello!')
 | `opacity` | `nil` | Alpha override |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 
 **Example:**
 
@@ -1201,6 +1259,7 @@ sprite = Sprite.new('characters.png',
 | `opacity` | `nil` | Alpha override |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 | `padding` | `0` | Inset from anchored edges (also `padding_top`/`padding_right`/`padding_bottom`/`padding_left`) |
 | `frame` | `nil` | When `source` is a `SpriteSheet`, the named frame to display statically |
 | `clip_x` | `0` | X offset into the sprite sheet |
@@ -1313,6 +1372,8 @@ A `SpriteSheet` (alias `TextureAtlas`) loads a packed atlas where named regions 
 
 The format is detected from the file extension (`.xml` / `.json`); the texture image referenced inside the atlas is loaded relative to the atlas file's directory. All `Sprite`s built from the same `SpriteSheet` share one GPU texture, so loading a single atlas once and constructing many sprites against it is cheap.
 
+`SpriteSheet.new` also takes `scale_mode:`, which every `Sprite` built from the sheet starts with. See [Scale Mode](#scale-mode).
+
 ```ruby
 sheet = SpriteSheet.new('characters.xml')
 
@@ -1387,6 +1448,7 @@ ts[0, 32] = :water
 | `scale` | `1` | Scale multiplier for tile rendering |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 
 ### Tileset Methods
 
@@ -1424,6 +1486,7 @@ canvas = Canvas.new(width: 200, height: 200)
 | `opacity` | `nil` | Alpha override on the tint |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
+| `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 
 A Canvas captures the display scale once, at construction, and bakes it into its pixel buffer; it never re-evaluates (unlike `Text`, which re-rasterizes on scale changes), because doing so would discard your accumulated drawing. With the default settings this is handled for you. With `pixel_scale: true`, construct the Canvas *after* `show` starts so it picks up the physical-pixel size; see the `update`-loop pattern under [Pixel Scale](#pixel-scale).
 

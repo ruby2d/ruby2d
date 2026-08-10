@@ -50,7 +50,7 @@ CONFIGURE_ARGS=--with-system-libs rake
 gem install ruby2d -- --with-system-libs
 ```
 
-Either way you'll need the **development** packages (headers, not just the runtime libraries) for version 3 of SDL, SDL_image, SDL_mixer, and SDL_ttf. Names vary by system (`libsdl3-dev`, `SDL3-devel`, `sdl3`), and SDL3 is new enough that some distros don't carry it yet. If yours doesn't, use `rake deps:build` above.
+Either way you'll need the **development** packages (headers, not just the runtime libraries) for version 3 of SDL, SDL_image, SDL_mixer, and SDL_ttf, with SDL itself at 3.4 or newer. Names vary by system (`libsdl3-dev`, `SDL3-devel`, `sdl3`), and SDL3 is new enough that some distros don't carry it yet. If yours doesn't, use `rake deps:build` above.
 
 ## Tests
 

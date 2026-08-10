@@ -520,6 +520,7 @@ R_VAL ruby2d_ext_text_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
         return R_NIL;
       }
       SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
+      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
       txt->tex_w = new_w;
       txt->tex_h = new_h;
     }
@@ -536,11 +537,14 @@ R_VAL ruby2d_ext_text_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
         return R_NIL;
       }
       SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
+      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
     }
 #endif
     txt->texture_stale = false;
     // Keep surface alive for canvas blitting; R2D_Text_free handles cleanup
   }
+
+  R2D_ApplyScaleMode(txt->texture, obj, &txt->applied_scale_mode);
 
 #ifdef __EMSCRIPTEN__
   // The persistent texture's capacity can exceed the content — clip to it.

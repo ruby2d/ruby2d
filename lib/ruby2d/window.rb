@@ -25,7 +25,7 @@ module Ruby2D
                 :background, :icon, :resizable,
                 :highdpi, :pixel_scale,
                 :viewport_width, :viewport_height, :viewport_mode,
-                :render_mode,
+                :render_mode, :scale_mode,
                 :mouse_x, :mouse_y, :diagnostics, :show_fps, :close_on_esc
 
     # Accepted `fps_cap` values, shared by the strict constructor check and the
@@ -158,6 +158,11 @@ module Ruby2D
         end
         @render_mode = opts[:render_mode]
         Ext.window_set_render_mode(self) if Window.shown?
+      end
+
+      unless opts[:scale_mode].nil?
+        @scale_mode = TextureScaling.validate(opts[:scale_mode])
+        Ext.window_set_scale_mode(self) if Window.shown?
       end
 
       @close_on_esc = opts[:close_on_esc] unless opts[:close_on_esc].nil?
@@ -760,6 +765,9 @@ module Ruby2D
       # Render mode: :continuous renders every tick up to fps_cap; :on_demand
       # only renders when request_render is called or the OS signals a redraw.
       @render_mode = :continuous
+
+      # Default texture sampling for objects that don't set their own.
+      @scale_mode = :linear
 
       # Size of the computer's display
       @display_width = nil

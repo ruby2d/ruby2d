@@ -4,6 +4,7 @@ module Ruby2D
   # A text string drawn with a specified font and size
   class Text
     include Renderable
+    include TextureScaling
 
     # Font style name → TTF style flag bit (mirrors SDL3_ttf's `TTF_STYLE_*`).
     STYLE_FLAGS = {
@@ -60,7 +61,9 @@ module Ruby2D
                    rotate: 0, rx: nil, ry: nil, color: nil, colour: nil,
                    opacity: nil, add: true, visible: true,
                    padding: nil, padding_top: nil, padding_right: nil,
-                   padding_bottom: nil, padding_left: nil)
+                   padding_bottom: nil, padding_left: nil,
+                   scale_mode: nil)
+      self.scale_mode = scale_mode
       x, y = _extract_alignment(x, y)
       _apply_padding(padding, padding_top, padding_right, padding_bottom, padding_left)
       @x = x

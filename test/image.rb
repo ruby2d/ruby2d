@@ -1,14 +1,15 @@
 # Image
 #
-# Visual test of every Image variation and modifier in three panels:
+# Visual test of every Image variation and modifier in three panels plus a strip:
 #   1. FORMATS + MODIFIERS — PNG / JPG / BMP / SVG decoders, tint, opacity
 #   2. VECTOR SCALING      — bee.svg at increasing sizes plus modifiers on a vector source
 #   3. ROTATION            — slow live rotation around three pivot points (default / center / external)
+#   4. SCALE MODE          — :linear / :nearest / :pixel_art magnifying one low-res source
 
 require 'ruby2d'
 
 W = 1500
-H = 540
+H = 720
 
 set title: 'Ruby 2D — Image', width: W, height: H
 set close_on_esc: true
@@ -48,6 +49,18 @@ end
 
 def panel_label(x, y, text)
   Text.new(text, x: x, y: y, size: 10, color: DIM)
+end
+
+# A deliberately low-res source, magnified. `resize!` runs before `scale_mode`
+# is assigned so every cell downsamples identically and only the magnification
+# differs between them.
+def magnified(path, x, y, size, mode)
+  img = Image.new(path, x: x, y: y)
+  img.resize!(8, 8)
+  img.scale_mode = mode
+  img.width  = size
+  img.height = size
+  img
 end
 
 # --- Header -----------------------------------------------------------------
@@ -185,6 +198,51 @@ ROT_LABEL_Y = p3y + 320
 hint(rot_cx0 - 44, ROT_LABEL_Y, 'default (center)')
 hint(rot_cx1 - 50, ROT_LABEL_Y, 'top-left (corner)')
 hint(rot_cx2 - 48, ROT_LABEL_Y, 'external (orbit)')
+
+# --- Panel 4: SCALE MODE ----------------------------------------------------
+
+STRIP_X = COL_X[0]
+STRIP_Y = ROW_Y + PANEL_H + 20
+STRIP_W = W - STRIP_X * 2
+STRIP_H = 180
+
+frame(STRIP_X, STRIP_Y, STRIP_W, STRIP_H)
+panel_label(STRIP_X + 10, STRIP_Y + 8, '[ SCALE MODE ]')
+
+SRC       = "#{IMG_DIR}/colors.png".freeze
+THUMB_Y   = STRIP_Y + 50
+LABEL_Y   = THUMB_Y + 100
+PITCH     = 110
+
+# Left group — a whole-number scale. :nearest and :pixel_art should be
+# indistinguishable here; :linear is the blurry one.
+section(STRIP_X + 15, STRIP_Y + 32, 'integer scale — 8×8 source at 96px (12×)')
+[
+  [:linear,    'linear (default)'],
+  [:nearest,   'nearest'],
+  [:pixel_art, 'pixel_art']
+].each_with_index do |(mode, name), i|
+  x = STRIP_X + 20 + i * PITCH
+  magnified(SRC, x, THUMB_Y, 96, mode)
+  hint(x, LABEL_Y, name)
+end
+
+# Right group — a fractional scale, where the two crisp modes diverge:
+# :nearest gives unevenly sized pixels, :pixel_art antialiases the seams.
+section(STRIP_X + 760, STRIP_Y + 32, 'fractional scale — same source at 100px (12.5×)')
+[
+  [:nearest,   'nearest — uneven'],
+  [:pixel_art, 'pixel_art — smoothed']
+].each_with_index do |(mode, name), i|
+  x = STRIP_X + 765 + i * PITCH
+  magnified(SRC, x, THUMB_Y, 100, mode)
+  hint(x, LABEL_Y, name)
+end
+
+hint(STRIP_X + 1010, THUMB_Y + 10, 'Both groups share one source image;')
+hint(STRIP_X + 1010, THUMB_Y + 26, 'only the sampling mode differs.')
+hint(STRIP_X + 1010, THUMB_Y + 50, 'pixel_art needs a GPU renderer —')
+hint(STRIP_X + 1010, THUMB_Y + 66, 'it falls back to nearest without one.')
 
 # --- Update -----------------------------------------------------------------
 

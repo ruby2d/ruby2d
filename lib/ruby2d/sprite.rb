@@ -27,7 +27,8 @@ module Ruby2D
                    clip_x: 0, clip_y: 0, clip_width: nil, clip_height: nil,
                    add: true, visible: true,
                    padding: nil, padding_top: nil, padding_right: nil,
-                   padding_bottom: nil, padding_left: nil)
+                   padding_bottom: nil, padding_left: nil,
+                   scale_mode: nil)
       @sheet = source.is_a?(SpriteSheet) ? source : nil
 
       if @sheet
@@ -35,12 +36,13 @@ module Ruby2D
               tint: tint, opacity: opacity, add: false,
               padding: padding, padding_top: padding_top, padding_right: padding_right,
               padding_bottom: padding_bottom, padding_left: padding_left,
-              _share_from: @sheet.texture)
+              scale_mode: scale_mode, _share_from: @sheet.texture)
       else
         super(source, x: x, y: y, z: z, rotate: rotate, rx: rx, ry: ry,
               tint: tint, opacity: opacity, add: false,
               padding: padding, padding_top: padding_top, padding_right: padding_right,
-              padding_bottom: padding_bottom, padding_left: padding_left)
+              padding_bottom: padding_bottom, padding_left: padding_left,
+              scale_mode: scale_mode)
       end
 
       # Stash the resolved sheet rect (if any) so trim metadata can be

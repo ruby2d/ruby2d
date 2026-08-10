@@ -24,10 +24,20 @@ module Ruby2D
       @tint = Color.new(c)
     end
 
+    # Sampling mode for the tileset's texture. Kept on the backing Image,
+    # which is what `render` draws through.
+    def scale_mode
+      @texture.scale_mode
+    end
+
+    def scale_mode=(value)
+      @texture.scale_mode = value
+    end
+
     # Create a tileset from an image
     def initialize(path, tile_width: 32, tile_height: 32, z: 0,
                    padding: 0, spacing: 0,
-                   scale: 1, add: true, visible: true)
+                   scale: 1, add: true, visible: true, scale_mode: nil)
       # `scale` and the tile dimensions feed the UV denominator
       # (`@scaled_*` sizes); a non-positive value collapses them to zero and
       # divides into NaN/Inf texture coordinates, so reject it up front.
@@ -44,7 +54,7 @@ module Ruby2D
       @path = path.to_s
 
       # Initialize the tileset texture image (not added to the window)
-      @texture = Image.new(@path, add: false)
+      @texture = Image.new(@path, add: false, scale_mode: scale_mode)
       # The tile UV coordinates are normalized against the source texture's
       # true pixel dimensions, so `@width`/`@height` always track the texture.
       @width = @texture.width
