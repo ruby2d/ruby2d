@@ -1,6 +1,19 @@
 # Ruby2D::Window
 
 module Ruby2D
+  # Whether Ruby drives the frame loop, which decides what `Window#show` does
+  # after the window exists. On CRuby and Spinel, `Ext.window_show` creates the
+  # window and returns, so `show` runs `tick until @close` itself. On mruby
+  # native and on the web, `Ext.window_show` blocks and calls `tick` from C —
+  # the web through emscripten's main-loop trampoline.
+  #
+  # Asked as a question rather than tested against an engine name at the call
+  # site: a new target only has to answer it, and Spinel (where the binding
+  # layer is compiled out entirely) answers it without a special case.
+  def self.ruby_owned_loop?
+    !web? && RUBY_ENGINE != 'mruby'
+  end
+
   # The application window
   class Window
     # Event structures
@@ -471,8 +484,8 @@ module Ruby2D
       @close = false
       load_default_gamepad_mappings
 
-      if RUBY_ENGINE == 'ruby'
-        # CRuby: window_show creates the window and returns — Ruby owns the loop.
+      if Ruby2D.ruby_owned_loop?
+        # CRuby and Spinel: window_show creates the window and returns.
         # Mark shown only after it succeeds; on failure it raises, so shown? stays
         # false and no frame dereferences a NULL renderer.
         Ext.window_show(self)

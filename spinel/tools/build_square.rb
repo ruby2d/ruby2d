@@ -36,15 +36,6 @@ def lib(name) = File.read(File.join(ROOT, 'lib/ruby2d', "#{name}.rb"))
 src = MIN.map { |f| "#{lib(f)}\n\n" }.join
 src = spinel_compat(src, lib('window/class_methods'))
 
-# Ruby has to own the main loop: Spinel's FFI has no callbacks, so the mruby
-# branch — where `window_show` blocks in C and drives the frame loop — can never
-# work here. `RUBY_ENGINE` is "spinel", so the CRuby test is false and that is
-# exactly the branch it would take. See ../README.md.
-src = spinel_sub(src,
-                 "      if RUBY_ENGINE == 'ruby'\n",
-                 "      if true # Spinel: Ruby owns the loop, as on CRuby\n",
-                 'Window#show engine branch')
-
 # `Ext` on this target ###########################################################
 #
 # Every `Ext` call in `lib/` passes `self` so C can read the window's ivars.
