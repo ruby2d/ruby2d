@@ -20,7 +20,7 @@ Three new bugs are open, drafted in `issues/` as 08-10 — one hang, two silent 
 | 09 | A forwarded block stored in an **ivar** loses its captured locals (incomplete fix of #3772) | `update { }` runs but every counter it writes stays at its initial value |
 | 10 | A block's result type is unified across `yield` call sites | Event dispatch calls the wrong event class's methods |
 
-Only 08 blocks the smoke test, and `spinel/tools/patch_next.rb` steps around it. With that patch the subset passes except for `ticks: 0`, which is 09.
+**None of the three is a dead end.** 08 and 09 both have workarounds verified against the real library, applied by `tools/patch_next.rb` and `tools/patch_capture.rb`; with both, the subset runs **identically to CRuby**, `ticks: 5` and all. Neither is landed in `cli/spinel.rb`: 08 is a regression and 09 would cost a positional parameter on every block-taking `Window` method, so both wait on upstream. 10 has no workaround and does not need one yet — it only bites once input events are wired up, which the MVP does not do.
 
 Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and per-object `on(click: :left)` filtering needs a runtime `send`. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -47,7 +47,9 @@ $SPINEL spinel/scratch/subset.rb -o spinel/scratch/subset.bin --cc="cc -ferror-l
 ./spinel/scratch/subset.bin
 ```
 
-Against `1aa42ab3` this prints `SUBSET OK`, with `ticks: 0` where CRuby gives `ticks: 5` — that difference is issue 09. Drop `patch_next.rb` and it hangs instead, which is issue 08.
+Against `1aa42ab3` this prints `SUBSET OK`, with `ticks: 0` where CRuby gives `ticks: 5` — that difference is issue 09. Drop `patch_next.rb` and it hangs instead, which is issue 08. Add `ruby spinel/tools/patch_capture.rb` after `patch_next.rb` and the run matches CRuby exactly, `ticks: 5` included.
+
+Running it without the patches first is worth the extra minute: it is how you find out whether either bug has been fixed upstream.
 
 Two habits worth keeping. The CRuby run is the control: it must pass, or the harness is broken rather than the compiler. And always pass `-ferror-limit=0` — clang stops at 20 by default, so a real count of 23 reads as 20 and progress looks like a plateau.
 
@@ -86,7 +88,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` steps around issue 08; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
