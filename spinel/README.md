@@ -22,7 +22,7 @@ Three new bugs are open, drafted in `issues/` as 08-10 — one hang, two silent 
 
 **None of the three is a dead end.** 08 and 09 both have workarounds verified against the real library, applied by `tools/patch_next.rb` and `tools/patch_capture.rb`; with both, the subset runs **identically to CRuby**, `ticks: 5` and all. Neither is landed in `cli/spinel.rb`: 08 is a regression and 09 would cost a positional parameter on every block-taking `Window` method, so both wait on upstream. 10 has no workaround and does not need one yet — it only bites once input events are wired up, which the MVP does not do.
 
-Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and per-object `on(click: :left)` filtering needs a runtime `send`. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
+Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
 ### Setup
 
@@ -173,6 +173,12 @@ end
 That is runtime reflection over the class graph. Whole-program AOT bakes the graph at compile time and keeps no metaobject to query, so this is inherent to the model, not a defect in Spinel. `overrides?` is rewritten to `false` on this target, so `@overrides_update` / `@overrides_render` are always off and the frame loop runs the DSL procs only.
 
 **It is not permanently unsupportable** — only this *mechanism* is. Detecting the pattern without reflection (for instance, having the base `update` record that it was used as the DSL setter, and treating "never set" as the class pattern) would restore it for every runtime. That is a `window.rb` design change affecting all three targets, and it has to respect the prepended-module case the current comment at `window.rb:841-848` calls out, so it was out of scope here.
+
+### Events are unsupported, per-object and window-level alike
+
+**Window-level `on` does not compile at all** (2026-08-10), and not only in its filtered form. `Window#on`'s two branches share a method body, so `build_filter_wrapper`'s `e.send(:"#{k}?", v)` is compiled whichever form is called — even `on(:mouse_down) { }` fails with *"unsupported send with a runtime method name"*. Verified on the subset, not inferred.
+
+That rules out any script with input handling until it is addressed, which is most of `examples/`. The fix is the same shape as the per-object one below and equally a `lib/` design decision: `EVENT_FILTER_PREDICATES` is a small closed map, so the dispatch could be a `case` instead of a `send`. The interpolated `:"#{k}?"` form in the hash-filter branch needs the same treatment.
 
 ### Per-object events are unsupported
 
