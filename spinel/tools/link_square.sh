@@ -1,14 +1,15 @@
 #!/bin/sh
 # Generate, patch, compile and link the Spinel square demo.
 #
-#   SPINEL=/path/to/spinel/bin/spinel ./spinel/tools/link_square.sh
+#   ./spinel/tools/link_square.sh
 #   FRAMES=60 SHOT=spinel/scratch/square.png ./spinel/scratch/square.bin
 #
-# Run from the repo root. Builds the `RUBY2D_NO_RUBY` core on first use and
-# reuses it after; delete spinel/scratch/core to force a rebuild.
+# Run from the repo root. Finds Spinel via spinel_path.sh, so no path has to be
+# set by hand. Builds the `RUBY2D_NO_RUBY` core on first use and reuses it
+# after; delete spinel/scratch/core to force a rebuild.
 
 set -e
-: "${SPINEL:?set SPINEL to the spinel binary}"
+. ./spinel/tools/spinel_path.sh
 
 R2D=$(pwd)
 CORE="$R2D/spinel/scratch/core"

@@ -8,7 +8,7 @@ The rest of this document is a research log in discovery order. This section is 
 
 ### Status
 
-**The MVP is done: a real Ruby 2D script compiles with Spinel and draws a square on screen.** `set title:`, `Square.new`, `show` — through `lib/`'s own scene graph into the real `R2D_*` core, 5.2 MB standalone binary. Build it with `SPINEL=… ./spinel/tools/link_square.sh`; see [MVP reached](#mvp-reached-a-ruby-2d-script-on-screen-2026-08-10). What remains for a shippable feature is CLI wiring (`ruby2d build --spinel`), not research.
+**The MVP is done: a real Ruby 2D script compiles with Spinel and draws a square on screen.** `set title:`, `Square.new`, `show` — through `lib/`'s own scene graph into the real `R2D_*` core, 5.2 MB standalone binary. Build it with `./spinel/tools/link_square.sh`; see [MVP reached](#mvp-reached-a-ruby-2d-script-on-screen-2026-08-10). What remains for a shippable feature is CLI wiring (`ruby2d build --spinel`), not research.
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
@@ -28,13 +28,19 @@ Three things remain gaps rather than bugs, all inherent to AOT: the class patter
 
 ### Setup
 
-Spinel is not vendored — clone it anywhere outside the repo and build:
+Spinel is not vendored. Clone it **beside this repo** and build:
 
 ```sh
-git clone --depth 1 https://github.com/matz/spinel.git
-cd spinel && make deps && make      # builds bin/spinel; needs network for libprism
-export SPINEL="$PWD/bin/spinel"     # used by the tools below
-export RUBY2D_SPINEL="$SPINEL"      # used by cli/spinel.rb's find_spinel
+git clone --depth 1 https://github.com/matz/spinel.git ../spinel
+(cd ../spinel && make deps && make)     # builds bin/spinel; needs network for libprism
+```
+
+Nothing else to set: every tool here resolves the binary through `tools/spinel_path.sh` (shell) or `resolve_spinel` (Ruby), which look at `$SPINEL`, then `$RUBY2D_SPINEL`, then `../spinel/bin/spinel`, then `$PATH`. Keeping the recipes path-free is deliberate — this branch is shared, and a machine-specific path in a committed script is noise at best and a broken copy-paste at worst.
+
+Any other location works, it just has to be named once:
+
+```sh
+export RUBY2D_SPINEL=/wherever/spinel/bin/spinel   # also what cli/spinel.rb honors
 ```
 
 `make deps` fetches libprism and rbs from RubyGems. A rebuild after `git fetch` is just `make -j8`.
@@ -45,6 +51,7 @@ export RUBY2D_SPINEL="$SPINEL"      # used by cli/spinel.rb's find_spinel
 ruby spinel/tools/build_subset.rb     # assembles the square-only slice of lib/
 ruby spinel/tools/patch_next.rb       # steps around the Hash#each hang (issue 08)
 ruby spinel/scratch/subset.rb         # CRuby baseline — must print SUBSET OK
+. ./spinel/tools/spinel_path.sh    # resolves $SPINEL; no path to set
 $SPINEL spinel/scratch/subset.rb -o spinel/scratch/subset.bin --cc="cc -ferror-limit=0"
 ./spinel/scratch/subset.bin
 ```
@@ -60,7 +67,7 @@ Because two of the open bugs are infinite loops, run compiled binaries under a c
 ### Resuming
 
 ```sh
-ruby spinel/tools/verify_issues.rb                    # needs $SPINEL
+ruby spinel/tools/verify_issues.rb
 gh issue list --repo matz/spinel --state all --search "3771..3777"
 ```
 
@@ -90,12 +97,12 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `spinel_path.sh` resolves the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
 
-**The Spinel compiler itself stays outside the repo.** It is a large separate git repository that gets rebuilt on every upstream pull, so nesting it here would be awkward and would confuse tooling. Clone it wherever you like and point `RUBY2D_SPINEL` at `bin/spinel` — that is the resolution order `find_spinel` already implements. The recipes below assume it is on `$SPINEL` or `$PATH`.
+**The Spinel compiler itself stays outside the repo.** It is a large separate git repository that gets rebuilt on every upstream pull, so nesting it here would be awkward and would confuse tooling. Clone it beside this repo as `../spinel`, or point `RUBY2D_SPINEL` at `bin/spinel` — the same resolution order `find_spinel` implements. The recipes below need no path set.
 
 ## Why Spinel fits
 
@@ -203,7 +210,7 @@ Every workaround in this document exists because of one of these. Spinel's contr
 Re-verify the whole set against a freshly built compiler before trusting any of it:
 
 ```sh
-SPINEL=/path/to/spinel/bin/spinel ruby spinel/tools/verify_issues.rb
+ruby spinel/tools/verify_issues.rb
 ```
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
@@ -467,7 +474,7 @@ Square.new(x: 160, y: 110, size: 80, color: 'red')
 show
 ```
 
-Build it with `SPINEL=… ./tools/link_square.sh`, then run `FRAMES=30 SHOT=out.png ./spinel/scratch/square.bin`. The frame cap and screenshot exist so the build checks itself without a human watching a window.
+Build it with `./tools/link_square.sh`, then run `FRAMES=30 SHOT=out.png ./spinel/scratch/square.bin`. The frame cap and screenshot exist so the build checks itself without a human watching a window.
 
 This is the milestone the earlier one was not: `bouncing_balls.rb` proved the C path with hand-written FFI, and the subset proved the `lib/` path with stubs. This is both at once — `lib/`'s `Window`, `Renderable`, `Quad` and `Square` driving the real `R2D_*` core, with a Ruby-owned frame loop.
 
