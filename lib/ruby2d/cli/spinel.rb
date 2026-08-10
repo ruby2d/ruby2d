@@ -32,36 +32,6 @@ def spinel_sub(src, from, to, what)
 end
 
 
-# Spinel carries only plain `def` methods from a module body into the including
-# class: `attr_reader`, `attr_accessor`, `alias_method`, and `alias` declared in
-# a module don't reach it. `Renderable` is included by every shape, so its
-# attributes have to be written out. The same declarations in a *class* body are
-# fine, which is why only these are rewritten.
-def spinel_expand_renderable(src)
-  readers   = %w[x y z width height color x_align y_align]
-  accessors = %w[visible padding_top padding_right padding_bottom padding_left]
-
-  defs  = readers.map { |m| "    def #{m}\n      @#{m}\n    end\n" }
-  defs += accessors.flat_map do |m|
-    ["    def #{m}\n      @#{m}\n    end\n",
-     "    def #{m}=(value)\n      @#{m} = value\n    end\n"]
-  end
-
-  src = spinel_sub(src,
-                   "    attr_reader :x, :y, :z, :width, :height, :color, :x_align, :y_align\n" \
-                   "    attr_accessor :visible,\n" \
-                   "                  :padding_top, :padding_right, :padding_bottom, :padding_left\n",
-                   defs.join,
-                   'Renderable attributes')
-
-  src = spinel_sub(src, "    alias_method :visible?, :visible\n",
-                   "    def visible?\n      @visible\n    end\n", 'Renderable#visible?')
-
-  spinel_sub(src, "    alias colour color\n",
-             "    def colour\n      color\n    end\n", 'Renderable#colour')
-end
-
-
 # `alias_method` inside `class << self` doesn't produce a callable class method
 # (`attr_reader` in the same position does work, so only the alias is rewritten).
 def spinel_expand_window_singleton(src)
@@ -134,25 +104,6 @@ end
 # the binding layer under RUBY2D_NO_RUBY. The Spinel target is native.
 def spinel_web_predicate
   "module Ruby2D\n  def self.web?\n    false\n  end\nend\n\n"
-end
-
-
-# Spinel rejects `return` in expression position, so the `x = expr or return`
-# guard idiom has to become a statement. Rewritten rather than changed in `lib/`
-# because the idiom is idiomatic Ruby and reads better than the expansion.
-def spinel_expand_or_return(src)
-  rewritten = 0
-  src = src.gsub(/^(\s*)([a-z_][\w]*) = (.+?) or return( nil)?$/) do
-    indent, name, expr = Regexp.last_match(1), Regexp.last_match(2), Regexp.last_match(3)
-    rewritten += 1
-    "#{indent}#{name} = #{expr}\n#{indent}return #{Regexp.last_match(4) ? 'nil' : ''}".rstrip +
-      " if #{name}.nil?"
-  end
-  if rewritten.zero?
-    raise SpinelCompatDrift, 'Spinel compat `or return` matched nothing. See spinel/README.md.'
-  end
-
-  src
 end
 
 
@@ -307,11 +258,9 @@ end
 # `class_methods_source` is `lib/ruby2d/window/class_methods.rb`, read for the
 # list of delegating class methods rather than hardcoding it.
 def spinel_compat(src, class_methods_source)
-  src = spinel_expand_renderable(src)
   src = spinel_expand_window_singleton(src)
   src = spinel_bypass_window_class_methods(src, class_methods_source)
   src = spinel_window_guards(src)
-  src = spinel_expand_or_return(src)
   src = spinel_expand_hash_delete(src)
   src = spinel_disable_class_pattern(src)
   src = spinel_disable_object_interactivity(src)

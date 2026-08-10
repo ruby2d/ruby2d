@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `1c3d99897ef3` (2026-08-10)**.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `1aa42ab3` (2026-08-10)**.
 
 ## Start here
 
@@ -10,9 +10,19 @@ The rest of this document is a research log in discovery order. This section is 
 
 The C side works. A Spinel-compiled binary drives Ruby 2D's real `R2D_*` core over FFI and renders — see `bouncing_balls.rb`, which runs at 60fps today.
 
-The `lib/` side is **blocked on [#3773](https://github.com/matz/spinel/issues/3773)**, and blocked deliberately: the workaround would put a line in ~13 shape classes that exists only to dodge a compiler bug. The square-only slice of `lib/` compiles to zero C errors and runs until the scene graph dispatches, then raises `NoMethodError`.
+**The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=is%3Aissue+3771..3777) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-Seven bugs are filed upstream, [#3771-#3777](https://github.com/matz/spinel/issues?q=is%3Aissue+3771..3777). Nothing here is waiting on Ruby 2D.
+Three new bugs are open, drafted in `issues/` as 08-10 — one hang, two silent wrong answers:
+
+| | What breaks | Effect on Ruby 2D |
+|---|---|---|
+| 08 | `next` inside `Hash#each` never advances the iterator (regression, first bad `ffb0587c`) | Every `Rectangle`/`Square` construction hangs |
+| 09 | A forwarded block stored in an **ivar** loses its captured locals (incomplete fix of #3772) | `update { }` runs but every counter it writes stays at its initial value |
+| 10 | A block's result type is unified across `yield` call sites | Event dispatch calls the wrong event class's methods |
+
+Only 08 blocks the smoke test, and `spinel/tools/patch_next.rb` steps around it. With that patch the subset passes except for `ticks: 0`, which is 09.
+
+Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and per-object `on(click: :left)` filtering needs a runtime `send`. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
 ### Setup
 
@@ -31,21 +41,26 @@ export RUBY2D_SPINEL="$SPINEL"      # used by cli/spinel.rb's find_spinel
 
 ```sh
 ruby spinel/tools/build_subset.rb     # assembles the square-only slice of lib/
+ruby spinel/tools/patch_next.rb       # steps around the Hash#each hang (issue 08)
 ruby spinel/scratch/subset.rb         # CRuby baseline — must print SUBSET OK
-$SPINEL spinel/scratch/subset.rb -o /tmp/subset && /tmp/subset
+$SPINEL spinel/scratch/subset.rb -o spinel/scratch/subset.bin --cc="cc -ferror-limit=0"
+./spinel/scratch/subset.bin
 ```
 
-As of Spinel `1c3d99897ef3` the last line fails with `undefined method 'visible?' for an instance of Ruby2D::Quad` — that is #3773. **If it prints `SUBSET OK`, the blocker is gone** and the MVP is reachable again.
+Against `1aa42ab3` this prints `SUBSET OK`, with `ticks: 0` where CRuby gives `ticks: 5` — that difference is issue 09. Drop `patch_next.rb` and it hangs instead, which is issue 08.
 
-The CRuby run is the control: it must pass, or the harness is broken rather than the compiler.
+Two habits worth keeping. The CRuby run is the control: it must pass, or the harness is broken rather than the compiler. And always pass `-ferror-limit=0` — clang stops at 20 by default, so a real count of 23 reads as 20 and progress looks like a plateau.
+
+Because two of the open bugs are infinite loops, run compiled binaries under a cap; `spinel/tools/run_capped.sh` is a five-second one (macOS has no `timeout(1)`).
 
 ### Resuming
 
 ```sh
+ruby spinel/tools/verify_issues.rb                    # needs $SPINEL
 gh issue list --repo matz/spinel --state all --search "3771..3777"
 ```
 
-A closed issue is the cue to re-check the matching row in [Workarounds to re-check](#workarounds-to-re-check) — by rebuilding the subset, not by running a standalone probe. Those diverge: a nested-`include` bug was fixed in isolation while the real library still failed.
+A `FIXED` row is the cue to re-check the matching workaround with `SPINEL_SKIP=` and rebuild the subset — not to run a standalone probe. Those diverge in both directions: a nested-`include` bug was fixed in isolation while the real library still failed, and #3772's own reproducer passes today while the library shape it was filed for still breaks.
 
 Spinel ships many commits a day, so pull before trusting any measurement here.
 
@@ -71,7 +86,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/`; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` steps around issue 08; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
@@ -159,15 +174,39 @@ That is runtime reflection over the class graph. Whole-program AOT bakes the gra
 
 ### Per-object events are unsupported
 
-`Interactive` reaches the shapes through a nested include — `Renderable` includes it, the shapes include `Renderable` — and that second hop does not carry the methods across, so `object.interactive?` is undefined at run time. The `respond_to?` guard in front of it is answered from the compile-time class graph and gets it wrong.
+The original reason — a nested include not carrying `Interactive`'s methods across — was fixed by #3774. The feature is still off, for a different and more durable reason found on 2026-08-10.
 
-Registration is switched off rather than worked around, so `on` / `off` on a shape does nothing on this target. Unlike the class pattern this one probably *is* a bug rather than a limit — a nested include is ordinary Ruby — but it was not isolated, so it is listed here rather than as a reproducer.
+`Interactive#on`'s filtered form dispatches the matcher predicate by name:
+
+```ruby
+wrapped = ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
+```
+
+Spinel rejects that outright — *"unsupported send with a runtime method name (AOT needs a compile-time-known name)"* — and it is a compile error for the whole program, not a run-time failure of that path, so merely not calling `on` is no defense. The smoke test only compiles because it never calls `on` at all, which leaves the method unreachable and uncompiled.
+
+This one is fixable on the Ruby side whenever the feature is wanted: every value in `OBJECT_EVENT_FILTER_PREDICATES` is `:button?` today, so the `send` could become a direct call. That trades away the indirection the map exists to provide, so it is a design decision for `interactive.rb` rather than a workaround to bury in `cli/spinel.rb`.
 
 ## To report upstream
 
-Every workaround in this document exists because of one of these. Spinel's contributing notes ask for "a 5-line Ruby that fails in Spinel but passes in CRuby", so the table separates the ones already in that shape from the ones that still need work. Filing the top group costs little and could clear whole categories at once.
+Every workaround in this document exists because of one of these. Spinel's contributing notes ask for "a 5-line Ruby that fails in Spinel but passes in CRuby", so each draft carries a reproducer in that shape, plus the CRuby and Spinel output it produces.
 
-**Filed upstream on 2026-08-10** as #3771-#3777, each verified against `1c3d99897ef3` with both CRuby and Spinel output captured. The drafts stay here as the local record:
+Re-verify the whole set against a freshly built compiler before trusting any of it:
+
+```sh
+SPINEL=/path/to/spinel/bin/spinel ruby spinel/tools/verify_issues.rb
+```
+
+Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
+
+**Open — drafted 2026-08-10 against `1aa42ab3`, not yet filed:**
+
+| Draft | Bug |
+|---|---|
+| `issues/08-next-in-hash-each-hangs.md` | `next` inside `Hash#each` never advances the iterator — **hangs**, and a regression (first bad `ffb0587c`) |
+| `issues/09-forwarded-block-stored-in-ivar.md` | A forwarded block stored in an ivar loses its captured locals — **silent**, and an incomplete fix of #3772 |
+| `issues/10-yield-result-type-unified-across-call-sites.md` | A block's result type is unified across `yield` call sites, dispatching to the wrong class — **silent** |
+
+**Filed and fixed.** #3771-#3777 were filed on 2026-08-10 against `1c3d99897ef3` and all seven were closed the same day; `verify_issues.rb` confirms each independently against `1aa42ab3`. The drafts stay here as the local record:
 
 | Issue | Draft | Bug |
 |---|---|---|
@@ -232,19 +271,32 @@ Spinel moves fast, so every workaround here is provisional. **Last re-checked ag
 
 One caution learned the hard way: a probe passing in isolation does **not** mean the workaround can be dropped. The nested-`include` bug behind the disabled per-object events is fixed in a standalone probe yet still fails in the real library. Re-check by removing the transform and rebuilding the subset, not by running the probe alone.
 
-The probes live in the research scratchpad, which is disposable — recreate them from the "Re-check by" column, which describes each in one line.
+Drop one by name and rebuild:
 
-| Workaround | Re-check by |
+```sh
+SPINEL_SKIP=expand_hash_delete ruby spinel/tools/build_subset.rb
+SPINEL_SKIP=all ruby spinel/tools/build_subset.rb        # what is still needed at all
+```
+
+Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still prints `SUBSET OK`. Both halves matter: dropping `disable_class_pattern` compiles clean and then fails at run time.
+
+**Still needed, re-checked against `1aa42ab3` (2026-08-10):**
+
+| Workaround | Why it is still there |
 |---|---|
-| Rewrite `Window.<m>` → `DSL.window.<m>` for every delegating `ClassMethods` entry (issue 6) | Drop `spinel_bypass_window_class_methods` and recompile the smoke subset |
-| Top-level `def` shims instead of `include Ruby2D` + `extend Ruby2D::DSL` | `include`/`extend` a module with instance methods at top level, call one |
-| Expand `attr_*`/`alias` out of `module Renderable` (issues 1-3) | `attr_reader` in a module, `include` it, call the reader |
-| Define `Ruby2D.web?` and `Ruby2D.render_ready_check` in Ruby | Drop them and recompile the smoke subset |
-| Expand `x = expr or return` to a statement guard | `return` in expression position |
-| Spell out `ffi_func` type arrays instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
+| `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver |
+| `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call |
+| `expand_window_singleton`, `window_guards` | `shown?` with an implicit receiver does not resolve |
+| `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
+| `expand_massign` | Multiple assignment emits the same `sp_RbVal`/`mrb_int` mismatch |
+| `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
+| `disable_class_pattern`, `disable_object_interactivity` | AOT gaps, not bugs — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
+| `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
-Two of these are worth upstreaming rather than carrying: the `-dead_strip` host-vs-target flag bug, and issue 6 once reduced. The `attr_*`-in-module expansion is worth keeping regardless — it is a plain refactor that costs nothing under CRuby or mruby.
+**Dropped on 2026-08-10**, once #3771-#3777 landed: `expand_renderable` (`attr_*`/`alias` in a module body now reach the including class) and `expand_or_return` (`return` in expression position is accepted). Both functions are deleted, not disabled.
+
+The `-dead_strip` host-vs-target flag bug is still worth upstreaming rather than carrying.
 
 ## Milestone: a square on screen (2026-08-08)
 

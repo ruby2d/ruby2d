@@ -12,6 +12,15 @@
 #
 # Add files to MIN to widen the slice; see ../README.md for what each additional
 # subsystem drags in.
+#
+# To re-check a workaround after an upstream fix, drop it and rebuild:
+#
+#   SPINEL_SKIP=expand_or_return,dsl_shims ruby spinel/tools/build_subset.rb
+#   SPINEL_SKIP=all ruby spinel/tools/build_subset.rb
+#
+# Names are the `spinel_*` functions in cli/spinel.rb minus the prefix. This is
+# the documented way to re-check the workaround table in ../README.md — a probe
+# passing standalone does not mean the transform can go.
 
 ROOT = File.expand_path('../..', __dir__)
 OUT  = File.join(ROOT, 'spinel', 'scratch', 'subset.rb')
@@ -22,6 +31,33 @@ def find_executable(_name) = nil
 def cache_platform_dir = '/nonexistent'
 def cache_stamp_ok?(_dir) = false
 load File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')
+
+# Replace the named transforms with the identity, so a workaround can be dropped
+# without editing lib/. `web_predicate` appends rather than rewrites, so its
+# identity is the empty string.
+TRANSFORMS = %w[
+  expand_window_singleton bypass_window_class_methods window_guards
+  expand_hash_delete disable_class_pattern disable_object_interactivity
+  expand_massign web_predicate dsl_shims
+].freeze
+
+skip = (ENV['SPINEL_SKIP'] || '').split(',').map(&:strip).reject(&:empty?)
+skip = TRANSFORMS if skip == ['all']
+(skip - TRANSFORMS).each { |n| abort "unknown transform #{n.inspect}; known: #{TRANSFORMS.join(', ')}" }
+
+skip.each do |name|
+  body =
+    case name
+    when 'web_predicate' then ->(*) { '' }
+    when 'bypass_window_class_methods' then ->(src, _) { src }
+    # `include Ruby2D` is emitted separately below; the shims exist only to put
+    # the DSL's instance methods at top level, which `extend` does directly.
+    when 'dsl_shims' then ->(*) { "extend Ruby2D::DSL\n" }
+    else ->(src) { src }
+    end
+  Object.send(:define_method, :"spinel_#{name}", &body)
+end
+warn "skipping: #{skip.join(', ')}" unless skip.empty?
 
 # The minimum for a moving square: no image, text, canvas, audio, sprite or
 # button, and none of the shapes a square doesn't use.
