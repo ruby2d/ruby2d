@@ -111,7 +111,7 @@ applied.select { |e| e[:kind] == :bug }.each { |e| puts "    #{e[:label]}\n     
 puts "\n  Still worked around by cli/spinel.rb (each a compiler bug):"
 puts '    bypass_window_class_methods — applied above; a class method on a constant receiver via extend'
 puts '    window_guards (issue 13), dsl_shims (issue 12), positional_callbacks (issue 11)'
-puts '    expand_hash_delete, expand_massign (issue 14), disable_class_pattern (an AOT limit)'
+puts '    expand_hash_delete, disable_class_pattern (an AOT limit)'
 
 if File.exist?(BIN)
   puts "\n  Then it compiles. Nothing else blocks a clean build.\n\n"

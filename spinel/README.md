@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all five checks at `20a06d01`.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `fa666718` (2026-08-11)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -20,7 +20,7 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `20a06d01` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which the first is a forwarder and only `Window#update` stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite (2823 pass, 0 fail). See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Three now have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13, `expand_massign` → issue 14). Two do not: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Two have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13); a third, `expand_massign`, was fixed upstream before it could be filed and the workaround is gone. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -292,12 +292,11 @@ The gap falls into three kinds, and the middle one had been under-counted:
 **What is left once all of that is edited out** — clang reports these together, so the list is complete:
 
 ```
- 18  assigning to 'mrb_int' from incompatible type 'sp_RbVal'      → issue 14
   1  initializing 'sp_RbVal' with incompatible type 'const char *' → expand_hash_delete
   1  returning 'sp_RbVal' from a function returning 'sp_PolyArray *'  → unfiled
 ```
 
-Every one is the same shape: a boxed `sp_RbVal` assigned to an unboxed slot, with no conversion emitted.
+Both are the same shape: a boxed `sp_RbVal` assigned to an unboxed slot, with no conversion emitted. There were 20 on 2026-08-10; `ef8535c4` removed the 18 multiple-assignment ones.
 
 Two cautions the survey itself taught. Neutralize an *expression*, not a line — blanking whole lines left `if/elsif/else` unbalanced and produced four parse errors that read as findings. And keep the surrounding variables used: replacing a call with a bare `true` left a block parameter unused, which changes the capture analysis and invented a blocker that vanished when both variables were kept.
 
@@ -363,12 +362,11 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 |---|---|
 | `issues/11-…` | A forwarded block's callee resolves to the first same-named method — the #3783 follow-up, with a root cause and a patch in `issues/11-ambiguous-forward-callee.patch` |
 | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) |
-| `issues/14-…` | Destructuring into a method's own parameters from a polymorphic expression emits invalid C — 22 of the library's C errors |
 | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) |
 
 ### Two workarounds with no reproducer yet
 
-**Read the failing line before writing a probe.** The first pass at these three wrote one plausible minimal shape each, all three passed, and the conclusion drawn — "these can't be reduced" — was wrong. Opening the assembled subset at the line the compiler names, and asking what the probe had dropped, reproduced `expand_massign` on the next try. It is now issue 14. The failing line is free information; guessing at shapes is not.
+**Read the failing line before writing a probe.** The first pass at these three wrote one plausible minimal shape each, all three passed, and the conclusion drawn — "these can't be reduced" — was wrong. Opening the assembled subset at the line the compiler names, and asking what the probe had dropped, reproduced `expand_massign` on the next try — drafted as issue 14, then fixed upstream before it could be filed. The failing line is free information; guessing at shapes is not.
 
 Two still resist, after two hypotheses each. Both are provably needed — remove the transform and the library breaks — and for both the exact construct and diagnostic are known, so what is missing is only the small form:
 
@@ -444,7 +442,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `20a06d01` on 2026-08-10.** That pass dropped three more rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `fa666718` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `positional_callbacks` guards a bug whose own filed reproducer passes today while the library shape it was filed for still fails. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -459,7 +457,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `20a06d01` (2026-08-10):**
+**Still needed, re-checked against `fa666718` (2026-08-11):**
 
 | Workaround | Why it is still there |
 |---|---|
@@ -467,7 +465,6 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call |
 | `window_guards` | `shown?` with an implicit receiver does not resolve |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
-| `expand_massign` | Multiple assignment emits the same `sp_RbVal`/`mrb_int` mismatch |
 | `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals — [#3783](https://github.com/matz/spinel/issues/3783) is **closed and its reproducer passes**, but the library shape still fails. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10) |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
@@ -476,7 +473,9 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 **Dropped on 2026-08-10**, once #3771-#3777 landed: `expand_renderable` (`attr_*`/`alias` in a module body now reach the including class) and `expand_or_return` (`return` in expression position is accepted).
 
-**Dropped later the same day**, once #3782-#3784 landed and the whole table was swept:
+**Dropped 2026-08-11**, at `fa666718`: `expand_massign`, once [`ef8535c4`](https://github.com/matz/spinel/commit/ef8535c4) *"Unbox a poly multiple assignment into a scalar target"* landed. Found upstream independently — issue 14 was drafted but never filed. It had been 18 of the library's 20 remaining C errors.
+
+**Dropped 2026-08-10**, once #3782-#3784 landed and the whole table was swept:
 
 | Dropped | Was working around | Verified by |
 |---|---|---|

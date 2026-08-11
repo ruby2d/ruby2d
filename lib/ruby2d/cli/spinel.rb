@@ -106,70 +106,6 @@ def spinel_web_predicate
 end
 
 
-# Whether `expr` has a comma outside any bracket or quote — i.e. whether it is
-# a list rather than a single expression. Deliberately a scanner and not a
-# regex: `f(a, b)` and `@x, @y` are indistinguishable without tracking depth.
-def spinel_top_level_comma?(expr)
-  depth = 0
-  quote = nil
-  chars = expr.chars
-  chars.each_with_index do |c, i|
-    escaped = i.positive? && chars[i - 1] == '\\'
-    if quote
-      quote = nil if c == quote && !escaped
-    elsif ['"', "'"].include?(c)
-      quote = c
-    elsif ['(', '[', '{'].include?(c)
-      depth += 1
-    elsif [')', ']', '}'].include?(c)
-      depth -= 1
-    elsif c == ',' && depth.zero?
-      return true
-    end
-  end
-  false
-end
-
-
-# Destructuring assignment from a polymorphic expression emits invalid C: the
-# poly result lands in locals Spinel typed `mrb_int`, with no unboxing. The
-# polymorphism usually comes from an optional keyword argument (`points: nil`
-# makes the parameter `NilClass | Array`), so it is pervasive rather than local.
-#
-# Rewriting `a, b = expr` to an indexed temporary sidesteps it. Kept here rather
-# than in `lib/` because three lines per site, at ~40 sites, is a real
-# readability cost for what should be a compiler fix — see "To report upstream".
-#
-# Deliberately NOT rewritten:
-#   - parallel assignment (`a, b = @x, @y`) — no array is indexed, and it works
-#   - block parameters (`|a, b|`) — a different construct entirely
-#   - anything with a splat, which the indexed form can't express
-def spinel_expand_massign(src)
-  rewritten = 0
-  out = src.lines.map do |line|
-    m = line.match(/\A(\s*)([a-z_]\w*), ([a-z_]\w*)(?:, ([a-z_]\w*))? = (\S.*?)\s*\z/)
-    next line unless m
-    # A comma at bracket depth zero means parallel assignment (`a, b = @x, @y`),
-    # which compiles fine and must be left alone. A comma *inside* parens is
-    # just an argument list (`x, y = f(a, b)`) and should still be rewritten.
-    next line if spinel_top_level_comma?(m[5])
-    next line if m[5].include?('*') || m[5].end_with?('=')
-
-    indent, names, rhs = m[1], [m[2], m[3], m[4]].compact, m[5]
-    tmp = "_sp_#{names.first}"
-    rewritten += 1
-    ["#{indent}#{tmp} = #{rhs}\n",
-     *names.each_with_index.map { |n, i| "#{indent}#{n} = #{tmp}[#{i}]\n" }].join
-  end.join
-
-  if rewritten.zero?
-    raise SpinelCompatDrift, 'Spinel compat `multiple assignment` matched nothing. See spinel/README.md.'
-  end
-
-  out
-end
-
-
 # An ivar first assigned inside a module body stays polymorphic, and a method
 # name that several core classes share then resolves to the wrong one:
 # `@gamepads_by_id.delete(id)` compiles to `String#delete`. Unambiguous methods
@@ -278,7 +214,6 @@ def spinel_compat(src, class_methods_source)
   src = spinel_window_guards(src)
   src = spinel_expand_hash_delete(src)
   src = spinel_disable_class_pattern(src)
-  src = spinel_expand_massign(src)
   src + spinel_web_predicate
 end
 

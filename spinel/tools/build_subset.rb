@@ -33,8 +33,7 @@ load File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')
 # identity is the empty string.
 TRANSFORMS = %w[
   bypass_window_class_methods window_guards expand_hash_delete
-  disable_class_pattern positional_callbacks expand_massign
-  web_predicate dsl_shims
+  disable_class_pattern positional_callbacks web_predicate dsl_shims
 ].freeze
 
 skip = (ENV['SPINEL_SKIP'] || '').split(',').map(&:strip).reject(&:empty?)

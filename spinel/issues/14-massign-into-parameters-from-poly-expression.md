@@ -1,5 +1,7 @@
 # [Codegen] Destructuring into a method's own parameters from a polymorphic expression emits invalid C
 
+**Fixed upstream before it was filed**, by [`ef8535c4`](https://github.com/matz/spinel/commit/ef8535c4) *"Unbox a poly multiple assignment into a scalar target"* (test: `massign_poly_scalar_target.rb`), found independently on 2026-08-11. The `expand_massign` workaround was dropped the same day, verified against the real library and not just this reproduction. Kept as the local record; do not file.
+
 Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
