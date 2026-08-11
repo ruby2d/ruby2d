@@ -12,7 +12,7 @@ The rest of this document is a research log in discovery order. This section is 
 
 What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. All three draw **filled and stroked, in a single color** — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
-**`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws, but only with a one-line patch to Spinel.** Unpatched, any `set` call that omits `background:` passes a nil key to a String-keyed hash and segfaults before the first frame. Filed as `issues/16-…` with the patch; see [square.rb: the goal](#squarerb-the-goal-and-the-one-line-in-the-way-2026-08-11).
+**`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws, but only with a one-line patch to Spinel.** Unpatched, any `set` call that omits `background:` passes a nil key to a String-keyed hash and segfaults before the first frame. Filed as [#3790](https://github.com/matz/spinel/issues/3790), with the patch in `issues/16-nil-key-hash.patch`; see [square.rb: the goal](#squarerb-the-goal-and-the-one-line-in-the-way-2026-08-11).
 
 **Per-vertex colors do not work yet.** `color:` or `stroke_color:` given an array — the `Color::Set` gradient path — compiles and then dies at run time with `undefined method 'empty?' for an instance of Array`. Fill and stroke fail identically, so it is `Color::Set`, not the shape code. Untyped-receiver probes of the same shape pass standalone, which puts it in the same category as `bypass_window_class_methods` and `expand_hash_delete`: real, reproducible in the library, not yet reduced. Unlike the stroke gap this one is loud, so preflight does not reject it.
 
@@ -381,12 +381,7 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 | [#3787](https://github.com/matz/spinel/issues/3787) | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) | yes — `dsl_shims` |
 | [#3788](https://github.com/matz/spinel/issues/3788) | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) | yes — `window_guards` |
 | [#3789](https://github.com/matz/spinel/issues/3789) | `issues/15-…` | Reading an ivar from an `extend`-provided method emits invalid C — found while probing 13 | no — the library's extended class methods hold no state |
-
-**Drafted, not yet filed:**
-
-| Draft | Bug | Blocks us |
-|---|---|---|
-| `issues/16-…` | A nil key looked up in a String-keyed `Hash` segfaults — `sp_str_hash` reads the tag byte at `s[-1]` without a NULL check. One-line patch in `issues/16-nil-key-hash.patch`, verified at 2854 pass / 0 fail | yes — any `set` without `background:`, which is `square.rb` |
+| [#3790](https://github.com/matz/spinel/issues/3790) | `issues/16-…` | A nil key looked up in a String-keyed `Hash` segfaults — `sp_str_hash` reads the tag byte at `s[-1]` with no NULL check; one-line patch in `issues/16-nil-key-hash.patch`, verified at 2854 pass / 0 fail | yes — any `set` without `background:`, so `square.rb` itself |
 
 A crashing reproducer needs the same treatment a hanging one gets: the shell prints `segmentation fault` but the binary never wrote it, so `verify_issues.rb` reads the exit status for a fatal signal rather than comparing output. SIGKILL is excluded, since that is its own timeout killer.
 
@@ -759,7 +754,7 @@ stop reason = EXC_BAD_ACCESS (code=1, address=0xffffffffffffffff)
 
 **`set title: 'My App'` carries no `background:` key.** `Window.set` (`window.rb:672`) runs `@background = Color.new(opts[:background]) if Color.valid?(opts[:background])`, `Color.valid?` opens with `NAMED_COLORS.key?(color)`, and Spinel's `sp_str_hash` reads the tag byte at `s[-1]` before hashing. A nil key is a NULL `const char *`, so that read lands at `0xffffffffffffffff` — the fault address and the `[x19, #-0x1]` in the disassembly, exactly.
 
-It is filed as `issues/16-…` with a one-line patch. The convincing part is that the convention already exists in the same file: `sp_str_eq`, twenty-five lines above, handles NULL on either side and says why in its comment — *"nil-vs-string equality is false in Ruby"*. The polymorphic dispatch path guards it too. Only the direct typed call the codegen emits was missing it, so the fix goes where the convention already lives:
+It is filed as [#3790](https://github.com/matz/spinel/issues/3790), drafted in `issues/16-…` with a one-line patch. The convincing part is that the convention already exists in the same file: `sp_str_eq`, just above it, handles NULL on either side and says why in its comment — *"nil-vs-string equality is false in Ruby"*. The polymorphic dispatch path guards it too. Only the direct typed call the codegen emits was missing it, so the fix goes where the convention already lives:
 
 ```c
 if(!s)return 0;
