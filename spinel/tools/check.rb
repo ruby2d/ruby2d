@@ -51,7 +51,7 @@ def check_subset
   return ['subset', :fail, "#{errors} C errors, no binary"] unless built
 
   out, status = run_capped(["./#{SCRATCH}/subset.bin"])
-  return ['subset', :fail, 'hung — #3782 is back, or spinel_hash_each_next no longer matches'] if status == :timeout
+  return ['subset', :fail, 'hung — #3782 has regressed again'] if status == :timeout
 
   if out == control
     ['subset', :pass, "matches CRuby (#{control.lines.size} lines)"]

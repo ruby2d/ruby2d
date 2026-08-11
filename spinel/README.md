@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all five checks. The CLI additionally builds clean against `550d2a9d`.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all five checks at `20a06d01`.
 
 ## Start here
 
@@ -16,15 +16,11 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-Three new bugs are open, filed as [#3782-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) and drafted in `issues/` as 08-10 — one hang, two silent wrong answers:
+**All ten filed bugs are closed upstream** ([#3771-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 10 fixed, 0 reproduce.
 
-| | What breaks | Effect on Ruby 2D |
-|---|---|---|
-| 08 | `next` inside `Hash#each` never advances the iterator (regression, first bad `ffb0587c`) | Every `Rectangle`/`Square` construction hangs |
-| 09 | A forwarded block stored in an **ivar** loses its captured locals (incomplete fix of #3772) | `update { }` runs but every counter it writes stays at its initial value |
-| 10 | A block's result type is unified across `yield` call sites | Event dispatch calls the wrong event class's methods |
+**One of them is not actually fixed for us.** #3783's own reproducer passes at `20a06d01`, but the library shape it was filed for still fails: with the `positional_callbacks` workaround removed, the `update` block runs every frame, reads its captured local as `1` every time, and the outer value ends at `0`. This is the second round of exactly this — #3783 was itself the follow-up to #3772 for the same reason. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10).
 
-**None of the three is a dead end.** 08 and 09 are worked around in `cli/spinel.rb` as `hash_each_next` and `positional_callbacks`, verified against the real library rather than a probe. They had been kept out as standalone patch scripts while this was a demo, on the grounds that upstream would fix them; wiring the CLI settled it, because without them a built app hangs on the first `Square.new` and every `update` counter silently stays at zero. Both are one `spinel_sub` each and delete cleanly when #3782 and #3783 land. 10 needs no workaround yet — it only bites once input events are wired up, which this target does not do.
+That leaves one workaround tied to an open (if closed-on-paper) bug. Everything else in the table is either a permanent AOT gap or a bug still reproducing on its own terms.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -120,7 +116,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` and `reduce_oracle_diff.sh` are the two-sided oracles for `spinel-reduce` — the first for crashes, the second for silent wrong answers |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
@@ -226,6 +222,29 @@ Spinel rejects that outright — *"unsupported send with a runtime method name (
 
 This one is fixable on the Ruby side whenever the feature is wanted: every value in `OBJECT_EVENT_FILTER_PREDICATES` is `:button?` today, so the `send` could become a direct call. That trades away the indirection the map exists to provide, so it is a design decision for `interactive.rb` rather than a workaround to bury in `cli/spinel.rb`.
 
+## #3783 is closed and still broken for us (2026-08-10)
+
+All ten filed bugs closed. Sweeping the workaround table found nine of the ten genuinely fixed in the real library, and one not.
+
+Remove `positional_callbacks` and the subset still compiles, still runs, and still prints `SUBSET OK` — with one earlier line wrong:
+
+```
+CRuby                            Spinel
+block ran; it reads ticks as 1   block ran; it reads ticks as 1
+block ran; it reads ticks as 2   block ran; it reads ticks as 1
+block ran; it reads ticks as 3   block ran; it reads ticks as 1
+...                              ...
+ticks: 5                         ticks: 0
+```
+
+The block **runs** every frame. Each call gets a fresh copy of the captured local, increments it to 1, and the write never reaches the enclosing scope. That is the same signature #3783 was filed with, and #3772 before it.
+
+**Eight build-up probes all pass**, so the trigger is not any of the obvious candidates. Each of these behaves correctly on its own at `20a06d01`: the filed reproducer; the block called five times; the receiver coming from a method rather than a local (`DSL.window.update(&proc)`); the arity read before storing; the ivar initialized to `nil` so it is `NilClass | Proc`; two callbacks stored on one object; an arity-dependent `call` vs `call(dt)`. `scratch/probe_3783.rb` and `probe_3783b.rb` hold them.
+
+So this one resists the build-up approach that cracked #3773, and it is being reduced instead — with a new oracle, because the existing one looks for a crash and this is a silent wrong answer. `tools/reduce_oracle_diff.sh` calls a candidate interesting only when CRuby and Spinel both run it cleanly and their output differs. That is the right default for this branch: three of the ten filed bugs were silent.
+
+**The lesson to carry:** `verify_issues.rb` reporting `FIXED` means the reproducer passes, nothing more. The workaround sweep is the real test, and it disagreed here. Do not delete a transform because its issue is closed.
+
 ## To report upstream
 
 Every workaround in this document exists because of one of these. Spinel's contributing notes ask for "a 5-line Ruby that fails in Spinel but passes in CRuby", so each draft carries a reproducer in that shape, plus the CRuby and Spinel output it produces.
@@ -238,7 +257,7 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-**Filed and open.** #3782-#3784 were filed on 2026-08-10 against `c70ed332`, re-verified against that commit first — including each draft's "Additional Findings" contrasts, which `verify_issues.rb` does not cover because it only runs the main reproducer:
+**Filed and closed the same day.** #3782-#3784 were filed on 2026-08-10 against `c70ed332`, re-verified against that commit first — including each draft's "Additional Findings" contrasts, which `verify_issues.rb` does not cover because it only runs the main reproducer. All three closed within hours. #3783's fix does **not** cover the shape Ruby 2D uses; see [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10).
 
 | Issue | Draft | Bug |
 |---|---|---|
@@ -299,9 +318,9 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `1c3d99897ef3` on 2026-08-10.** That pass dropped two rows — `Hash#delete_if` is now implemented, and an extend-provided method returning nil-or-raise now resolves — which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-run the probes and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `20a06d01` on 2026-08-10.** That pass dropped three more rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
-One caution learned the hard way: a probe passing in isolation does **not** mean the workaround can be dropped. The nested-`include` bug behind the disabled per-object events is fixed in a standalone probe yet still fails in the real library. Re-check by removing the transform and rebuilding the subset, not by running the probe alone.
+One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `positional_callbacks` guards a bug whose own filed reproducer passes today while the library shape it was filed for still fails. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
 Drop one by name and rebuild:
 
@@ -310,25 +329,38 @@ SPINEL_SKIP=expand_hash_delete ruby spinel/tools/build_subset.rb
 SPINEL_SKIP=all ruby spinel/tools/build_subset.rb        # what is still needed at all
 ```
 
-Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still prints `SUBSET OK`. Both halves matter: dropping `disable_class_pattern` compiles clean and then fails at run time.
+Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still matches CRuby line for line. Both halves matter twice over: dropping `disable_class_pattern` compiles clean and then fails at run time, and dropping `positional_callbacks` compiles clean, runs, and still prints `SUBSET OK` — with one earlier line wrong.
 
-**Still needed, re-checked against `c70ed332` (2026-08-10):**
+`scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
+
+**Still needed, re-checked against `20a06d01` (2026-08-10):**
 
 | Workaround | Why it is still there |
 |---|---|
 | `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver |
 | `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call |
-| `expand_window_singleton`, `window_guards` | `shown?` with an implicit receiver does not resolve |
+| `window_guards` | `shown?` with an implicit receiver does not resolve |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
 | `expand_massign` | Multiple assignment emits the same `sp_RbVal`/`mrb_int` mismatch |
-| `hash_each_next` | `next` inside `Hash#each` hangs ([#3782](https://github.com/matz/spinel/issues/3782)) — without it every `Square.new` loops forever |
-| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals ([#3783](https://github.com/matz/spinel/issues/3783)) — without it every `update` counter stays at zero |
+| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals — [#3783](https://github.com/matz/spinel/issues/3783) is **closed and its reproducer passes**, but the library shape still fails. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10) |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
-| `disable_class_pattern`, `disable_object_interactivity` | AOT gaps, not bugs — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
+| `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
-**Dropped on 2026-08-10**, once #3771-#3777 landed: `expand_renderable` (`attr_*`/`alias` in a module body now reach the including class) and `expand_or_return` (`return` in expression position is accepted). Both functions are deleted, not disabled.
+**Dropped on 2026-08-10**, once #3771-#3777 landed: `expand_renderable` (`attr_*`/`alias` in a module body now reach the including class) and `expand_or_return` (`return` in expression position is accepted).
+
+**Dropped later the same day**, once #3782-#3784 landed and the whole table was swept:
+
+| Dropped | Was working around | Verified by |
+|---|---|---|
+| `expand_window_singleton` | `alias_method` in `class << self` producing no callable class method ([#3776](https://github.com/matz/spinel/issues/3776)) | subset compiles clean and matches CRuby |
+| `hash_each_next` | `next` inside `Hash#each` hanging ([#3782](https://github.com/matz/spinel/issues/3782)) | subset, demo, and CLI all pass without it |
+| `disable_object_interactivity` | A nested `include` not carrying `Interactive`'s methods across ([#3774](https://github.com/matz/spinel/issues/3774)) | the real library now registers per-object interactivity without error |
+
+The last one is the notable one: the README carried it for weeks as the standing example of "fixed in a probe, still broken in the library". It is now genuinely fixed in the library — which is why the table is swept by removing transforms rather than by re-running probes. Note that dropping it does not make per-object `on` usable; preflight still rejects `on` outright, for the runtime-`send` reason below.
+
+All functions are deleted, not disabled.
 
 The `-dead_strip` host-vs-target flag bug is still worth upstreaming rather than carrying.
 

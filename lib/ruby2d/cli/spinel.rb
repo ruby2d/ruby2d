@@ -39,14 +39,6 @@ def spinel_sub(src, from, to, what)
 end
 
 
-# `alias_method` inside `class << self` doesn't produce a callable class method
-# (`attr_reader` in the same position does work, so only the alias is rewritten).
-def spinel_expand_window_singleton(src)
-  spinel_sub(src, "      alias_method :shown?, :shown\n",
-             "      def shown?\n        @shown\n      end\n", 'Window.shown?')
-end
-
-
 # `Window.<m>` fails to resolve when `m` reaches the class through
 # `extend ClassMethods` (issue 6 in spinel/README.md — cause still unknown after ten
 # reductions, every one of which passed in isolation).
@@ -222,47 +214,6 @@ def spinel_disable_class_pattern(src)
 end
 
 
-# `Interactive` reaches the shapes through a nested include — `Renderable`
-# includes it, the shapes include `Renderable` — and that second hop does not
-# carry its methods across, so `object.interactive?` is undefined at run time.
-# The guard in front of it uses `respond_to?`, which an AOT build answers from
-# the compile-time class graph and gets wrong here.
-#
-# Per-object events are outside the current scope, so the registration is
-# switched off rather than worked around. This is a scope limit, not a fix:
-# `on` / `off` on a shape will not work on the Spinel target until the nested
-# include does. See spinel/README.md.
-def spinel_disable_object_interactivity(src)
-  spinel_sub(src,
-             "      if object.respond_to?(:interactive?) && object.interactive?\n",
-             "      if false # per-object events unsupported on this target\n",
-             'per-object interactivity registration')
-end
-
-
-# `next` inside a `Hash#each` block does not advance the iterator, so the block
-# restarts the same entry forever (issue #3782). The one site in `lib/` is the
-# keyword-argument validator every shape constructor runs through, which means a
-# build without this hangs on the first `Square.new` — no output, no error.
-#
-# The `if` form is the same code with the guard inverted. Unlike most entries
-# here this rewrites a construct rather than a workaround for a design limit:
-# #3782 is a regression, so delete this once it is fixed.
-def spinel_hash_each_next(src)
-  spinel_sub(src,
-             "      dims.each do |name, value|\n" \
-             "        next unless value.is_a?(Numeric) && value.negative?\n" \
-             "        raise ArgumentError, \"\#{self.class} \#{name} must be zero or positive, got \#{value}\"\n" \
-             "      end\n",
-             "      dims.each do |name, value|\n" \
-             "        if value.is_a?(Numeric) && value.negative?\n" \
-             "          raise ArgumentError, \"\#{self.class} \#{name} must be zero or positive, got \#{value}\"\n" \
-             "        end\n" \
-             "      end\n",
-             'next inside Hash#each')
-end
-
-
 # A block forwarded with `&proc` and then stored in an instance variable loses
 # its captured locals (issue #3783), so `update { @score += 1 }` runs every frame
 # and the counter never moves. Silent: the app looks alive and does nothing.
@@ -323,13 +274,10 @@ end
 # `class_methods_source` is `lib/ruby2d/window/class_methods.rb`, read for the
 # list of delegating class methods rather than hardcoding it.
 def spinel_compat(src, class_methods_source)
-  src = spinel_expand_window_singleton(src)
   src = spinel_bypass_window_class_methods(src, class_methods_source)
   src = spinel_window_guards(src)
   src = spinel_expand_hash_delete(src)
   src = spinel_disable_class_pattern(src)
-  src = spinel_disable_object_interactivity(src)
-  src = spinel_hash_each_next(src)
   src = spinel_expand_massign(src)
   src + spinel_web_predicate
 end

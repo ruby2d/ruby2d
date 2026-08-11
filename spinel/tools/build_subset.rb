@@ -32,9 +32,9 @@ load File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')
 # without editing lib/. `web_predicate` appends rather than rewrites, so its
 # identity is the empty string.
 TRANSFORMS = %w[
-  expand_window_singleton bypass_window_class_methods window_guards
-  expand_hash_delete disable_class_pattern disable_object_interactivity
-  hash_each_next positional_callbacks expand_massign web_predicate dsl_shims
+  bypass_window_class_methods window_guards expand_hash_delete
+  disable_class_pattern positional_callbacks expand_massign
+  web_predicate dsl_shims
 ].freeze
 
 skip = (ENV['SPINEL_SKIP'] || '').split(',').map(&:strip).reject(&:empty?)
