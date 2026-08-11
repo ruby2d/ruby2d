@@ -48,9 +48,11 @@ Moving `class Decoy` below `class Holder`, changing nothing else, prints `n=3`.
 
 ## Additional Findings
 
-The receiver has to be unresolvable for the name fallback to run at all. `Registry.holder` is a call, so `infer_type` gives no object and the node is neither `ConstantReadNode` nor `ConstantPathNode`. With a receiver the pass can resolve — a local holding a `Holder`, for instance — the correct callee is found and both orderings work.
+`Decoy` is never instantiated and its `store` is never called. Its presence in the source, ahead of `Holder`, is the whole difference — dead code changes the compiled behaviour of a live path.
 
-Twenty-one other shapes were tried before this one and all behave correctly at `20a06d01`, so the ambiguity appears to be the whole trigger: repeated invocation, an ivar initialized to `nil`, the arity read before storing, two callbacks stored on one object, an arity-dependent `call` vs `call(dt)`, a receiver from a module accessor, a bare same-named call that never executes, and two forwarding shims side by side.
+The receiver has to be unresolvable for the name fallback to run at all. `Registry.holder` is a call, so `infer_type` gives no object and the node is neither `ConstantReadNode` nor `ConstantPathNode`. With a receiver the pass can resolve — a local holding a `Holder`, for instance — the correct callee is found and both orderings work. Dropping `Decoy` entirely also works, leaving `Holder#store` as the only candidate.
+
+Twenty-one other variations were tried before this one and all behave correctly at `20a06d01`, so the ambiguity appears to be the whole trigger: repeated invocation, an ivar initialized to `nil`, the arity read before storing, two callbacks stored on one object, an arity-dependent `call` vs `call(dt)`, a receiver from a module accessor, a bare same-named call that never executes, and two forwarding shims side by side.
 
 In Ruby 2D this is reached through an ordinary DSL callback. The library defines four methods named `update` that take a block — a top-level shim, `Ruby2D::DSL#update`, `Window::ClassMethods#update`, and `Window#update` — of which only `Window#update` stores it, and it is not the first. Every `update { }` block therefore runs each frame against a copy of its captured locals, so counters and accumulators stay at their initial values with no error.
 
@@ -73,7 +75,7 @@ The comment there notes the fallback is safe because at worst it leaves a forwar
 
 ## Suggested fix
 
-Treat an ambiguous forward as an escape rather than picking one candidate, which costs no more than the single-match case already accepts:
+One option, offered to show the cause is reachable rather than to propose the design — resolving a call receiver like `Registry.holder` would fix it closer to the source. This one stops guessing instead: treat an ambiguous forward as an escape rather than picking a candidate.
 
 ```diff
          if (fmi < 0) {
@@ -101,6 +103,8 @@ with `BLK_FWD_AMBIGUOUS` (-2) handled where the callee is consulted:
 ```
 
 With this applied: the reproduction above prints `n=3` in both orderings, Ruby 2D's callbacks work with its workaround removed, and `make test` reports 2823 pass, 0 fail, 0 error.
+
+It leaves more forwarders uninlined than before — the same cost the single-match fallback already accepts, but incurred more often. That has not been measured.
 
 ## Environment
 
