@@ -144,10 +144,14 @@ def check_issues
   out, = sh!('ruby', 'spinel/tools/verify_issues.rb')
   fixed = out.scan(/\bFIXED\b/).size
   repro = out.scan(/\breproduces\b/).size
-  changed = out.scan(/\bCHANGED\b/).size
+  # Every other verdict needs a human. Counting only fixed and reproduces let
+  # two drafts vanish from this line entirely while the verifier was reporting
+  # them — a summary that omits rows is worse than one that flags them.
+  unclear = out.scan(/\bCHANGED\b/).size + out.scan(/compile-FAIL/).size +
+            out.scan(/\bno-repro\b/).size
   detail = "#{fixed} fixed, #{repro} reproduce"
-  detail += ", #{changed} CHANGED — read by hand" if changed.positive?
-  [changed.zero? ? 'issues' : 'issues', changed.zero? ? :pass : :warn, detail]
+  detail += ", #{unclear} to read by hand" if unclear.positive?
+  ['issues', unclear.zero? ? :pass : :warn, detail]
 end
 
 CHECKS = { 'subset' => method(:check_subset),

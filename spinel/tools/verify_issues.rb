@@ -82,7 +82,16 @@ rows = Dir[File.join(ISSUES, '*.md')].sort.map do |path|
   compiled = system(SPINEL, rb, '-o', bin, out: File::NULL, err: File::NULL)
   spinel =
     if !compiled
-      want_spinel.include?('error') || want_spinel.include?('rejected') ? 'reproduces' : 'compile-FAIL'
+      # Does the draft document a refusal? Spinel's own diagnostics start with
+      # `spinel:` and clang's carry `error:` — matching those is what tells a
+      # reproduced compile error apart from a draft that has gone stale.
+      #
+      # Sniffing for the word "error" is not enough: `unsupported call:` and
+      # `(NameError)` contain neither it nor "rejected", so two drafts whose
+      # expectations matched exactly still reported `compile-FAIL`.
+      documented = want_spinel.match?(/^spinel:/) || want_spinel.include?('error:') ||
+                   want_spinel.include?('rejected')
+      documented ? 'reproduces' : 'compile-FAIL'
     else
       got = run([bin]).to_s.strip
       if want_spinel.include?(HANG)
