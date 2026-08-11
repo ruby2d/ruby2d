@@ -20,7 +20,7 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `20a06d01` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which the first is a forwarder and only `Window#update` stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite (2823 pass, 0 fail). See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Two now have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13). Three do not: `bypass_window_class_methods`, `expand_hash_delete`, and `expand_massign` are still needed by the library while their obvious minimal shapes pass standalone — see [Three workarounds with no reproducer yet](#three-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Three now have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13, `expand_massign` → issue 14). Two do not: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -330,19 +330,23 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 |---|---|
 | `issues/11-…` | A forwarded block's callee resolves to the first same-named method — the #3783 follow-up, with a root cause and a patch in `issues/11-ambiguous-forward-callee.patch` |
 | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) |
+| `issues/14-…` | Destructuring into a method's own parameters from a polymorphic expression emits invalid C — 22 of the library's C errors |
 | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) |
 
-### Three workarounds with no reproducer yet
+### Two workarounds with no reproducer yet
 
-Each of these is provably still needed — remove the transform and the library breaks — but the obvious minimal shape **passes standalone at `20a06d01`**, so there is nothing fileable yet. Checked on 2026-08-10 with `scratch/probe_remaining.rb`:
+**Read the failing line before writing a probe.** The first pass at these three wrote one plausible minimal shape each, all three passed, and the conclusion drawn — "these can't be reduced" — was wrong. Opening the assembled subset at the line the compiler names, and asking what the probe had dropped, reproduced `expand_massign` on the next try. It is now issue 14. The failing line is free information; guessing at shapes is not.
 
-| Workaround | Minimal shape tried | Result |
-|---|---|---|
-| `bypass_window_class_methods` | a class method reached via `extend`, delegating to a module accessor | passes |
-| `expand_hash_delete` | `Hash#delete` on a polymorphic ivar | passes |
-| `expand_massign` | destructuring from a poly expression (`points: nil`) | passes |
+Two still resist, after two hypotheses each. Both are provably needed — remove the transform and the library breaks — and for both the exact construct and diagnostic are known, so what is missing is only the small form:
 
-This is the #3783 pattern again: the library shape has an ingredient the obvious reduction drops. Do not file these as-is — a maintainer would get three programs that work. `expand_massign` is the best next target because it throws **22 C errors** in the library, and a loud failure suits `spinel-reduce` with the plain crash oracle (`tools/reduce_oracle.sh`) rather than the diff one.
+| Workaround | Failing line | Diagnostic | Shapes tried that pass |
+|---|---|---|---|
+| `bypass_window_class_methods` | `span = Window.viewport_width` | `unsupported call: (CallNode 'viewport_width') recv=ConstantReadNode/ty48` | the class method alone; plus an `attr_reader` of the same name on instances |
+| `expand_hash_delete` | `pad = @gamepads_by_id.delete(id)` | `passing 'sp_RbVal' to parameter of incompatible type 'const char *'` — i.e. it bound to `String#delete` | the ivar assigned in `initialize`; the ivar assigned inside a module body |
+
+Being unable to reduce one is not a reason to sit on it forever. Each has a runnable failing program (the assembled subset), an exact oracle, and a named construct, which is enough for a maintainer holding the compiler source. Reduce first, but file rather than let them block the port indefinitely.
+
+`tools/reduce_oracle_build.sh` is the oracle for both — they are compile failures, so neither the crash oracle nor the diff one fits. Pin `EXPECT` to the diagnostic above so the reducer cannot wander onto a different error.
 
 Found while probing, and **not** tied to any workaround: reading an ivar from an extended module's method emits invalid C (`((sp_Class){1})->iv_shown`, *"member reference type 'sp_Class' is not a pointer"*). Real, reproducible, and useful to upstream, but it blocks nothing here.
 
