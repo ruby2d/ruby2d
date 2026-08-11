@@ -832,6 +832,18 @@ Run it bare for an interactive window, or `./bouncing_balls 150 shot.png` to sto
 
 ## Reducing a whole-program failure
 
+**Read before you reduce.** Three oracles sit in `tools/` and they make reduction look like the default move. On this branch it has not been. Every bug that was actually cracked came from *reading* something — the line the compiler names, Spinel's own commit log, its source — and usually in minutes:
+
+| Bug | What worked | Cost |
+|---|---|---|
+| #11, the block-capture root cause | `git log --grep` over Matz's fixes for #3772 and #3783 named the mechanism, file, and line | ~5 min, after 21 hand-written probes all passed |
+| issue 14, massign | opened the assembled subset at the line clang named and asked what the probe had dropped | ~2 min |
+| issues 12 and 13 | mirrored the real construct out of `lib/` instead of inventing a shape | ~10 min |
+| #3783 by reduction | killed after 12 hours, no result, and by then superseded | 12 h |
+| massign by reduction | 3,980 → 208 lines, and it drifted onto a *different* bug | ~6 h, beaten by a 15-line hand-written case |
+
+The two reduction runs cost about 18 hours and produced nothing that was used. So reach for `spinel-reduce` when reading has genuinely failed, not first — and always pin `EXPECT` to the specific diagnostic. The massign run drifted precisely because it was launched with `EXPECT='error:'`, which matches any clang error, so the reducer was free to wander to another one and did.
+
 Two techniques earned their keep, both counter to the obvious approach.
 
 **Scale up, don't cut down.** Eleven attempts to reduce the failing program all passed in isolation, because the trigger *was* the surrounding structure. Starting from a passing probe and adding one structural feature at a time found it immediately, then bisected to the two required ingredients in one more pass.
