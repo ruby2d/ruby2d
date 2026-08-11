@@ -1,6 +1,6 @@
 # [Codegen] A forwarded block's callee resolves to the first same-named method, losing captures when that one is another forwarder
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3786](https://github.com/matz/spinel/issues/3786). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

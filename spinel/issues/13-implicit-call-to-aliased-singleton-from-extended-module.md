@@ -1,6 +1,6 @@
 # [Compile] An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3788](https://github.com/matz/spinel/issues/3788). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 

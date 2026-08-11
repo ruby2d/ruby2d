@@ -1,6 +1,6 @@
 # [Codegen] Reading an instance variable from an `extend`-provided method emits invalid C
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3789](https://github.com/matz/spinel/issues/3789). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 
