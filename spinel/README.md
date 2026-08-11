@@ -12,6 +12,8 @@ The rest of this document is a research log in discovery order. This section is 
 
 What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. All three draw **filled and stroked, in a single color** — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
+**`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws, but only with a one-line patch to Spinel.** Unpatched, any `set` call that omits `background:` passes a nil key to a String-keyed hash and segfaults before the first frame. Filed as `issues/16-…` with the patch; see [square.rb: the goal](#squarerb-the-goal-and-the-one-line-in-the-way-2026-08-11).
+
 **Per-vertex colors do not work yet.** `color:` or `stroke_color:` given an array — the `Color::Set` gradient path — compiles and then dies at run time with `undefined method 'empty?' for an instance of Array`. Fill and stroke fail identically, so it is `Color::Set`, not the shape code. Untyped-receiver probes of the same shape pass standalone, which puts it in the same category as `bypass_window_class_methods` and `expand_hash_delete`: real, reproducible in the library, not yet reduced. Unlike the stroke gap this one is loud, so preflight does not reject it.
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
@@ -64,7 +66,7 @@ cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
   demo       pass     drew 2 distinct colors over 31 frames
   cli        pass     built an app that drew 3 colors over 31 frames
   preflight  pass     rejected unsupported features by name
-  issues     pass     11 fixed, 4 reproduce
+  issues     pass     11 fixed, 5 reproduce
 ```
 
 - **subset** compiles the `lib/` slice and diffs it against the same program run under CRuby. Any divergence is a compiler difference, because the control has to pass first.
@@ -129,6 +131,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `Rakefile` | The checks, kept here rather than in the root Rakefile so this branch merges or disappears as one piece |
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
+| `square.rb` | USAGE.md's opening example, verbatim — the target this branch is aimed at, built with `ruby2d build --spinel` |
 | `issues/` | The upstream bug reports, one file per issue |
 | `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `compare.rb` diffs that fixture's pixels between mruby and Spinel; `sweep.rb` drops each workaround in turn; `survey.rb` reports what blocks a clean build; `upstream.rb` pulls and rebuilds the compiler; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` and `reduce_oracle_diff.sh` are the two-sided oracles for `spinel-reduce` — the first for crashes, the second for silent wrong answers |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
@@ -378,6 +381,14 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 | [#3787](https://github.com/matz/spinel/issues/3787) | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) | yes — `dsl_shims` |
 | [#3788](https://github.com/matz/spinel/issues/3788) | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) | yes — `window_guards` |
 | [#3789](https://github.com/matz/spinel/issues/3789) | `issues/15-…` | Reading an ivar from an `extend`-provided method emits invalid C — found while probing 13 | no — the library's extended class methods hold no state |
+
+**Drafted, not yet filed:**
+
+| Draft | Bug | Blocks us |
+|---|---|---|
+| `issues/16-…` | A nil key looked up in a String-keyed `Hash` segfaults — `sp_str_hash` reads the tag byte at `s[-1]` without a NULL check. One-line patch in `issues/16-nil-key-hash.patch`, verified at 2854 pass / 0 fail | yes — any `set` without `background:`, which is `square.rb` |
+
+A crashing reproducer needs the same treatment a hanging one gets: the shell prints `segmentation fault` but the binary never wrote it, so `verify_issues.rb` reads the exit status for a fatal signal rather than comparing output. SIGKILL is excluded, since that is its own timeout killer.
 
 ### Two workarounds with no reproducer yet
 
@@ -735,6 +746,28 @@ Mapping `lib/`'s `Ext` calls onto the `R2D_*` core is mostly mechanical — of t
 **`RUBY_ENGINE` is `"spinel"`, so `Window#show` takes the wrong branch.** The condition is `RUBY_ENGINE == 'ruby'`, so Spinel falls through to the mruby/WASM path where *C owns the loop* — precisely what FFI cannot support. Spinel needs the CRuby-shaped branch, where Ruby runs `tick until @close`.
 
 The honest fix is not a string comparison against a third engine name: the condition is really asking "does Ruby own the main loop?". Until the build path exists, `cli/spinel.rb` rewrites it; when the feature lands, `window.rb` should ask that question directly.
+
+## `square.rb`: the goal, and the one line in the way (2026-08-11)
+
+`spinel/square.rb` is USAGE.md's opening example copied verbatim. `ruby2d build --spinel spinel/square.rb` compiles it with no preflight complaint into a 4.9 MB binary whose only dynamic dependencies are system frameworks — and until today that binary segfaulted before its first frame.
+
+```
+stop reason = EXC_BAD_ACCESS (code=1, address=0xffffffffffffffff)
+    frame #0: app`sp_StrStrHash_has_key + 132
+->  0x1002f7bf0 <+132>: ldurb  w1, [x19, #-0x1]
+```
+
+**`set title: 'My App'` carries no `background:` key.** `Window.set` (`window.rb:672`) runs `@background = Color.new(opts[:background]) if Color.valid?(opts[:background])`, `Color.valid?` opens with `NAMED_COLORS.key?(color)`, and Spinel's `sp_str_hash` reads the tag byte at `s[-1]` before hashing. A nil key is a NULL `const char *`, so that read lands at `0xffffffffffffffff` — the fault address and the `[x19, #-0x1]` in the disassembly, exactly.
+
+It is filed as `issues/16-…` with a one-line patch. The convincing part is that the convention already exists in the same file: `sp_str_eq`, twenty-five lines above, handles NULL on either side and says why in its comment — *"nil-vs-string equality is false in Ruby"*. The polymorphic dispatch path guards it too. Only the direct typed call the codegen emits was missing it, so the fix goes where the convention already lives:
+
+```c
+if(!s)return 0;
+```
+
+Nine variants pin the shape: `key?`, `has_key?`, `include?` and `[]` all crash on a String-keyed hash whatever the value type; an Integer-keyed hash is fine; and a **literal** `nil` at the call site is fine because it gets folded. That last one is why this survived — written directly it never reaches the runtime, and only a nil arriving through a variable faults. With the guard applied, all nine match Ruby, `square.rb` draws, and Spinel's own suite reports 2854 pass, 0 fail, 0 error.
+
+**No check here would ever have caught this.** Every fixture on this branch sets a background in a single `set` call, so none of them ever passes a nil key. The script that found it is the most ordinary one imaginable, which is the argument for keeping `square.rb` in the repo and building it: the fixtures test the target, and only a script shaped like the documentation tests the *product*.
 
 ## Strokes drew nothing (2026-08-11)
 

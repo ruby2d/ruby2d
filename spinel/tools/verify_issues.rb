@@ -31,6 +31,14 @@ TIMEOUT = 10
 # so in prose instead.
 HANG = '(hangs'
 
+# A reproducer that crashes is the same problem one step further: the shell
+# prints "segmentation fault" but the binary never wrote it, so the captured
+# stream holds only whatever came before the fault. The crash is read from the
+# exit status instead. SIGKILL is deliberately not in this list — that one is
+# the timeout killer below, not the bug.
+CRASH = 'segmentation fault'
+FATAL_SIGNALS = %w[SEGV BUS ABRT ILL FPE].filter_map { |s| Signal.list[s] }.freeze
+
 # `heading` is a pattern, not a literal: the expectation headings carry a commit
 # ("**Spinel (1aa42ab3):**") that changes as issues are re-verified. An earlier
 # literal match silently found nothing here, which read as "FIXED" for every
@@ -44,20 +52,23 @@ end
 # hangs on them is no better than the bug.
 def run(cmd)
   out = nil
+  status = nil
   pid = nil
   Open3.popen2e(*cmd) do |_in, o, t|
     pid = t.pid
     killer = Thread.new { sleep TIMEOUT; Process.kill('KILL', pid) rescue nil }
     out = o.read
-    t.value
+    status = t.value
     killer.kill
   end
-  out
+  [out, status]
 rescue StandardError => e
-  "ERROR: #{e.message}"
+  ["ERROR: #{e.message}", nil]
 end
 
 def timed_out?(actual) = actual.to_s.strip.empty?
+
+def crashed?(status) = FATAL_SIGNALS.include?(status&.termsig)
 
 require 'fileutils'
 FileUtils.mkdir_p(SCRATCH)
@@ -75,7 +86,8 @@ rows = Dir[File.join(ISSUES, '*.md')].sort.map do |path|
   rb = File.join(SCRATCH, "#{name}.rb")
   File.write(rb, code)
 
-  got_ruby = run(['ruby', rb]).to_s.strip
+  got_ruby, = run(['ruby', rb])
+  got_ruby = got_ruby.to_s.strip
   cruby = got_ruby == want_ruby ? 'ok' : 'MISMATCH'
 
   bin = File.join(SCRATCH, name)
@@ -93,9 +105,12 @@ rows = Dir[File.join(ISSUES, '*.md')].sort.map do |path|
                    want_spinel.include?('rejected')
       documented ? 'reproduces' : 'compile-FAIL'
     else
-      got = run([bin]).to_s.strip
+      got, status = run([bin])
+      got = got.to_s.strip
       if want_spinel.include?(HANG)
         timed_out?(got) ? 'reproduces' : 'FIXED'
+      elsif want_spinel.include?(CRASH)
+        crashed?(status) ? 'reproduces' : 'FIXED'
       elsif got == want_spinel then 'reproduces'
       elsif got == want_ruby then 'FIXED'
       else 'CHANGED'

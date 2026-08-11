@@ -1,0 +1,15 @@
+diff --git a/lib/sp_str.h b/lib/sp_str.h
+index c6c3a4ca..4e4ab575 100644
+--- a/lib/sp_str.h
++++ b/lib/sp_str.h
+@@ -215,6 +215,10 @@ static SP_NOINLINE uint64_t sp_str_hash_miss(const char*s,unsigned char m){
+   return sp_str_hash_compute(s);
+ }
+ static inline uint64_t sp_str_hash(const char*s){
++  /* A NULL key is nil, which no string-keyed table can hold: hash it to a
++     fixed bucket and let sp_str_eq's NULL path miss every stored key. Same
++     convention sp_str_eq already documents above. */
++  if(!s)return 0;
+   unsigned char m=((const unsigned char*)s)[-1];
+   if(m==0xfe||m==0xfc||m==0xf1){
+     uint64_t cached=(((sp_str_hdr*)(s-1))-1)->hash;
