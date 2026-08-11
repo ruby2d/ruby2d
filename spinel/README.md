@@ -268,6 +268,39 @@ Also worth knowing: `spinel-doctor --only inference` reports methods "widened to
 
 `tools/reduce_oracle_diff.sh` was written for this and remains the right oracle for the silent class — a candidate counts only when CRuby and Spinel both run cleanly and disagree. It was not what cracked this one.
 
+## What blocks a clean build of the whole library (2026-08-10)
+
+```sh
+cd spinel && rake survey
+```
+
+`tools/survey.rb` assembles all 37 `LIB_FILES` with the compatibility layer off and reports the complete gap. **Doctor alone cannot answer this**: Spinel stops at the first construct it refuses and never reaches the next, so a plain build names one blocker however many there are — which is exactly why they surfaced one per session. The survey edits out each known blocker so the one behind it becomes visible, and its `NEUTRALIZE` table is the catalogue. Add to it when a new blocker appears; delete an entry when the issue is fixed, and a missing site raises rather than passing quietly.
+
+The gap falls into three kinds, and the middle one had been under-counted:
+
+**Inherent AOT limits — a change in `lib/`, never an upstream fix.**
+
+| | Why it cannot be fixed upstream |
+|---|---|
+| `send` with a runtime method name, 3 sites | AOT needs a compile-time-known name. Every value in the predicate maps is `:button?` today, so a compile-time table would replace it |
+| `Object#define_singleton_method` (`button.rb`) | no per-object method table exists when every call site is a direct C call |
+| `Module#undef_method` (`image`, `canvas`, `tileset`) | methods resolve statically, so there is nothing to undefine from |
+| the class pattern's `ancestors` reflection | already handled by `disable_class_pattern` |
+
+**Compiler bugs.** Six are worked around in `cli/spinel.rb` (four drafted as issues 11-14, two unreduced), and the survey found two more that no workaround covers: a lambda capturing the enclosing block parameter in `interactive.rb`, and `Hash#delete_if` on an ivar in `object_events.rb`. Neither is filed.
+
+**What is left once all of that is edited out** — clang reports these together, so the list is complete:
+
+```
+ 18  assigning to 'mrb_int' from incompatible type 'sp_RbVal'      → issue 14
+  1  initializing 'sp_RbVal' with incompatible type 'const char *' → expand_hash_delete
+  1  returning 'sp_RbVal' from a function returning 'sp_PolyArray *'  → unfiled
+```
+
+Every one is the same shape: a boxed `sp_RbVal` assigned to an unboxed slot, with no conversion emitted.
+
+Two cautions the survey itself taught. Neutralize an *expression*, not a line — blanking whole lines left `if/elsif/else` unbalanced and produced four parse errors that read as findings. And keep the surrounding variables used: replacing a call with a bare `true` left a block parameter unused, which changes the capture analysis and invented a blocker that vanished when both variables were kept.
+
 ## The whole library at once: `spinel-doctor` (2026-08-10)
 
 Bugs were being found one at a time because a build stops at its first error, so widening the slice produced a queue. `spinel-doctor` — in the Spinel checkout's `bin/`, built alongside the compiler — analyses without stopping, and answers "what would we face if we widened all the way" in one run.

@@ -40,4 +40,16 @@ end
 desc 'Run all Spinel checks'
 task(:all) { run_check('all') }
 
+# Deliberately outside the default set: it answers "how far is the whole
+# library from compiling", which is a roadmap question, not a regression one,
+# and it takes minutes.
+desc 'Spinel: what blocks a clean build of the whole library'
+task :survey do
+  print_task 'Spinel: survey'
+  puts "  \e[2m$ ruby spinel/tools/survey.rb\e[0m"
+  Dir.chdir(ROOT) { system('ruby', 'spinel/tools/survey.rb') || exit(1) }
+rescue Interrupt
+  exit(130)
+end
+
 task default: :all
