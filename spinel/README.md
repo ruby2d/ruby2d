@@ -18,9 +18,9 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **All ten filed bugs are closed upstream** ([#3771-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 10 fixed, 0 reproduce.
 
-**One of them is not actually fixed for us.** #3783's own reproducer passes at `20a06d01`, but the library shape it was filed for still fails: with the `positional_callbacks` workaround removed, the `update` block runs every frame, reads its captured local as `1` every time, and the outer value ends at `0`. This is the second round of exactly this — #3783 was itself the follow-up to #3772 for the same reason. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10).
+**One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `20a06d01` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which only the last stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite (2823 pass, 0 fail). See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
 
-That leaves one workaround tied to an open (if closed-on-paper) bug. Everything else in the table is either a permanent AOT gap or a bug still reproducing on its own terms.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four bugs are still worked around and **none of them has been filed**: `bypass_window_class_methods` and `window_guards` (a class method reached through `extend ClassMethods`), `expand_hash_delete`, `expand_massign`, and `dsl_shims`. Reproduce, read the source, propose a fix — the route that worked for #11.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -222,9 +222,24 @@ Spinel rejects that outright — *"unsupported send with a runtime method name (
 
 This one is fixable on the Ruby side whenever the feature is wanted: every value in `OBJECT_EVENT_FILTER_PREDICATES` is `:button?` today, so the `send` could become a direct call. That trades away the indirection the map exists to provide, so it is a design decision for `interactive.rb` rather than a workaround to bury in `cli/spinel.rb`.
 
-## #3783 is closed and still broken for us (2026-08-10)
+## #3783 is closed and still broken for us — root cause and patch (2026-08-10)
 
-All ten filed bugs closed. Sweeping the workaround table found nine of the ten genuinely fixed in the real library, and one not.
+All ten filed bugs closed. Sweeping the workaround table found nine of the ten genuinely fixed in the real library, and one not. Chasing that one produced a root cause, a twenty-line reproducer, and a patch that passes Spinel's own suite — drafted as `issues/11-…` with the diff in `issues/11-ambiguous-forward-callee.patch`.
+
+**The cause.** Escape analysis decides whether a forwarded block's captures need heap cells by resolving which method the block is forwarded into. When the receiver cannot be resolved it falls back to matching by name and takes the **first** scope it finds (`src/analyze.c`, from [`0780e65a`](https://github.com/matz/spinel/commit/0780e65a)). Ruby 2D has four methods named `update` that take a block — a top-level shim, `DSL#update`, `ClassMethods#update`, and `Window#update` — and only the last stores it. `window/class_methods.rb` is assembled before `window.rb`, so the first match is a forwarder, the forward is judged harmless, and the block is inlined with its captures uncelled.
+
+**What made it findable** was reading Matz's own fix commits rather than guessing at shapes. Twenty-one hand-built probes all passed; the commit message for `0780e65a` named the mechanism in one sentence, and the code showed the `break`. The prediction that followed — that the bug depends on *definition order* — reproduced immediately:
+
+```
+storer defined first       ok    n=3
+forwarder defined first    FAIL  n=0
+```
+
+**The fix** treats an ambiguous forward as an escape instead of betting on one candidate, which costs no more than the single-match case already accepts. Verified three ways: the reproducer, Ruby 2D's callbacks with `positional_callbacks` removed, and `make test` in the Spinel checkout at 2823 pass / 0 fail / 0 error.
+
+Keep `positional_callbacks` until the fix is upstream — the branch has to build with a released compiler, not a locally patched one.
+
+### How the evidence was gathered
 
 Remove `positional_callbacks` and the subset still compiles, still runs, and still prints `SUBSET OK` — with one earlier line wrong:
 
@@ -239,11 +254,63 @@ ticks: 5                         ticks: 0
 
 The block **runs** every frame. Each call gets a fresh copy of the captured local, increments it to 1, and the write never reaches the enclosing scope. That is the same signature #3783 was filed with, and #3772 before it.
 
-**Eight build-up probes all pass**, so the trigger is not any of the obvious candidates. Each of these behaves correctly on its own at `20a06d01`: the filed reproducer; the block called five times; the receiver coming from a method rather than a local (`DSL.window.update(&proc)`); the arity read before storing; the ivar initialized to `nil` so it is `NilClass | Proc`; two callbacks stored on one object; an arity-dependent `call` vs `call(dt)`. `scratch/probe_3783.rb` and `probe_3783b.rb` hold them.
+Two experiments narrowed it before the source did, and both are worth reusing:
 
-So this one resists the build-up approach that cracked #3773, and it is being reduced instead — with a new oracle, because the existing one looks for a crash and this is a silent wrong answer. `tools/reduce_oracle_diff.sh` calls a candidate interesting only when CRuby and Spinel both run it cleanly and their output differs. That is the right default for this branch: three of the ten filed bugs were silent.
+**Embed a passing probe in the failing program.** Probe A, appended verbatim to the failing 4,000-line subset, still returned the correct answer while the library's own callback failed in the same binary. That ruled out scale, call-graph size, and interference in one run, and proved a minimal reproducer had to exist.
 
-**The lesson to carry:** `verify_issues.rb` reporting `FIXED` means the reproducer passes, nothing more. The workaround sweep is the real test, and it disagreed here. Do not delete a transform because its issue is closed.
+**Vary only the call site.** Registering the callback four ways showed the generated shim was necessary: `update { }` through the shim failed, while `DSL.window.update { }`, a local receiver, and a pre-built `proc` passed with `&` all worked.
+
+**Twenty-one probes all passed**, which is the useful negative space: repeated invocation, an ivar initialized to `nil`, the arity read before storing, two callbacks on one object, an arity-dependent `call` vs `call(dt)`, a receiver from a module accessor, a bare same-named call that never executes, two forwarding shims side by side, and the shared-name and dead-call-site factors both separately and together. `scratch/probe_*.rb` holds them.
+
+Also worth knowing: `spinel-doctor --only inference` reports methods "widened to untyped (slow path)", and widening is **not** the cause — it appears in the passing cases too. That hypothesis cost an hour; the commit log answered in five minutes.
+
+**Two lessons to carry.** `verify_issues.rb` reporting `FIXED` means the reproducer passes, nothing more — the workaround sweep is the real test, and it disagreed here. And when a bug resists guessing, read the fix history for the ones it follows: `git log --grep` in the Spinel checkout found the mechanism, the file, and the line.
+
+`tools/reduce_oracle_diff.sh` was written for this and remains the right oracle for the silent class — a candidate counts only when CRuby and Spinel both run cleanly and disagree. It was not what cracked this one.
+
+## The whole library at once: `spinel-doctor` (2026-08-10)
+
+Bugs were being found one at a time because a build stops at its first error, so widening the slice produced a queue. `spinel-doctor` — in the Spinel checkout's `bin/`, built alongside the compiler — analyses without stopping, and answers "what would we face if we widened all the way" in one run.
+
+Assemble the **full** `LIB_FILES` (`scratch/survey_full.rb` does this by swapping `SPINEL_LIB_FILES` for `Ruby2D::CLI::LIB_FILES`; the result need not run, only be analyzed) and point doctor at it:
+
+```sh
+export SPINEL=../spinel/bin/spinel
+ruby spinel/scratch/survey_full.rb
+../spinel/bin/spinel-doctor --skip behavior spinel/scratch/full.rb
+```
+
+At `20a06d01`, across all 37 files and 9,226 assembled lines:
+
+```
+[ERR]  unsupported (1)
+  [ok]   unresolved
+[info] inference (850)
+  [ok]   requires
+[ERR]  build (1)
+```
+
+**One unsupported construct in the entire library**, and both errors are the same line — the event-filter hash form in `window.rb`:
+
+```ruby
+if matcher.all? { |k, v| e.send(:"#{k}?", v) }
+```
+> `unsupported send with a runtime method name (AOT needs a compile-time-known name)`
+
+Everything else — image, text, canvas, audio, sprite, tileset, polygon — parses, resolves, and would compile. What stands between the slice and the whole library is that one line plus FFI adapter work, which is mechanical and countable.
+
+The legs are worth knowing individually:
+
+| Leg | Answers |
+|---|---|
+| `unsupported` | constructs Spinel refuses outright — the real blockers |
+| `unresolved` | calls it cannot resolve, each marked whether CRuby agrees |
+| `inference` | every method widened to untyped. **Informational** — widening is not a bug signal, and treating it as one cost an hour on #3783 |
+| `requires` | files it could not load |
+| `build` | does the C compile |
+| `behavior` | runs it and diffs against CRuby. Opt in with `--only behavior`; reports *that* output differs, not where |
+
+`behavior` is a ready-made differential tester. Pointed at a corpus rather than one program — every `USAGE.md` snippet, say, which the project already guarantees runs as written — it would find runtime divergences in bulk, the way the static legs find compile ones.
 
 ## To report upstream
 
@@ -257,7 +324,9 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-**Filed and closed the same day.** #3782-#3784 were filed on 2026-08-10 against `c70ed332`, re-verified against that commit first — including each draft's "Additional Findings" contrasts, which `verify_issues.rb` does not cover because it only runs the main reproducer. All three closed within hours. #3783's fix does **not** cover the shape Ruby 2D uses; see [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10).
+**Drafted, not yet filed.** `issues/11-ambiguous-forward-callee-picks-first-name-match.md` — the follow-up to #3783, with a root cause, a twenty-line reproducer, and a patch in `issues/11-ambiguous-forward-callee.patch`.
+
+**Filed and closed the same day.** #3782-#3784 were filed on 2026-08-10 against `c70ed332`, re-verified against that commit first — including each draft's "Additional Findings" contrasts, which `verify_issues.rb` does not cover because it only runs the main reproducer. All three closed within hours. #3783's fix does **not** cover the shape Ruby 2D uses; see [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
 
 | Issue | Draft | Bug |
 |---|---|---|
@@ -342,7 +411,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | `window_guards` | `shown?` with an implicit receiver does not resolve |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
 | `expand_massign` | Multiple assignment emits the same `sp_RbVal`/`mrb_int` mismatch |
-| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals — [#3783](https://github.com/matz/spinel/issues/3783) is **closed and its reproducer passes**, but the library shape still fails. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us-2026-08-10) |
+| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals — [#3783](https://github.com/matz/spinel/issues/3783) is **closed and its reproducer passes**, but the library shape still fails. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10) |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
