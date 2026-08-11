@@ -89,6 +89,6 @@ In Ruby 2D this is a guard: a class method in an extended module checks `shown?`
 
 ## Environment
 
-- Spinel commit: `20a06d01`
+- Spinel commit: `28b4e9f9`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

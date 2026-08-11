@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `fa666718` (2026-08-11)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `28b4e9f9` (2026-08-11)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -442,7 +442,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `fa666718` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `28b4e9f9` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `positional_callbacks` guards a bug whose own filed reproducer passes today while the library shape it was filed for still fails. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -457,7 +457,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `fa666718` (2026-08-11):**
+**Still needed, re-checked against `28b4e9f9` (2026-08-11):**
 
 | Workaround | Why it is still there |
 |---|---|

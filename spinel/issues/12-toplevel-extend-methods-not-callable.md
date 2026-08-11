@@ -71,6 +71,6 @@ Ruby 2D reaches this through its public API. The library defines a `DSL` module 
 
 ## Environment
 
-- Spinel commit: `20a06d01`
+- Spinel commit: `28b4e9f9`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21
