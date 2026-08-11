@@ -27,6 +27,8 @@ end
 CHECKS = {
   'subset' => 'compile the lib/ slice and diff it against CRuby',
   'demo' => 'build the square demo and check it actually drew pixels',
+  'cli' => 'build an app with `ruby2d build --spinel` and check its pixels',
+  'preflight' => 'check an unsupported app is rejected by feature name',
   'issues' => 're-run every filed reproducer to see what upstream has fixed'
 }.freeze
 

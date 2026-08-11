@@ -25,9 +25,14 @@ end
 
 # Run with a hard cap. Two open Spinel bugs are infinite loops, so anything that
 # executes freshly compiled code needs one — a checker that hangs on them is no
-# better than the bug. Returns [output, :ok | :timeout | :error].
+# better than the bug.
+#
+# Returns [output, :ok | :timeout | :error, exit code]. The exit code is
+# separate from the status because they answer different questions: whether the
+# command finished, and whether it succeeded. A killed process has no code.
 def run_capped(cmd, seconds: 20)
   out = nil
+  code = nil
   status = :ok
   Open3.popen2e(*cmd) do |_in, o, t|
     killer = Thread.new do
@@ -38,12 +43,12 @@ def run_capped(cmd, seconds: 20)
       nil
     end
     out = o.read
-    t.value
+    code = t.value.exitstatus
     killer.kill
   end
-  [out.to_s, status]
+  [out.to_s, status, code]
 rescue StandardError => e
-  ["#{e.class}: #{e.message}", :error]
+  ["#{e.class}: #{e.message}", :error, nil]
 end
 
 # Distinct colors in a PNG, or nil if it can't be decoded.

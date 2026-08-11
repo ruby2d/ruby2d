@@ -21,9 +21,14 @@ Dir.chdir(ROOT)
 SPINEL = resolve_spinel
 SCRATCH = 'spinel/scratch'
 
+# `find_spinel` in cli/spinel.rb honors this first, so the checks that shell out
+# to `ruby2d build --spinel` use the same compiler the rest measured against
+# rather than whatever a `ruby2d setup --spinel` left in the cache.
+ENV['RUBY2D_SPINEL'] = SPINEL
+
 def sh!(*cmd)
-  out, status = run_capped(cmd, seconds: 600)
-  [out, status == :ok]
+  out, status, code = run_capped(cmd, seconds: 600)
+  [out, status == :ok && code&.zero?]
 end
 
 def compile(src, bin)
@@ -38,8 +43,6 @@ end
 # The lib/ slice: does it compile, and does it behave the way CRuby does?
 def check_subset
   sh!('ruby', 'spinel/tools/build_subset.rb')
-  sh!('ruby', 'spinel/tools/patch_next.rb',    "#{SCRATCH}/subset.rb")
-  sh!('ruby', 'spinel/tools/patch_capture.rb', "#{SCRATCH}/subset.rb")
 
   control, ok = sh!('ruby', "#{SCRATCH}/subset.rb")
   return ['subset', :fail, "CRuby control failed — the harness is broken, not the compiler:\n#{control}"] unless ok
@@ -48,7 +51,7 @@ def check_subset
   return ['subset', :fail, "#{errors} C errors, no binary"] unless built
 
   out, status = run_capped(["./#{SCRATCH}/subset.bin"])
-  return ['subset', :fail, 'hung — issue 08 is back, or patch_next no longer applies'] if status == :timeout
+  return ['subset', :fail, 'hung — #3782 is back, or spinel_hash_each_next no longer matches'] if status == :timeout
 
   if out == control
     ['subset', :pass, "matches CRuby (#{control.lines.size} lines)"]
@@ -79,6 +82,63 @@ def check_demo
   ['demo', :pass, "drew #{colors} distinct colors over #{run[/rendered (\d+) frames/, 1]} frames"]
 end
 
+# The CLI: does `ruby2d build --spinel` take an ordinary app and produce a
+# binary that draws? This is the only check that goes through the installed gem
+# rather than the working tree — so run `rake` first, or it tests the last
+# install and not the current edit.
+def check_cli
+  dir = "#{SCRATCH}/cli"
+  FileUtils.rm_rf(dir)
+  FileUtils.mkdir_p(dir)
+  FileUtils.cp('spinel/tools/cli_app.rb', "#{dir}/app.rb")
+  shot = File.expand_path("#{dir}/app.png")
+
+  out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'app.rb') }
+  return ['cli', :fail, "build failed:\n#{out}"] unless ok
+
+  binary = "#{dir}/build/native/app"
+  return ['cli', :fail, "no executable at #{binary}"] unless File.exist?(binary)
+
+  ENV['FRAMES'] = '30'
+  ENV['SHOT'] = shot
+  run, status = run_capped([File.expand_path(binary)], seconds: 60)
+  return ['cli', :fail, 'hung'] if status == :timeout
+  return ['cli', :fail, "no screenshot written:\n#{run}"] unless File.exist?(shot)
+
+  colors = png_distinct_colors(shot)
+  return ['cli', :skip, 'built and ran, but the screenshot could not be decoded'] if colors.nil?
+  return ['cli', :fail, "rendered a blank window (#{colors} distinct color)"] if colors < 2
+
+  frames = run[/ran (\d+) frames/, 1]
+  # A frame count that stayed at 0 means the `update` block ran without its
+  # captured local — #3783 silently back, which nothing else here would catch.
+  return ['cli', :fail, "update block lost its captured local (ran #{frames.inspect} frames)"] unless frames.to_i > 1
+
+  ['cli', :pass, "built an app that drew #{colors} colors over #{frames} frames"]
+end
+
+# The preflight: does an app using unsupported features stop with a message
+# naming them, rather than a wall of generated-C errors?
+def check_preflight
+  dir = "#{SCRATCH}/cli"
+  FileUtils.mkdir_p(dir)
+  File.write("#{dir}/unsupported.rb", <<~'RUBY')
+    require 'ruby2d'
+    Circle.new(x: 10, y: 10, radius: 5)
+    on :key_down do
+      close
+    end
+  RUBY
+
+  out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'unsupported.rb') }
+  return ['preflight', :fail, "accepted an app it can't build"] if ok
+
+  missing = %w[Circle on].reject { |name| out.include?(name) }
+  return ['preflight', :fail, "didn't name #{missing.join(' or ')}:\n#{out}"] unless missing.empty?
+
+  ['preflight', :pass, 'rejected unsupported features by name']
+end
+
 # The filed reproducers: has upstream fixed any of them?
 def check_issues
   out, = sh!('ruby', 'spinel/tools/verify_issues.rb')
@@ -92,6 +152,8 @@ end
 
 CHECKS = { 'subset' => method(:check_subset),
            'demo' => method(:check_demo),
+           'cli' => method(:check_cli),
+           'preflight' => method(:check_preflight),
            'issues' => method(:check_issues) }.freeze
 
 which = ARGV[0] || 'all'
@@ -110,7 +172,7 @@ results = selected.map do |name|
 end
 
 puts
-results.each { |name, status, detail| puts format('  %-8s %-8s %s', name, status, detail) }
+results.each { |name, status, detail| puts format('  %-10s %-8s %s', name, status, detail) }
 puts
 
 exit(results.any? { |r| r[1] == :fail } ? 1 : 0)

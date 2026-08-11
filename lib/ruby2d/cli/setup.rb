@@ -10,6 +10,7 @@ require 'ruby2d/gem_paths'
 require 'fileutils'
 require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/messages'
+require 'ruby2d/cli/spinel'  # cache paths for --spinel; extension-free, as above
 require 'ruby2d/version'
 require_relative '../../../assets/target'
 
@@ -156,8 +157,118 @@ def setup_clean(yes: false)
 end
 
 
+# Spinel — Matz's whole-program Ruby AOT compiler — is not vendored and has no
+# releases, so `ruby2d setup --spinel` builds it from source into the same cache
+# as the other dependencies. It is a compiler, not a library: nothing links it,
+# `ruby2d build --spinel` runs it.
+SPINEL_REPO = 'https://github.com/matz/spinel.git'
+
+
+# Remove the Spinel checkout, and with it the compiler built inside it.
+def setup_spinel_clean(sources, yes:)
+  unless Dir.exist?(sources)
+    setup_step 'Nothing to remove'
+    puts "    #{'Spinel is not built'.dim}\n\n"
+    return
+  end
+
+  setup_step 'Remove the Spinel compiler'
+  puts "\n  This removes the checkout at #{setup_tildify(sources)}, and the"
+  puts '  compiler built inside it. Rebuilding takes several minutes.'
+  setup_confirm!(yes: yes)
+
+  FileUtils.rm_rf sources
+  puts "\n  Removed the Spinel compiler.\n\n"
+end
+
+
+# Build the Spinel compiler from source into the per-user cache.
+def setup_spinel(force: false, clean: false, yes: false)
+  sources = spinel_cache_dir
+  bin = spinel_cache_bin
+
+  if clean
+    note '`--clean` only removes the compiler; `--force` was ignored.' if force
+    return setup_spinel_clean(sources, yes: yes)
+  end
+
+  if File.exist?(bin) && !force
+    setup_step 'Spinel ready'
+    commit = spinel_commit(bin)
+    puts "    #{["built at #{setup_tildify(bin)}", commit && "commit #{commit}"].compact.join(' — ').dim}"
+    puts "\n  Already built. Re-run with #{'--force'.bold} to update and rebuild, or"
+    puts "  #{'ruby2d build --spinel <app>.rb'.bold} to build an app.\n\n"
+    return
+  end
+
+  missing = %w[git make].reject { |cmd| setup_command?(cmd) }
+  cc = ENV['CC'] || 'cc'
+  missing << cc unless setup_command?(cc)
+  unless missing.empty?
+    error "Missing build tools: #{missing.join(', ')}", spaced: true
+    puts "  Spinel builds with git, make, and a C compiler.\n\n"
+    exit 1
+  end
+
+  setup_step 'Set up the Spinel compiler'
+  puts
+  puts "    #{'Source'.dim}     #{SPINEL_REPO}"
+  puts "    #{'Location'.dim}   #{setup_tildify(sources)}"
+  puts "\n  #{'This will:'.bold}"
+  puts "    • #{Dir.exist?(sources) ? 'Update the existing Spinel checkout' : 'Clone Spinel with git'}"
+  puts '    • Download its parser dependency and compile it — this takes several minutes'
+  puts "    • Leave the compiler at #{setup_tildify(bin)}"
+  puts "\n  Spinel is an experimental ahead-of-time Ruby compiler, and the Ruby 2D"
+  puts "  target that uses it draws shapes only. #{'ruby2d build'.bold} still uses mruby."
+
+  setup_confirm!(yes: yes)
+
+  setup_step Dir.exist?(sources) ? 'Updating Spinel' : 'Cloning Spinel'
+  FileUtils.mkdir_p File.dirname(sources)
+  ok = if Dir.exist?(sources)
+         # `--force` on an existing checkout means "get the current Spinel", so
+         # fetch and reset rather than reusing what's there. A cancelled build
+         # leaves the checkout behind, which is what makes re-running resume.
+         Dir.chdir(sources) do
+           system('git', 'fetch', '--depth', '1', 'origin', 'HEAD') &&
+             system('git', 'reset', '--hard', 'FETCH_HEAD')
+         end
+       else
+         system('git', 'clone', '--depth', '1', SPINEL_REPO, sources)
+       end
+
+  unless ok
+    error 'Failed to get the Spinel sources. See the output above.', spaced: true
+    exit 1
+  end
+
+  setup_step 'Building Spinel'
+  puts "    #{'$ make deps && make'.dim}\n\n"
+  ok = Dir.chdir(sources) { system('make', 'deps') && system('make') }
+  unless ok
+    error 'Failed to build Spinel. See the output above.', spaced: true
+    puts "  Re-run #{'ruby2d setup --spinel'.bold} to try again — the checkout is kept.\n\n"
+    exit 1
+  end
+
+  unless File.exist?(bin)
+    error "Spinel built without producing #{setup_tildify(bin)}.", spaced: true
+    exit 1
+  end
+
+  commit = spinel_commit(bin)
+  setup_step 'Built the Spinel compiler'
+  puts "\n    #{'Spinel'.bold}"
+  puts "    bin/spinel#{"  #{"commit #{commit}".dim}" if commit}"
+  puts "\n  Built at #{setup_tildify(bin)}"
+  puts "\n  #{'Ready!'.bold} Run #{'ruby2d build --spinel <app>.rb'.bold} to build an app.\n\n"
+end
+
+
 # Build the native SDL3 + mruby static libraries for the current platform.
-def setup(force: false, clean: false, yes: false)
+def setup(force: false, clean: false, yes: false, spinel: false)
+  return setup_spinel(force: force, clean: clean, yes: yes) if spinel
+
   if clean
     # `--clean` is standalone: it only removes. Say so rather than letting a
     # combined `--force` look like it did something (matches `build --clean`).

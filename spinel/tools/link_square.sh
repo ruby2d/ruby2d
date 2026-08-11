@@ -27,8 +27,6 @@ if [ ! -f "$CORE/libruby2d_core.a" ]; then
 fi
 
 ruby spinel/tools/build_square.rb
-ruby spinel/tools/patch_next.rb    spinel/scratch/square.rb
-ruby spinel/tools/patch_capture.rb spinel/scratch/square.rb
 
 # `-ferror-limit=0`: clang stops at 20 by default, which makes a real error
 # count read as a plateau. The frameworks are what SDL3 needs on macOS.

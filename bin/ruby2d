@@ -47,11 +47,17 @@ Options:
   --assets <dir>    Bundle a directory of media files (native and web)
   --template <file> Use a custom HTML template for the web build (web only)
   --single-file     Produce a single self-contained HTML file (web only)
+  --spinel          Compile with Spinel instead of mruby (experimental, native)
   --debug           Print debugging info and keep intermediate files
   --clean           Clean up the build directory
 
 An app can bundle its own asset directories without the --assets flag by
-declaring them in its source: #{'# ruby2d:assets <dir>'.bold} (one per line).\n\n"
+declaring them in its source: #{'# ruby2d:assets <dir>'.bold} (one per line).
+
+#{'--spinel'.bold} compiles the app and library ahead of time into a standalone
+executable, with no Ruby engine inside it. It's experimental and draws shapes
+only; the build stops and names anything it can't compile yet. Build it first
+with #{'ruby2d setup --spinel'.bold}.\n\n"
 
 usage_launch = "
 Use the #{'launch'.bold} command to run a Ruby 2D app that has been built.
@@ -76,6 +82,7 @@ Usage: ruby2d setup [options]
 Options:
   --force    Rebuild even if the libraries already exist
   --clean    Remove the built libraries for this platform
+  --spinel   Build the Spinel compiler instead, for #{'ruby2d build --spinel'.bold}
   -y, --yes  Skip the confirmation prompt\n\n"
 
 usage_usage = "
@@ -137,6 +144,9 @@ when 'build'
   # --native the same as `build --native app.rb`.
   native = ARGV.delete('--native')
   web    = ARGV.delete('--web')
+  # `--spinel` picks the compiler, not the target: it's a modifier on the native
+  # build, so it reads the same wherever it appears and implies --native.
+  @spinel = !ARGV.delete('--spinel').nil?
   # Whether web was requested explicitly (vs. implied by the all-platforms
   # default), so a missing `emcc` fails loudly for `--web` but skips quietly otherwise.
   @web_explicit = !web.nil?
@@ -146,7 +156,7 @@ when 'build'
     # `--clean` is standalone: it only empties the build directory. Warn if it
     # was combined with build arguments so the skipped build isn't silent.
     leftover = (ARGV[1..] || []).reject { |a| a.start_with?('-') }
-    if native || web || !leftover.empty?
+    if native || web || @spinel || !leftover.empty?
       puts "#{'Note:'.bold} `--clean` only cleans the build directory; other build arguments were ignored."
     end
     clean_up(:all)
@@ -155,6 +165,24 @@ when 'build'
               elsif web && !native then :web
               else [:native, :web]
               end
+
+    # `--spinel` compiles ahead-of-time to a native executable; there's no web
+    # target for it yet. Reject the combination rather than quietly dropping
+    # half of what was asked for, and narrow the default to native alone.
+    if @spinel
+      if web
+        puts "#{'Error:'.error} --spinel builds native only; it can't be combined with --web"
+        puts usage_build
+        exit 1
+      end
+      if @assets_dir
+        puts "#{'Error:'.error} --assets can't be used with --spinel, which has no way to load media yet"
+        puts usage_build
+        exit 1
+      end
+      targets = :native
+    end
+
     # `--template`/`--single-file` are web-only; reject them on a native-only
     # build instead of silently dropping the request. (`--assets` bundles for
     # both native and web, so it's allowed here.)
@@ -201,9 +229,10 @@ when 'setup'
   if ARGV.delete('--help') || ARGV.delete('-h')
     puts usage_setup
   else
-    force = !ARGV.delete('--force').nil?
-    clean = !ARGV.delete('--clean').nil?
-    yes   = !(ARGV.delete('--yes') || ARGV.delete('-y')).nil?
+    force  = !ARGV.delete('--force').nil?
+    clean  = !ARGV.delete('--clean').nil?
+    yes    = !(ARGV.delete('--yes') || ARGV.delete('-y')).nil?
+    spinel = !ARGV.delete('--spinel').nil?
     # The known flags were deleted above, so any remaining `-`-prefixed token is
     # an unrecognized option.
     if (unknown = (ARGV[1..] || []).find { |a| a.start_with?('-') })
@@ -212,7 +241,7 @@ when 'setup'
       exit 1
     end
     begin
-      setup(force: force, clean: clean, yes: yes)
+      setup(force: force, clean: clean, yes: yes, spinel: spinel)
     rescue Interrupt
       # Ctrl-C reaches the whole foreground process group, so it lands here
       # rather than in `system`'s return value — and it can arrive at the

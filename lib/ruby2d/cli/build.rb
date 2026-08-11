@@ -174,6 +174,29 @@ def find_mrbc
 end
 
 
+# The system libraries and frameworks SDL3 needs on this platform, independent
+# of how Ruby 2D itself was compiled — shared by the mruby and Spinel builds.
+def native_platform_flags
+  flags = +''
+  case AssetsTarget.host_os
+
+  when 'macos'
+    %w[AVFoundation AudioToolbox Carbon Cocoa CoreAudio CoreHaptics
+       CoreMedia ForceFeedback GameController IOKit Metal QuartzCore
+       UniformTypeIdentifiers].each do |name|
+      add_ld_flags(flags, name, :framework)
+    end
+
+  when 'windows'
+    flags << '-lgdi32 -lhid -limm32 -lole32 -loleaut32 -lrpcrt4 -lsetupapi -lusp10 -luuid -lversion -lwinmm -lws2_32'
+
+  when 'linux', 'bsd'
+    flags << '-lm'
+  end
+  flags
+end
+
+
 # Add linker flags
 def add_ld_flags(ld_flags, name, type, dir = nil)
   case type
@@ -313,6 +336,14 @@ end
 def build(targets, ruby2d_app)
   targets = [targets] unless targets.is_a?(Array)
 
+  # `--spinel` is a different compiler for the same native target, not a target
+  # of its own: it replaces mruby, so it owns the whole build rather than
+  # slotting into the loop below. See cli/spinel.rb.
+  if @spinel
+    require 'ruby2d/cli/spinel'
+    return build_spinel(ruby2d_app)
+  end
+
   compile(ruby2d_app)
 
   # Asset directories to bundle: the `--assets` flag plus any `# ruby2d:assets
@@ -371,22 +402,7 @@ def compile_native
     libs.each { |name| ld_flags << "-l#{name} " }
   end
 
-  # Add compiler flags for each platform
-  case AssetsTarget.host_os
-
-  when 'macos'
-    %w[AVFoundation AudioToolbox Carbon Cocoa CoreAudio CoreHaptics
-       CoreMedia ForceFeedback GameController IOKit Metal QuartzCore
-       UniformTypeIdentifiers].each do |name|
-      add_ld_flags(ld_flags, name, :framework)
-    end
-
-  when 'windows'
-    ld_flags << '-lgdi32 -lhid -limm32 -lole32 -loleaut32 -lrpcrt4 -lsetupapi -lusp10 -luuid -lversion -lwinmm -lws2_32'
-
-  when 'linux', 'bsd'
-    ld_flags << '-lm'
-  end
+  ld_flags << native_platform_flags
 
   # Check for a C compiler up front so a missing toolchain gives a clear message
   # instead of a bare `failed` on exit 127 (like the `mrbc` check). A missing C

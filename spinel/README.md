@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all three checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `c70ed332` (2026-08-10)** — `cd spinel && rake` green on all five checks. The CLI additionally builds clean against `550d2a9d`.
 
 ## Start here
 
@@ -8,7 +8,9 @@ The rest of this document is a research log in discovery order. This section is 
 
 ### Status
 
-**The MVP is done: a real Ruby 2D script compiles with Spinel and draws a square on screen.** `set title:`, `Square.new`, `show` — through `lib/`'s own scene graph into the real `R2D_*` core, 5.2 MB standalone binary. Build it with `./spinel/tools/link_square.sh`; see [MVP reached](#mvp-reached-a-ruby-2d-script-on-screen-2026-08-10). What remains for a shippable feature is CLI wiring (`ruby2d build --spinel`), not research.
+**The feature is wired: `ruby2d build --spinel app.rb` compiles an ordinary Ruby 2D script to a standalone 5.2 MB binary.** No hand-run scripts, no paths to set — get the compiler with `ruby2d setup --spinel`, then build. The app goes through `lib/`'s own scene graph into the real `R2D_*` core, with Ruby owning the frame loop. See [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10).
+
+What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
@@ -22,20 +24,26 @@ Three new bugs are open, filed as [#3782-#3784](https://github.com/matz/spinel/i
 | 09 | A forwarded block stored in an **ivar** loses its captured locals (incomplete fix of #3772) | `update { }` runs but every counter it writes stays at its initial value |
 | 10 | A block's result type is unified across `yield` call sites | Event dispatch calls the wrong event class's methods |
 
-**None of the three is a dead end.** 08 and 09 both have workarounds verified against the real library, applied by `tools/patch_next.rb` and `tools/patch_capture.rb`; with both, the subset runs **identically to CRuby**, `ticks: 5` and all. Neither is landed in `cli/spinel.rb`: 08 is a regression and 09 would cost a positional parameter on every block-taking `Window` method, so both wait on upstream. 10 has no workaround and does not need one yet — it only bites once input events are wired up, which the MVP does not do.
+**None of the three is a dead end.** 08 and 09 are worked around in `cli/spinel.rb` as `hash_each_next` and `positional_callbacks`, verified against the real library rather than a probe. They had been kept out as standalone patch scripts while this was a demo, on the grounds that upstream would fix them; wiring the CLI settled it, because without them a built app hangs on the first `Square.new` and every `update` counter silently stays at zero. Both are one `spinel_sub` each and delete cleanly when #3782 and #3783 land. 10 needs no workaround yet — it only bites once input events are wired up, which this target does not do.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
 ### Setup
 
-Spinel is not vendored. Clone it **beside this repo** and build:
+Spinel is not vendored. For using the feature, one command gets it:
+
+```sh
+ruby2d setup --spinel     # clones and builds into the ruby2d cache; several minutes
+```
+
+For working **on** this branch, clone it **beside this repo** instead — the tools here look there, and a checkout you control is easier to `git bisect`:
 
 ```sh
 git clone --depth 1 https://github.com/matz/spinel.git ../spinel
 (cd ../spinel && make deps && make)     # builds bin/spinel; needs network for libprism
 ```
 
-Nothing else to set: every tool here resolves the binary through `tools/spinel_path.sh` (shell) or `resolve_spinel` (Ruby), which look at `$SPINEL`, then `$RUBY2D_SPINEL`, then `../spinel/bin/spinel`, then `$PATH`. Keeping the recipes path-free is deliberate — this branch is shared, and a machine-specific path in a committed script is noise at best and a broken copy-paste at worst.
+Nothing else to set: every tool here resolves the binary through `tools/spinel_path.sh` (shell) or `resolve_spinel` (Ruby), which look at `$SPINEL`, then `$RUBY2D_SPINEL`, then `../spinel/bin/spinel`, then `$PATH`. `find_spinel` in `cli/spinel.rb` is the same order minus the sibling checkout, with the `setup --spinel` build in its place. Keeping the recipes path-free is deliberate — this branch is shared, and a machine-specific path in a committed script is noise at best and a broken copy-paste at worst.
 
 Any other location works, it just has to be named once:
 
@@ -45,21 +53,29 @@ export RUBY2D_SPINEL=/wherever/spinel/bin/spinel   # also what cli/spinel.rb hon
 
 `make deps` fetches libprism and rbs from RubyGems. A rebuild after `git fetch` is just `make -j8`.
 
+**Spinel is used from its checkout, never copied out of it.** It resolves `libspinel_rt.a` and its C sources relative to its own `bin/`, so a lone copied binary fails at link time. That is why `setup --spinel` builds into the cache's sources directory and leaves the compiler there.
+
 ### Check where things stand
 
 ```sh
-cd spinel && rake     # all three checks; or `rake subset`, `rake demo`, `rake issues`
+cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
 ```
 
 ```
-  subset   pass     matches CRuby (4 lines)
-  demo     pass     drew 2 distinct colors over 31 frames
-  issues   pass     7 fixed, 3 reproduce
+  subset     pass     matches CRuby (4 lines)
+  demo       pass     drew 2 distinct colors over 31 frames
+  cli        pass     built an app that drew 2 colors over 31 frames
+  preflight  pass     rejected unsupported features by name
+  issues     pass     7 fixed, 3 reproduce
 ```
 
 - **subset** compiles the `lib/` slice and diffs it against the same program run under CRuby. Any divergence is a compiler difference, because the control has to pass first.
 - **demo** builds the square and checks the **pixels**, not the exit status.
+- **cli** builds `tools/cli_app.rb` with `ruby2d build --spinel` and checks its pixels and its frame count. The frame count is the point: a zero would mean #3783 is back, which no other check would notice.
+- **preflight** builds an app using `Circle` and `on` and checks the build refuses it *by name*.
 - **issues** re-runs every filed reproducer. A `FIXED` row is the cue to drop the matching workaround with `SPINEL_SKIP=` and rebuild.
+
+**`cli` and `preflight` go through the installed gem**, not the working tree — so run `rake` in the repo root first or they test your last install. Everything else reads `lib/` directly.
 
 `spinel/tools/check.rb` is what these run, and it encodes the things that wasted the most time when they were manual:
 
@@ -87,6 +103,7 @@ Spinel ships many commits a day, so pull before trusting any measurement here.
 | Why this is viable at all | [Why Spinel fits](#why-spinel-fits) |
 | What breaks and how it is worked around | [Workarounds to re-check](#workarounds-to-re-check), then `lib/ruby2d/cli/spinel.rb` |
 | What is filed upstream | [To report upstream](#to-report-upstream) and `issues/` |
+| How the CLI is wired | [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10) |
 | How to rebuild the demo | [Building the demo](#building-the-demo) |
 | How to chase a new whole-program bug | [Reducing a whole-program failure](#reducing-a-whole-program-failure) |
 | What the MVP is and what is left | [MVP](#mvp) |
@@ -103,7 +120,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the square-only slice of `lib/` (`SPINEL_SKIP=` drops workarounds); `verify_issues.rb` re-runs every filed reproducer; `patch_next.rb` and `patch_capture.rb` step around issues 08 and 09; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
+| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` is the two-sided oracle for `spinel-reduce` |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
@@ -304,6 +321,8 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | `expand_window_singleton`, `window_guards` | `shown?` with an implicit receiver does not resolve |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
 | `expand_massign` | Multiple assignment emits the same `sp_RbVal`/`mrb_int` mismatch |
+| `hash_each_next` | `next` inside `Hash#each` hangs ([#3782](https://github.com/matz/spinel/issues/3782)) — without it every `Square.new` loops forever |
+| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals ([#3783](https://github.com/matz/spinel/issues/3783)) — without it every `update` counter stays at zero |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern`, `disable_object_interactivity` | AOT gaps, not bugs — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
@@ -476,7 +495,7 @@ Build it with `./tools/link_square.sh`, then run `FRAMES=30 SHOT=out.png ./spine
 
 This is the milestone the earlier one was not: `bouncing_balls.rb` proved the C path with hand-written FFI, and the subset proved the `lib/` path with stubs. This is both at once — `lib/`'s `Window`, `Renderable`, `Quad` and `Square` driving the real `R2D_*` core, with a Ruby-owned frame loop.
 
-`tools/build_square.rb` is the generator; the adapter lives in its `FFI` heredoc. Three things it had to get right, each of which failed silently or obscurely first:
+`tools/build_square.rb` supplies the demo's main; the assembly and the adapter moved into `cli/spinel.rb` when the CLI landed (`spinel_assemble`, `SPINEL_EXT`). Three things the adapter had to get right, each of which failed silently or obscurely first:
 
 - **Qualify every FFI call.** `R2D_DrawQuad(...)` inside the declaring module is an "unsupported call"; `Ext.R2D_DrawQuad(...)` works. This is what `bouncing_balls.rb` already did as `R2D.R2D_DrawCircle(...)`.
 - **Spell out the type array.** `[:float] * 24` is rejected; the 24 entries have to be literal.
@@ -485,6 +504,55 @@ This is the milestone the earlier one was not: `bouncing_balls.rb` proved the C 
 `R2D_ShowWindow` also learned that an empty icon string means "no icon" — a flattened caller has no NULL to pass, since Spinel's FFI has no nil for `:str`.
 
 **Still stubbed:** 31 of the 41 `Ext` entry points are inert. They have to exist, because Spinel compiles the whole reachable graph, but a static square never reaches them. `drain_events` returns `nil` on purpose, which is what keeps input — and therefore issue 10 — out of the picture entirely.
+
+## The CLI: `ruby2d build --spinel` (2026-08-10)
+
+The demo above became a feature. `ruby2d setup --spinel` gets the compiler, `ruby2d build --spinel app.rb` produces a standalone executable, and `ruby2d launch --native` runs it — the same three commands the mruby path uses.
+
+```sh
+ruby2d setup --spinel
+ruby2d build --spinel app.rb
+```
+
+### The flag
+
+`--spinel` is a **modifier, not a target**. `--native` and `--web` say what to produce; `--spinel` says what to produce it with, so it reads the same wherever it appears (`build app.rb --spinel`) and implies `--native`. `--web --spinel` is an error rather than a silent half-build, and stays one until the wasm path exists. `--assets` is rejected too: nothing in the slice can read a file, so accepting it would bundle media the app has no way to open.
+
+Everything else the flag touches is one branch in `build`, which hands the whole build to `build_spinel`. There is no Spinel case threaded through the mruby build steps — the two paths share helpers (`native_platform_flags`, `strip_require`, `create_macos_bundle`), not control flow.
+
+### What the build does
+
+1. **Preflight** the app source and stop if it uses something unsupported.
+2. **Assemble** the `lib/` slice, the compatibility transforms, the FFI adapter, and the app into one Ruby file — `spinel_assemble`.
+3. **Compile the core**: the five `ext/ruby2d` C files that make up the `R2D_*` renderer, with `-DRUBY2D_NO_RUBY`, archived as `libruby2d_core.a`.
+4. **Run Spinel** over the assembled file, linking that archive and the SDL3 statics.
+
+Step 2 is the same function `tools/build_subset.rb` and `tools/build_square.rb` call. That is deliberate: those checks used to assemble the program themselves, so a green check proved something about the harness. Now `rake demo` passing is evidence about `ruby2d build --spinel`.
+
+### Preflight
+
+Spinel compiles the whole reachable graph, so an unsupported class isn't a feature that quietly does nothing — it's a wall of generated-C errors naming Spinel internals. Preflight reads the app first and stops with the line the user wrote:
+
+```
+Error: bouncing_balls.rb uses features the Spinel target doesn't support yet.
+
+    line  5  Circle  shapes and media beyond Square, Rectangle, and Quad
+    line 12  on      input events — event dispatch needs a runtime `send`
+```
+
+The rejected class list is **derived** from `Ruby2D::CLI::LIB_FILES - SPINEL_LIB_FILES`, not written out, so widening the slice narrows the rejections automatically. A `lib/` file that appears in neither list raises `SpinelCompatDrift` — the same drift detection the transforms use, so a new subsystem can't be quietly forgotten on one side.
+
+It matches on source text, and does not try to parse. A class name inside a string reads as a use, which errs toward a false rejection with a clear message — the safer way to be wrong here. `on` only counts at the start of a line or after a receiver, so the English word in a string doesn't trip it.
+
+### Warnings
+
+The generated C compiles with `-w` unless `--debug`. The warnings are about Spinel, not about anything the user wrote, and there are 17 of them on a hello-world; a wall of `incompatible pointer types` on an ordinary build is noise. Under `--debug` they are shown, and they are worth reading there — every silent mistyping bug filed so far announced itself as one of those warnings first, #3784 included. Errors are never capped: `-ferror-limit=0` where the compiler is clang.
+
+### Where the compiler lives
+
+`ruby2d setup --spinel` clones and builds into the cache's sources directory and **leaves the compiler in the checkout**. Copying `bin/spinel` out of it does not work: Spinel resolves `libspinel_rt.a` and its C sources relative to its own `bin/`, so a lone binary fails at link with a missing archive. This was found by doing exactly that.
+
+The build prints the commit it used, read from the checkout's git rather than from a stamp written at install time — so it stays correct for a `RUBY2D_SPINEL` pointing at a tree someone rebuilds on their own.
 
 ## What the `Ext` adapter has to solve (2026-08-10)
 
@@ -521,6 +589,8 @@ dsl
 
 Dropped for the MVP: `audio`, `canvas`, `font`, `image`, `text`, `bitmap_text`, `sprite`, `sprite_sheet`, `tileset`, `button`, `json_parser`, `atlas_parser`.
 
+**What shipped is narrower than this list.** `SPINEL_LIB_FILES` in `cli/spinel.rb` also leaves out `circle`, `ellipse`, `line`, `polygon`, `polyline`, and `triangle`: they compile, but each needs `Ext` entry points the adapter doesn't have yet, and a missing one is a compile error rather than a dormant feature. Circle, ellipse, triangle, and line are the cheap ones — `R2D_DrawCircle`, `R2D_DrawEllipse`, `R2D_DrawTriangle`, `R2D_DrawLine` are all scalar-only, so they are `ffi_func` declarations plus an adapter method each. Polygon and polyline are not: they take `const float *` vertex arrays, which Spinel's FFI has no way to build from a Ruby Array.
+
 ### Checklist
 
 - [x] **Step 0 — compile the real `lib/`.** Done; see [Step 0 results](#step-0-results-the-real-lib-under-spinel). The MVP subset compiles clean.
@@ -528,17 +598,17 @@ Dropped for the MVP: `audio`, `canvas`, `font`, `image`, `text`, `bitmap_text`, 
 - [x] Unblock issue 6 for the MVP — rewrite the 4 internal call sites to `DSL.window.<m>(self)`. Verified: MVP subset compiles clean, nothing neutralized. Provisional; see [Workarounds to re-check](#workarounds-to-re-check).
 - [ ] Reduce issue 6 with `bin/spinel-reduce` and report upstream. The public `Window.add(obj)` class method still fails, so the bug is worked around, not fixed.
 - [ ] Redesign the `on event: { ... }` hash-filter path around a compile-time predicate table (issues 4 and 5), or gate it off on the Spinel target for the MVP.
-- [ ] `find_spinel` in `build.rb`, mirroring `find_mrbc` (`build.rb:162-174`): `RUBY2D_SPINEL` → stamped cache → `$PATH`. See [Getting Spinel](#getting-spinel).
-- [ ] `ruby2d setup --spinel` builds Spinel into the per-user cache, reusing the existing stamp model (`build.rb:126-137`). Not needed while `RUBY2D_SPINEL` covers development.
-- [ ] `--spinel` flag in `bin/ruby2d`, position-independent like `--native`/`--web` (`bin/ruby2d:138`), plus a `# ruby2d:compiler spinel` source directive mirroring `# ruby2d:assets`.
-- [ ] Thin C shim: flat, Ruby-free window lifecycle and event entry points. Compile with `shapes.c` and `fps.c` (both already Ruby-free) into a static archive.
-- [ ] `lib/ruby2d/spinel/ext.rb`: hand-written `ffi_func` declarations for the MVP subset. Hand-writing is right at this size, but it duplicates the binding list and *will* drift from `ext/` — a shared manifest generating both is the eventual answer, and the drift is a conscious MVP tradeoff, not an oversight.
-- [ ] Replace the `include Ruby2D` / `extend Ruby2D::DSL` preamble with generated top-level DSL shims on the Spinel path only.
-- [ ] Link step: `--link <archive>` for the SDL3 statics (Spinel places them between the generated TU and its runtime, exactly where they need to go) and `--cc` to carry the macOS frameworks.
-- [ ] Run an existing example unmodified — a shapes-only one — and confirm it renders and takes input.
+- [x] `find_spinel` in `cli/spinel.rb`, mirroring `find_mrbc`: `RUBY2D_SPINEL` → cache build → `$PATH`. See [Getting Spinel](#getting-spinel).
+- [x] `ruby2d setup --spinel` builds Spinel into the per-user cache. No stamp file in the end — the commit is read from the checkout, which can't go stale.
+- [x] `--spinel` flag in `bin/ruby2d`, position-independent like `--native`/`--web`. The `# ruby2d:compiler spinel` source directive was **not** built: a compiler choice is a property of the build, not of the app, and one way in is enough until someone wants the other.
+- [x] Thin C shim: the `RUBY2D_NO_RUBY` core, five `ext/ruby2d` files archived as `libruby2d_core.a` at build time.
+- [x] `ffi_func` declarations for the slice — as `SPINEL_EXT` in `cli/spinel.rb` rather than a `lib/` file, since it is only ever read as text and would not load under CRuby. It still duplicates the binding list and will drift from `ext/`; a shared manifest generating both remains the eventual answer.
+- [x] Replace the `include Ruby2D` / `extend Ruby2D::DSL` preamble with generated top-level DSL shims on the Spinel path only.
+- [x] Link step: `--link <archive>` for the SDL3 statics and `--cc` to carry the macOS frameworks.
+- [ ] Run an existing example unmodified — needs the four scalar shapes above, and input, which is blocked on the runtime `send` in `on`.
 - [ ] Benchmark that example against the mruby build.
 
-Reusable without change: asset bundling, `ruby2d launch --native`, and the macOS `.app` bundle step. Only compile and link are swapped.
+Reused without change: `ruby2d launch --native` and the macOS `.app` bundle step. Asset bundling is *not* reused — nothing in the slice can read a file, so `--assets` is rejected rather than accepted and ignored.
 
 ### Explicitly out of scope for the MVP
 
