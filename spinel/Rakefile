@@ -40,16 +40,31 @@ end
 desc 'Run all Spinel checks'
 task(:all) { run_check('all') }
 
-# Deliberately outside the default set: it answers "how far is the whole
-# library from compiling", which is a roadmap question, not a regression one,
-# and it takes minutes.
-desc 'Spinel: what blocks a clean build of the whole library'
-task :survey do
-  print_task 'Spinel: survey'
-  puts "  \e[2m$ ruby spinel/tools/survey.rb\e[0m"
-  Dir.chdir(ROOT) { system('ruby', 'spinel/tools/survey.rb') || exit(1) }
+def run_tool(name, script)
+  print_task "Spinel: #{name}"
+  puts "  \e[2m$ ruby spinel/tools/#{script}\e[0m"
+  Dir.chdir(ROOT) { system('ruby', "spinel/tools/#{script}") || exit(1) }
 rescue Interrupt
   exit(130)
+end
+
+# These three sit outside the default set: they answer roadmap questions rather
+# than regression ones, and each takes minutes.
+
+desc 'Spinel: what blocks a clean build of the whole library'
+task(:survey) { run_tool('survey', 'survey.rb') }
+
+desc 'Spinel: drop each workaround in turn and report which are still needed'
+task(:sweep) { run_tool('sweep', 'sweep.rb') }
+
+# `issues` before `sweep` deliberately: the reproducers are quick and tell you
+# where to look, the sweep is slow and tells you what can actually go. They have
+# disagreed in both directions, so neither substitutes for the other.
+desc 'Spinel: pull and rebuild the compiler, then re-check issues and workarounds'
+task upstream: [] do
+  run_tool('upstream', 'upstream.rb')
+  run_check('issues')
+  run_tool('sweep', 'sweep.rb')
 end
 
 task default: :all

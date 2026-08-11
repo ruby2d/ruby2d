@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `28b4e9f9` (2026-08-11)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `489cbde7` (2026-08-11)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -18,7 +18,7 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **All ten filed bugs are closed upstream** ([#3771-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 10 fixed, 0 reproduce.
 
-**One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `20a06d01` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which the first is a forwarder and only `Window#update` stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite (2823 pass, 0 fail). See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
+**One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `489cbde7` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which the first is a forwarder and only `Window#update` stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite, no failures. See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
 
 **What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Two have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13); a third, `expand_massign`, was fixed upstream before it could be filed and the workaround is gone. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
 
@@ -235,7 +235,7 @@ storer defined first       ok    n=3
 forwarder defined first    FAIL  n=0
 ```
 
-**The fix** treats an ambiguous forward as an escape instead of betting on one candidate, which costs no more than the single-match case already accepts. Verified three ways: the reproducer, Ruby 2D's callbacks with `positional_callbacks` removed, and `make test` in the Spinel checkout at 2823 pass / 0 fail / 0 error.
+**The fix** treats an ambiguous forward as an escape instead of betting on one candidate, which costs no more than the single-match case already accepts. Verified three ways: the reproducer, Ruby 2D's callbacks with `positional_callbacks` removed, and `make test` in the Spinel checkout, which reports no failures and no errors.
 
 Keep `positional_callbacks` until the fix is upstream — the branch has to build with a released compiler, not a locally patched one.
 
@@ -442,7 +442,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `28b4e9f9` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `489cbde7` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `positional_callbacks` guards a bug whose own filed reproducer passes today while the library shape it was filed for still fails. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -457,7 +457,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `28b4e9f9` (2026-08-11):**
+**Still needed, re-checked against `489cbde7` (2026-08-11):**
 
 | Workaround | Why it is still there |
 |---|---|

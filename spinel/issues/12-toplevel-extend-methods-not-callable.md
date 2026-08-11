@@ -25,7 +25,7 @@ puts hello
 hi
 ```
 
-**Spinel (20a06d01):**
+**Spinel (489cbde7):**
 ```
 spinel: t.rb:7: undefined local variable or method 'hello' for main (NameError)
 ```
@@ -71,6 +71,6 @@ Ruby 2D reaches this through its public API. The library defines a `DSL` module 
 
 ## Environment
 
-- Spinel commit: `28b4e9f9`
+- Spinel commit: `489cbde7`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

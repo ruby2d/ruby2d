@@ -31,10 +31,10 @@ load File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')
 # Replace the named transforms with the identity, so a workaround can be dropped
 # without editing lib/. `web_predicate` appends rather than rewrites, so its
 # identity is the empty string.
-TRANSFORMS = %w[
-  bypass_window_class_methods window_guards expand_hash_delete
-  disable_class_pattern positional_callbacks web_predicate dsl_shims
-].freeze
+# Read out of cli/spinel.rb rather than listed here — a hardcoded copy went
+# stale twice, once when transforms were dropped and once when they were added.
+require_relative 'spinel_env'
+TRANSFORMS = spinel_transform_names(File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')).freeze
 
 skip = (ENV['SPINEL_SKIP'] || '').split(',').map(&:strip).reject(&:empty?)
 skip = TRANSFORMS if skip == ['all']

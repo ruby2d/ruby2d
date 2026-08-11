@@ -51,6 +51,23 @@ rescue StandardError => e
   ["#{e.class}: #{e.message}", :error, nil]
 end
 
+# The compatibility transforms `cli/spinel.rb` applies, read out of the file
+# rather than listed here. Two tools need this list and both had hardcoded
+# copies that went stale the moment a transform was added or dropped — which is
+# the same drift the transforms themselves guard against.
+#
+# `spinel_compat` names most of them; `positional_callbacks` and `dsl_shims` are
+# applied later in `spinel_assemble`, so they are added explicitly.
+def spinel_transform_names(cli_spinel_path)
+  source = File.read(cli_spinel_path)
+  body = source[/^def spinel_compat\b.*?^end$/m] or
+    raise "could not find spinel_compat in #{cli_spinel_path}"
+
+  names = body.scan(/\bspinel_(\w+)/).flatten - %w[compat sub]
+  (names + %w[positional_callbacks dsl_shims]).uniq
+end
+
+
 # Distinct colors in a PNG, or nil if it can't be decoded.
 #
 # This exists for one reason: a window that renders nothing looks exactly like a
