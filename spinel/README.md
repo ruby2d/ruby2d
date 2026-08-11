@@ -363,6 +363,7 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 | `issues/11-…` | A forwarded block's callee resolves to the first same-named method — the #3783 follow-up, with a root cause and a patch in `issues/11-ambiguous-forward-callee.patch` |
 | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) |
 | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) |
+| `issues/15-…` | Reading an ivar from an `extend`-provided method emits invalid C — found while probing 13, and **does not block us**: the library's extended class methods hold no state |
 
 ### Two workarounds with no reproducer yet
 
