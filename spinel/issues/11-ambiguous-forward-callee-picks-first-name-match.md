@@ -8,6 +8,8 @@ Follow-up to [#3783](https://github.com/matz/spinel/issues/3783), whose reproduc
 
 When the escape analysis cannot resolve a forwarded block's callee from the receiver, it falls back to matching by method name and takes the first scope it finds. If several methods share that name, the first one is not necessarily the callee — and when it is another forwarder, the forward is judged harmless, the block is inlined, and its captures are never celled.
 
+This pass runs before the receiver's type settles, so the fallback is reached even for a plain local receiver: an ordinary `h.store(&b)` is enough.
+
 The result is that the same program compiles correctly or incorrectly depending on the **order the classes are defined in**.
 
 ## Reproduction
@@ -22,15 +24,12 @@ class Holder
   def run; @proc.call; end
 end
 
-module Registry
-  def self.holder; @holder ||= Holder.new; end
-end
+def forward(h, &b); h.store(&b); end
 
-def forward(&b); Registry.holder.store(&b); end
-
+h = Holder.new
 n = 0
-forward { n += 1 }
-3.times { Registry.holder.run }
+forward(h) { n += 1 }
+3.times { h.run }
 puts "n=#{n}"
 ```
 
@@ -50,7 +49,16 @@ Moving `class Decoy` below `class Holder`, changing nothing else, prints `n=3`.
 
 `Decoy` is never instantiated and its `store` is never called. Its presence in the source, ahead of `Holder`, is the whole difference — dead code changes the compiled behaviour of a live path.
 
-The receiver has to be unresolvable for the name fallback to run at all. `Registry.holder` is a call, so `infer_type` gives no object and the node is neither `ConstantReadNode` nor `ConstantPathNode`. With a receiver the pass can resolve — a local holding a `Holder`, for instance — the correct callee is found and both orderings work. Dropping `Decoy` entirely also works, leaving `Holder#store` as the only candidate.
+Dropping `Decoy` entirely also works, leaving `Holder#store` as the only candidate.
+
+**The receiver form does not matter.** A local typed `Holder`, as above, and a call the pass cannot resolve both fail, and both are fixed by moving `Decoy` down:
+
+| receiver | `Decoy` first | `Decoy` last |
+|---|---|---|
+| `h.store(&b)`, `h` a local | `n=0` | `n=3` |
+| `Registry.holder.store(&b)`, via `def self.holder` | `n=0` | `n=3` |
+
+That is consistent with the comment on the resolution code, which notes the pass runs before the receiver's type settles — so a local receiver reaches the name fallback too.
 
 Twenty-one other variations were tried before this one and all behave correctly at `489cbde7`, so the ambiguity appears to be the whole trigger: repeated invocation, an ivar initialized to `nil`, the arity read before storing, two callbacks stored on one object, an arity-dependent `call` vs `call(dt)`, a receiver from a module accessor, a bare same-named call that never executes, and two forwarding shims side by side.
 
