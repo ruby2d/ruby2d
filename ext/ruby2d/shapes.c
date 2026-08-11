@@ -903,6 +903,40 @@ void R2D_DrawQuad(float x1, float y1,
 
 
 /*
+ * Strokes the outline of a quad with per-vertex colors.
+ *
+ * Parameters:
+ *   stroke_width - Thickness of the outline
+ *   x, y - Vertex position coordinates for each of the 4 corners
+ *   r, g, b, a - Vertex color values (red, green, blue, alpha) for each corner
+ *
+ * A flattened R2D_StrokePath, closed over the four corners. See ruby2d.h for
+ * why the scalar form exists.
+ */
+void R2D_StrokeQuad(float stroke_width,
+                    float x1, float y1,
+                    float r1, float g1, float b1, float a1,
+                    float x2, float y2,
+                    float r2, float g2, float b2, float a2,
+                    float x3, float y3,
+                    float r3, float g3, float b3, float a3,
+                    float x4, float y4,
+                    float r4, float g4, float b4, float a4) {
+
+  float verts[8] = { x1, y1, x2, y2, x3, y3, x4, y4 };
+
+  float colors[16] = {
+    r1, g1, b1, a1,
+    r2, g2, b2, a2,
+    r3, g3, b3, a3,
+    r4, g4, b4, a4
+  };
+
+  R2D_StrokePath(verts, 4, 1, stroke_width, R2D_MITER_LIMIT, colors);
+}
+
+
+/*
  * Draws a line with specified width and per-vertex colors.
  *
  * Parameters:

@@ -9,7 +9,10 @@ require 'ruby2d'
 
 set title: 'Spinel CLI check', width: 320, height: 240, background: 'navy'
 
-Square.new(x: 120, y: 80, size: 80, color: 'red')
+# Stroked deliberately: a stroke that silently drew nothing was the one visible
+# defect this check ever shipped, and it passed because two colors were enough.
+Square.new(x: 120, y: 80, size: 80, color: 'red',
+           stroke_width: 8, stroke_color: 'lime')
 
 frames = (ENV['FRAMES'] || '30').to_i
 shot = ENV['SHOT'] || ''

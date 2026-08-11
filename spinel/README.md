@@ -10,7 +10,9 @@ The rest of this document is a research log in discovery order. This section is 
 
 **The feature is wired: `ruby2d build --spinel app.rb` compiles an ordinary Ruby 2D script to a standalone 5.2 MB binary.** No hand-run scripts, no paths to set — get the compiler with `ruby2d setup --spinel`, then build. The app goes through `lib/`'s own scene graph into the real `R2D_*` core, with Ruby owning the frame loop. See [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10).
 
-What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
+What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. All three draw **filled and stroked, in a single color** — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
+
+**Per-vertex colors do not work yet.** `color:` or `stroke_color:` given an array — the `Color::Set` gradient path — compiles and then dies at run time with `undefined method 'empty?' for an instance of Array`. Fill and stroke fail identically, so it is `Color::Set`, not the shape code. Untyped-receiver probes of the same shape pass standalone, which puts it in the same category as `bypass_window_class_methods` and `expand_hash_delete`: real, reproducible in the library, not yet reduced. Unlike the stroke gap this one is loud, so preflight does not reject it.
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
@@ -60,16 +62,27 @@ cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
 ```
   subset     pass     matches CRuby (4 lines)
   demo       pass     drew 2 distinct colors over 31 frames
-  cli        pass     built an app that drew 2 colors over 31 frames
+  cli        pass     built an app that drew 3 colors over 31 frames
   preflight  pass     rejected unsupported features by name
-  issues     pass     7 fixed, 3 reproduce
+  issues     pass     11 fixed, 4 reproduce
 ```
 
 - **subset** compiles the `lib/` slice and diffs it against the same program run under CRuby. Any divergence is a compiler difference, because the control has to pass first.
 - **demo** builds the square and checks the **pixels**, not the exit status.
-- **cli** builds `tools/cli_app.rb` with `ruby2d build --spinel` and checks its pixels and its frame count. The frame count is the point: a zero would mean #3783 is back, which no other check would notice.
+- **cli** builds `tools/cli_app.rb` with `ruby2d build --spinel` and checks its pixels and its frame count. Both are load-bearing: a zero frame count would mean #3783 is back, and the fixture's shape is stroked so the color count is exactly three — two means a stroke went inert again.
 - **preflight** builds an app using `Circle` and `on` and checks the build refuses it *by name*.
 - **issues** re-runs every filed reproducer. A `FIXED` row is the cue to drop the matching workaround with `SPINEL_SKIP=` and rebuild.
+
+Three more sit outside the default set, because they answer roadmap questions rather than regression ones and each takes minutes:
+
+```sh
+cd spinel && rake sweep      # drop each workaround in turn; the one to run after a pull
+cd spinel && rake survey     # what blocks a clean build of all 37 files
+cd spinel && rake compare    # build the fixture on both engines and diff the pixels
+cd spinel && rake upstream   # pull, rebuild, then re-run issues and sweep
+```
+
+**`rake compare` is the one that answers "does it draw the same thing mruby does".** Every other check grades the Spinel target against itself, and a whole feature can be missing without any of them noticing — which is exactly how strokes stayed inert.
 
 **`cli` and `preflight` go through the installed gem**, not the working tree — so run `rake` in the repo root first or they test your last install. Everything else reads `lib/` directly.
 
@@ -98,6 +111,7 @@ Spinel ships many commits a day, so pull before trusting any measurement here.
 |---|---|
 | Why this is viable at all | [Why Spinel fits](#why-spinel-fits) |
 | What breaks and how it is worked around | [Workarounds to re-check](#workarounds-to-re-check), then `lib/ruby2d/cli/spinel.rb` |
+| Why "it runs and draws" is not enough | [Strokes drew nothing](#strokes-drew-nothing-2026-08-11) |
 | What is filed upstream | [To report upstream](#to-report-upstream) and `issues/` |
 | How the CLI is wired | [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10) |
 | How to rebuild the demo | [Building the demo](#building-the-demo) |
@@ -116,7 +130,7 @@ Everything worth keeping from the Spinel spike. Nothing here is a final home —
 | `README.md` | This document: findings, checklist, workarounds, and what to report upstream |
 | `bouncing_balls.rb` | A port of `examples/bouncing_balls.rb` to the FFI path — the demo that runs today |
 | `issues/` | The upstream bug reports, one file per issue |
-| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` and `reduce_oracle_diff.sh` are the two-sided oracles for `spinel-reduce` — the first for crashes, the second for silent wrong answers |
+| `tools/` | `check.rb` runs the checks behind `rake`; `spinel_path.sh`/`spinel_env.rb` resolve the compiler so no recipe hardcodes a path; `build_square.rb` + `link_square.sh` build the square demo; `build_subset.rb` assembles the slice with `Ext` stubbed (`SPINEL_SKIP=` drops workarounds); `cli_app.rb` is the fixture the `cli` check builds; `compare.rb` diffs that fixture's pixels between mruby and Spinel; `sweep.rb` drops each workaround in turn; `survey.rb` reports what blocks a clean build; `upstream.rb` pulls and rebuilds the compiler; `verify_issues.rb` re-runs every filed reproducer; `run_capped.sh` runs a binary under a time cap; `reduce_oracle.sh` and `reduce_oracle_diff.sh` are the two-sided oracles for `spinel-reduce` — the first for crashes, the second for silent wrong answers |
 | `scratch/` | Working area for experiments — gitignored, safe to delete |
 
 Experiments go in `scratch/`, which is gitignored: generated sources, object files, built binaries, probe scripts. It survives across sessions, unlike a system temp directory, but nothing there is precious — delete it freely. Anything worth keeping is promoted up a level and committed.
@@ -721,6 +735,23 @@ Mapping `lib/`'s `Ext` calls onto the `R2D_*` core is mostly mechanical — of t
 **`RUBY_ENGINE` is `"spinel"`, so `Window#show` takes the wrong branch.** The condition is `RUBY_ENGINE == 'ruby'`, so Spinel falls through to the mruby/WASM path where *C owns the loop* — precisely what FFI cannot support. Spinel needs the CRuby-shaped branch, where Ruby runs `tick until @close`.
 
 The honest fix is not a string comparison against a third engine name: the condition is really asking "does Ruby own the main loop?". Until the build path exists, `cli/spinel.rb` rewrites it; when the feature lands, `window.rb` should ask that question directly.
+
+## Strokes drew nothing (2026-08-11)
+
+`Square.new(size: 80, color: 'red', stroke_width: 8, stroke_color: 'lime')` built, ran, and drew a red square with no outline. `Ext.stroke_quad_uniform` and `Ext.stroke_quad` were among the inert stubs, so `Quad#render` called them every frame and they returned `nil`.
+
+**Nothing here caught it, and the reason is worth keeping.** The `cli` check asked for *more than one distinct color*, which a fill alone satisfies, and the demo fixture had no stroke in it at all. The frame count was healthy, the window was not blank, the build was clean. Every check graded the Spinel target against itself, and none of them asked the only question that fails: does it draw what mruby draws?
+
+**Why C had to change.** `R2D_StrokePath` takes `const float *` for both the vertices and the colors, and Spinel's FFI passes scalars only — there is no way to build the arrays. So `shapes.c` gained `R2D_StrokeQuad`, a flattened closed four-vertex path: the stroke width, then the same 24 floats `R2D_DrawQuad` already takes. `Quad`, `Rectangle` and `Square` are the whole of this slice's stroking and all three are four-vertex paths, so one entry point covers all of it. Adding `Triangle` later needs the same treatment at three vertices, not this function.
+
+**Verified against mruby, not against itself.** `rake compare` builds `tools/cli_app.rb` with both engines and diffs the screenshots. They are byte-identical — 640x480, three colors, matching pixel counts — and the geometry is right for the reason it should be: 10,240 lime pixels is exactly a 176² outer minus a 144² inner, an 8px stroke centered on the edge of a 160px square at 2× pixel scale.
+
+Two guards came out of it:
+
+- The `cli` fixture is now stroked and the check asserts **exactly three** colors, naming the stroke when it sees two. Verified by reverting the adapter to a stub: `the stroke drew nothing (2 colors, expected 3)`.
+- `tools/link_square.sh` built `libruby2d_core.a` once and reused it forever. Adding a function surfaced as an undefined symbol, which is loud — but a changed function *body* would have silently linked the old code, and that is the same failure again one layer down. The archive now rebuilds when anything under `ext/ruby2d/` is newer.
+
+**`compare` found a second bug on its first run.** The committed fixture strokes in one color, so `Ext.stroke_quad` — the per-vertex sibling — compiled but never executed, which is the same "present but unproven" state the stubs were in. Putting a `stroke_color: %w[red lime blue yellow]` square in the fixture and running `compare` produced `undefined method 'empty?' for an instance of Array` from the Spinel binary while mruby drew it. It is not about strokes: a per-vertex **fill** with no stroke anywhere fails the same way, so the fault is in the `Color::Set` path both share. `Array#empty?` compiles and runs standalone, and so does a hand-written `is_a?(Array) && !colors.empty?` guard through an untyped parameter — the reduction is still open. The fixture was left in its single-color form, since that is the shape whose result is verified.
 
 ## MVP
 

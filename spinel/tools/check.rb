@@ -109,6 +109,11 @@ def check_cli
   return ['cli', :skip, 'built and ran, but the screenshot could not be decoded'] if colors.nil?
   return ['cli', :fail, "rendered a blank window (#{colors} distinct color)"] if colors < 2
 
+  # Background, fill, stroke. Counting "more than one color" is what let a
+  # stroke that drew nothing pass here for weeks, so the fixture's exact three
+  # are named: two means the stroke is inert again.
+  return ['cli', :fail, "the stroke drew nothing (#{colors} colors, expected 3)"] if colors < 3
+
   frames = run[/ran (\d+) frames/, 1]
   # A frame count that stayed at 0 means the `update` block ran without its
   # captured local — #3783 silently back, which nothing else here would catch.

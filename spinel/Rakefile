@@ -57,6 +57,9 @@ task(:survey) { run_tool('survey', 'survey.rb') }
 desc 'Spinel: drop each workaround in turn and report which are still needed'
 task(:sweep) { run_tool('sweep', 'sweep.rb') }
 
+desc 'Spinel: build the fixture on both engines and diff the pixels'
+task(:compare) { run_tool('compare', 'compare.rb') }
+
 # `issues` before `sweep` deliberately: the reproducers are quick and tell you
 # where to look, the sweep is slow and tells you what can actually go. They have
 # disagreed in both directions, so neither substitutes for the other.

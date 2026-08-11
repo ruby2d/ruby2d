@@ -985,6 +985,25 @@ void R2D_DrawQuad(
 );
 
 /*
+ * Stroke a quad outline, as a closed four-vertex path
+ *
+ * A flattened R2D_StrokePath: identical geometry, scalar parameters only. For
+ * callers that can't build a float array — Spinel's FFI passes scalars — this
+ * is the way to a quad stroke.
+ */
+void R2D_StrokeQuad(
+  float stroke_width,
+  float x1, float y1,
+  float r1, float g1, float b1, float a1,
+  float x2, float y2,
+  float r2, float g2, float b2, float a2,
+  float x3, float y3,
+  float r3, float g3, float b3, float a3,
+  float x4, float y4,
+  float r4, float g4, float b4, float a4
+);
+
+/*
  * Draw a line from a quad
  */
 void R2D_DrawLine(

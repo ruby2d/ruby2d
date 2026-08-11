@@ -288,6 +288,12 @@ SPINEL_EXT = <<~'RUBY'
                                :float, :float, :float, :float, :float, :float,
                                :float, :float, :float, :float, :float, :float,
                                :float, :float, :float, :float, :float, :float], :void
+      # 25: the stroke width, then the same 24 as R2D_DrawQuad.
+      ffi_func :R2D_StrokeQuad, [:float,
+                                 :float, :float, :float, :float, :float, :float,
+                                 :float, :float, :float, :float, :float, :float,
+                                 :float, :float, :float, :float, :float, :float,
+                                 :float, :float, :float, :float, :float, :float], :void
 
       # `Window#initialize` calls this; the real window is not created until
       # `window_show`, but the core needs its R2D_Window allocated first.
@@ -363,6 +369,26 @@ SPINEL_EXT = <<~'RUBY'
                          x2.to_f, y2.to_f, r2.to_f, g2.to_f, b2.to_f, a2.to_f,
                          x3.to_f, y3.to_f, r3.to_f, g3.to_f, b3.to_f, a3.to_f,
                          x4.to_f, y4.to_f, r4.to_f, g4.to_f, b4.to_f, a4.to_f)
+      end
+
+      # Quad, Rectangle and Square are the whole of this slice's stroking, and
+      # all three are closed four-vertex paths, so `R2D_StrokeQuad` covers it.
+      def self.stroke_quad_uniform(x1, y1, x2, y2, x3, y3, x4, y4, sw, r, g, b, a)
+        Ext.R2D_StrokeQuad(sw.to_f,
+                           x1.to_f, y1.to_f, r.to_f, g.to_f, b.to_f, a.to_f,
+                           x2.to_f, y2.to_f, r.to_f, g.to_f, b.to_f, a.to_f,
+                           x3.to_f, y3.to_f, r.to_f, g.to_f, b.to_f, a.to_f,
+                           x4.to_f, y4.to_f, r.to_f, g.to_f, b.to_f, a.to_f)
+      end
+
+      def self.stroke_quad(x1, y1, x2, y2, x3, y3, x4, y4, sw,
+                           r1, g1, b1, a1, r2, g2, b2, a2,
+                           r3, g3, b3, a3, r4, g4, b4, a4)
+        Ext.R2D_StrokeQuad(sw.to_f,
+                           x1.to_f, y1.to_f, r1.to_f, g1.to_f, b1.to_f, a1.to_f,
+                           x2.to_f, y2.to_f, r2.to_f, g2.to_f, b2.to_f, a2.to_f,
+                           x3.to_f, y3.to_f, r3.to_f, g3.to_f, b3.to_f, a3.to_f,
+                           x4.to_f, y4.to_f, r4.to_f, g4.to_f, b4.to_f, a4.to_f)
       end
     end
   end
