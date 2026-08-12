@@ -46,6 +46,38 @@ spinel: w8.rb:7: unsupported call: node 15 (CallNode `shown?`) recv=-/ty-1 argc=
 
 ## Additional Findings
 
+**It is not limited to the implicit-receiver form.** A method the module provides is also unreachable through an explicit constant receiver from elsewhere in the program, with the same `extend`-in-a-reopened-body arrangement:
+
+```ruby
+class Win
+  module ClassMethods
+    def viewport_width
+      100
+    end
+  end
+end
+
+class Win
+  extend ClassMethods
+end
+
+class Shape
+  def resolve
+    Win.viewport_width
+  end
+end
+
+puts Shape.new.resolve
+```
+
+Ruby 4.0.6 prints `100`. Spinel:
+
+```
+spinel: v1.rb:15: unsupported call: node 22 (CallNode `viewport_width`) recv=ConstantReadNode/ty48 argc=0
+```
+
+Moving `extend ClassMethods` up into the first body makes it print `100`. So the module's methods are not attached to the class at all when the `extend` is written in a reopening — the implicit-receiver case above is one symptom and this is another.
+
 Moving the `extend` is the whole difference. Everything else can vary:
 
 | Variant | Result |
@@ -64,7 +96,9 @@ The diagnostic's `recv=-/ty-1` says the receiver is absent and its type unknown,
 
 ## Impact
 
-This is why Ruby 2D still needs its workaround after #3788 was fixed. `Window::ClassMethods` is defined in `lib/ruby2d/window/class_methods.rb` and `extend ClassMethods` is written in `lib/ruby2d/window.rb`, so the two are necessarily in different `class Window` bodies — splitting a large class across files is ordinary practice, and it makes every implicit-receiver singleton call in the module unresolvable.
+This is why Ruby 2D still needs its workaround after #3788 was fixed, and it is two workarounds rather than one. `Window::ClassMethods` is defined in `lib/ruby2d/window/class_methods.rb` and `extend ClassMethods` is written in `lib/ruby2d/window.rb`, so the two are necessarily in different `class Window` bodies. Splitting a large class across files is ordinary practice, and it makes the module's methods unreachable both ways: an implicit-receiver singleton call inside the module, and `Window.viewport_width` from anywhere else.
+
+The second is the more expensive one. It is not a fixed list of call sites — whole-program inference only analyzes reachable code, so each newly-exercised path surfaces more of them — and the workaround is a source rewrite of every `Window.<m>` call to `DSL.window.<m>`, applied across the library.
 
 ## Environment
 

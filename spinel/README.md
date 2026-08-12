@@ -389,7 +389,7 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 | `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `9678c99b`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
 | `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped — the `dsl_shims` residue after #3787 | Ready to file, 9 lines |
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | Ready to file, 19 lines. The only wrong-answer bug of the three |
-| `issues/21-…` | `extend` written in a *reopened* class body makes implicit-receiver singleton calls unresolvable — the `window_guards` residue after #3788, and not about `alias_method` at all | Ready to file, 15 lines |
+| `issues/21-…` | `extend` written in a *reopened* class body detaches the module's methods from the class, both for an implicit-receiver call inside it and for `Win.method` from outside — not about `alias_method` at all | Ready to file, 15 lines. **Worth two workarounds**: the `window_guards` residue after #3788, and `bypass_window_class_methods`, which had resisted ten reduction attempts |
 
 **All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
@@ -504,10 +504,10 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 | Workaround | Why it is still there |
 |---|---|
-| `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver |
+| `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver. Root cause found 2026-08-11: the `extend` is written in a different `class Window` body from the module, same as `window_guards`. Drafted as `issues/21-…` |
 | `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped, and a class's own same-named method is silently shadowed. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is drafted as `issues/19-…` and `issues/20-…` |
 | `window_guards` | `shown?` with an implicit receiver does not resolve, because `extend ClassMethods` is written in a different `class Window` body from the module. [#3788](https://github.com/matz/spinel/issues/3788) is closed and its reproducer passes; the residue is drafted as `issues/21-…` |
-| `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
+| `expand_hash_delete` | `@gamepads_by_id.delete(id)` resolves to `String#delete`, passing `sp_RbVal` where a `const char *` is wanted. Two mirrors of the shape pass standalone (ivar assigned in a module method, and in the class), so the ivar has to be genuinely poly — the same family as `issues/17-…` and probably the same investigation |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — drafted as `issues/18-…`, ready to file |
