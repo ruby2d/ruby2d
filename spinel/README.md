@@ -28,7 +28,7 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 16 fixed, 0 reproduce.
 
-**Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it currently keeps `dsl_shims` and `window_guards` even though both reproducers pass. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11).
+**Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and drafted — `issues/19-…`, `issues/20-…`, `issues/21-…` — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11).
 
 **What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Two are filed and fixed, and the library shape still fails anyway (`dsl_shims` → #3787, `window_guards` → #3788), so each needs a *second* reproducer written from the library's failure rather than from the original small case. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #3786.
 
@@ -387,6 +387,9 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 |---|---|---|
 | `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | Needs a minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle sharper than the runtime one |
 | `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `9678c99b`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
+| `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped — the `dsl_shims` residue after #3787 | Ready to file, 9 lines |
+| `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | Ready to file, 19 lines. The only wrong-answer bug of the three |
+| `issues/21-…` | `extend` written in a *reopened* class body makes implicit-receiver singleton calls unresolvable — the `window_guards` residue after #3788, and not about `alias_method` at all | Ready to file, 15 lines |
 
 **All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
@@ -502,8 +505,8 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | Workaround | Why it is still there |
 |---|---|
 | `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver |
-| `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call — [#3787](https://github.com/matz/spinel/issues/3787) is **closed and its reproducer passes**, but the library shape still fails with 4 C errors |
-| `window_guards` | `shown?` with an implicit receiver does not resolve — [#3788](https://github.com/matz/spinel/issues/3788) is **closed and its reproducer passes**, but the library shape still fails |
+| `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped, and a class's own same-named method is silently shadowed. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is drafted as `issues/19-…` and `issues/20-…` |
+| `window_guards` | `shown?` with an implicit receiver does not resolve, because `extend ClassMethods` is written in a different `class Window` body from the module. [#3788](https://github.com/matz/spinel/issues/3788) is closed and its reproducer passes; the residue is drafted as `issues/21-…` |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
@@ -841,7 +844,16 @@ Two things came out of it, and the second matters more than the first.
 | #3789 `bebef965` | none | — |
 | #3790 `fcaf3fcc` | none | — |
 
-So the reproducer-passes-library-fails split, which cost weeks on #3783, happened twice more in one afternoon. It is not an unlucky case; it is the normal outcome of reducing a whole-program failure to five lines. A minimal reproducer captures the construct, and these bugs are about *context* — which same-named method comes first, which module the receiver reached the class through — so the small case can be fixed completely while the library shape is untouched. **What each of these needs now is a second reproducer, written from the library's own failing line rather than from the original small case.** That is the route that worked for #3786, and `dsl_shims` and `window_guards` both have a named diagnostic to start from.
+So the reproducer-passes-library-fails split, which cost weeks on #3783, happened twice more in one afternoon. It is not an unlucky case; it is the normal outcome of reducing a whole-program failure to five lines. A minimal reproducer captures the construct, and these bugs are about *context* — which same-named method comes first, which module the receiver reached the class through — so the small case can be fixed completely while the library shape is untouched.
+
+**Both residues were reduced the same day**, by writing a second reproducer from the library's failing line instead of from the original small case, and all three are drafted as `issues/19-…`, `issues/20-…` and `issues/21-…`. The missing ingredient each time was something the first reproducer had no reason to include:
+
+| Original | What its reproducer left out |
+|---|---|
+| #3787, top-level `extend` | a **block parameter** on the module method, and a **class with the same method name** |
+| #3788, implicit call to a singleton | the `extend` written in a **reopened** class body, which is what splitting a class across files forces |
+
+Neither omission is a mistake in the original — both reproducers are the smallest thing that showed the reported symptom. It is that "smallest thing that fails" and "the shape a library actually has" are different targets, and only the second one predicts whether a workaround can go.
 
 One incidental result: `dsl_shims` had been reported `inconclusive` by every sweep, because `positional_callbacks` rewrote the shims it generates and the two could not be tested apart. Dropping one made the other measurable for the first time.
 
