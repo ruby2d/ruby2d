@@ -35,7 +35,7 @@ switch (_t399.cls_id) {
 
 ## Cause
 
-`src/codegen_call.c`, in the block that emits the builtin arms — `if (is_empty)`, the second occurrence, at line 4254 as of `b51c880d`. Find it by the comment rather than the line, which moves within hours:
+`src/codegen_call.c`, in the block that emits the builtin arms — `if (is_empty)`, the second occurrence, at line 4254 as of `01bc08c8`. Find it by the comment rather than the line, which moves within hours:
 
 > Container reads on a builtin receiver that reached this dispatch only because a user class happens to own the name. The user arms are above; without an arm of its own the switch left every builtin tag on the raise default […]
 
@@ -105,6 +105,6 @@ The open question is what widens a receiver to genuinely `untyped` rather than t
 
 ## Environment
 
-- Spinel commit: `b51c880d`
+- Spinel commit: `01bc08c8`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

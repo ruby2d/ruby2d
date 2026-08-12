@@ -2,7 +2,7 @@
 
 **Status:** Spinel-only — `ffi_func` is a Spinel DSL, so there is no CRuby behavior to compare against and `verify_issues.rb` does not run this one. Re-check it by hand.
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3804](https://github.com/matz/spinel/issues/3804). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
 
@@ -70,6 +70,6 @@ Naming the declaration line is the more valuable half. Even without support for 
 
 ## Environment
 
-- Spinel commit: `b51c880d`
+- Spinel commit: `01bc08c8`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

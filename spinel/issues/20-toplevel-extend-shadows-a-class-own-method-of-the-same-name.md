@@ -1,5 +1,9 @@
 # [Runtime] A top-level `extend` shadows a class's own method of the same name, silently
 
+**Fixed upstream before it was filed**, by [`80a3beb2`](https://github.com/matz/spinel/commit/80a3beb2) *"Keep a module usable from a class and the top level at once"* on 2026-08-12. Its parent is `b51c880d`, where the reproduction below fails, so the attribution is exact. Kept as the local record; do not file.
+
+The fix came from [#3795](https://github.com/matz/spinel/issues/3795), reported against `include` rather than `extend` — the same underlying defect described there as "a receiverless call inside such a class reached for the top-level copy — the module's own null-receiver function — rather than the class's transplanted one", which is precisely the `sp_DSL_update(NULL)` below. **The `extend` shape is not covered by a test upstream.** `test/module_included_class_and_toplevel.rb` uses `include`, and no test exercises a class whose own method is shadowed. If this regresses, their suite will not catch it, so the reproduction below is worth offering as a test case.
+
 Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
 ## Description
@@ -67,7 +71,7 @@ so it is not that `Window`'s method is missing — the wrong callee is selected 
 
 This is the shape Ruby 2D hits. `Window` defines `update` and `render`; the DSL module of the same names is extended at the top level so scripts can write `update do … end`; and `Window`'s own internals call `update` and `render` with an implicit receiver. Every one of those dispatches to the DSL method, so the window's update and render hooks never run.
 
-Ruby 2D works around it by generating standalone top-level shims instead of using `extend`, which is the only reason the port draws anything.
+Ruby 2D works around it by generating standalone top-level shims instead of using `extend`, which is the only reason the port draws anything. That workaround — `dsl_shims` — outlives the fix: dropping it now leaves the block-parameter bug in `issues/19-…`, which is a separate defect at the same call site.
 
 ## Environment
 

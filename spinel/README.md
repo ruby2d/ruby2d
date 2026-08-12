@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `b51c880d` (2026-08-11)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `01bc08c8` (2026-08-12)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -26,11 +26,11 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 16 fixed, 0 reproduce.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 2 reproduce, 2 parked: the seventeenth is draft 20, fixed on 2026-08-12 before it could be filed, and the two that reproduce are the unfiled drafts 19 and 21.
 
-**Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and drafted — `issues/19-…`, `issues/20-…`, `issues/21-…` — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11).
+**Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Two are filed and fixed, and the library shape still fails anyway (`dsl_shims` → #3787, `window_guards` → #3788), so each needs a *second* reproducer written from the library's failure rather than from the original small case. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #3786.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Three are now filed with a reduced reproducer — `dsl_shims` → [#3803](https://github.com/matz/spinel/issues/3803), and `window_guards` and `bypass_window_class_methods` → [#3802](https://github.com/matz/spinel/issues/3802), which covers both. Each needed a *second* reproducer written from the library's failure rather than from the original small case. One remains undiagnosed: `expand_hash_delete` is still needed while its minimal shapes pass standalone — see [One workaround with no reproducer yet](#one-workaround-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #3786.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -381,17 +381,24 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 
 A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. Two exist: `research notes` for one that is root-caused but has no reproducer yet, and `Spinel-only` for one whose reproducer uses a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. Neither is counted as something to read by hand — a permanent warning is one nobody reads — so both need a human on a re-verification pass, which is what the table below is for.
 
-**Drafted, not yet filed:**
+**Filed on 2026-08-12 against `01bc08c8`**, all three reduced from a workaround this branch could not otherwise drop:
+
+| Issue | Draft | Bug | Workaround it covers |
+|---|---|---|---|
+| [#3802](https://github.com/matz/spinel/issues/3802) | `issues/21-…` | `extend` written in a *reopened* class body detaches the module's methods from the class, both for an implicit-receiver call inside it and for `Win.method` from outside — not about `alias_method` at all | `window_guards` **and** `bypass_window_class_methods`, which had resisted ten reduction attempts |
+| [#3803](https://github.com/matz/spinel/issues/3803) | `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped | `dsl_shims`, all of it now that 20 is fixed |
+| [#3804](https://github.com/matz/spinel/issues/3804) | `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | the adapter's spelled-out type arrays |
+
+The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `01bc08c8`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
+
+**Still drafted, not filed:**
 
 | Draft | Bug | Status |
 |---|---|---|
 | `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | Needs a minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle sharper than the runtime one |
-| `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `b51c880d`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
-| `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped — the `dsl_shims` residue after #3787 | Ready to file, 9 lines |
-| `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | Ready to file, 19 lines. The only wrong-answer bug of the three |
-| `issues/21-…` | `extend` written in a *reopened* class body detaches the module's methods from the class, both for an implicit-receiver call inside it and for `Win.method` from outside — not about `alias_method` at all | Ready to file, 15 lines. **Worth two workarounds**: the `window_guards` residue after #3788, and `bypass_window_class_methods`, which had resisted ten reduction attempts |
+| `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
 
-**All sixteen filed drafts now pass** at `b51c880d`; the `reproduce` count on the `issues` line is the unfiled drafts above. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Nineteen of the twenty-one drafts are filed** — all but 17, which still needs a reproducer, and 20, which upstream fixed first. At `01bc08c8` `verify_issues.rb` reports 17 fixed, 2 reproduce, 2 parked: the two reproducing are #3802 and #3803, open as of filing; the two parked are draft 17 and draft 18, the latter filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -407,20 +414,19 @@ The drafts keep the commit they were filed against, since that is what the filed
 
 A crashing reproducer needs the same treatment a hanging one gets: the shell prints `segmentation fault` but the binary never wrote it, so `verify_issues.rb` reads the exit status for a fatal signal rather than comparing output. SIGKILL is excluded, since that is its own timeout killer.
 
-### Two workarounds with no reproducer yet
+### One workaround with no reproducer yet
 
-**Read the failing line before writing a probe.** The first pass at these three wrote one plausible minimal shape each, all three passed, and the conclusion drawn — "these can't be reduced" — was wrong. Opening the assembled subset at the line the compiler names, and asking what the probe had dropped, reproduced `expand_massign` on the next try — drafted as issue 14, then fixed upstream before it could be filed. The failing line is free information; guessing at shapes is not.
+**Read the failing line before writing a probe.** The first pass at these wrote one plausible minimal shape each, all passed, and the conclusion drawn — "these can't be reduced" — was wrong. Opening the assembled subset at the line the compiler names, and asking what the probe had dropped, reproduced `expand_massign` on the next try — drafted as issue 14, then fixed upstream before it could be filed. It also reduced `bypass_window_class_methods` on 2026-08-11, after ten failed attempts, once the question became "what does the *library* do that the probe doesn't" — the answer being an `extend` in a reopened class body, filed as [#3802](https://github.com/matz/spinel/issues/3802). The failing line is free information; guessing at shapes is not.
 
-Two still resist, after two hypotheses each. Both are provably needed — remove the transform and the library breaks — and for both the exact construct and diagnostic are known, so what is missing is only the small form:
+One still resists, after two hypotheses. It is provably needed — remove the transform and the library breaks — and the exact construct and diagnostic are known, so what is missing is only the small form:
 
 | Workaround | Failing line | Diagnostic | Shapes tried that pass |
 |---|---|---|---|
-| `bypass_window_class_methods` | `span = Window.viewport_width` | `unsupported call: (CallNode 'viewport_width') recv=ConstantReadNode/ty48` | the class method alone; plus an `attr_reader` of the same name on instances |
 | `expand_hash_delete` | `pad = @gamepads_by_id.delete(id)` | `passing 'sp_RbVal' to parameter of incompatible type 'const char *'` — i.e. it bound to `String#delete` | the ivar assigned in `initialize`; the ivar assigned inside a module body |
 
-Being unable to reduce one is not a reason to sit on it forever. Each has a runnable failing program (the assembled subset), an exact oracle, and a named construct, which is enough for a maintainer holding the compiler source. Reduce first, but file rather than let them block the port indefinitely.
+Being unable to reduce one is not a reason to sit on it forever. It has a runnable failing program (the assembled subset), an exact oracle, and a named construct, which is enough for a maintainer holding the compiler source. Reduce first, but file rather than let it block the port indefinitely.
 
-`tools/reduce_oracle_build.sh` is the oracle for both — they are compile failures, so neither the crash oracle nor the diff one fits. Pin `EXPECT` to the diagnostic above so the reducer cannot wander onto a different error.
+`tools/reduce_oracle_build.sh` is the oracle for it — a compile failure, so neither the crash oracle nor the diff one fits. Pin `EXPECT` to the diagnostic above so the reducer cannot wander onto a different error.
 
 Found while probing, and **not** tied to any workaround: reading an ivar from an extended module's method emits invalid C (`((sp_Class){1})->iv_shown`, *"member reference type 'sp_Class' is not a pointer"*). Real, reproducible, and useful to upstream, but it blocks nothing here.
 
@@ -485,7 +491,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `b51c880d` on 2026-08-11**, which dropped nothing. The `9678c99b` pass before it dropped `positional_callbacks`, the `489cbde7` one before that dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `01bc08c8` on 2026-08-12**, which dropped nothing — it fixed one of the two bugs behind `dsl_shims`, and the other still holds the row. The `b51c880d` pass before it dropped nothing either, the `9678c99b` one dropped `positional_callbacks`, the `489cbde7` one before that dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `dsl_shims` and `window_guards` both guard bugs that are fixed upstream and whose filed reproducers pass, and both are still needed. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -500,17 +506,17 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `b51c880d` (2026-08-11):**
+**Still needed, re-checked against `01bc08c8` (2026-08-12):**
 
 | Workaround | Why it is still there |
 |---|---|
-| `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver. Root cause found 2026-08-11: the `extend` is written in a different `class Window` body from the module, same as `window_guards`. Drafted as `issues/21-…` |
-| `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped, and a class's own same-named method is silently shadowed. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is drafted as `issues/19-…` and `issues/20-…` |
-| `window_guards` | `shown?` with an implicit receiver does not resolve, because `extend ClassMethods` is written in a different `class Window` body from the module. [#3788](https://github.com/matz/spinel/issues/3788) is closed and its reproducer passes; the residue is drafted as `issues/21-…` |
+| `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver. Root cause found 2026-08-11: the `extend` is written in a different `class Window` body from the module, same as `window_guards`. Filed as [#3802](https://github.com/matz/spinel/issues/3802) |
+| `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is filed as [#3803](https://github.com/matz/spinel/issues/3803). The shadowing bug that shared this row was fixed on 2026-08-12 by `80a3beb2` and the row stayed, which is the point of sweeping rather than trusting a fix |
+| `window_guards` | `shown?` with an implicit receiver does not resolve, because `extend ClassMethods` is written in a different `class Window` body from the module. [#3788](https://github.com/matz/spinel/issues/3788) is closed and its reproducer passes; the residue is filed as [#3802](https://github.com/matz/spinel/issues/3802) |
 | `expand_hash_delete` | `@gamepads_by_id.delete(id)` resolves to `String#delete`, passing `sp_RbVal` where a `const char *` is wanted. Two mirrors of the shape pass standalone (ivar assigned in a module method, and in the class), so the ivar has to be genuinely poly — the same family as `issues/17-…` and probably the same investigation |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
-| `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — drafted as `issues/18-…`, ready to file |
+| `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — filed as [#3804](https://github.com/matz/spinel/issues/3804) |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
 **Dropped on 2026-08-11**, once [#3786](https://github.com/matz/spinel/issues/3786) landed as `1c168009`: `positional_callbacks`. It was the longest-lived workaround on this branch and the only one whose bug we root-caused and patched ourselves.
@@ -846,7 +852,7 @@ Two things came out of it, and the second matters more than the first.
 
 So the reproducer-passes-library-fails split, which cost weeks on #3783, happened twice more in one afternoon. It is not an unlucky case; it is the normal outcome of reducing a whole-program failure to five lines. A minimal reproducer captures the construct, and these bugs are about *context* — which same-named method comes first, which module the receiver reached the class through — so the small case can be fixed completely while the library shape is untouched.
 
-**Both residues were reduced the same day**, by writing a second reproducer from the library's failing line instead of from the original small case, and all three are drafted as `issues/19-…`, `issues/20-…` and `issues/21-…`. The missing ingredient each time was something the first reproducer had no reason to include:
+**Both residues were reduced the same day**, by writing a second reproducer from the library's failing line instead of from the original small case, and all three were drafted as `issues/19-…`, `issues/20-…` and `issues/21-…` — two filed as #3803 and #3802, the third fixed upstream first. The missing ingredient each time was something the first reproducer had no reason to include:
 
 | Original | What its reproducer left out |
 |---|---|
@@ -856,6 +862,16 @@ So the reproducer-passes-library-fails split, which cost weeks on #3783, happene
 Neither omission is a mistake in the original — both reproducers are the smallest thing that showed the reported symptom. It is that "smallest thing that fails" and "the shape a library actually has" are different targets, and only the second one predicts whether a workaround can go.
 
 One incidental result: `dsl_shims` had been reported `inconclusive` by every sweep, because `positional_callbacks` rewrote the shims it generates and the two could not be tested apart. Dropping one made the other measurable for the first time.
+
+## A draft fixed by someone else's report (2026-08-12)
+
+`b51c880d` → `01bc08c8`, 17 commits, one of which moved us: [`80a3beb2`](https://github.com/matz/spinel/commit/80a3beb2) *"Keep a module usable from a class and the top level at once"* fixed draft 20 — the silent shadowing bug — before it could be filed. Its parent is `b51c880d`, where the reproduction fails, so the attribution is exact.
+
+It arrived from [#3795](https://github.com/matz/spinel/issues/3795), a different port hitting the **`include`** form of the same defect: a receiverless call inside the class reached the module's top-level copy rather than the class's transplanted one, which is exactly the `sp_DSL_update(NULL)` draft 20 recorded. Nobody filed the `extend` form. Had it gone out that morning it would have been a duplicate.
+
+**Check `rake issues` before filing, not only `rake sweep`.** The standing advice is that the sweep is the check that matters after a pull, because a passing reproducer does not mean a droppable workaround. This pull ran the other way: the sweep did not move at all — six transforms, nothing droppable — while `issues` went 16 fixed to 17. `dsl_shims` guarded two bugs, and one of them being fixed is invisible to a check that only asks whether the transform can go. The two checks answer different questions in both directions, and filing a duplicate is the cost of only running one of them.
+
+**The `extend` shape has no test upstream.** `test/module_included_class_and_toplevel.rb` came with #3795 and uses `include`; nothing exercises a class whose own method is shadowed. Draft 20 is kept as the local record and is worth offering as a test case rather than as a bug.
 
 ## MVP
 
