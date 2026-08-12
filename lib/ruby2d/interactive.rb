@@ -8,17 +8,19 @@ module Ruby2D
   # Including objects must expose `x`, `y`, `z`, `width`, `height`, and
   # `contains?(x, y)` so `Window::ObjectEventDispatch` can hit-test them.
   module Interactive
-    # Per-object events that take a value matcher (button) in the kwarg form.
-    # `:hover`, `:hover_out`, and `:mouse_scroll` carry no matchable field.
-    OBJECT_EVENT_FILTER_PREDICATES = {
-      mouse_down: :button?, mouse_held: :button?, mouse_up: :button?,
-      click: :button?, drag: :button?
+    # Per-object events that take a value matcher (button) in the kwarg form,
+    # mapped to the matchable field. `:hover`, `:hover_out`, and `:mouse_scroll`
+    # carry no matchable field. Fields rather than predicate method names for
+    # the reason given at `Window::EVENT_FILTER_FIELDS`.
+    OBJECT_EVENT_FILTER_FIELDS = {
+      mouse_down: :button, mouse_held: :button, mouse_up: :button,
+      click: :button, drag: :button
     }.freeze
 
     # The full per-object event vocabulary: the filterable events above plus the
-    # three that carry no matchable field. Derived from the predicates map so the
+    # three that carry no matchable field. Derived from the fields map so the
     # two can't drift, and mirrors what Window::ObjectEventDispatch fires.
-    OBJECT_EVENTS = (OBJECT_EVENT_FILTER_PREDICATES.keys + %i[hover hover_out mouse_scroll]).freeze
+    OBJECT_EVENTS = (OBJECT_EVENT_FILTER_FIELDS.keys + %i[hover hover_out mouse_scroll]).freeze
 
     # Register a per-object event handler. Two forms:
     #
@@ -33,13 +35,13 @@ module Ruby2D
         register_object_event_handler(event, proc)
       elsif event.nil? && !filters.empty?
         descriptors = filters.map do |type, matcher|
-          predicate = OBJECT_EVENT_FILTER_PREDICATES[type] or
+          field = OBJECT_EVENT_FILTER_FIELDS[type] or
             raise Error, "`#{type}` does not support filtering with `on event: value`"
           values = Array(matcher)
           # Every filterable object event matches on a mouse button, so a bad
           # name fails here rather than the first time the user clicks.
           values.each { |v| Mouse.validate!(v) }
-          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
+          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }
           register_object_event_handler(type, wrapped)
         end
         descriptors.size == 1 ? descriptors.first : descriptors

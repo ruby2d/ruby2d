@@ -16,16 +16,39 @@ module Ruby2D
       # not the struct.
       GamepadConnectData = Struct.new(:gamepad) do
         def gamepad?(other) = gamepad.equal?(other)
+
+        # Answer a filter for one matchable field. See `Window#matches?`.
+        def matches?(field, value)
+          field == :gamepad && gamepad?(value)
+        end
       end
 
       GamepadButtonData = Struct.new(:gamepad, :button) do
         def gamepad?(other) = gamepad.equal?(other)
         def button?(name)   = button == Gamepad::BUTTONS.validate!(name)
+
+        # Answer a filter for one matchable field. See `Window#matches?`.
+        def matches?(field, value)
+          case field
+          when :gamepad then gamepad?(value)
+          when :button  then button?(value)
+          else false
+          end
+        end
       end
 
       GamepadAxisData = Struct.new(:gamepad, :axis, :value) do
         def gamepad?(other) = gamepad.equal?(other)
         def axis?(name)     = axis == Gamepad::AXES.validate!(name)
+
+        # Answer a filter for one matchable field. See `Window#matches?`.
+        def matches?(field, value)
+          case field
+          when :gamepad then gamepad?(value)
+          when :axis    then axis?(value)
+          else false
+          end
+        end
       end
 
       # Connected gamepads in connect order. Stable: index 0 is the

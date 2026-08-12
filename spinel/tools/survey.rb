@@ -53,10 +53,10 @@ def spinel_dsl_shims(_dsl_source) = "extend Ruby2D::DSL\n"
 #         change in `lib/`, and each one costs a feature or an idiom.
 # :bug  — a compiler bug, filed or filable.
 NEUTRALIZE = [
-  { kind: :aot, label: 'send with a runtime method name (3 sites)',
-    note: 'window and per-object event filters; a compile-time predicate table would replace it',
-    subs: [['e.send(:"#{k}?", v)', '(e.nil? && v.nil?)'],      # rubocop:disable Lint/InterpolationCheck
-           ['e.send(predicate, v)', '(e.nil? && v.nil?)']] },
+  # The event filters' `send` with a runtime method name was here until
+  # 2026-08-12, when `lib/` moved to a per-event `matches?(field, value)` and
+  # the three sites went away. It was the construct that kept every script with
+  # input handling from compiling. See spinel/README.md.
 
   { kind: :aot, label: 'Object#define_singleton_method (button.rb)',
     note: 'no per-object method table exists when every call site is a direct C call',
@@ -73,7 +73,7 @@ NEUTRALIZE = [
 
   { kind: :bug, label: 'a lambda capturing the enclosing block parameter (interactive.rb)',
     note: 'unsupported proc referencing an uncaptured outer variable; same family as issue 11',
-    subs: [['          wrapped = ->(e) { proc.call(e) if values.any? { |v| (e.nil? && v.nil?) } }',
+    subs: [['          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }',
             '          wrapped = ->(e) { e }']] },
 
   { kind: :bug, label: 'Hash#delete_if on an ivar (object_events.rb)',

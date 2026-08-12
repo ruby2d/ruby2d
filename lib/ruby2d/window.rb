@@ -23,9 +23,19 @@ module Ruby2D
       def button?(name) = button == Mouse.validate!(name)
       def position      = [x, y]
       def delta         = [delta_x, delta_y]
+
+      # Answer a filter for one matchable field. See `Window#matches?`.
+      def matches?(field, value)
+        field == :button && button?(value)
+      end
     end
     KeyEvent              = Struct.new(:type, :key) do
       def key?(name) = key == Keyboard.validate!(name)
+
+      # Answer a filter for one matchable field. See `Window#matches?`.
+      def matches?(field, value)
+        field == :key && key?(value)
+      end
     end
 
     include KeyEvents
@@ -252,16 +262,22 @@ module Ruby2D
       Ext.now
     end
 
-    # Maps event types to the predicate used in the kwarg form of `on` —
-    # e.g. `on key_down: :escape` filters via `event.key?(:escape)`. For
-    # gamepad events the entries map to the *primary* predicate (the one a
-    # bare scalar matcher targets); hash matchers like
-    # `{ gamepad: pad1, button: :south }` derive the predicate from each key.
-    EVENT_FILTER_PREDICATES = {
-      key_down: :key?, key_held: :key?, key_up: :key?,
-      mouse_down: :button?, mouse_held: :button?, mouse_up: :button?,
-      gamepad_button_down: :button?, gamepad_button_held: :button?,
-      gamepad_button_up:   :button?, gamepad_axis: :axis?
+    # Maps event types to the matchable field used in the kwarg form of `on` —
+    # e.g. `on key_down: :escape` filters via `event.matches?(:key, :escape)`.
+    # For gamepad events the entries name the *primary* field (the one a bare
+    # scalar matcher targets); hash matchers like
+    # `{ gamepad: pad1, button: :south }` take the field from each key.
+    #
+    # Fields rather than predicate method names because every event answers
+    # `matches?`, while `key?` / `button?` / `axis?` each exist on only some of
+    # them — one shared entry point keeps the dispatch a plain method call
+    # instead of a `send` with a name computed at runtime, which whole-program
+    # AOT compilation cannot resolve. See spinel/README.md.
+    EVENT_FILTER_FIELDS = {
+      key_down: :key, key_held: :key, key_up: :key,
+      mouse_down: :button, mouse_held: :button, mouse_up: :button,
+      gamepad_button_down: :button, gamepad_button_held: :button,
+      gamepad_button_up:   :button, gamepad_axis: :axis
     }.freeze
 
     # Name vocabularies for filter values, so `on(key_down: 'space')` fails
@@ -349,19 +365,19 @@ module Ruby2D
           end
         end
         ->(e) {
-          if matcher.all? { |k, v| e.send(:"#{k}?", v) }
+          if matcher.all? { |k, v| e.matches?(k, v) }
             proc.call(*args.call(e))
           end
         }
       else
-        predicate = EVENT_FILTER_PREDICATES[type] or
+        field = EVENT_FILTER_FIELDS[type] or
           raise Error, "`#{type}` does not support filtering with `on event: value`"
         values = Array(matcher)
         if (vocabulary = EVENT_FILTER_VOCABULARIES[type])
           values.each { |v| vocabulary.validate!(v) }
         end
         ->(e) {
-          if values.any? { |v| e.send(predicate, v) }
+          if values.any? { |v| e.matches?(field, v) }
             proc.call(*args.call(e))
           end
         }
