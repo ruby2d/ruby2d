@@ -26,13 +26,13 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 4 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the four that reproduce are #3802, #3803, #3805 and #3806, all filed that day and open.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 6 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the six that reproduce are #3802, #3803, #3805, #3806, #3807 and #3808, all filed that day and open.
 
 **Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Three are now filed with a reduced reproducer — `dsl_shims` → [#3803](https://github.com/matz/spinel/issues/3803), and `window_guards` and `bypass_window_class_methods` → [#3802](https://github.com/matz/spinel/issues/3802), which covers both. Each needed a *second* reproducer written from the library's failure rather than from the original small case. The fourth, `expand_hash_delete`, is filed as [#3806](https://github.com/matz/spinel/issues/3806) — see [Every workaround now has a reproducer](#every-workaround-now-has-a-reproducer). **Every compiler-bug workaround on this branch now has a minimal reproducer**, which was not true this morning.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reported exactly one unsupported construct, the event filter's runtime-name `send`, until `lib/` removed it on 2026-08-12; the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Three are now filed with a reduced reproducer — `dsl_shims` → [#3803](https://github.com/matz/spinel/issues/3803), and `window_guards` and `bypass_window_class_methods` → [#3802](https://github.com/matz/spinel/issues/3802), which covers both. Each needed a *second* reproducer written from the library's failure rather than from the original small case. The fourth, `expand_hash_delete`, is filed as [#3806](https://github.com/matz/spinel/issues/3806) — see [Every workaround now has a reproducer](#every-workaround-now-has-a-reproducer). **Every compiler-bug workaround on this branch now has a minimal reproducer**, which was not true this morning.
 
-Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
+Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them — the `send` that made them inherently incompatible is gone, and **no script using input events compiles today** for four ordinary compiler-bug reasons instead, two of them filed as [#3807](https://github.com/matz/spinel/issues/3807) and [#3808](https://github.com/matz/spinel/issues/3808). See [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12).
 
 ### Setup
 
@@ -225,25 +225,35 @@ That is runtime reflection over the class graph. Whole-program AOT bakes the gra
 
 **It is not permanently unsupportable** — only this *mechanism* is. Detecting the pattern without reflection (for instance, having the base `update` record that it was used as the DSL setter, and treating "never set" as the class pattern) would restore it for every runtime. That is a `window.rb` design change affecting all three targets, and it has to respect the prepended-module case the current comment at `window.rb:841-848` calls out, so it was out of scope here.
 
-### Events are unsupported, per-object and window-level alike
+### Events are unsupported — the `send` is gone, three compiler bugs remain (2026-08-12)
 
-**Window-level `on` does not compile at all** (2026-08-10), and not only in its filtered form. `Window#on`'s two branches share a method body, so `build_filter_wrapper`'s `e.send(:"#{k}?", v)` is compiled whichever form is called — even `on(:mouse_down) { }` fails with *"unsupported send with a runtime method name"*. Verified on the subset, not inferred.
-
-That rules out any script with input handling until it is addressed, which is most of `examples/`. The fix is the same shape as the per-object one below and equally a `lib/` design decision: `EVENT_FILTER_PREDICATES` is a small closed map, so the dispatch could be a `case` instead of a `send`. The interpolated `:"#{k}?"` form in the hash-filter branch needs the same treatment.
-
-### Per-object events are unsupported
-
-The original reason — a nested include not carrying `Interactive`'s methods across — was fixed by #3774. The feature is still off, for a different and more durable reason found on 2026-08-10.
-
-`Interactive#on`'s filtered form dispatches the matcher predicate by name:
+**The runtime-name `send` was removed from `lib/` on 2026-08-12.** It was the only blocker on this path that no upstream fix could have cleared: `e.send(:"#{k}?", v)` and `e.send(predicate, v)` name a method at run time, which whole-program AOT cannot resolve by construction. Both window-level and per-object filters now go through a per-event `matches?(field, value)`:
 
 ```ruby
-wrapped = ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
+# each event answers for its own fields
+def matches?(field, value)
+  case field
+  when :gamepad then gamepad?(value)
+  when :button  then button?(value)
+  else false
+  end
+end
 ```
 
-Spinel rejects that outright — *"unsupported send with a runtime method name (AOT needs a compile-time-known name)"* — and it is a compile error for the whole program, not a run-time failure of that path, so merely not calling `on` is no defense. The smoke test only compiles because it never calls `on` at all, which leaves the method unreachable and uncompiled.
+`EVENT_FILTER_PREDICATES` became `EVENT_FILTER_FIELDS` (and the same for the per-object map): the map keeps its indirection, but names a *field* rather than a method, so the dispatch is an ordinary call every event class owns. The public API is unchanged and all 867 specs pass. `rake survey` no longer lists a `send` among the AOT limits — only `define_singleton_method` and `undef_method` remain there.
 
-This one is fixable on the Ruby side whenever the feature is wanted: every value in `OBJECT_EVENT_FILTER_PREDICATES` is `:button?` today, so the `send` could become a direct call. That trades away the indirection the map exists to provide, so it is a design decision for `interactive.rb` rather than a workaround to bury in `cli/spinel.rb`.
+**Input handling still does not work**, because three ordinary compiler bugs sit behind the one that was ours:
+
+| Bug | Filed | Effect on `on` |
+|---|---|---|
+| A keywords-only call binds the keyword hash to an optional positional too | [#3808](https://github.com/matz/spinel/issues/3808) | `on(key_down: :escape)` raises "requires either an event symbol or event filters" — `def on(event = nil, **filters, &proc)` is the shape |
+| `equal?` between a typed receiver and a poly argument folds to `false` | [#3807](https://github.com/matz/spinel/issues/3807) | gamepad identity filters never match, silently |
+| An escaping lambda's parameter inferred as `Integer` | not reduced | `e.matches?` raises `NoMethodError` at the handler |
+| A lambda capturing the enclosing block parameter (`Interactive#on`) | not filed | per-object `on` refuses to compile at all |
+
+The refactor was verified rather than assumed: with only the last of those neutralized, `Window#on` compiles and runs, so it is these bugs and not the design that stop it. The preflight therefore still rejects `on`, with its reason updated — the feature is genuinely unavailable, and a silent half-working event system would be worse than a clear refusal.
+
+**Related, and a clean negative result:** the library's three other `equal?` sites are *not* affected by #3807 — `sprite.rb`'s frozen-sentinel default, and the poly-vs-poly comparisons in `quad.rb` and `triangle.rb`. The fold needs a user-class-typed receiver against a poly argument specifically; both operands poly, or a sentinel default, compile and answer correctly. Checked because a silent identity failure in shipped code would be worse than the bug that prompted the look.
 
 ## #3783 is closed and still broken for us — root cause and patch (2026-08-10)
 
@@ -354,6 +364,8 @@ if matcher.all? { |k, v| e.send(:"#{k}?", v) }
 
 Everything else — image, text, canvas, audio, sprite, tileset, polygon — parses, resolves, and would compile. What stands between the slice and the whole library is that one line plus FFI adapter work, which is mechanical and countable.
 
+> **Since 2026-08-12** that line is gone: `lib/` replaced the `send` with a per-event `matches?(field, value)`. Input handling is still unavailable, now for four ordinary compiler-bug reasons rather than an inherent AOT limit — see [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12).
+
 The legs are worth knowing individually:
 
 | Leg | Answers |
@@ -381,7 +393,7 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 
 A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. One exists today: `Spinel-only`, for a reproducer using a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. It is not counted as something to read by hand — a permanent warning is one nobody reads — so it needs a human on a re-verification pass, which is what the table below is for. `research notes` is the other opt-out, for a draft that is root-caused but has no reproducer yet; draft 17 used it until 2026-08-12 and none does now.
 
-**Filed on 2026-08-12**, all five reduced from a workaround this branch could not otherwise drop — the first three against `01bc08c8`, #3805 and #3806 against `83d1315d`:
+**Filed on 2026-08-12**, seven in one day. The first five were reduced from a workaround this branch could not otherwise drop; the last two came out of removing the event-filter `send` from `lib/`. The first three were verified against `01bc08c8`, the rest against `83d1315d`:
 
 | Issue | Draft | Bug | Workaround it covers |
 |---|---|---|---|
@@ -390,6 +402,8 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 | [#3804](https://github.com/matz/spinel/issues/3804) | `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | the adapter's spelled-out type arrays |
 | [#3805](https://github.com/matz/spinel/issues/3805) | `issues/17-…` | A user class defining `length` diverts `empty?` on a poly receiver away from the builtin lowering into a dispatch keyed on `empty?`, which nothing owns, so the call becomes an unconditional raise — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | `Color::Set#empty?` in `lib/`, which is a real method rather than a workaround |
 | [#3806](https://github.com/matz/spinel/issues/3806) | `issues/22-…` | `delete` on a poly receiver is lowered to `String#delete`, stringifying the receiver — silently wrong with a String argument, a C compile error otherwise | `expand_hash_delete`, the last workaround to get a reproducer |
+| [#3807](https://github.com/matz/spinel/issues/3807) | `issues/23-…` | `equal?` between a typed receiver and a poly argument is folded to the constant `false`, both operands discarded | none — found while removing the event-filter `send` |
+| [#3808](https://github.com/matz/spinel/issues/3808) | `issues/24-…` | A keywords-only call binds the keyword hash to an optional positional parameter as well as to `**kwargs` | none — same |
 
 The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
@@ -399,7 +413,7 @@ The duplicate search before filing turned up one close relative worth citing rat
 |---|---|---|
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
 
-**Twenty-one of the twenty-two drafts are filed** — every one except 20, which upstream fixed before it could be filed. At `83d1315d` `verify_issues.rb` reports 17 fixed, 4 reproduce, 1 parked: the four reproducing are #3802, #3803, #3805 and #3806; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty-three of the twenty-four drafts are filed** — every one except 20, which upstream fixed before it could be filed. At `83d1315d` `verify_issues.rb` reports 17 fixed, 6 reproduce, 1 parked: the six reproducing are #3802, #3803, #3805, #3806, #3807 and #3808; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -747,7 +761,7 @@ Spinel compiles the whole reachable graph, so an unsupported class isn't a featu
 Error: bouncing_balls.rb uses features the Spinel target doesn't support yet.
 
     line  5  Circle  shapes and media beyond Square, Rectangle, and Quad
-    line 12  on      input events — event dispatch needs a runtime `send`
+    line 12  on      input events — blocked on three upstream bugs, see spinel/README.md
 ```
 
 The rejected class list is **derived** from `Ruby2D::CLI::LIB_FILES - SPINEL_LIB_FILES`, not written out, so widening the slice narrows the rejections automatically. A `lib/` file that appears in neither list raises `SpinelCompatDrift` — the same drift detection the transforms use, so a new subsystem can't be quietly forgotten on one side.
@@ -917,7 +931,7 @@ Dropped for the MVP: `audio`, `canvas`, `font`, `image`, `text`, `bitmap_text`, 
 - [x] `ffi_func` declarations for the slice — as `SPINEL_EXT` in `cli/spinel.rb` rather than a `lib/` file, since it is only ever read as text and would not load under CRuby. It still duplicates the binding list and will drift from `ext/`; a shared manifest generating both remains the eventual answer.
 - [x] Replace the `include Ruby2D` / `extend Ruby2D::DSL` preamble with generated top-level DSL shims on the Spinel path only.
 - [x] Link step: `--link <archive>` for the SDL3 statics and `--cc` to carry the macOS frameworks.
-- [ ] Run an existing example unmodified — needs the four scalar shapes above, and input, which is blocked on the runtime `send` in `on`.
+- [ ] Run an existing example unmodified — needs the four scalar shapes above, and input, which is blocked on #3807, #3808 and two unfiled compiler bugs.
 - [ ] Benchmark that example against the mruby build.
 
 Reused without change: `ruby2d launch --native` and the macOS `.app` bundle step. Asset bundling is *not* reused — nothing in the slice can read a file, so `--assets` is rejected rather than accepted and ignored.
