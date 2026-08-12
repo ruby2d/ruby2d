@@ -35,6 +35,15 @@ module Ruby2D
         @colors.length
       end
 
+      # Check if the set holds no colors. Always false in practice, since a set
+      # cannot be built from an empty array, but an Enumerable collection is
+      # expected to answer it — and on the Spinel target the name has to exist
+      # somewhere in the program for `empty?` to compile at all. See
+      # spinel/README.md.
+      def empty?
+        @colors.empty?
+      end
+
       # Iterate over each color
       def each(&block)
         @colors.each(&block)

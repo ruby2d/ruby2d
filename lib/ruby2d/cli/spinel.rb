@@ -327,9 +327,14 @@ SPINEL_EXT = <<~'RUBY'
                          x4.to_f, y4.to_f, r.to_f, g.to_f, b.to_f, a.to_f)
       end
 
-      def self.draw_quad(x1, y1, x2, y2, x3, y3, x4, y4,
-                         r1, g1, b1, a1, r2, g2, b2, a2,
-                         r3, g3, b3, a3, r4, g4, b4, a4)
+      # Interleaved, one vertex at a time — the order `Quad#render` passes and
+      # the order `R2D_DrawQuad` takes. `stroke_quad` below groups the
+      # coordinates instead, because that is how `lib/` calls *it*; the two
+      # differ, and matching each to its caller is the whole job here.
+      def self.draw_quad(x1, y1, r1, g1, b1, a1,
+                         x2, y2, r2, g2, b2, a2,
+                         x3, y3, r3, g3, b3, a3,
+                         x4, y4, r4, g4, b4, a4)
         Ext.R2D_DrawQuad(x1.to_f, y1.to_f, r1.to_f, g1.to_f, b1.to_f, a1.to_f,
                          x2.to_f, y2.to_f, r2.to_f, g2.to_f, b2.to_f, a2.to_f,
                          x3.to_f, y3.to_f, r3.to_f, g3.to_f, b3.to_f, a3.to_f,

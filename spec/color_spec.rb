@@ -165,6 +165,12 @@ RSpec.describe Ruby2D::Color do
     end
   end
 
+  describe "Set#empty?" do
+    it "is false for a set, which cannot be built empty" do
+      expect(Ruby2D::Color::Set.new(%w[red green blue])).not_to be_empty
+    end
+  end
+
   describe ".for_render" do
     it "returns the same shared instance for a repeated color string" do
       expect(Ruby2D::Color.for_render('#e5e7eb')).to equal(Ruby2D::Color.for_render('#e5e7eb'))

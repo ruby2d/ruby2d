@@ -69,52 +69,85 @@ def histogram(rows, channels)
   counts
 end
 
-FileUtils.rm_rf(DIR)
-FileUtils.mkdir_p(DIR)
+# Both fixtures, because they exercise different `Ext` entry points: a single
+# color goes through `draw_quad_uniform`, per-vertex colors through `draw_quad`,
+# and a bug in one is invisible to the other. Each was in fact broken while the
+# other passed.
+FIXTURES = { 'cli' => 'spinel/tools/cli_app.rb',
+             'gradient' => 'spinel/tools/gradient_app.rb' }.freeze
 
-# mruby has no `ENV`, which the fixture reads for its frame cap. Only that
-# plumbing is substituted — both engines compile byte-identical drawing code.
-FIXTURE = File.read('spinel/tools/cli_app.rb').sub(/^frames = .*$/, 'frames = 30')
+# A histogram is how a single-color divergence explains itself — which color
+# gained or lost pixels. A gradient has thousands of colors and the same list
+# would be unreadable, so past this many it reports the shape of the difference
+# instead.
+HISTOGRAM_LIMIT = 12
 
-shots = { 'mruby' => '--native', 'spinel' => '--spinel' }.map do |name, flag|
-  shot = File.expand_path("#{DIR}/#{name}.png")
-  File.write("#{DIR}/app.rb", FIXTURE.sub(/^shot = .*$/, "shot = #{shot.inspect}"))
-  puts "  building #{name} (#{flag})…"
+def screenshots(fixture, dir)
+  # mruby has no `ENV`, which the fixture reads for its frame cap. Only that
+  # plumbing is substituted — both engines compile byte-identical drawing code.
+  source = File.read(fixture).sub(/^frames = .*$/, 'frames = 30')
 
-  out, status, code = Dir.chdir(DIR) { run_capped(['ruby2d', 'build', flag, 'app.rb'], seconds: 900) }
-  abort "\n#{name} build failed:\n#{out}" unless status == :ok && code&.zero?
+  { 'mruby' => '--native', 'spinel' => '--spinel' }.map do |name, flag|
+    shot = File.expand_path("#{dir}/#{name}.png")
+    File.write("#{dir}/app.rb", source.sub(/^shot = .*$/, "shot = #{shot.inspect}"))
+    puts "    building #{name} (#{flag})…"
 
-  binary = File.expand_path("#{DIR}/build/native/app")
-  abort "\n#{name}: nothing at #{binary}" unless File.exist?(binary)
+    out, status, code = Dir.chdir(dir) { run_capped(['ruby2d', 'build', flag, 'app.rb'], seconds: 900) }
+    abort "\n#{name} build failed:\n#{out}" unless status == :ok && code&.zero?
 
-  ran, status = run_capped([binary], seconds: 60)
-  abort "\n#{name} hung" if status == :timeout
-  abort "\n#{name} wrote no screenshot:\n#{ran}" unless File.exist?(shot)
+    binary = File.expand_path("#{dir}/build/native/app")
+    abort "\n#{name}: nothing at #{binary}" unless File.exist?(binary)
 
-  FileUtils.rm_rf("#{DIR}/build")
-  [name, png_rows(shot)]
-end.to_h
+    ran, status = run_capped([binary], seconds: 60)
+    abort "\n#{name} hung" if status == :timeout
+    abort "\n#{name} wrote no screenshot:\n#{ran}" unless File.exist?(shot)
 
-a = shots['mruby']
-b = shots['spinel']
-abort "\n  different geometry: mruby #{a[0]}x#{a[1]}, spinel #{b[0]}x#{b[1]}" \
-  unless a[0] == b[0] && a[1] == b[1] && a[2] == b[2]
-
-ha = histogram(a[3], a[2])
-hb = histogram(b[3], b[2])
-
-puts "\n  #{a[0]}x#{a[1]}, #{(ha.keys | hb.keys).size} colors between them\n\n"
-puts format('  %-18s %10s %10s', 'color', 'mruby', 'spinel')
-(ha.keys | hb.keys).sort_by { |c| -(ha[c] + hb[c]) }.each do |color|
-  puts format('  %-18s %10d %10d%s', color.inspect, ha[color], hb[color],
-              ha[color] == hb[color] ? '' : '  <- differs')
+    FileUtils.rm_rf("#{dir}/build")
+    [name, png_rows(shot)]
+  end.to_h
 end
 
-differing = a[3].each_index.count { |y| a[3][y] != b[3][y] }
-if differing.zero?
-  puts "\n  Identical: every pixel of #{a[1]} scanlines matches.\n\n"
-else
-  puts "\n  DIVERGED: #{differing} of #{a[1]} scanlines differ."
-  puts "  A color present for mruby and absent for Spinel is an inert `Ext` stub.\n\n"
-  exit 1
+diverged = FIXTURES.map do |label, fixture|
+  dir = "#{DIR}/#{label}"
+  FileUtils.rm_rf(dir)
+  FileUtils.mkdir_p(dir)
+  puts "\n  #{label}\n\n"
+
+  shots = screenshots(fixture, dir)
+  a = shots['mruby']
+  b = shots['spinel']
+  abort "\n  different geometry: mruby #{a[0]}x#{a[1]}, spinel #{b[0]}x#{b[1]}" \
+    unless a[0] == b[0] && a[1] == b[1] && a[2] == b[2]
+
+  ha = histogram(a[3], a[2])
+  hb = histogram(b[3], b[2])
+  colors = (ha.keys | hb.keys)
+
+  puts "\n  #{a[0]}x#{a[1]}, #{colors.size} colors between them\n\n"
+  if colors.size <= HISTOGRAM_LIMIT
+    puts format('  %-18s %10s %10s', 'color', 'mruby', 'spinel')
+    colors.sort_by { |c| -(ha[c] + hb[c]) }.each do |color|
+      puts format('  %-18s %10d %10d%s', color.inspect, ha[color], hb[color],
+                  ha[color] == hb[color] ? '' : '  <- differs')
+    end
+  else
+    only_mruby = (ha.keys - hb.keys).size
+    only_spinel = (hb.keys - ha.keys).size
+    puts format('  %d colors only mruby drew, %d only Spinel drew', only_mruby, only_spinel)
+  end
+
+  differing = a[3].each_index.count { |y| a[3][y] != b[3][y] }
+  if differing.zero?
+    puts "\n  Identical: every pixel of #{a[1]} scanlines matches."
+    false
+  else
+    puts "\n  DIVERGED: #{differing} of #{a[1]} scanlines differ."
+    puts '  A color present for mruby and absent for Spinel is an inert `Ext` stub.'
+    puts '  The same drawing in the wrong place is an `Ext` adapter taking its'
+    puts '  arguments in a different order from the `lib/` call.'
+    true
+  end
 end
+
+puts
+exit 1 if diverged.any?
