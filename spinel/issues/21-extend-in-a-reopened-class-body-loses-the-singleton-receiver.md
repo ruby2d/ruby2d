@@ -39,7 +39,7 @@ puts Win.check
 no
 ```
 
-**Spinel (9678c99b):**
+**Spinel (b51c880d):**
 ```
 spinel: w8.rb:7: unsupported call: node 15 (CallNode `shown?`) recv=-/ty-1 argc=0
 ```
@@ -102,6 +102,6 @@ The second is the more expensive one. It is not a fixed list of call sites — w
 
 ## Environment
 
-- Spinel commit: `9678c99b`
+- Spinel commit: `b51c880d`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

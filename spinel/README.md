@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `9678c99b` (2026-08-11)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `b51c880d` (2026-08-11)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -386,12 +386,12 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 | Draft | Bug | Status |
 |---|---|---|
 | `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | Needs a minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle sharper than the runtime one |
-| `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `9678c99b`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
+| `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `b51c880d`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
 | `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped — the `dsl_shims` residue after #3787 | Ready to file, 9 lines |
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | Ready to file, 19 lines. The only wrong-answer bug of the three |
 | `issues/21-…` | `extend` written in a *reopened* class body detaches the module's methods from the class, both for an implicit-receiver call inside it and for `Win.method` from outside — not about `alias_method` at all | Ready to file, 15 lines. **Worth two workarounds**: the `window_guards` residue after #3788, and `bypass_window_class_methods`, which had resisted ten reduction attempts |
 
-**All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**All sixteen filed drafts now pass** at `b51c880d`; the `reproduce` count on the `issues` line is the unfiled drafts above. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -485,7 +485,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `9678c99b` on 2026-08-11.** That pass dropped `positional_callbacks`, the `489cbde7` pass before it dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `b51c880d` on 2026-08-11**, which dropped nothing. The `9678c99b` pass before it dropped `positional_callbacks`, the `489cbde7` one before that dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `dsl_shims` and `window_guards` both guard bugs that are fixed upstream and whose filed reproducers pass, and both are still needed. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -500,7 +500,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `9678c99b` (2026-08-11):**
+**Still needed, re-checked against `b51c880d` (2026-08-11):**
 
 | Workaround | Why it is still there |
 |---|---|

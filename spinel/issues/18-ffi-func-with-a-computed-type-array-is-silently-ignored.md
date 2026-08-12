@@ -70,6 +70,6 @@ Naming the declaration line is the more valuable half. Even without support for 
 
 ## Environment
 
-- Spinel commit: `9678c99b`
+- Spinel commit: `b51c880d`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

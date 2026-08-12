@@ -29,7 +29,7 @@ update { nil }
 DSL#update
 ```
 
-**Spinel (9678c99b):**
+**Spinel (b51c880d):**
 ```
 block_param.rb:9:21: error: too few arguments to function call, expected 2, have 1
 spinel: C compilation failed
@@ -61,6 +61,6 @@ The last row is what shows the receiver and the block are handled separately: an
 
 ## Environment
 
-- Spinel commit: `9678c99b`
+- Spinel commit: `b51c880d`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

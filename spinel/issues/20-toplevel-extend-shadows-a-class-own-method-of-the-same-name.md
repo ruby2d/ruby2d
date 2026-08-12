@@ -41,7 +41,7 @@ Window#update
 DSL#update
 ```
 
-**Spinel (9678c99b):**
+**Spinel (b51c880d):**
 ```
 DSL#update
 DSL#update
@@ -71,6 +71,6 @@ Ruby 2D works around it by generating standalone top-level shims instead of usin
 
 ## Environment
 
-- Spinel commit: `9678c99b`
+- Spinel commit: `b51c880d`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21
