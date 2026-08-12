@@ -56,15 +56,15 @@ end
 # copies that went stale the moment a transform was added or dropped — which is
 # the same drift the transforms themselves guard against.
 #
-# `spinel_compat` names most of them; `positional_callbacks` and `dsl_shims` are
-# applied later in `spinel_assemble`, so they are added explicitly.
+# `spinel_compat` names most of them; `dsl_shims` is applied later in
+# `spinel_assemble`, so it is added explicitly.
 def spinel_transform_names(cli_spinel_path)
   source = File.read(cli_spinel_path)
   body = source[/^def spinel_compat\b.*?^end$/m] or
     raise "could not find spinel_compat in #{cli_spinel_path}"
 
   names = body.scan(/\bspinel_(\w+)/).flatten - %w[compat sub]
-  (names + %w[positional_callbacks dsl_shims]).uniq
+  (names + %w[dsl_shims]).uniq
 end
 
 

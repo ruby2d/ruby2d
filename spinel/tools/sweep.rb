@@ -12,12 +12,14 @@
 #     the sweep caught it and kept the workaround
 #   - a nested-`include` bug was fixed in a probe while the real library still
 #     failed, for weeks
+#   - #3787 and #3788 were both fixed upstream and both reproducers pass, and
+#     `dsl_shims` and `window_guards` are both still needed
 #
 # A transform is droppable only when the library compiles to zero errors AND
 # runs to the same output as CRuby. Both halves matter: dropping
 # `disable_class_pattern` compiles clean and then fails at run time, and
-# dropping `positional_callbacks` compiles, runs, prints `SUBSET OK`, and has
-# one earlier line wrong.
+# `positional_callbacks` — since deleted — compiled, ran, printed `SUBSET OK`,
+# and had one earlier line wrong.
 
 require 'fileutils'
 require_relative 'spinel_env'
@@ -52,8 +54,9 @@ puts "control: #{control.lines.last.strip}"
 puts "\n  #{TRANSFORMS.size} transforms, read from cli/spinel.rb\n\n"
 
 results = TRANSFORMS.map do |name|
-  # A transform whose site another one creates cannot be tested alone —
-  # `positional_callbacks` rewrites the shims `dsl_shims` generates.
+  # A transform whose site another one creates cannot be tested alone. No pair
+  # is coupled that way today — `positional_callbacks` rewrote the shims
+  # `dsl_shims` generates, and it is gone — but the next one added might be.
   if (err = build(name))
     next [name, 'inconclusive', "another transform depends on it — #{err[0, 70]}"]
   end

@@ -47,7 +47,6 @@ def spinel_compat(src, class_methods_source)
   spinel_bypass_window_class_methods(src, class_methods_source) + spinel_web_predicate
 end
 
-def spinel_positional_callbacks(src) = src
 def spinel_dsl_shims(_dsl_source) = "extend Ruby2D::DSL\n"
 
 # :aot  — inherent to ahead-of-time compilation. Never fixed upstream; needs a
@@ -110,7 +109,7 @@ applied.select { |e| e[:kind] == :bug }.each { |e| puts "    #{e[:label]}\n     
 
 puts "\n  Still worked around by cli/spinel.rb (each a compiler bug):"
 puts '    bypass_window_class_methods — applied above; a class method on a constant receiver via extend'
-puts '    window_guards (issue 13), dsl_shims (issue 12), positional_callbacks (issue 11)'
+puts '    window_guards (#3788) and dsl_shims (#3787) — both fixed upstream, both still needed here'
 puts '    expand_hash_delete, disable_class_pattern (an AOT limit)'
 
 if File.exist?(BIN)

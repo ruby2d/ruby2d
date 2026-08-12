@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `489cbde7` (2026-08-11)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `9678c99b` (2026-08-11)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -12,7 +12,13 @@ The rest of this document is a research log in discovery order. This section is 
 
 What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. All three draw **filled and stroked, in a single color** — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
-**`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws, but only with a one-line patch to Spinel.** Unpatched, any `set` call that omits `background:` passes a nil key to a String-keyed hash and segfaults before the first frame. Filed as [#3790](https://github.com/matz/spinel/issues/3790), with the patch in `issues/16-nil-key-hash.patch`; see [square.rb: the goal](#squarerb-the-goal-and-the-one-line-in-the-way-2026-08-11).
+**`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws on a stock compiler.**
+
+```sh
+ruby2d build --spinel spinel/square.rb && ruby2d launch --native
+```
+
+It needed a patched Spinel for one day: any `set` call omitting `background:` passed a nil key to a String-keyed hash and segfaulted before the first frame. [#3790](https://github.com/matz/spinel/issues/3790) fixed that in `fcaf3fcc`. See [square.rb: the goal](#squarerb-the-goal-and-the-one-line-that-was-in-the-way-2026-08-11).
 
 **Per-vertex colors do not work yet.** `color:` or `stroke_color:` given an array — the `Color::Set` gradient path — compiles and then dies at run time with `undefined method 'empty?' for an instance of Array`. Fill and stroke fail identically, so it is `Color::Set`, not the shape code. Untyped-receiver probes of the same shape pass standalone, which puts it in the same category as `bypass_window_class_methods` and `expand_hash_delete`: real, reproducible in the library, not yet reduced. Unlike the stroke gap this one is loud, so preflight does not reject it.
 
@@ -20,11 +26,11 @@ What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, a
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All ten filed bugs are closed upstream** ([#3771-#3784](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 10 fixed, 0 reproduce.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)), and `verify_issues.rb` reports 16 fixed, 0 reproduce.
 
-**One of them is not actually fixed for us** — and it is now root-caused, with a patch. #3783's reproducer passes at `489cbde7` while the library shape still fails, because escape analysis resolves a forwarded block's callee by taking the first same-named method it finds, and Ruby 2D has four methods named `update` of which the first is a forwarder and only `Window#update` stores the block. Drafted as `issues/11-…`, diff in `issues/11-ambiguous-forward-callee.patch`, verified against Spinel's own suite, no failures. See [root cause and patch](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10).
+**Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it currently keeps `dsl_shims` and `window_guards` even though both reproducers pass. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, five workarounds cover unfiled compiler bugs. Two have minimal reproducers and are drafted (`dsl_shims` → issue 12, `window_guards` → issue 13); a third, `expand_massign`, was fixed upstream before it could be filed and the workaround is gone. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #11.
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reports exactly **one** unsupported construct — the `e.send(:"#{k}?", v)` event filter — so the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Two are filed and fixed, and the library shape still fails anyway (`dsl_shims` → #3787, `window_guards` → #3788), so each needs a *second* reproducer written from the library's failure rather than from the original small case. Two remain undiagnosed: `bypass_window_class_methods` and `expand_hash_delete` are still needed while their minimal shapes pass standalone — see [Two workarounds with no reproducer yet](#two-workarounds-with-no-reproducer-yet). Reproduce, read the source, propose a fix — the route that worked for #3786.
 
 Three things remain gaps rather than bugs, all inherent to AOT: the class pattern needs `Module#ancestors` reflection, and both window-level and per-object `on` dispatch a filter predicate through a runtime `send` — which means **no script using input events compiles today**. See [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target).
 
@@ -241,7 +247,7 @@ This one is fixable on the Ruby side whenever the feature is wanted: every value
 
 ## #3783 is closed and still broken for us — root cause and patch (2026-08-10)
 
-All ten filed bugs closed. Sweeping the workaround table found nine of the ten genuinely fixed in the real library, and one not. Chasing that one produced a root cause, a twenty-line reproducer, and a patch that passes Spinel's own suite — drafted as `issues/11-…` with the diff in `issues/11-ambiguous-forward-callee.patch`.
+All ten filed bugs closed. Sweeping the workaround table found nine of the ten genuinely fixed in the real library, and one not. Chasing that one produced a root cause, a twenty-line reproducer, and a patch that passes Spinel's own suite — drafted as `issues/11-…`.
 
 **The cause.** Escape analysis decides whether a forwarded block's captures need heap cells by resolving which method the block is forwarded into. When it cannot resolve the receiver it falls back to matching by name and takes the **first** scope it finds — and because that pass runs before receiver types settle, a plain local receiver reaches the fallback too, so the bug is not confined to call receivers (`src/analyze.c`, from [`0780e65a`](https://github.com/matz/spinel/commit/0780e65a)). Ruby 2D has four methods named `update` that take a block — `ClassMethods#update`, `Window#update`, `DSL#update`, and the generated top-level shim, in assembled order — and only `Window#update` stores it. `window/class_methods.rb` comes first and forwards, so the forward is judged harmless and the block is inlined with its captures uncelled.
 
@@ -254,11 +260,11 @@ forwarder defined first    FAIL  n=0
 
 **The fix** treats an ambiguous forward as an escape instead of betting on one candidate, which costs no more than the single-match case already accepts. Verified three ways: the reproducer, Ruby 2D's callbacks with `positional_callbacks` removed, and `make test` in the Spinel checkout, which reports no failures and no errors.
 
-Keep `positional_callbacks` until the fix is upstream — the branch has to build with a released compiler, not a locally patched one.
+**Filed as [#3786](https://github.com/matz/spinel/issues/3786) and fixed upstream in `1c168009` on 2026-08-11**, and `positional_callbacks` was deleted the same day — the branch's longest-lived workaround, and the only one whose bug it root-caused and patched itself.
 
 ### How the evidence was gathered
 
-Remove `positional_callbacks` and the subset still compiles, still runs, and still prints `SUBSET OK` — with one earlier line wrong:
+Removing `positional_callbacks` left the subset compiling, running, and still printing `SUBSET OK` — with one earlier line wrong:
 
 ```
 CRuby                            Spinel
@@ -373,15 +379,19 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-**Filed 2026-08-11 against `489cbde7`, open:** each was re-verified at that commit first, including its "Additional Findings" contrasts — which `verify_issues.rb` does not cover, and which is how a false claim in #3786 was caught before filing.
+**All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
-| Issue | Draft | Bug | Blocks us |
-|---|---|---|---|
-| [#3786](https://github.com/matz/spinel/issues/3786) | `issues/11-…` | A forwarded block's callee resolves to the first same-named method — the #3783 follow-up, with a root cause and a patch in `issues/11-ambiguous-forward-callee.patch` | yes — `update` blocks lose their captured locals |
-| [#3787](https://github.com/matz/spinel/issues/3787) | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) | yes — `dsl_shims` |
-| [#3788](https://github.com/matz/spinel/issues/3788) | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) | yes — `window_guards` |
-| [#3789](https://github.com/matz/spinel/issues/3789) | `issues/15-…` | Reading an ivar from an `extend`-provided method emits invalid C — found while probing 13 | no — the library's extended class methods hold no state |
-| [#3790](https://github.com/matz/spinel/issues/3790) | `issues/16-…` | A nil key looked up in a String-keyed `Hash` segfaults — `sp_str_hash` reads the tag byte at `s[-1]` with no NULL check; one-line patch in `issues/16-nil-key-hash.patch`, verified at 2854 pass / 0 fail | yes — any `set` without `background:`, so `square.rb` itself |
+| Issue | Draft | Bug | Fixed by | Workaround |
+|---|---|---|---|---|
+| [#3786](https://github.com/matz/spinel/issues/3786) | `issues/11-…` | A forwarded block's callee resolves to the first same-named method — the #3783 follow-up, root-caused and patched here | `1c168009` | `positional_callbacks` **dropped** |
+| [#3787](https://github.com/matz/spinel/issues/3787) | `issues/12-…` | Top-level `extend` of a module does not make its methods callable (top-level `include` works — the sibling of #3775) | `e40fe331` | `dsl_shims` still needed |
+| [#3788](https://github.com/matz/spinel/issues/3788) | `issues/13-…` | An implicit-receiver call to an `alias_method` singleton is unsupported from an extended module (the explicit-receiver form works, so #3776's fix holds) | `329050a6` | `window_guards` still needed |
+| [#3789](https://github.com/matz/spinel/issues/3789) | `issues/15-…` | Reading an ivar from an `extend`-provided method emits invalid C — found while probing 13 | `bebef965` | none — the library's extended class methods hold no state |
+| [#3790](https://github.com/matz/spinel/issues/3790) | `issues/16-…` | A nil key looked up in a String-keyed `Hash` segfaults — `sp_str_hash` reads the tag byte at `s[-1]` with no NULL check | `fcaf3fcc` | none — it blocked `square.rb`, which now builds unpatched |
+
+The upstream fix for #3790 is our patch with a better constant: the guard returns the FNV offset basis rather than 0, so a nil key lands where the empty-string hash would rather than in bucket 0. **Two of the five cleared their reproducer without clearing the library**, which is the #3783 pattern for the third and fourth time — see [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11).
+
+The drafts keep the commit they were filed against, since that is what the filed copies say.
 
 A crashing reproducer needs the same treatment a hanging one gets: the shell prints `segmentation fault` but the binary never wrote it, so `verify_issues.rb` reads the exit status for a fatal signal rather than comparing output. SIGKILL is excluded, since that is its own timeout killer.
 
@@ -463,9 +473,9 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `489cbde7` on 2026-08-11.** That pass dropped `expand_massign`; the one before it dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `9678c99b` on 2026-08-11.** That pass dropped `positional_callbacks`, the `489cbde7` pass before it dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
-One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `positional_callbacks` guards a bug whose own filed reproducer passes today while the library shape it was filed for still fails. Re-check by removing the transform and rebuilding, never by running the probe alone.
+One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `dsl_shims` and `window_guards` both guard bugs that are fixed upstream and whose filed reproducers pass, and both are still needed. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
 Drop one by name and rebuild:
 
@@ -474,23 +484,24 @@ SPINEL_SKIP=expand_hash_delete ruby spinel/tools/build_subset.rb
 SPINEL_SKIP=all ruby spinel/tools/build_subset.rb        # what is still needed at all
 ```
 
-Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still matches CRuby line for line. Both halves matter twice over: dropping `disable_class_pattern` compiles clean and then fails at run time, and dropping `positional_callbacks` compiles clean, runs, and still prints `SUBSET OK` — with one earlier line wrong.
+Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile the result and run it — a transform that is no longer needed compiles to zero errors *and* still matches CRuby line for line. Both halves matter twice over: dropping `disable_class_pattern` compiles clean and then fails at run time, and `positional_callbacks`, while it was still needed, compiled clean, ran, and still printed `SUBSET OK` — with one earlier line wrong.
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `489cbde7` (2026-08-11):**
+**Still needed, re-checked against `9678c99b` (2026-08-11):**
 
 | Workaround | Why it is still there |
 |---|---|
 | `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver |
-| `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call |
-| `window_guards` | `shown?` with an implicit receiver does not resolve |
+| `dsl_shims` | `extend Ruby2D::DSL` at top level, then calling `update`, is an unsupported call — [#3787](https://github.com/matz/spinel/issues/3787) is **closed and its reproducer passes**, but the library shape still fails with 4 C errors |
+| `window_guards` | `shown?` with an implicit receiver does not resolve — [#3788](https://github.com/matz/spinel/issues/3788) is **closed and its reproducer passes**, but the library shape still fails |
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
-| `positional_callbacks` | A forwarded block stored in an ivar loses its captured locals — [#3783](https://github.com/matz/spinel/issues/3783) is **closed and its reproducer passes**, but the library shape still fails. See [#3783 is closed and still broken for us](#3783-is-closed-and-still-broken-for-us--root-cause-and-patch-2026-08-10) |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
+
+**Dropped on 2026-08-11**, once [#3786](https://github.com/matz/spinel/issues/3786) landed as `1c168009`: `positional_callbacks`. It was the longest-lived workaround on this branch and the only one whose bug we root-caused and patched ourselves.
 
 **Dropped on 2026-08-10**, once #3771-#3777 landed: `expand_renderable` (`attr_*`/`alias` in a module body now reach the including class) and `expand_or_return` (`return` in expression position is accepted).
 
@@ -742,9 +753,9 @@ Mapping `lib/`'s `Ext` calls onto the `R2D_*` core is mostly mechanical — of t
 
 The honest fix is not a string comparison against a third engine name: the condition is really asking "does Ruby own the main loop?". Until the build path exists, `cli/spinel.rb` rewrites it; when the feature lands, `window.rb` should ask that question directly.
 
-## `square.rb`: the goal, and the one line in the way (2026-08-11)
+## `square.rb`: the goal, and the one line that was in the way (2026-08-11)
 
-`spinel/square.rb` is USAGE.md's opening example copied verbatim. `ruby2d build --spinel spinel/square.rb` compiles it with no preflight complaint into a 4.9 MB binary whose only dynamic dependencies are system frameworks — and until today that binary segfaulted before its first frame.
+`spinel/square.rb` is USAGE.md's opening example copied verbatim. `ruby2d build --spinel spinel/square.rb` compiles it with no preflight complaint into a 4.9 MB binary whose only dynamic dependencies are system frameworks — and for most of a day that binary segfaulted before its first frame. [#3790](https://github.com/matz/spinel/issues/3790) landed as `fcaf3fcc` the same day; it now draws on a stock compiler, verified headless at two distinct colors.
 
 ```
 stop reason = EXC_BAD_ACCESS (code=1, address=0xffffffffffffffff)
@@ -754,11 +765,13 @@ stop reason = EXC_BAD_ACCESS (code=1, address=0xffffffffffffffff)
 
 **`set title: 'My App'` carries no `background:` key.** `Window.set` (`window.rb:672`) runs `@background = Color.new(opts[:background]) if Color.valid?(opts[:background])`, `Color.valid?` opens with `NAMED_COLORS.key?(color)`, and Spinel's `sp_str_hash` reads the tag byte at `s[-1]` before hashing. A nil key is a NULL `const char *`, so that read lands at `0xffffffffffffffff` — the fault address and the `[x19, #-0x1]` in the disassembly, exactly.
 
-It is filed as [#3790](https://github.com/matz/spinel/issues/3790), drafted in `issues/16-…` with a one-line patch. The convincing part is that the convention already exists in the same file: `sp_str_eq`, just above it, handles NULL on either side and says why in its comment — *"nil-vs-string equality is false in Ruby"*. The polymorphic dispatch path guards it too. Only the direct typed call the codegen emits was missing it, so the fix goes where the convention already lives:
+It was filed as [#3790](https://github.com/matz/spinel/issues/3790), drafted in `issues/16-…` with a one-line patch. The convincing part is that the convention already existed in the same file: `sp_str_eq`, just above it, handles NULL on either side and says why in its comment — *"nil-vs-string equality is false in Ruby"*. The polymorphic dispatch path guards it too. Only the direct typed call the codegen emits was missing it, so the fix goes where the convention already lives:
 
 ```c
 if(!s)return 0;
 ```
+
+The upstream fix is that line with a better constant — `return 14695981039346656037ULL`, the FNV offset basis, so a nil key lands where the empty string would rather than in bucket 0.
 
 Nine variants pin the shape: `key?`, `has_key?`, `include?` and `[]` all crash on a String-keyed hash whatever the value type; an Integer-keyed hash is fine; and a **literal** `nil` at the call site is fine because it gets folded. That last one is why this survived — written directly it never reaches the runtime, and only a nil arriving through a variable faults. With the guard applied, all nine match Ruby, `square.rb` draws, and Spinel's own suite reports 2854 pass, 0 fail, 0 error.
 
@@ -780,6 +793,28 @@ Two guards came out of it:
 - `tools/link_square.sh` built `libruby2d_core.a` once and reused it forever. Adding a function surfaced as an undefined symbol, which is loud — but a changed function *body* would have silently linked the old code, and that is the same failure again one layer down. The archive now rebuilds when anything under `ext/ruby2d/` is newer.
 
 **`compare` found a second bug on its first run.** The committed fixture strokes in one color, so `Ext.stroke_quad` — the per-vertex sibling — compiled but never executed, which is the same "present but unproven" state the stubs were in. Putting a `stroke_color: %w[red lime blue yellow]` square in the fixture and running `compare` produced `undefined method 'empty?' for an instance of Array` from the Spinel binary while mruby drew it. It is not about strokes: a per-vertex **fill** with no stroke anywhere fails the same way, so the fault is in the `Color::Set` path both share. `Array#empty?` compiles and runs standalone, and so does a hand-written `is_a?(Array) && !colors.empty?` guard through an untyped parameter — the reduction is still open. The fixture was left in its single-color form, since that is the shape whose result is verified.
+
+## Fixed upstream, still worked around (2026-08-11)
+
+All five issues filed that morning — [#3786-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) — were fixed the same day, each by a commit citing its number: `1c168009`, `e40fe331`, `329050a6`, `bebef965`, `fcaf3fcc`. `verify_issues.rb` now reports **16 fixed, 0 reproduce**, the first clean board this branch has had.
+
+Two things came out of it, and the second matters more than the first.
+
+**`square.rb` builds and draws on a stock compiler.** #3790's fix is the branch's goal reached: USAGE.md's opening example, unmodified, through `ruby2d build --spinel`, into a binary that opens a window with a red square on navy. Verified headless rather than by eye — the same script with a screenshot at frame 20 writes two distinct colors and exits 0.
+
+**Five fixes bought one workaround.** `rake sweep` cleared `positional_callbacks` and nothing else:
+
+| Fix | Workaround it was filed for | After |
+|---|---|---|
+| #3786 `1c168009` | `positional_callbacks` | **dropped** |
+| #3787 `e40fe331` | `dsl_shims` | still needed — 4 C errors |
+| #3788 `329050a6` | `window_guards` | still needed — `unsupported call: CallNode 'shown?'` |
+| #3789 `bebef965` | none | — |
+| #3790 `fcaf3fcc` | none | — |
+
+So the reproducer-passes-library-fails split, which cost weeks on #3783, happened twice more in one afternoon. It is not an unlucky case; it is the normal outcome of reducing a whole-program failure to five lines. A minimal reproducer captures the construct, and these bugs are about *context* — which same-named method comes first, which module the receiver reached the class through — so the small case can be fixed completely while the library shape is untouched. **What each of these needs now is a second reproducer, written from the library's own failing line rather than from the original small case.** That is the route that worked for #3786, and `dsl_shims` and `window_guards` both have a named diagnostic to start from.
+
+One incidental result: `dsl_shims` had been reported `inconclusive` by every sweep, because `positional_callbacks` rewrote the shims it generates and the two could not be tested apart. Dropping one made the other measurable for the first time.
 
 ## MVP
 
