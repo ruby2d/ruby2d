@@ -379,6 +379,14 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
+A draft that is root-caused but has no reproducer yet opts out with a `**Status:** research notes` line and reports as `draft` — nothing to run, and deliberately not counted as something to read by hand. A permanent warning is one nobody reads.
+
+**Drafted, not yet filed:**
+
+| Draft | Bug | What it needs |
+|---|---|---|
+| `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | A minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle that is sharper than the runtime one |
+
 **All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |

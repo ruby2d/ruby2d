@@ -12,6 +12,9 @@
 #   reproduces  — still buggy, matches the recorded Spinel output
 #   FIXED       — now matches Ruby; close the issue and drop its workaround
 #   CHANGED     — matches neither; re-read it by hand before trusting anything
+#   draft       — parked without a reproducer; nothing to run. Opt in with a
+#                 `**Status:** research notes` line, so an unfinished draft is
+#                 distinguishable from a finished one that lost its blocks.
 #
 # A `cruby` column that is not `ok` means the reproducer itself has rotted —
 # fix that first, since a case CRuby rejects is one no maintainer can act on.
@@ -76,6 +79,13 @@ FileUtils.mkdir_p(SCRATCH)
 rows = Dir[File.join(ISSUES, '*.md')].sort.map do |path|
   md = File.read(path)
   name = File.basename(path, '.md')
+
+  # A draft parked on purpose: root-caused but without a minimal reproducer, so
+  # there is nothing here to run. Reported as `draft` rather than `no-repro`
+  # because the two need opposite responses — one is waiting on research, the
+  # other means a finished draft lost its reproduction block and is broken.
+  next [name, '-', 'draft'] if md.match?(/^\*\*Status:\*\* research notes/)
+
   code = section(md, '## Reproduction')
   next [name, 'no-repro', '-'] unless code
 
@@ -124,5 +134,8 @@ w = rows.map { |r| r[0].size }.max
 puts format("%-#{w}s  %-8s  %s", 'issue', 'cruby', 'spinel')
 rows.each { |r| puts format("%-#{w}s  %-8s  %s", *r) }
 
+# Drafts are out of both halves of this count: nothing ran, so they are neither
+# fixed nor still broken, and including them understated the score.
+runnable = rows.count { |r| r[2] != 'draft' }
 stale = rows.count { |r| r[2] == 'FIXED' }
-puts "\n#{stale} of #{rows.size} now behave correctly." if stale.positive?
+puts "\n#{stale} of #{runnable} now behave correctly." if stale.positive?
