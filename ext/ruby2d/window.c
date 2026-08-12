@@ -761,7 +761,24 @@ int  R2D_PollWidth(void)         { return r2d_window ? r2d_window->orig_width : 
 int  R2D_PollHeight(void)        { return r2d_window ? r2d_window->orig_height : 0; }
 int  R2D_PollViewportWidth(void) { return r2d_window ? r2d_window->viewport.width : 0; }
 int  R2D_PollViewportHeight(void){ return r2d_window ? r2d_window->viewport.height : 0; }
-bool R2D_PollClosed(void)        { return r2d_window ? r2d_window->close : true; }
+
+/*
+ * Whether the app should stop looping: the window is already closed, or the
+ * last poll saw a quit. The second half matters only here. Every other engine
+ * reads the queued R2D_EVT_CLOSE out of `drain_events` and closes the window
+ * from Ruby, which sets `close`; the Spinel build has no way to return an
+ * event array over FFI, so without this the red X and Cmd-Q were polled,
+ * queued, and then dropped, and `tick until @close` never ended.
+ */
+bool R2D_PollClosed(void) {
+  if (!r2d_window) return true;
+  if (r2d_window->close) return true;
+
+  for (int i = 0; i < event_count; i++) {
+    if (event_buf[i].category == R2D_EVT_CLOSE) return true;
+  }
+  return false;
+}
 
 
 /*
