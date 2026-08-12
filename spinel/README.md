@@ -379,13 +379,14 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-A draft that is root-caused but has no reproducer yet opts out with a `**Status:** research notes` line and reports as `draft` — nothing to run, and deliberately not counted as something to read by hand. A permanent warning is one nobody reads.
+A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. Two exist: `research notes` for one that is root-caused but has no reproducer yet, and `Spinel-only` for one whose reproducer uses a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. Neither is counted as something to read by hand — a permanent warning is one nobody reads — so both need a human on a re-verification pass, which is what the table below is for.
 
 **Drafted, not yet filed:**
 
-| Draft | Bug | What it needs |
+| Draft | Bug | Status |
 |---|---|---|
-| `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | A minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle that is sharper than the runtime one |
+| `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | Needs a minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle sharper than the runtime one |
+| `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | Ready to file. Verified at `9678c99b`, by hand: `ffi_func` is Spinel-only, so `verify_issues.rb` skips it |
 
 **All sixteen filed drafts now pass** — `verify_issues.rb` reports 16 fixed, 0 reproduce at `9678c99b`. The last five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
@@ -506,7 +507,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | `expand_hash_delete` | `Hash#delete`'s result assigns `sp_RbVal` to an `mrb_int` |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
-| `ffi_func` type arrays spelled out instead of `[:double]*6` | Declare an `ffi_func` with a computed type array |
+| `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — drafted as `issues/18-…`, ready to file |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
 **Dropped on 2026-08-11**, once [#3786](https://github.com/matz/spinel/issues/3786) landed as `1c168009`: `positional_callbacks`. It was the longest-lived workaround on this branch and the only one whose bug we root-caused and patched ourselves.

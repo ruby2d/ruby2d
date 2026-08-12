@@ -154,11 +154,11 @@ def check_issues
   # them — a summary that omits rows is worse than one that flags them.
   unclear = out.scan(/\bCHANGED\b/).size + out.scan(/compile-FAIL/).size +
             out.scan(/\bno-repro\b/).size
-  # Drafts parked without a reproducer are deliberate, so they are reported but
+  # Drafts the verifier cannot judge are deliberate, so they are reported but
   # not flagged: a warning that is always on is one nobody reads.
-  drafts = out.scan(/\bdraft\b/).size
+  parked = out.scan(/\bdraft\b/).size + out.scan(/\bspinel-only\b/).size
   detail = "#{fixed} fixed, #{repro} reproduce"
-  detail += ", #{drafts} draft" if drafts.positive?
+  detail += ", #{parked} parked" if parked.positive?
   detail += ", #{unclear} to read by hand" if unclear.positive?
   ['issues', unclear.zero? ? :pass : :warn, detail]
 end

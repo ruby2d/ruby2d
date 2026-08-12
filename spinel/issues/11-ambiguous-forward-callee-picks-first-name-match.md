@@ -47,7 +47,7 @@ Moving `class Decoy` below `class Holder`, changing nothing else, prints `n=3`.
 
 ## Additional Findings
 
-`Decoy` is never instantiated and its `store` is never called. Its presence in the source, ahead of `Holder`, is the whole difference — dead code changes the compiled behaviour of a live path.
+`Decoy` is never instantiated and its `store` is never called. Its presence in the source, ahead of `Holder`, is the whole difference — dead code changes the compiled behavior of a live path.
 
 Dropping `Decoy` entirely also works, leaving `Holder#store` as the only candidate.
 

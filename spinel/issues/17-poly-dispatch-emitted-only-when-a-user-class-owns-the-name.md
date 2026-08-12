@@ -93,7 +93,7 @@ Every one of these compiles and runs correctly under Spinel, matching CRuby. The
 
 ## Suggested next step
 
-Do not reduce against run-time behaviour — the oracle is available at compile time and is far sharper. `spinel app.rb -c` writes `app.c`; the bug is present whenever
+Do not reduce against run-time behavior — the oracle is available at compile time and is far sharper. `spinel app.rb -c` writes `app.c`; the bug is present whenever
 
 ```sh
 grep -c 'sp_nomethod_msg_args("empty?"' app.c

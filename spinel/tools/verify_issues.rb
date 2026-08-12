@@ -12,9 +12,12 @@
 #   reproduces  — still buggy, matches the recorded Spinel output
 #   FIXED       — now matches Ruby; close the issue and drop its workaround
 #   CHANGED     — matches neither; re-read it by hand before trusting anything
-#   draft       — parked without a reproducer; nothing to run. Opt in with a
-#                 `**Status:** research notes` line, so an unfinished draft is
-#                 distinguishable from a finished one that lost its blocks.
+#   draft       — parked without a reproducer; nothing to run
+#   spinel-only — no CRuby oracle, so the comparison does not apply
+#
+# The last two are opted into by the draft itself with a `**Status:**` line —
+# see UNVERIFIABLE below — so a knowingly unjudgeable draft stays
+# distinguishable from a finished one that lost its blocks.
 #
 # A `cruby` column that is not `ok` means the reproducer itself has rotted —
 # fix that first, since a case CRuby rejects is one no maintainer can act on.
@@ -41,6 +44,17 @@ HANG = '(hangs'
 # the timeout killer below, not the bug.
 CRASH = 'segmentation fault'
 FATAL_SIGNALS = %w[SEGV BUS ABRT ILL FPE].filter_map { |s| Signal.list[s] }.freeze
+
+# Drafts this harness cannot judge, each opting out in its own text with a
+# `**Status:**` line, and each reported under the word on the right.
+#
+#   research notes — root-caused, no minimal reproducer yet: nothing to run
+#   Spinel-only    — exercises a compiler-only DSL (`ffi_func`), so CRuby is
+#                    not an oracle and the two-sided comparison is meaningless
+#
+# Neither counts as something to read by hand. Both still need a human on a
+# re-verification pass, which is what the README's drafts table is for.
+UNVERIFIABLE = { 'research notes' => 'draft', 'Spinel-only' => 'spinel-only' }.freeze
 
 # `heading` is a pattern, not a literal: the expectation headings carry a commit
 # ("**Spinel (1aa42ab3):**") that changes as issues are re-verified. An earlier
@@ -80,11 +94,13 @@ rows = Dir[File.join(ISSUES, '*.md')].sort.map do |path|
   md = File.read(path)
   name = File.basename(path, '.md')
 
-  # A draft parked on purpose: root-caused but without a minimal reproducer, so
-  # there is nothing here to run. Reported as `draft` rather than `no-repro`
-  # because the two need opposite responses — one is waiting on research, the
-  # other means a finished draft lost its reproduction block and is broken.
-  next [name, '-', 'draft'] if md.match?(/^\*\*Status:\*\* research notes/)
+  # A draft this harness cannot judge, saying so in its own text. Reported
+  # under its own word rather than as `no-repro`, because the two need opposite
+  # responses: these are known and deliberate, while `no-repro` means a
+  # finished draft lost its reproduction block and is broken.
+  if (status = md[/^\*\*Status:\*\* (#{Regexp.union(UNVERIFIABLE.keys)})/, 1])
+    next [name, '-', UNVERIFIABLE.fetch(status)]
+  end
 
   code = section(md, '## Reproduction')
   next [name, 'no-repro', '-'] unless code
@@ -134,8 +150,8 @@ w = rows.map { |r| r[0].size }.max
 puts format("%-#{w}s  %-8s  %s", 'issue', 'cruby', 'spinel')
 rows.each { |r| puts format("%-#{w}s  %-8s  %s", *r) }
 
-# Drafts are out of both halves of this count: nothing ran, so they are neither
-# fixed nor still broken, and including them understated the score.
-runnable = rows.count { |r| r[2] != 'draft' }
+# Unjudgeable drafts are out of both halves of this count: nothing ran, so they
+# are neither fixed nor still broken, and including them understated the score.
+runnable = rows.count { |r| !UNVERIFIABLE.value?(r[2]) }
 stale = rows.count { |r| r[2] == 'FIXED' }
 puts "\n#{stale} of #{runnable} now behave correctly." if stale.positive?
