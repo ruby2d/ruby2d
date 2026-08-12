@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `01bc08c8` (2026-08-12)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 to 2026-08-10 on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `83d1315d` (2026-08-12)** — `cd spinel && rake` green on all five checks.
 
 ## Start here
 
@@ -26,7 +26,7 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 2 reproduce, 2 parked: the seventeenth is draft 20, fixed on 2026-08-12 before it could be filed, and the two that reproduce are the unfiled drafts 19 and 21.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 3 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the three that reproduce are #3802, #3803 and draft 17.
 
 **Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
@@ -379,26 +379,26 @@ ruby spinel/tools/verify_issues.rb
 
 Each draft is self-describing enough for the tool to check it: the code under "## Reproduction", the correct output under "**Ruby 4.0.6:**", the buggy output under "**Spinel (…):**". A row reading `FIXED` means the issue can be closed and its workaround re-checked; `CHANGED` means read it by hand before believing anything.
 
-A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. Two exist: `research notes` for one that is root-caused but has no reproducer yet, and `Spinel-only` for one whose reproducer uses a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. Neither is counted as something to read by hand — a permanent warning is one nobody reads — so both need a human on a re-verification pass, which is what the table below is for.
+A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. One exists today: `Spinel-only`, for a reproducer using a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. It is not counted as something to read by hand — a permanent warning is one nobody reads — so it needs a human on a re-verification pass, which is what the table below is for. `research notes` is the other opt-out, for a draft that is root-caused but has no reproducer yet; draft 17 used it until 2026-08-12 and none does now.
 
-**Filed on 2026-08-12 against `01bc08c8`**, all three reduced from a workaround this branch could not otherwise drop:
+**Filed on 2026-08-12**, all four reduced from a workaround this branch could not otherwise drop — the first three against `01bc08c8`, #3805 against `83d1315d`:
 
 | Issue | Draft | Bug | Workaround it covers |
 |---|---|---|---|
 | [#3802](https://github.com/matz/spinel/issues/3802) | `issues/21-…` | `extend` written in a *reopened* class body detaches the module's methods from the class, both for an implicit-receiver call inside it and for `Win.method` from outside — not about `alias_method` at all | `window_guards` **and** `bypass_window_class_methods`, which had resisted ten reduction attempts |
 | [#3803](https://github.com/matz/spinel/issues/3803) | `issues/19-…` | A method declaring `&block`, reached through a top-level `extend`, is called with the block argument dropped | `dsl_shims`, all of it now that 20 is fixed |
 | [#3804](https://github.com/matz/spinel/issues/3804) | `issues/18-…` | `ffi_func` given a computed type array — `[:float] * 6`, or a constant — silently drops the declaration, and the error lands on the first call instead, naming neither `ffi_func` nor the declaration's line | the adapter's spelled-out type arrays |
+| [#3805](https://github.com/matz/spinel/issues/3805) | `issues/17-…` | A user class defining `length` diverts `empty?` on a poly receiver away from the builtin lowering into a dispatch keyed on `empty?`, which nothing owns, so the call becomes an unconditional raise — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | `Color::Set#empty?` in `lib/`, which is a real method rather than a workaround |
 
-The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `01bc08c8`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
+The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
-**Still drafted, not filed:**
+**Still drafted, not filed** — one, and it is not going anywhere:
 
 | Draft | Bug | Status |
 |---|---|---|
-| `issues/17-…` | A method on an untyped receiver compiles to an unconditional `NoMethodError` raise unless a user class owns the name — see [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) | Needs a minimal reproducer. Eleven probe variants are recorded in the draft so they are not retried, and it names a compile-time oracle sharper than the runtime one |
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
 
-**Nineteen of the twenty-one drafts are filed** — all but 17, which still needs a reproducer, and 20, which upstream fixed first. At `01bc08c8` `verify_issues.rb` reports 17 fixed, 2 reproduce, 2 parked: the two reproducing are #3802 and #3803, open as of filing; the two parked are draft 17 and draft 18, the latter filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty of the twenty-one drafts are filed** — all but 20, which upstream fixed first. At `83d1315d` `verify_issues.rb` reports 17 fixed, 3 reproduce, 1 parked: the three reproducing are #3802, #3803 and #3805; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -491,7 +491,7 @@ Prefer `lib/`. The transforms are string matching against library source and are
 
 ## Workarounds to re-check
 
-Spinel moves fast, so every workaround here is provisional. **Last re-checked against `01bc08c8` on 2026-08-12**, which dropped nothing — it fixed one of the two bugs behind `dsl_shims`, and the other still holds the row. The `b51c880d` pass before it dropped nothing either, the `9678c99b` one dropped `positional_callbacks`, the `489cbde7` one before that dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
+Spinel moves fast, so every workaround here is provisional. **Last re-checked against `83d1315d` on 2026-08-12**, which dropped nothing — it fixed one of the two bugs behind `dsl_shims`, and the other still holds the row. The `b51c880d` pass before it dropped nothing either, the `9678c99b` one dropped `positional_callbacks`, the `489cbde7` one before that dropped `expand_massign`, and the one before that dropped three rows, which is the whole point of keeping this table. After a `git fetch` in the Spinel checkout, re-check and delete any row that passes. **Do not let these calcify into permanent Ruby 2D design.**
 
 One caution learned the hard way, and confirmed again in this pass: a probe passing in isolation does **not** mean the workaround can be dropped. `dsl_shims` and `window_guards` both guard bugs that are fixed upstream and whose filed reproducers pass, and both are still needed. Re-check by removing the transform and rebuilding, never by running the probe alone.
 
@@ -506,14 +506,14 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 
 `scratch/recheck_workarounds.rb` automates the sweep: it drops each transform in turn, rebuilds, compiles, runs, and diffs against CRuby. Recreate it from this description if it has been cleaned away; it takes a few minutes and answers the whole table at once.
 
-**Still needed, re-checked against `01bc08c8` (2026-08-12):**
+**Still needed, re-checked against `83d1315d` (2026-08-12):**
 
 | Workaround | Why it is still there |
 |---|---|
 | `bypass_window_class_methods` | `Window.viewport_width` — a class method reached through `extend ClassMethods` — is an unsupported call on a constant receiver. Root cause found 2026-08-11: the `extend` is written in a different `class Window` body from the module, same as `window_guards`. Filed as [#3802](https://github.com/matz/spinel/issues/3802) |
 | `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is filed as [#3803](https://github.com/matz/spinel/issues/3803). The shadowing bug that shared this row was fixed on 2026-08-12 by `80a3beb2` and the row stayed, which is the point of sweeping rather than trusting a fix |
 | `window_guards` | `shown?` with an implicit receiver does not resolve, because `extend ClassMethods` is written in a different `class Window` body from the module. [#3788](https://github.com/matz/spinel/issues/3788) is closed and its reproducer passes; the residue is filed as [#3802](https://github.com/matz/spinel/issues/3802) |
-| `expand_hash_delete` | `@gamepads_by_id.delete(id)` resolves to `String#delete`, passing `sp_RbVal` where a `const char *` is wanted. Two mirrors of the shape pass standalone (ivar assigned in a module method, and in the class), so the ivar has to be genuinely poly — the same family as `issues/17-…` and probably the same investigation |
+| `expand_hash_delete` | `@gamepads_by_id.delete(id)` resolves to `String#delete`, passing `sp_RbVal` where a `const char *` is wanted. Two mirrors of the shape pass standalone (ivar assigned in a module method, and in the class), so the ivar has to be genuinely poly. Adjacent to `issues/17-…`: `Tileset#delete` means a user class owns the name, which is the same ingredient, but a mirror with a typed ivar compiles and runs correctly, so the poly-ness is still the missing half |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — filed as [#3804](https://github.com/matz/spinel/issues/3804) |
@@ -816,15 +816,15 @@ Two guards came out of it:
 
 `Square.new(color: %w[red lime blue yellow])` compiled and then died with `undefined method 'empty?' for an instance of Array`. Two independent bugs were stacked behind that one message, and fixing either alone still left a wrong picture.
 
-**The compiler bug.** Spinel emits a polymorphic dispatch for a method on an untyped receiver *only when some user-defined class in the program owns that name*; the builtin arms are added alongside the user ones. Nothing in Ruby 2D defines `empty?`, so `Color.set`'s `!colors.empty?` compiled to an unconditional raise with no dispatch at all:
+**The compiler bug.** `empty?` on a polymorphic receiver normally lowers to the generic builtin form, `sp_poly_length(recv) == 0`. Spinel skips that lowering when any user class in the program defines **`length`** — and `Color::Set` does. Control then reaches the poly dispatch, which is keyed on the name actually called; nothing in Ruby 2D defined `empty?`, so no dispatch was emitted and `Color.set`'s `!colors.empty?` collapsed to an unconditional raise:
 
 ```c
 sp_raise_cls("NoMethodError", sp_nomethod_msg_args("empty?", lv_colors, 0, ...))
 ```
 
-`Color::Set` *does* define `length`, which is why `length` on the very same receiver gets a proper `switch (cls_id)` with a case per array flavor. `codegen_call.c:4253` says so in its own comment: the builtin arms exist for receivers that "reached this dispatch only because a user class happens to own the name."
-
 The decisive test was appending a never-instantiated `class Probe; def empty?; end` to the assembled program — the gradient then ran. **Six hand-written probes all passed before that**, which is this branch's usual score against a whole-program bug; the generated C and the compiler source gave the answer in minutes once reading replaced guessing.
+
+**The first root cause was backwards, and it took a reproducer to find that out.** Until 2026-08-12 this section said the dispatch is emitted *only when a user class owns the name called*, which fit every observation — the raise, the working `length` on the same receiver, the never-instantiated `Probe` fixing it. It was wrong: the trigger is a user class owning `length`, and eleven more probes passed while the draft carried the inverted explanation. What settled it was reading `codegen_call_recv.c`'s entry condition rather than `codegen_call.c`'s arm emitter — the bug is that the two disagree about which name to ask about. See `issues/17-…`, which reproduces it in eight lines.
 
 **The fix in `lib/` is not a workaround.** `Color::Set` has `length`, `first`, `last`, `each` and includes `Enumerable`, so `empty?` belongs on it regardless — it just also happens to be the name Spinel needs to see. It is always false in practice, since a set cannot be built from an empty array.
 
