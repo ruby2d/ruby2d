@@ -26,7 +26,7 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 6 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the six that reproduce are #3802, #3803, #3805, #3806, #3807 and #3808, all filed that day and open.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 8 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the eight that reproduce are #3802 through #3810, all filed that day and open.
 
 **Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
@@ -393,7 +393,7 @@ Each draft is self-describing enough for the tool to check it: the code under "#
 
 A draft the verifier cannot judge says so in its own text, with a `**Status:**` line naming why, and reports under that word instead of running. One exists today: `Spinel-only`, for a reproducer using a compiler-only DSL, where CRuby is not an oracle and the two-sided comparison is meaningless. It is not counted as something to read by hand — a permanent warning is one nobody reads — so it needs a human on a re-verification pass, which is what the table below is for. `research notes` is the other opt-out, for a draft that is root-caused but has no reproducer yet; draft 17 used it until 2026-08-12 and none does now.
 
-**Filed on 2026-08-12**, seven in one day. The first five were reduced from a workaround this branch could not otherwise drop; the last two came out of removing the event-filter `send` from `lib/`. The first three were verified against `01bc08c8`, the rest against `83d1315d`:
+**Filed on 2026-08-12**, nine in one day. The first five were reduced from a workaround this branch could not otherwise drop; the last two came out of removing the event-filter `send` from `lib/`. The last two came out of measuring what `examples/bouncing_balls.rb` needs. The first three were verified against `01bc08c8`, the rest against `83d1315d`:
 
 | Issue | Draft | Bug | Workaround it covers |
 |---|---|---|---|
@@ -404,6 +404,8 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 | [#3806](https://github.com/matz/spinel/issues/3806) | `issues/22-…` | `delete` on a poly receiver is lowered to `String#delete`, stringifying the receiver — silently wrong with a String argument, a C compile error otherwise | `expand_hash_delete`, the last workaround to get a reproducer |
 | [#3807](https://github.com/matz/spinel/issues/3807) | `issues/23-…` | `equal?` between a typed receiver and a poly argument is folded to the constant `false`, both operands discarded | none — found while removing the event-filter `send` |
 | [#3808](https://github.com/matz/spinel/issues/3808) | `issues/24-…` | A keywords-only call binds the keyword hash to an optional positional parameter as well as to `**kwargs` | none — same |
+| [#3809](https://github.com/matz/spinel/issues/3809) | `issues/25-…` | `obj.attr += value` is refused when the writer is a hand-written `def` rather than an `attr_writer`; longhand works | none — blocks `s.x += b.vx * dt`, the shape any physics loop has |
+| [#3810](https://github.com/matz/spinel/issues/3810) | `issues/26-…` | A String-keyed Hash looked up with a poly key reads `.v.s` with no tag check and **segfaults** — the residue of #3790's `nil` key | none — crashes any app using a numeric `[r, g, b, a]` color |
 
 The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
@@ -413,7 +415,7 @@ The duplicate search before filing turned up one close relative worth citing rat
 |---|---|---|
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
 
-**Twenty-three of the twenty-four drafts are filed** — every one except 20, which upstream fixed before it could be filed. At `83d1315d` `verify_issues.rb` reports 17 fixed, 6 reproduce, 1 parked: the six reproducing are #3802, #3803, #3805, #3806, #3807 and #3808; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty-five of the twenty-six drafts are filed** — every one except 20, which upstream fixed before it could be filed. At `83d1315d` `verify_issues.rb` reports 17 fixed, 8 reproduce, 1 parked: the eight reproducing are #3802, #3803, #3805, #3806, #3807, #3808, #3809 and #3810; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -890,6 +892,23 @@ It arrived from [#3795](https://github.com/matz/spinel/issues/3795), a different
 
 **The `extend` shape has no test upstream.** `test/module_included_class_and_toplevel.rb` came with #3795 and uses `include`; nothing exercises a class whose own method is shadowed. Draft 20 is kept as the local record and is worth offering as a test case rather than as a bug.
 
+## What `bouncing_balls.rb` needs, measured (2026-08-12)
+
+The next milestone is an existing example running **unmodified**. `examples/bouncing_balls.rb` was measured rather than estimated: build it with `Circle` swapped for `Square`, the `on` blocks removed, and `s.x += …` written longhand, and **the rest of the script compiles and runs**. So the gap is four items, not a vague "most of the library".
+
+| Gap | Whose | Status |
+|---|---|---|
+| `Circle` is not in the target | ours | FFI adapter plus the lib slice — mechanical and countable |
+| `s.x += b.vx * dt` — operator write on a `def` writer | upstream | [#3809](https://github.com/matz/spinel/issues/3809) |
+| `color: [r, g, b, a]` numeric arrays **segfault** | upstream | [#3810](https://github.com/matz/spinel/issues/3810) |
+| the four `on` handlers | upstream | [#3807](https://github.com/matz/spinel/issues/3807), [#3808](https://github.com/matz/spinel/issues/3808), and two unfiled — see [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12) |
+
+Everything else already works: a user `Struct`, `rand`, `Array.new(n) { }`, `<<` / `shift` / `size` / `each`, `Math.exp`, `Float#abs`, and an `update` block mutating top-level locals captured from the script body.
+
+**Two of those were invisible until an example was tried.** Nothing in the library's own subset writes `shape.x += v`, and no fixture used a numeric color, so #3809 and #3810 had never been exercised — #3810 crashes before the first frame for any app with an `[r, g, b, a]` color. `rake compare`'s fixtures use string and `%w[]` colors only; **a numeric-rgba fixture belongs there**, for the same reason the gradient fixture was added after three `Ext` entry points turned out to draw nothing correct.
+
+**The crash was nearly missed twice over.** The build succeeded, and the first check of the binary read `$?` after a pipe — which reports the exit status of the last command in the pipeline, not the program. It printed 0 for a process that died on SIGSEGV. Run the binary without a pipe, or read `PIPESTATUS`, before believing an exit code.
+
 ## MVP
 
 **Goal: a plain Ruby 2D script that draws a moving square, built with `ruby2d build --spinel`, that runs.** One binary, one shape, closeable.
@@ -931,7 +950,7 @@ Dropped for the MVP: `audio`, `canvas`, `font`, `image`, `text`, `bitmap_text`, 
 - [x] `ffi_func` declarations for the slice — as `SPINEL_EXT` in `cli/spinel.rb` rather than a `lib/` file, since it is only ever read as text and would not load under CRuby. It still duplicates the binding list and will drift from `ext/`; a shared manifest generating both remains the eventual answer.
 - [x] Replace the `include Ruby2D` / `extend Ruby2D::DSL` preamble with generated top-level DSL shims on the Spinel path only.
 - [x] Link step: `--link <archive>` for the SDL3 statics and `--cc` to carry the macOS frameworks.
-- [ ] Run an existing example unmodified — needs the four scalar shapes above, and input, which is blocked on #3807, #3808 and two unfiled compiler bugs.
+- [ ] Run an existing example unmodified — `bouncing_balls.rb` needs `Circle`, #3809, #3810 and input handling; see [What `bouncing_balls.rb` needs, measured](#what-bouncing_ballsrb-needs-measured-2026-08-12).
 - [ ] Benchmark that example against the mruby build.
 
 Reused without change: `ruby2d launch --native` and the macOS `.app` bundle step. Asset bundling is *not* reused — nothing in the slice can read a file, so `--assets` is rejected rather than accepted and ignored.
