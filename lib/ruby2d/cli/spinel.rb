@@ -300,7 +300,8 @@ SPINEL_EXT = <<~'RUBY'
         win._spinel_sync(Ext.R2D_PollMouseX(), Ext.R2D_PollMouseY(),
                          Ext.R2D_PollWidth(), Ext.R2D_PollHeight(),
                          Ext.R2D_PollViewportWidth(), Ext.R2D_PollViewportHeight(),
-                         Ext.R2D_PollClosed())
+                         Ext.R2D_PollClosed(),
+                         Ext.R2D_FrameCount(), Ext.R2D_Fps())
         nil
       end
 
@@ -391,7 +392,10 @@ RUBY
 SPINEL_WINDOW_SYNC = <<~'RUBY'
   module Ruby2D
     class Window
-      def _spinel_sync(mx, my, w, h, vw, vh, closed)
+      # `frames` and `fps` are the two the other engines write straight into the
+      # Ruby object from C (`window.c`, in the poll path). Nothing reads them
+      # back out over there, so they come through here like the rest.
+      def _spinel_sync(mx, my, w, h, vw, vh, closed, frames, fps)
         @mouse_x = mx
         @mouse_y = my
         @width = w
@@ -399,6 +403,8 @@ SPINEL_WINDOW_SYNC = <<~'RUBY'
         @viewport_width = vw
         @viewport_height = vh
         @close = true if closed
+        @frames = frames
+        @fps = fps
         nil
       end
     end
