@@ -273,10 +273,18 @@ module Ruby2D
         true
       end
 
-      # Check if the value is a valid color
+      # Check if the value is a valid color.
+      #
+      # The `String` check in front of the name lookup is the same guard `hex?`
+      # makes for itself, and it matters beyond tidiness: a per-vertex array
+      # asks this about each element, so the lookup is reached with a Float on
+      # any numeric `[r, g, b, a]` color. On the Spinel target that key reaches
+      # a String-keyed Hash as an untyped value and segfaults — see
+      # spinel/README.md and matz/spinel#3810.
       def valid?(color)
         color.is_a?(Color) ||             # color object
-          NAMED_COLORS.key?(color) ||     # keyword
+          (color.instance_of?(String) &&  # keyword
+           NAMED_COLORS.key?(color)) ||
           hex?(color) ||                  # hexadecimal value
           (                               # [r, g, b] or [r, g, b, a] numbers
             color.instance_of?(Array) &&
