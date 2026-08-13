@@ -414,7 +414,7 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 
 The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
-**Not filed** — four, for different reasons:
+**Not filed** — six, for different reasons:
 
 | Draft | Bug | Status |
 |---|---|---|
@@ -423,8 +423,9 @@ The duplicate search before filing turned up one close relative worth citing rat
 | `issues/28-…` | A stored block capturing an array of objects is refused — `unsupported closure capturing a non-integer variable`, with no source location | **Drafted 2026-08-12, awaiting review.** Found porting `mandelbrot.rb`; verified reproducing at `84f5a236` |
 | `issues/29-…` | An attribute write on a run-time-typed receiver is **silently dropped** when the writer is a `def` and any class declares the name as an attr | **Drafted 2026-08-13, awaiting review.** Found re-testing the workarounds after the upstream sync; verified reproducing at `84f5a236` |
 | the `Interactive#on` lambda | A proc referencing the enclosing method's block parameter is refused — the last thing between here and input events | **Not reduced.** The site is named in [Input is one bug away](#input-is-one-bug-away-2026-08-13); every standalone form of it compiles, so there is nothing filable yet |
+| `issues/30-…` | **Design, not a bug.** Method resolution is re-derived at each emission site, and the boxed write path never consults the method table — the mechanism behind #3805, #3806 and drafts 27 and 29 | **Drafted 2026-08-13, awaiting review.** Written after reading `src/codegen_stmt.c` and `src/codegen_call.c`; parked in `verify_issues.rb` as research notes, since a design issue has no single reproducer |
 
-**Twenty-five of the twenty-nine drafts are filed** — every one except 20, which upstream fixed first, and 27, 28 and 29, which are waiting on review. At `84f5a236` `verify_issues.rb` reports 24 fixed, 3 reproduce, 1 parked, 1 to read by hand: the three reproducing are drafts 27, 28 and 29; the one parked is draft 18, filed as #3804 but not machine-checkable; the one to read by hand is draft 24, whose double binding is fixed with a residue. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty-five of the thirty drafts are filed** — every one except 20, which upstream fixed first, and 27, 28, 29 and 30, which are waiting on review. At `84f5a236` `verify_issues.rb` reports 24 fixed, 3 reproduce, 1 parked, 1 to read by hand: the three reproducing are drafts 27, 28 and 29; the one parked is draft 18, filed as #3804 but not machine-checkable; the one to read by hand is draft 24, whose double binding is fixed with a residue. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
