@@ -129,7 +129,7 @@ def check_preflight
   FileUtils.mkdir_p(dir)
   File.write("#{dir}/unsupported.rb", <<~'RUBY')
     require 'ruby2d'
-    Circle.new(x: 10, y: 10, radius: 5)
+    Text.new('hello', x: 10, y: 10)
     on :key_down do
       close
     end
@@ -138,7 +138,7 @@ def check_preflight
   out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'unsupported.rb') }
   return ['preflight', :fail, "accepted an app it can't build"] if ok
 
-  missing = %w[Circle on].reject { |name| out.include?(name) }
+  missing = %w[Text on].reject { |name| out.include?(name) }
   return ['preflight', :fail, "didn't name #{missing.join(' or ')}:\n#{out}"] unless missing.empty?
 
   ['preflight', :pass, 'rejected unsupported features by name']

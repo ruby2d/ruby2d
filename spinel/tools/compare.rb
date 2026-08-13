@@ -69,12 +69,13 @@ def histogram(rows, channels)
   counts
 end
 
-# Both fixtures, because they exercise different `Ext` entry points: a single
-# color goes through `draw_quad_uniform`, per-vertex colors through `draw_quad`,
-# and a bug in one is invisible to the other. Each was in fact broken while the
-# other passed.
+# All three, because they exercise different `Ext` entry points: a single color
+# goes through `draw_quad_uniform`, per-vertex colors through `draw_quad`, and
+# circles through neither. A bug in one is invisible to the others — each of the
+# first two was in fact broken while the other passed.
 FIXTURES = { 'cli' => 'spinel/tools/cli_app.rb',
-             'gradient' => 'spinel/tools/gradient_app.rb' }.freeze
+             'gradient' => 'spinel/tools/gradient_app.rb',
+             'circle' => 'spinel/tools/circle_app.rb' }.freeze
 
 # A histogram is how a single-color divergence explains itself — which color
 # gained or lost pixels. A gradient has thousands of colors and the same list

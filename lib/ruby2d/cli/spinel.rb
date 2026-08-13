@@ -209,6 +209,7 @@ SPINEL_LIB_FILES = %w[
   quad
   rectangle
   square
+  circle
   vertices
   dsl
 ].freeze
@@ -259,6 +260,13 @@ SPINEL_EXT = <<~'RUBY'
                                  :float, :float, :float, :float, :float, :float,
                                  :float, :float, :float, :float, :float, :float,
                                  :float, :float, :float, :float, :float, :float], :void
+      ffi_func :R2D_DrawCircle, [:float, :float, :float, :int,
+                                 :float, :float, :float, :float], :void
+      # No `R2D_StrokeCircle` exists — `ext.c` strokes a circle as an
+      # axis-aligned ellipse with equal radii, and so does `stroke_circle` below.
+      ffi_func :R2D_StrokeEllipse, [:float, :float, :float, :float, :float,
+                                    :int, :float,
+                                    :float, :float, :float, :float], :void
 
       # `Window#initialize` calls this; the real window is not created until
       # `window_show`, but the core needs its R2D_Window allocated first.
@@ -360,6 +368,20 @@ SPINEL_EXT = <<~'RUBY'
                            x3.to_f, y3.to_f, r3.to_f, g3.to_f, b3.to_f, a3.to_f,
                            x4.to_f, y4.to_f, r4.to_f, g4.to_f, b4.to_f, a4.to_f)
       end
+
+      # `sectors` gets `.to_i` for the same reason the coordinates get `.to_f`:
+      # the FFI takes the declared type and nothing coerces on the way in.
+      def self.draw_circle(x, y, radius, sectors, r, g, b, a)
+        Ext.R2D_DrawCircle(x.to_f, y.to_f, radius.to_f, sectors.to_i,
+                           r.to_f, g.to_f, b.to_f, a.to_f)
+      end
+
+      # Equal radii, no tilt — the circle case of the ellipse stroke.
+      def self.stroke_circle(x, y, radius, sectors, sw, r, g, b, a)
+        Ext.R2D_StrokeEllipse(x.to_f, y.to_f, radius.to_f, radius.to_f, 0.0,
+                              sectors.to_i, sw.to_f,
+                              r.to_f, g.to_f, b.to_f, a.to_f)
+      end
     end
   end
 RUBY
@@ -431,7 +453,7 @@ end
 # widening SPINEL_LIB_FILES can't leave a stale rejection behind. Files that
 # define no user-facing class map to nil.
 SPINEL_EXCLUDED_CLASSES = {
-  'audio' => 'Audio', 'canvas' => 'Canvas', 'circle' => 'Circle',
+  'audio' => 'Audio', 'canvas' => 'Canvas',
   'ellipse' => 'Ellipse', 'font' => 'Font', 'image' => 'Image',
   'json_parser' => nil, 'atlas_parser' => nil, 'sprite_sheet' => 'SpriteSheet',
   'line' => 'Line', 'polygon' => 'Polygon', 'polyline' => 'Polyline',
