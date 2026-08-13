@@ -10,7 +10,7 @@ The rest of this document is a research log in discovery order. This section is 
 
 **The feature is wired: `ruby2d build --spinel app.rb` compiles an ordinary Ruby 2D script to a standalone 5.2 MB binary.** No hand-run scripts, no paths to set — get the compiler with `ruby2d setup --spinel`, then build. The app goes through `lib/`'s own scene graph into the real `R2D_*` core, with Ruby owning the frame loop. See [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10).
 
-What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, and `Quad`, and nothing else yet. All three draw **filled and stroked, in a single color or per-vertex** — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11) and [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
+What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, `Quad` and `Circle`, and nothing else yet. All four draw **filled and stroked**, the quad family in a single color or per-vertex — see [Strokes drew nothing](#strokes-drew-nothing-2026-08-11), [Per-vertex colors](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11) and [`Circle` lands](#circle-lands-and-finds-a-bug-on-the-way-in-2026-08-12). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
 **`spinel/square.rb` — USAGE.md's opening example, verbatim — builds and draws on a stock compiler.**
 
@@ -20,13 +20,17 @@ ruby2d build --spinel spinel/square.rb && ruby2d launch --native
 
 It needed a patched Spinel for one day: any `set` call omitting `background:` passed a nil key to a String-keyed hash and segfaulted before the first frame. [#3790](https://github.com/matz/spinel/issues/3790) fixed that in `fcaf3fcc`. See [square.rb: the goal](#squarerb-the-goal-and-the-one-line-that-was-in-the-way-2026-08-11).
 
+**`spinel/examples/` holds three scripts that run on all three engines unmodified** — `fountain.rb`, a sweeping emitter spraying bouncing, recycling balls; `balls.rb`, the fixed-workload benchmark scene; and `mandelbrot.rb`, 30,000 squares computed band by band and zooming itself. See [`fountain.rb`: a scene that moves](#fountainrb-a-scene-that-moves-2026-08-12) and [`mandelbrot.rb`, and what `Canvas` would take](#mandelbrotrb-and-what-canvas-would-take-2026-08-12).
+
+**And it is fast: 3.5× mruby and 2.3× CRuby** on the same scene's Ruby work, via `rake fps`. Wall-clock fps cannot show this — every engine ties at the display's refresh rate — see [How fast is it, really](#how-fast-is-it-really-2026-08-12).
+
 **Per-vertex colors work, and took two fixes to get there** — see [Per-vertex colors: a compiler bug and one of ours](#per-vertex-colors-a-compiler-bug-and-one-of-ours-2026-08-11). `rake compare` now builds a gradient fixture on both engines and gets byte-identical output.
 
 `bouncing_balls.rb` separately drives the same core at 60fps from hand-written FFI, and is the reference for the FFI patterns.
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 8 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the eight that reproduce are #3802 through #3810, all filed that day and open.
+**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 10 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the ten that reproduce are #3802 through #3810 — all filed that day and open — plus drafts 27 and 28, **not yet filed**.
 
 **Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
@@ -81,12 +85,13 @@ cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
 - **preflight** builds an app using `Circle` and `on` and checks the build refuses it *by name*.
 - **issues** re-runs every filed reproducer. A `FIXED` row is the cue to drop the matching workaround with `SPINEL_SKIP=` and rebuild.
 
-Three more sit outside the default set, because they answer roadmap questions rather than regression ones and each takes minutes:
+Four more sit outside the default set, because they answer roadmap questions rather than regression ones and each takes minutes:
 
 ```sh
 cd spinel && rake sweep      # drop each workaround in turn; the one to run after a pull
 cd spinel && rake survey     # what blocks a clean build of all 37 files
-cd spinel && rake compare    # build both fixtures on both engines and diff the pixels
+cd spinel && rake compare    # build all three fixtures on both engines and diff the pixels
+cd spinel && rake fps[name]  # one examples/ scene on CRuby, mruby and Spinel, Ruby-side cost
 cd spinel && rake upstream   # pull, rebuild, then re-run issues and sweep
 ```
 
@@ -409,13 +414,15 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 
 The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
-**Drafted and never filed** — one, and deliberately so:
+**Not filed** — two, for different reasons:
 
 | Draft | Bug | Status |
 |---|---|---|
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
+| `issues/27-…` | An override of an inherited `attr_reader` is dispatched to correctly but typed as the attr, so a differing return type **segfaults** or fails to compile — the residue of [#1702](https://github.com/matz/spinel/issues/1702) | **Drafted 2026-08-12, awaiting review.** Found adding `Circle`; verified reproducing at `83d1315d` |
+| `issues/28-…` | A stored block capturing an array of objects is refused — `unsupported closure capturing a non-integer variable`, with no source location | **Drafted 2026-08-12, awaiting review.** Found porting `mandelbrot.rb`; verified reproducing at `83d1315d` |
 
-**Twenty-five of the twenty-six drafts are filed** — every one except 20, which upstream fixed before it could be filed. At `83d1315d` `verify_issues.rb` reports 17 fixed, 8 reproduce, 1 parked: the eight reproducing are #3802, #3803, #3805, #3806, #3807, #3808, #3809 and #3810; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty-five of the twenty-eight drafts are filed** — every one except 20, which upstream fixed first, and 27 and 28, which are waiting on review. At `83d1315d` `verify_issues.rb` reports 17 fixed, 10 reproduce, 1 parked: the ten reproducing are #3802, #3803, #3805, #3806, #3807, #3808, #3809, #3810 and drafts 27 and 28; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -898,9 +905,9 @@ The next milestone is an existing example running **unmodified**. `examples/boun
 
 | Gap | Whose | Status |
 |---|---|---|
-| `Circle` is not in the target | ours | FFI adapter plus the lib slice — mechanical and countable |
+| `Circle` is not in the target | ours | **done 2026-08-12** — see below |
 | `s.x += b.vx * dt` — operator write on a `def` writer | upstream | [#3809](https://github.com/matz/spinel/issues/3809) |
-| `color: [r, g, b, a]` numeric arrays **segfault** | upstream | [#3810](https://github.com/matz/spinel/issues/3810) |
+| `color: [r, g, b, a]` numeric arrays **segfault** | upstream | [#3810](https://github.com/matz/spinel/issues/3810) — **worked around in `lib/` 2026-08-12**, see below |
 | the four `on` handlers | upstream | [#3807](https://github.com/matz/spinel/issues/3807), [#3808](https://github.com/matz/spinel/issues/3808), and two unfiled — see [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12) |
 
 Everything else already works: a user `Struct`, `rand`, `Array.new(n) { }`, `<<` / `shift` / `size` / `each`, `Math.exp`, `Float#abs`, and an `update` block mutating top-level locals captured from the script body.
@@ -908,6 +915,214 @@ Everything else already works: a user `Struct`, `rand`, `Array.new(n) { }`, `<<`
 **Two of those were invisible until an example was tried.** Nothing in the library's own subset writes `shape.x += v`, and no fixture used a numeric color, so #3809 and #3810 had never been exercised — #3810 crashes before the first frame for any app with an `[r, g, b, a]` color. `rake compare`'s fixtures use string and `%w[]` colors only; **a numeric-rgba fixture belongs there**, for the same reason the gradient fixture was added after three `Ext` entry points turned out to draw nothing correct.
 
 **The crash was nearly missed twice over.** The build succeeded, and the first check of the binary read `$?` after a pipe — which reports the exit status of the last command in the pipeline, not the program. It printed 0 for a process that died on SIGSEGV. Run the binary without a pipe, or read `PIPESTATUS`, before believing an exit code.
+
+## `Circle` lands, and finds a bug on the way in (2026-08-12)
+
+The first of the four is done. `circle` joins `SPINEL_LIB_FILES`, and the adapter gains `draw_circle` and `stroke_circle` over two new `ffi_func` declarations — `R2D_DrawCircle`, and `R2D_StrokeEllipse` with the radius passed twice, which is exactly what `ext.c` does for the other engines since no `R2D_StrokeCircle` exists. **Pixel-identical to mruby on the new `circle` fixture**, which is the only evidence worth having here.
+
+The fixture is a third one rather than a line added to `cli_app.rb`, for the reason the gradient fixture is separate: these two entry points are reached by nothing else. `draw_circle` takes a sector count where every quad entry point takes coordinates, so it uses a non-default `sectors` — a dropped argument would otherwise still produce the default and look right.
+
+**It is not the numeric-rgba fixture the section above asks for.** That was tried first and segfaults: #3810 is reached through `Color` before the first frame, so the fixture would be permanently red and `rake` with it. The comment at the top of `circle_app.rb` marks where the numeric form belongs once #3810 lands; the case itself is already covered by that issue's reproducer in `rake issues`.
+
+**Adding the class surfaced a new compiler bug** — draft 27, an override of an inherited `attr_reader` dispatching to the override while typed as the attr. `Circle` includes `Renderable`, which declares `attr_reader :width`, and defines its own `def width`; `Renderable`'s `@width` is never set on a circle, so the attr's type and the method's disagree and any user writing `circle.width` gets generated C that does not compile. `Quad#width` is the same shape and is fine, because `Rectangle` assigns `@width` an Integer and the two types agree — which is why this sat in the slice unnoticed since the first square. It is the residue of [#1702](https://github.com/matz/spinel/issues/1702) in the way [#3810](https://github.com/matz/spinel/issues/3810) is the residue of [#3790](https://github.com/matz/spinel/issues/3790): the dispatch half was fixed, the type half was not.
+
+Nothing in `bouncing_balls.rb` calls `width`, so this does not move the milestone. It took five failed probes before the emitted C was read — the [reduction rule](#reducing-a-whole-program-failure) again, and it gave the answer immediately once followed.
+
+## The numeric-color segfault was ours to fix (2026-08-12)
+
+[#3810](https://github.com/matz/spinel/issues/3810) is a real compiler bug and is still open, but the library did not have to be the thing that trips it. `Color.valid?` asked `NAMED_COLORS.key?(color)` before checking that `color` is a String, and a per-vertex array asks `valid?` about each element — so every numeric `[r, g, b, a]` color reached a String-keyed Hash with a Float key and crashed before the first frame.
+
+One `instance_of?(String)` guard in front of the lookup fixes it, and it is the guard `hex?` already makes for itself two lines below. **It lives in `lib/`, not the compatibility layer**, on the same grounds as `Color::Set#empty?`: it reads as ordinary Ruby that any reviewer would accept without knowing Spinel exists, and it is a little faster. The comment at the site names the issue so nobody simplifies it back.
+
+`circle_app.rb` now uses a numeric color with an alpha, so `rake compare` covers the path that crashed — including the blend against the background, which makes the two engines agree on float color math and not just geometry.
+
+**This is the shape to look for in the remaining gaps.** A compiler bug in a construct the library chooses to use is ours to route around; one in a construct the *user's script* uses is not.
+
+## What `bouncing_balls.rb` still needs (2026-08-12)
+
+Re-measured after `Circle` landed, and the earlier count was wrong in both directions. Building the example with only two changes — the two `s.x += …` lines written longhand and the four `on` blocks deleted — **the whole script compiles and runs**: the `Struct`, `rand`, the physics loop, `balls.shift.shape.remove`, all of it.
+
+| Gap | Whose | Can we work around it? |
+|---|---|---|
+| `Hash#delete_if` on an ivar, reached through `shape.remove` | upstream, unfiled | **yes** — a compat transform of the same shape as `expand_hash_delete`. Needs a reduced reproducer first |
+| `s.x += b.vx * dt` — [#3809](https://github.com/matz/spinel/issues/3809) | upstream | **no**, see below |
+| the four `on` handlers | upstream + ours | not until four compiler bugs are fixed, and then only with a new FFI seam |
+
+`delete_if` was missed the first time because nothing reaches it until an object is removed, and the earlier measurement never removed one. `Struct` member writes are fine — `b.vy += GRAVITY * dt` compiles — so #3809 costs exactly the two lines that write through `Circle`'s hand-written `x=` and `y=`.
+
+**#3809 is the one that decides "unmodified", and there is no workaround worth taking.** The refused construct is in the user's file, so the compatibility layer cannot reach it — that layer rewrites `lib/`, and rewriting the user's script in the build path is a different thing entirely, one that changes evaluation order for any receiver with side effects. The library-side alternative is turning `x=` and `y=` into `attr_writer`s, which is precisely what deletes the symbol-alignment feature (`x: :center`) they exist for. Upstream has been closing these within hours; waiting is cheaper than either.
+
+## `fountain.rb`: a scene that moves (2026-08-12)
+
+`square.rb` shows the target compiles a Ruby 2D script. **`spinel/examples/fountain.rb` shows it runs one**: an emitter sweeps the top of the window on a sine and sprays balls that fall, bounce off the walls and floor, lose energy, and get recycled back to the emitter once the pool fills. Translucent numeric colors, `Struct`, `rand`, top-level methods, `Math.sin`/`cos`/`exp`, all from one standalone binary.
+
+```sh
+RUBY2D_SPINEL=../spinel/bin/spinel ruby2d build --spinel spinel/examples/fountain.rb
+ruby2d launch --native
+```
+
+It has no input, which is not a stylistic choice — a demo needing input would be a demo of nothing until the four event bugs are fixed. The emitter's sweep replaces the mouse. It recycles balls rather than removing them, which sidesteps the `delete_if` above and is the better design regardless: the allocation count stops climbing the moment the pool fills.
+
+Verified over 1601 frames at its original tunables: the pool caps, the recycle cursor wraps, and the process exits 0. The tunables at the top are meant to be played with — `rake fps[fountain]` has run it at ~2,700 balls.
+
+### `dt` silently truncates to zero when a nested block reads it
+
+The first build ran at full speed and **sat perfectly still** — 241 frames, zero balls, the emitter parked at window center. Nothing failed. `--emit-types` on the assembled source named it in one line: the `update` block's `dt` parameter had inferred as `Integer`, so every frame delta of ~0.004 truncated to 0.
+
+The trigger is a nested block that reads the enclosing block's parameter, which `balls.each do |b| … b.vx * dt … end` does:
+
+```ruby
+update do |dt|
+  total += dt
+  values.each { |v| total = total + v * dt }   # `dt` becomes Integer
+end
+```
+
+Removing the inner block's use of `dt` restores `poly` and the demo runs. So does reading it into a local first — `step = dt` — which is what `fountain.rb` does, with a comment, because it costs one line and keeps `balls.each`.
+
+**It does not reduce to a standalone program yet.** Three shapes that ought to be equivalent — `yield`, a block stored in an ivar and called later, and that plus the library's two call sites of differing arity (`@update_proc.call(@delta_time)` and `@update_proc.call`) — all compile and run correctly. This is very likely the escaping-lambda-parameter bug already listed under [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12), now with a bisected trigger but still no minimal case.
+
+**This is the worst failure mode on this target so far**, and worth remembering as a class: no compile error, no crash, no diagnostic, full frame rate, and a scene that does nothing. The check that found it was `--emit-types`, not the debugger — when arithmetic silently produces nothing, ask what the compiler thinks the types are before asking what the values are.
+
+One smaller gap turned up alongside it: `Window#fps` read 0 on this target, because `_spinel_sync` carried mouse position and window size but not the frame counter or fps, though `R2D_Fps` and `R2D_FrameCount` were already declared in the adapter. Both are synced now — `window.c` writes them straight into the Ruby object from C on the other engines, which is the path that does not exist here.
+
+## `mandelbrot.rb`, and what `Canvas` would take (2026-08-12)
+
+The third example is a port of `examples/mandelbrot.rb`: it computes the set band by band behind a progress bar, then zooms itself into a boundary block every couple of seconds, and returns home when doubles run out of precision. **30,000 objects, and the heaviest thing this target has run** — heavy enough that Spinel holds 120fps on it while CRuby manages 76 and mruby 30.
+
+**It does not use `Canvas`, and that was the interesting part.** The original renders into one, which is exactly the right primitive — rasterize once into a texture, draw one quad. But `Canvas` cannot be reached from this target at all, and not because of a missing binding: *every* entry point in `canvas.c` takes the Canvas Ruby object as `argv[0]`, reads its ivars, and stores the `R2D_Canvas *` back inside it with `obj_set_struct`. There is no `R2D_Canvas *` API underneath to call. Supporting it means splitting that layer the way `window.c` and `shapes.c` are already split — a Ruby-free core plus a thin binding — and then finding a way to hand it rectangles, since `fill_rectangles` takes an array and the FFI passes scalars only. `Text` is the same shape. Both are real work in `ext/`, on code all three engines share.
+
+A `Square` per block needs none of it. The grid is built once and only recolored afterwards, so nothing is created or removed after startup — which also keeps it clear of the `Hash#delete_if` that `remove` reaches. It is blockier than a canvas and it re-renders every square every frame, and it works today.
+
+**It cost one more compiler bug, drafted as 28.** The obvious structure — `blocks` and `counts` as top-level arrays, passed into `render_band` — is refused: `unsupported closure capturing a non-integer variable (later slice)`, from the `update` block capturing them. An array of `Integer` is fine, an array that stays empty is fine, a bare object is fine, and the identical block called immediately rather than stored is fine. Holding the two tables in constants and letting the methods read them directly avoids it, which is what the example does.
+
+The diagnostic names no line — `node -1 (?)` — so the only way to find it in a 250-line file was to bisect by deletion. That is worth as much of the report as the bug.
+
+### What the example is tuned for, and why it matters
+
+Its first tuning showed 3.9× against CRuby, and that number was mostly measuring the wrong thing. Splitting the frame into the escape-time arithmetic and everything else says why:
+
+| | CRuby | Spinel | speedup |
+|---|---|---|---|
+| escape-time math | 9.9 ms | 1.0 ms | **9.8×** |
+| scene dispatch and the rest | 50.3 ms | 14.5 ms | 3.5× |
+| blended | 60.2 ms | 15.5 ms | 3.9× |
+
+**Two different speedups are being averaged, and the tunables decide the weights.** `PIXEL` buys sharpness with per-object dispatch, where Spinel is ~3.5× faster and that ratio does not move. `MAX_ITER` buys colour detail with pure Ruby float arithmetic in a tight loop, where it is far ahead — and *increasingly* so, because at shallow depths the per-block overhead around the loop still dominates it:
+
+| Configuration | objects | math is | math speedup | blended |
+|---|---|---|---|---|
+| `PIXEL 2`, `MAX_ITER 80` | 120,000 | 16% of CRuby's frame | 9.8× | 3.9× |
+| `PIXEL 2`, `MAX_ITER 800` | 120,000 | 60% | 29.7× | 7.5× |
+| `PIXEL 4`, `MAX_ITER 800` | 30,000 | 64% | 44.9× | 8.3× |
+| `PIXEL 4`, `MAX_ITER 2000` | 30,000 | 77% | 33.7× | **11.5×** |
+
+The example ships at the last row. It is also the best-looking of the four — deep iteration is what gives the boundary its fine colour banding — so sharpening the picture and exposing the compiler's advantage turn out to be the same edit.
+
+**Read that table's middle columns with suspicion — see the next section.** It was measured with the example's random zoom target still in place, so each row rendered a different region of the fractal. The blended column is directionally right and the shipped configuration is unchanged by the correction, but the math-speedup column is not comparable row to row, which is why it wanders up to 44.9× and back down.
+
+**The general lesson is worth more than the number.** A benchmark that blends a 30× speedup with a 3.5× one reports neither. Before tuning anything for a ratio, measure which part of the frame the ratio is actually coming from.
+
+## Tuning it properly, and the lever that was free (2026-08-12)
+
+Going back to the sweep above with the intent of pushing the ratio further turned up a measurement bug first: the zoom target is picked at random, so no two runs render the same thing. Two runs of *identical* source came out 37% apart. Pinning the view — never zoom, re-render the home view every pass — made runs repeatable to within about 1%, and only then was anything else worth measuring.
+
+**Micro-optimizing the escape loop does nothing.** Six variants, both engines, controlled workload:
+
+| Variant | CRuby frame | Spinel frame | math speedup |
+|---|---|---|---|
+| baseline | 26.57 ms | 4.20 ms | 24.5× |
+| `2.0 * zr * zi` instead of `2 *` | 26.76 ms | 4.22 ms | 24.1× |
+| carry `zr²`/`zi²` across the guard | 26.56 ms | 4.20 ms | 24.6× |
+| `MAX_ITER` hoisted into a local | 26.55 ms | 4.17 ms | 24.5× |
+| palette of `Color`s, not arrays | 26.32 ms | 4.19 ms | 27.2× |
+| all of the above | 26.21 ms | 4.15 ms | 27.4× |
+
+The squares-hoist is the interesting null: it removes two of five multiplications per iteration and changes nothing, because `cc -O2` already eliminates the common subexpression on the Spinel side and CRuby's loop is bound by interpreter dispatch rather than by the multiplies. The `Color` palette is the only row that moves at all, and it moves the *math* component (which includes the per-block `color=`) without touching the blended figure. The loop in the example is written for clarity because clarity is free here.
+
+**Scene dispatch is a flat 3.2×, everywhere in the path.** A static grid of 30,000 squares, measured visible and then hidden, so the difference is the render preamble and the native call:
+
+| | CRuby | Spinel | speedup |
+|---|---|---|---|
+| visible (full render) | 12.62 ms | 3.95 ms | 3.19× |
+| hidden (scene loop reaches each object and stops) | 3.35 ms | 1.07 ms | 3.12× |
+| difference (the draw itself) | 9.27 ms | 2.88 ms | 3.22× |
+
+That uniformity is the useful part: there is no stage of the object-render path where Spinel is disproportionately slow, so there is no Spinel-specific pathology to go fix. It is 3.2× the whole way down, and 27% of it — the same 27% on both engines — is just `@objects.each` reaching each object and asking `visible?`.
+
+So the ratio is decided entirely by the mix of a ~25× component and a 3.2× one, and **`BAND_ROWS` turned out to be the mix lever that costs nothing.** `PIXEL` and `MAX_ITER` both trade against the picture; block-rows per frame trades only against how fast a view streams in:
+
+| `BAND_ROWS` | CRuby frame | Spinel frame | math is | blended |
+|---|---|---|---|---|
+| 1 | 24.55 ms | 4.60 ms | 45% of CRuby's frame | 5.3× |
+| 2 | 28.51 ms | 4.47 ms | 53% | 6.4× |
+| 4 | 47.31 ms | 4.95 ms | 71% | 9.6× |
+| 8 | 78.52 ms | 6.18 ms | 83% | 12.7× |
+| 15 | 132.83 ms | 8.13 ms | 90% | 16.3× |
+
+On the fixed view it climbs monotonically, but the example ships at 4 rather than 15 for two reasons the fixed view cannot show. A deep zoom costs roughly twice the home view, and past `BAND_ROWS = 8` that pushes Spinel off the display refresh rate on the deepest views — losing the thing the demo is for. And on the real zooming example the *measured* headline peaks at 4 and falls back at 8 (15.8× versus 13.4×), because once a view completes in nineteen frames the fixed pause covers a different fraction of each engine's frames.
+
+`rake fps[mandelbrot,200]` at the shipped values:
+
+```
+engine         µs/frame      µs/object   relative
+Spinel            4487           0.15     21.62x
+CRuby            70832           2.36      1.37x
+mruby            97019           3.23      1.00x
+
+wall clock, all present-bound:
+CRuby             14.5 fps
+mruby              8.6 fps
+Spinel           116.3 fps
+```
+
+**15.8× against CRuby, up from 4.9×, without touching a pixel of the output.** The wall clock is the part worth showing: Spinel holds the display's refresh rate while CRuby runs at 14.5fps on the same source.
+
+## How fast is it, really (2026-08-12)
+
+**Spinel runs the same scene's Ruby work about 4.5-5× faster than mruby and 2.5× faster than CRuby.** `rake fps[name]` builds any example from `examples/` on all three engines and reports it:
+
+```
+  balls: update and scene dispatch per frame
+  180 objects at the end of the run
+
+  engine         µs/frame      µs/object   relative
+  Spinel             191           1.06      5.04x
+  CRuby              514           2.86      1.87x
+  mruby              964           5.35      1.00x
+```
+
+The absolute µs move with machine load; the ratios are the stable part, and across runs the Spinel-to-mruby figure sits between roughly 4.5× and 5×. On `fountain.rb` with ~2,700 balls it is 3.8×.
+
+**`mandelbrot.rb` is the one to point at**, because it is heavy enough that the wall clock finally separates too — Spinel holds 120fps while CRuby manages 76 and mruby 30:
+
+```
+  mandelbrot: update and scene dispatch per frame
+  30,003 objects at the end of the run
+
+  engine         µs/frame      µs/object   relative
+  Spinel            3926           0.13     11.44x
+  CRuby            19251           0.64      2.33x
+  mruby            44926           1.50      1.00x
+```
+
+**Wall-clock fps cannot answer this question, and finding that out is most of the work.** `SDL_RenderPresent` blocks at the display's refresh rate whatever the cap says: measured at ~120fps for 5 balls and for 3000, with vsync off *and* with a finite 10,000fps cap. All three engines tie at the refresh rate and the number says nothing. `benchmark/README.md` says as much for the native harness — "an empty window can measure *slower* than a populated one" — and solves it by subtracting present out with two harness-only method wrappers. That is runtime monkey-patching, so it cannot work on an AOT target.
+
+What `tools/fps.rb` measures instead is the Ruby side directly: the example's `update` block plus the scene-graph dispatch that draws every object. Present and the GPU are identical across all three engines and sit outside the timed region.
+
+**The example does not have to cooperate, and that is the whole design.** The harness is spliced in ahead of `show`, takes whatever procs the example already registered, and re-registers its own around them. The two clock reads bracket exactly the right work because of where the frame loop runs each hook: `update` is the first thing in `tick`, and the `render` block runs *after* every object's `_render_scene` inside `render_objects` (at the default `z: :foreground`). So one clock read at the top of `update` and one in `render` spans the frame's entire Ruby side, and no example needs editing.
+
+A benchmark-grade example still has to hold its workload still — `balls.rb` creates everything at startup and steps a fixed timestep, because with a real `dt` a faster engine would simulate further per frame and measure itself slower. `fountain.rb` grows its scene, so the tool notices the engines finishing on different object counts and drops the per-object column rather than printing a figure that means nothing.
+
+Caveats worth keeping attached to the number: one scene, one machine, fastest of three runs. It is a per-object dispatch benchmark, not a claim about whole programs.
+
+### Calling the *default* `@render_proc` through reflection is a SIGBUS
+
+Building the harness turned one up. Fetching `@render_proc` with `instance_variable_get` and calling it crashes the Spinel build with a SIGBUS about a dozen frames in — **but only when the example never registered a render block**, so what sits in that ivar is the `proc {}` that `Window#initialize` creates. The same empty block written literally in the example is fine. A user-registered proc fetched exactly the same way is fine. It is specific to the default one.
+
+It does not reduce: a class whose `initialize` stores a `proc {}`, fetched by `instance_variable_get` and called, compiles and runs correctly. So the trigger needs something the small case does not have, and the reduction is still open.
+
+The tool avoids it by reading the example's source and only fetching a proc the example actually registered — which it needs to do anyway, since an example with no `update` block would hit the identical shape.
 
 ## MVP
 
