@@ -1,77 +1,57 @@
-# [Design] Method resolution is re-derived at each emission site, and the write path never asks the method table
+# [Design] Method resolution is re-derived independently at each emission site
 
 **Status:** research notes
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel. This is a meta-issue over several already-filed bugs rather than a new reproducer — closing it means closing a gap between two code paths that both already exist, not redesigning anything.
+Filed as [#3910](https://github.com/matz/spinel/issues/3910). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel. This is a meta-issue over several already-filed bugs rather than a new reproducer: it documents a mechanism those bugs share, so it can be closed by closing the gap between code paths that already exist.
 
 ## Description
 
-Twenty-nine reproducers came out of this port. Most are unrelated. Four are the same bug wearing different clothes, and three more are the same shape in adjacent machinery — which is worth one issue rather than seven, because each has been fixed correctly and locally, and the next emission site to grow a dispatch will start from zero again.
+Thirty reproducers came out of this port. Most are unrelated. Four share one mechanism, and three more show the same shape in adjacent machinery. Each instance so far has been fixed correctly and locally; this issue records the shared mechanism so the next emission site does not have to rediscover it.
 
-The shared mechanism: **a call site has two possible lowerings — a proved one and a boxed one — and each derives method resolution independently.** The bugs are where the two derivations disagree. There is no function that answers "what does name `N` mean on receiver `R`"; there are two table queries, `comp_method_in_chain` (`src/compiler.c:440`) and `comp_reader_in_chain` (`src/compiler.c:957`), and roughly forty and fifty-six call sites respectively, each composing its own policy out of them.
+The mechanism: **a call site has two possible lowerings — a proved one and a boxed one — and each derives method resolution independently.** The bugs are where the two derivations disagree. There is no single function that answers "what does name `N` mean on receiver `R`"; there are three chain queries — `comp_method_in_chain` (`src/compiler.c:445`, ~368 uses), `comp_reader_in_chain` (`:962`, ~55 uses), and the recently added `comp_writer_in_chain` (`:968`, 18 uses) — plus the non-chain-aware `comp_is_writer` (`:828`), and each emission site composes its own policy from them.
 
-## The four
+## The family
 
-| Issue | What diverged |
-|---|---|
-| [#3805](https://github.com/matz/spinel/issues/3805) | `empty?` on a boxed receiver became an unconditional raise once any class in the program owned `length` — the guard consulted the method table but not the reader table |
-| [#3806](https://github.com/matz/spinel/issues/3806) | `delete` on a boxed receiver lowered to `String#delete` — resolution matched a builtin ahead of the user's method |
-| draft 27 | An override of an inherited `attr_reader` is *dispatched* through the method table and *typed* through the reader entry, so the emitted C disagrees with itself in one statement |
-| draft 29 | An attribute write on a boxed receiver is built from the writer table alone, gets no arm for a method-defined writer, and is silently discarded |
+| Report | Status at `e05feeb9` | What diverged |
+|---|---|---|
+| [#3805](https://github.com/matz/spinel/issues/3805) | fixed | `empty?` on a boxed receiver became an unconditional raise once any class owned `length` — the guard consulted the method table but not the reader table |
+| [#3806](https://github.com/matz/spinel/issues/3806) | fixed | `delete` on a boxed receiver lowered to `String#delete` — resolution matched a builtin ahead of the user's method |
+| [#3909](https://github.com/matz/spinel/issues/3909) | reproduces (segfault) | dispatch of an attr override now arbitrates reader-vs-method (`codegen_call_recv.c:8554`) but the expression's *type* still comes from the reader entry — the emitted C calls the override and casts its `mrb_int` result to `const char *` in one statement |
+| [#3907](https://github.com/matz/spinel/issues/3907) | reproduces (silent) | the boxed write switch is built from `comp_is_writer` alone: no arm for a `def x=` class, no `default`, so the store is discarded without a `NoMethodError` |
 
-Three more are the same shape in different machinery, listed for the pattern rather than as part of the ask: [#3807](https://github.com/matz/spinel/issues/3807) (`equal?` constant-folded on the proved path where the boxed path answers correctly), and [#3790](https://github.com/matz/spinel/issues/3790) and [#3810](https://github.com/matz/spinel/issues/3810) (a boxed key reaching a String-keyed Hash without a tag check).
+Three more show the same shape in different machinery, listed for the pattern only (all since fixed): [#3807](https://github.com/matz/spinel/issues/3807) (`equal?` constant-folded on the proved path where the boxed path answers correctly), [#3790](https://github.com/matz/spinel/issues/3790) and [#3810](https://github.com/matz/spinel/issues/3810) (a boxed key reaching a String-keyed Hash without a tag check).
 
-## Where it comes from
+## Recent fixes have each re-implemented the same policy
 
-`src/codegen_call_recv.c` carries twenty-two hand-rolled resolution guards, one per builtin name that a user class might shadow — `has_user_cnt`, `has_user_rnd`, `has_user_dig`, `has_user_len`, and so on. Each is separately responsible for remembering to consult both tables, and the comment above `has_user_len` (`src/codegen_call_recv.c:10238`) is [#3805](https://github.com/matz/spinel/issues/3805) written up by the person who fixed it:
+- [#3805](https://github.com/matz/spinel/issues/3805)'s fix taught `has_user_len` to also consult the reader table. Its comment states the general rule: *"`has_user_len` must also consult `comp_reader_in_chain`: a user class's `.size`/`.length` is very often an attr_reader/attr_accessor … `comp_method_in_chain` alone missed those."* Ten `has_user_*` guards remain in `src/codegen_call_recv.c`, each separately responsible for applying it.
+- The boxed read emitter arbitrates reader-vs-method with a more-derived-wins chain walk (`src/codegen_call_recv.c:8554`).
+- The typed write emitter performs the same arbitration again — `comp_writer_in_chain` vs `comp_method_in_chain`, more-derived wins, same-class tie to the explicit `def` (`src/codegen_stmt.c:5901-5913`).
+- `0da7012c` memoized `an_user_defines_or_reads` after measuring 388.7 million `comp_method_in_chain` calls compiling one program.
 
-> `has_user_len` must also consult `comp_reader_in_chain`: a user class's `.size`/`.length` is very often an attr_reader/attr_accessor — or a Struct member, which registers the same way — rather than a `def` method. `comp_method_in_chain` alone missed those…
-
-That is the whole family in one sentence. The policy is correct; it just has to be retyped at each site, and twenty-two chances to retype it correctly is twenty-two chances not to.
-
-## The write path specifically
-
-`src/codegen_stmt.c` has two polymorphic-write emitters, and they are not guarded alike.
-
-The typed-receiver one (line 5947) asks the method table first and only falls back to attribute dispatch:
-
-```c
-else if (comp_method_in_chain(c, ty_object_class(rt), nm, NULL) < 0) {
-  /* writer not in chain and no explicit method: try subclass dispatch via cls_id */
-```
-
-The boxed-receiver one (line 5988, `else if (rt == TY_POLY)`) has no such guard. It goes straight to `comp_is_writer` (line 6012) and never consults the method table at all. And `comp_is_writer` cannot answer the question:
-
-```c
-int comp_is_writer(ClassInfo *ci, const char *name) { return name_in(ci->writers, ci->nwriters, name); }
-```
-
-`writers[]` is populated from four places — `attr_writer`/`attr_accessor` (`src/analyze_scope.c:1618`), `Struct` members (1242, 1252), module inclusion (3307), and superclass copy (3832). A hand-written `def x=` never enters it, so a class defining its writer by hand is structurally absent from the switch. Unlike its reader counterpart the predicate is also not chain-aware.
-
-There is a second way an arm disappears, in the same loop (line 6019): a class whose ivar slot type cannot hold the concrete right-hand side is `continue`d past, so even an attribute-backed class can silently drop out on a type mismatch.
+[#3909](https://github.com/matz/spinel/issues/3909) is a site that has the dispatch half of the policy but not the typing half; [#3907](https://github.com/matz/spinel/issues/3907) is a site that predates the policy entirely.
 
 ## Fail-open versus fail-closed
 
-The read dispatch closes its switch with a raising default, and the comment explaining why is the argument this issue is making (`src/codegen_call.c:4408`):
+The read dispatch closes its switch with a raising default; the comment on the #3394 fix explains why (`src/codegen_call.c`):
 
 > Nothing claimed the fallthrough: the value is not one of the enumerated classes and no pre-arm recognised its tag, so it does not answer this method. Raise, as every other unresolved call does. Leaving the slot at its zero handed callers a NULL container that read back as empty — `str.split.join(" ")` answered `""` once a user class owned `split` (#3394), which is the silent form of the same gap.
 
-Both write emitters close with a bare `" } }\n"` (lines 5977 and 6026). So on the write side a resolution miss is not an error — it is a no-op. A receiver that genuinely does not respond to the name is swallowed the same way, with no `NoMethodError`.
+Both write emitters close with a bare `" } }\n"` instead, so on the write side a resolution miss is a no-op rather than an error. At `e05feeb9`, a boxed receiver that does not respond to `x=` at all runs past the assignment where CRuby raises `NoMethodError`.
 
-That difference is what makes this cluster expensive out of proportion to its size. A refusal costs an afternoon. Draft 29 compiles clean, runs clean, draws a window, and quietly discards every `shape.x = …` on an object held in an array — and it passed all five of the checks this port runs, because each asks whether something compiles, runs or draws, and none asks whether it behaves the way it does on CRuby.
+The two failure modes are not equivalent in practice. An unsupported diagnostic or a raise is caught the first time the program runs. [#3907](https://github.com/matz/spinel/issues/3907) compiles, runs, and draws, and was found only by comparing program output against CRuby — it passed all five of this port's build-and-run checks.
 
 ## Suggested fix
 
-Three, in increasing size. The first two are small and would between them have prevented all four.
+Three items, increasing in size. If the preferred route for 1 and 2 is to land them as part of [#3907](https://github.com/matz/spinel/issues/3907)'s fix, this issue can close with it; only 3 needs a decision of its own.
 
-1. **Give both write emitters in `src/codegen_stmt.c` the raising default the read emitter got in #3394.** Smallest possible change, and it converts this whole class from silent-wrong to loud-wrong. Draft 29 would have crashed on the first frame instead of hiding.
+1. **Give both write emitters in `src/codegen_stmt.c` the raising default the read emitter received in #3394.** This converts the write-side silent no-op into a `NoMethodError`.
 
-2. **Guard the boxed write path with `comp_method_in_chain` the way its typed sibling at line 5947 already is**, and emit a call arm for classes whose writer is a method rather than an attribute. This is draft 29 directly, and it makes the two write paths agree with each other.
+2. **Drive the boxed write switch through the arbitration the typed emitter already has** (`codegen_stmt.c:5901-5913`): per candidate class, an arm calling `sp_<Class>_x_set` where the method wins, an ivar store where the attr wins. This is [#3907](https://github.com/matz/spinel/issues/3907)'s fix, and it makes the two write paths agree with each other.
 
-3. **Longer term, one resolution function** — something shaped like `resolve(class_id, name, READ|WRITE)` returning *method*, *attribute*, or *none* — that every emission site calls instead of composing its own answer. That is what would retire the twenty-two `has_user_*` guards and stop the next dispatch site from starting over. Not proposed as urgent; proposed as the thing that makes 1 and 2 the last of their kind.
+3. **Longer term: one resolution function** — shaped like `resolve(class_id, name, READ|WRITE)` returning *method*, *attribute*, or *none* — called by every emission site instead of each composing its own answer. The pieces exist (`comp_writer_in_chain`, the chain-walk arbitration, the `an_user_defines_or_reads` memo); consolidating them would retire the remaining `has_user_*` guards. Not urgent, and worth doing only if the maintainers agree the consolidation carries its weight.
 
 ## Environment
 
-- Spinel commit: `84f5a236`
+- Spinel commit: `e05feeb9`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21

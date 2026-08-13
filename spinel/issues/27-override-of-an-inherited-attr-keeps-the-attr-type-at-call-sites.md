@@ -1,8 +1,8 @@
 # [Runtime] An override of an inherited `attr_reader` is dispatched correctly but typed as the attr
 
-Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
+Filed as [#3909](https://github.com/matz/spinel/issues/3909). Found while porting [Ruby 2D](https://github.com/ruby2d/ruby2d) to Spinel.
 
-Follow-up to [#1702](https://github.com/matz/spinel/issues/1702), whose reproduction passes at `83d1315d`. That issue was the *dispatch* half — the call site read the field instead of calling the override. The override is now called; the call site still takes its **type** from the attr.
+Follow-up to [#1702](https://github.com/matz/spinel/issues/1702), whose reproduction passes on current master. That issue was the *dispatch* half — the call site read the field instead of calling the override. The override is now called; the call site still takes its **type** from the attr.
 
 ## Description
 
@@ -34,7 +34,7 @@ puts Child.new('abc').x
 3
 ```
 
-**Spinel (83d1315d):**
+**Spinel (e05feeb9):**
 ```
 [segmentation fault]
 ```
@@ -72,14 +72,14 @@ A subclass that overrides an accessor to compute rather than store is the reason
 
 ## Cause
 
-`codegen_call_recv.c` consults the per-class `readers[]` table before the method table, which is the lookup [#1702](https://github.com/matz/spinel/issues/1702) identified (`comp_reader_in_chain` ahead of `comp_method_in_chain`, around line 3304). Emission now prefers the method, but the expression's type is still resolved through the reader entry, so the two paths disagree whenever the override's return type is not the ivar's.
+Dispatch and typing resolve the reader/method collision independently, and only dispatch arbitrates. The read emitter now walks the ancestor chain and lets the more-derived definition win (`src/codegen_call_recv.c:8554` — the fix [#1702](https://github.com/matz/spinel/issues/1702) got), which is why that issue's same-type reproduction passes. But the *type* of the call expression is still resolved through the reader entry, so the analyzer types the expression as the attr's ivar while the emitter calls the override: the emitted C declares `sp_Child_x` as returning `mrb_int` and, in the same statement, casts the result to `const char *`.
 
 ## Suggested fix
 
-Resolve the type from whichever member emission chose. When `comp_method_in_chain` wins, the call's type is that method's return type, and the reader entry should not be consulted for it — the same precedence the dispatch fix established, applied to the type.
+Resolve the type from whichever member the dispatch arbitration chose. When the method wins, the call's type is that method's return type, and the reader entry should not be consulted for it — the same more-derived-wins precedence the emitter applies at `codegen_call_recv.c:8554`, applied during inference.
 
 ## Environment
 
-- Spinel commit: `83d1315d`
+- Spinel commit: `e05feeb9`
 - Ruby version: 4.0.6
 - Platform: macOS 26 (arm64), Apple clang 21
