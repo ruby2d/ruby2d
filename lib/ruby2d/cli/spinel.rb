@@ -500,7 +500,7 @@ def spinel_unsupported_uses(source)
     end
     # `on` only counts as a call at the start of a line or after a receiver, so
     # the word inside an ordinary string doesn't read as event registration.
-    found << [n, 'on', 'input events — blocked on three upstream bugs, see spinel/README.md'] if line.match?(/(\A\s*|\.)on(\(|\s+[:\w])/)
+    found << [n, 'on', 'input events — blocked on one upstream bug, see spinel/README.md'] if line.match?(/(\A\s*|\.)on(\(|\s+[:\w])/)
     found << [n, 'Window subclass', 'the class pattern — it needs ancestor reflection'] if line.match?(/class\s+\w+\s*<\s*(Ruby2D::)?Window\b/)
   end
 

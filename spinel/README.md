@@ -30,13 +30,13 @@ It needed a patched Spinel for one day: any `set` call omitting `background:` pa
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**All sixteen filed bugs are closed upstream** ([#3771-#3790](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). `verify_issues.rb` reports 17 fixed, 10 reproduce, 1 parked: the seventeenth fixed is draft 20, which upstream fixed on 2026-08-12 before it could be filed, and the ten that reproduce are #3802 through #3810 — all filed that day and open — plus drafts 27 and 28, **not yet filed**.
+**Every filed bug is closed upstream** ([#3771-#3810](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `84f5a236` `verify_issues.rb` reports 24 fixed, 3 reproduce, 1 parked, 1 to read by hand: the three reproducing are drafts 27, 28 and 29, **none of them filed**; the one to read by hand is draft 24, fixed except for a residue — see [24 of 28](#24-of-28-and-the-first-bug-that-fails-silently-2026-08-13).
 
 **Two of them are fixed upstream and still worked around here.** A closed issue is not a dropped workaround: `rake sweep` is what answers that, and it keeps `dsl_shims` and `window_guards` even though both reproducers pass. Both residues are now reduced and filed as [#3803](https://github.com/matz/spinel/issues/3803) and [#3802](https://github.com/matz/spinel/issues/3802) — plus `issues/20-…`, which upstream fixed first — and each needed an ingredient the original reproducer had no reason to include: a block parameter, a name collision, and a reopened class body. See [Fixed upstream, still worked around](#fixed-upstream-still-worked-around-2026-08-11) and [A draft fixed by someone else's report](#a-draft-fixed-by-someone-elses-report-2026-08-12).
 
 **What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#the-whole-library-at-once-spinel-doctor-2026-08-10) on the full 37-file library reported exactly one unsupported construct, the event filter's runtime-name `send`, until `lib/` removed it on 2026-08-12; the rest is FFI adapter work. On the compiler side, four workarounds cover compiler bugs. Three are now filed with a reduced reproducer — `dsl_shims` → [#3803](https://github.com/matz/spinel/issues/3803), and `window_guards` and `bypass_window_class_methods` → [#3802](https://github.com/matz/spinel/issues/3802), which covers both. Each needed a *second* reproducer written from the library's failure rather than from the original small case. The fourth, `expand_hash_delete`, is filed as [#3806](https://github.com/matz/spinel/issues/3806) — see [Every workaround now has a reproducer](#every-workaround-now-has-a-reproducer). **Every compiler-bug workaround on this branch now has a minimal reproducer**, which was not true this morning.
 
-Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them — the `send` that made them inherently incompatible is gone, and **no script using input events compiles today** for four ordinary compiler-bug reasons instead, two of them filed as [#3807](https://github.com/matz/spinel/issues/3807) and [#3808](https://github.com/matz/spinel/issues/3808). See [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12).
+Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them — the `send` that made them inherently incompatible is gone, and **no script using input events compiles today** for ordinary compiler-bug reasons instead. Three of the four are fixed as of 2026-08-13 and one construct remains; see [Input is one bug away](#input-is-one-bug-away-2026-08-13).
 
 ### Setup
 
@@ -247,7 +247,7 @@ end
 
 `EVENT_FILTER_PREDICATES` became `EVENT_FILTER_FIELDS` (and the same for the per-object map): the map keeps its indirection, but names a *field* rather than a method, so the dispatch is an ordinary call every event class owns. The public API is unchanged and all 867 specs pass. `rake survey` no longer lists a `send` among the AOT limits — only `define_singleton_method` and `undef_method` remain there.
 
-**Input handling still does not work**, because three ordinary compiler bugs sit behind the one that was ours:
+**Input handling still does not work**, because three ordinary compiler bugs sit behind the one that was ours. (All but the last of these were fixed upstream on 2026-08-13 — see [Input is one bug away](#input-is-one-bug-away-2026-08-13).)
 
 | Bug | Filed | Effect on `on` |
 |---|---|---|
@@ -414,15 +414,17 @@ A draft the verifier cannot judge says so in its own text, with a `**Status:**` 
 
 The duplicate search before filing turned up one close relative worth citing rather than a duplicate: [#2856](https://github.com/matz/spinel/issues/2856), a class method added by *reopening* a class not being registered. Its reproduction passes at `83d1315d`, so a `def` in a reopened body registers while an `extend` does not — that contrast is in #3802 because it bounds the search.
 
-**Not filed** — two, for different reasons:
+**Not filed** — four, for different reasons:
 
 | Draft | Bug | Status |
 |---|---|---|
 | `issues/20-…` | A top-level `extend` shadows a class's own same-named method, **silently** — `Window#update` never runs | **Fixed upstream 2026-08-12 before it could be filed**, by `80a3beb2`. Do not file; kept as the record, and kept in `verify_issues.rb` because upstream has no test for this shape |
-| `issues/27-…` | An override of an inherited `attr_reader` is dispatched to correctly but typed as the attr, so a differing return type **segfaults** or fails to compile — the residue of [#1702](https://github.com/matz/spinel/issues/1702) | **Drafted 2026-08-12, awaiting review.** Found adding `Circle`; verified reproducing at `83d1315d` |
-| `issues/28-…` | A stored block capturing an array of objects is refused — `unsupported closure capturing a non-integer variable`, with no source location | **Drafted 2026-08-12, awaiting review.** Found porting `mandelbrot.rb`; verified reproducing at `83d1315d` |
+| `issues/27-…` | An override of an inherited `attr_reader` is dispatched to correctly but typed as the attr, so a differing return type **segfaults** or fails to compile — the residue of [#1702](https://github.com/matz/spinel/issues/1702) | **Drafted 2026-08-12, awaiting review.** Found adding `Circle`; verified reproducing at `84f5a236` |
+| `issues/28-…` | A stored block capturing an array of objects is refused — `unsupported closure capturing a non-integer variable`, with no source location | **Drafted 2026-08-12, awaiting review.** Found porting `mandelbrot.rb`; verified reproducing at `84f5a236` |
+| `issues/29-…` | An attribute write on a run-time-typed receiver is **silently dropped** when the writer is a `def` and any class declares the name as an attr | **Drafted 2026-08-13, awaiting review.** Found re-testing the workarounds after the upstream sync; verified reproducing at `84f5a236` |
+| the `Interactive#on` lambda | A proc referencing the enclosing method's block parameter is refused — the last thing between here and input events | **Not reduced.** The site is named in [Input is one bug away](#input-is-one-bug-away-2026-08-13); every standalone form of it compiles, so there is nothing filable yet |
 
-**Twenty-five of the twenty-eight drafts are filed** — every one except 20, which upstream fixed first, and 27 and 28, which are waiting on review. At `83d1315d` `verify_issues.rb` reports 17 fixed, 10 reproduce, 1 parked: the ten reproducing are #3802, #3803, #3805, #3806, #3807, #3808, #3809, #3810 and drafts 27 and 28; the one parked is draft 18, filed as #3804 but not machine-checkable. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
+**Twenty-five of the twenty-nine drafts are filed** — every one except 20, which upstream fixed first, and 27, 28 and 29, which are waiting on review. At `84f5a236` `verify_issues.rb` reports 24 fixed, 3 reproduce, 1 parked, 1 to read by hand: the three reproducing are drafts 27, 28 and 29; the one parked is draft 18, filed as #3804 but not machine-checkable; the one to read by hand is draft 24, whose double binding is fixed with a residue. The earlier five were filed on 2026-08-11 against `489cbde7` and fixed the same day, each closed by a commit citing its number:
 
 | Issue | Draft | Bug | Fixed by | Workaround |
 |---|---|---|---|---|
@@ -1297,6 +1299,66 @@ Then wrap `emcc` in a shim that rewrites `-Wl,-dead_strip` to `-Wl,--gc-sections
 ### Redoing the benchmark
 
 There is no bundled `mruby` binary — only `mrbc`. A ~12-line C driver calling `mrb_load_file`, linked against `assets/platform/macos-arm64/lib/libmruby.a` with `-Iassets/platform/include`, gives a runnable mruby for comparison. Run the same `.rb` under it, CRuby, and a Spinel-compiled binary, and check the checksums match before trusting the timings.
+
+## 24 of 28, and the first bug that fails silently (2026-08-13)
+
+Upstream moved 29 commits overnight, most of them ours. Rebuilt at `84f5a236`, `verify_issues.rb` goes from 17 fixed to **24**, and from ten reproducing to three:
+
+```
+24 of 28 now behave correctly.
+```
+
+Nine of the ten that were open closed, including every one filed on 2026-08-12: `60ac6cfa` (#3805), `70c24900` (#3802), `3d56e53d` (#3806), `0c075869` (#3807), `9381d631` (#3809), `9d249a34`, `2bb6d7bf` and `092ebce5`. What is left is drafts 27, 28 and 29, none of them filed.
+
+**Draft 24 came back `CHANGED` rather than fixed, and reading it by hand was worth the minute.** [#3808](https://github.com/matz/spinel/issues/3808)'s double binding is gone — an optional positional no longer receives the keyword hash — but a `nil` default leaves a residue:
+
+| Expression | Spinel | Ruby |
+|---|---|---|
+| `event.nil?` | `true` | `true` |
+| `event == nil` | `true` | `true` |
+| truthiness | falsy | falsy |
+| `event.class` | `Hash` | `NilClass` |
+| `event.inspect` | `{}` | `nil` |
+
+The value is nil; the slot is typed `Hash` from its `**kwrest` sibling, so identity and rendering disagree. Defaults of `:none` or `42` are unaffected. The `event.nil?` dispatch the issue was filed for now works, which is what `on` needs.
+
+**The workarounds were re-tested against the real library rather than against their reproducers**, which is the only way the next paragraph could have been found:
+
+| Accommodation | State at `84f5a236` |
+|---|---|
+| `obj.attr += v` refused | **gone** for ordinary receivers, including `s.x += b.vx` on a `Struct` field — still refused for an index receiver, `arr[0].x += 1` |
+| `step = dt` before any nested block | **still needed** — `dt` inside `ARR.each { }` is still `0` and still `Integer` |
+| no `remove` | **still broken**, now a run-time `undefined method 'delete_if' for an instance of Hash` rather than a compile error. `Renderable#z=` calls `remove`, so `obj.z = 5` crashes with it |
+| collections in constants (draft 28) | **still needed** |
+
+**And then draft 29, which is the first one on this branch that compiles clean, runs clean, draws a window, and is wrong.** A write to a run-time-typed receiver is emitted as a `switch` on class id built from the attribute table alone:
+
+```c
+{ sp_RbVal _t4 = lv_o; mrb_int _t5 = 42LL;
+  switch (_t4.cls_id) { case 0: ((sp_Attr *)_t4.v.p)->iv_x = _t5; break; } }
+```
+
+`case 0` is the class declaring `x` as an `attr_accessor`. A class whose writer is a hand-written `def x=` gets no arm, there is no `default`, and the store falls through and vanishes. The read of the same attribute on the same receiver is emitted correctly, with an arm for the method and a `default` that raises. The trigger is that *some* class in the program declares the name as an attr — with no attr anywhere the write dispatches through the method table and every class is handled.
+
+In this library that silently discards every `shape.x = …` and `shape.y = …` on a shape held in an array, while `shape.color = …` on the same object works, because `Renderable#color=` is the only definition of that name and `x=` collides with `MouseEvent`'s `attr_accessor :x`. No shipped example hits it: `balls.rb` and `fountain.rb` hold their shapes in `Struct` fields, and `mandelbrot.rb` only ever writes `color`. That is luck, not design — `examples/README.md` recommends holding a collection in a constant as the way around draft 28, which is exactly the shape that triggers this.
+
+**What found it was reading the generated C, after five reduction attempts all compiled correctly.** The [reduction rule](#reducing-a-whole-program-failure) again: the emitted code named the mechanism in one line, and the 34-line reproducer followed from it in a minute. Scaling up from a passing probe found nothing here, because the missing ingredient was not structural — it was that another class in the program had to declare the same name as an attr.
+
+**The lesson for the checks.** Draft 29 passed every one of the five: `subset` matched CRuby, `demo` drew its two colors, `cli` drew its three, `preflight` refused what it should, `issues` was green. All five ask whether something compiles, runs, or draws; none asks whether the library *behaves* the way it does on CRuby. `subset` is the only one that compares against a CRuby control at all, over four lines of output. A scene-level differential check — build a scene, drive it through the public API, dump the object state as text, diff the two engines — would have caught this on its first run, and is the obvious next piece of tooling.
+
+## Input is one bug away (2026-08-13)
+
+With [#3807](https://github.com/matz/spinel/issues/3807) fixed and [#3808](https://github.com/matz/spinel/issues/3808) workable, the four blockers in [Events are unsupported](#events-are-unsupported--the-send-is-gone-three-compiler-bugs-remain-2026-08-12) are down to one. Lifting the preflight's rejection of `on` and building a script that registers a key handler stops at a single site:
+
+```
+spinel: build/app.rb:2128: unsupported proc referencing an uncaptured outer variable `proc` (later slice): node 14120 (LambdaNode)
+```
+
+That is `interactive.rb:41` — `wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }`, the fourth blocker, the lambda in the *per-object* `on` that references the enclosing method's block parameter. The test script only used window-level `on`; whole-program compilation reaches `Interactive#on` regardless of whether the app calls it, so one method the user never touches refuses the build.
+
+**Stubbing out that one branch and rebuilding, the same script compiles, links, runs and exits clean.** So nothing else in the event path blocks the target: what remains is that construct, plus `drain_events`, which is ours — it still returns `nil`, and giving it a real body means an FFI entry point that returns an array of event objects.
+
+It did not reduce. A lambda referencing `&proc`, that lambda containing a nested block reading its own parameter, and the whole thing built inside an enclosing block all compile standalone at `84f5a236`. Something else in the real structure is required, so it stays a research note with the site named rather than a filed issue.
 
 ## Working artifacts
 
