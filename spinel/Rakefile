@@ -40,10 +40,11 @@ end
 desc 'Run all Spinel checks'
 task(:all) { run_check('all') }
 
-def run_tool(name, script)
+def run_tool(name, script, *args)
+  args = args.compact
   print_task "Spinel: #{name}"
-  puts "  \e[2m$ ruby spinel/tools/#{script}\e[0m"
-  Dir.chdir(ROOT) { system('ruby', "spinel/tools/#{script}") || exit(1) }
+  puts "  \e[2m$ ruby spinel/tools/#{[script, *args].join(' ')}\e[0m"
+  Dir.chdir(ROOT) { system('ruby', "spinel/tools/#{script}", *args) || exit(1) }
 rescue Interrupt
   exit(130)
 end
@@ -59,6 +60,11 @@ task(:sweep) { run_tool('sweep', 'sweep.rb') }
 
 desc 'Spinel: build the fixture on both engines and diff the pixels'
 task(:compare) { run_tool('compare', 'compare.rb') }
+
+desc 'Spinel: compare Ruby-side frame cost across CRuby, mruby and Spinel — rake fps[name,frames]'
+task :fps, [:name, :frames] do |_t, args|
+  run_tool('fps', 'fps.rb', args[:name], args[:frames])
+end
 
 # `issues` before `sweep` deliberately: the reproducers are quick and tell you
 # where to look, the sweep is slow and tells you what can actually go. They have
