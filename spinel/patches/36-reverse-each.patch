@@ -1,0 +1,96 @@
+diff --git a/src/codegen_iter.c b/src/codegen_iter.c
+--- a/src/codegen_iter.c
++++ b/src/codegen_iter.c
+@@ -2844,10 +2844,14 @@ int emit_iteration_stmt(Compiler *c, int id, Buf *b, int indent) {
+     if (rev) { emit_indent(b, indent); buf_printf(b, "mrb_int _t%d = sp_%sArray_length(%s);\n", tn, k, rb.p); }
+     emit_indent(b, indent);
+     if (rev) buf_printf(b, "for (mrb_int _t%d = _t%d - 1; _t%d >= 0; _t%d--) {\n", t, tn, t, t);
+     else {
+       buf_printf(b, "for (mrb_int _t%d = 0; _t%d < sp_%sArray_length(", t, t, k);
+       buf_puts(b, rb.p); buf_printf(b, "); _t%d++) {\n", t);
+     }
++    if (rev) {
++      emit_indent(b, indent + 1);
++      buf_printf(b, "if (_t%d >= sp_%sArray_length(%s)) continue;\n", t, k, rb.p);
++    }
+     if (p0) {
+       /* Destructuring: 2+ params over poly_array where params are scalar-typed
+          (e.g. `[[1,2],[3,4]].each { |a,b| }` or numbered `{ _1; _2 }`).
+diff --git a/test/array_reverse_each_mutation.rb b/test/array_reverse_each_mutation.rb
+new file mode 100644
+--- /dev/null
++++ b/test/array_reverse_each_mutation.rb
+@@ -0,0 +1,61 @@
++# Array#reverse_each keeps its initial upper bound but skips pending indices
++# invalidated by receiver shrinkage. It returns the original receiver.
++
++a = [1, 2, 3]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a.clear if x == 3
++end
++p [seen, a, returned.equal?(a)]
++
++a = [1, 2, 3, 4]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  if x == 4
++    a.pop
++    a.pop
++  end
++end
++p [seen, a, returned.equal?(a)]
++
++a = [1, 2, 3]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a.pop if x == 3
++end
++p [seen, a, returned.equal?(a)]
++
++a = [1, 2, 3]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a.shift if seen.length == 1
++end
++p [seen, a, returned.equal?(a)]
++
++a = [1, 2, 3]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a << 4 if x == 3
++end
++p [seen, a, returned.equal?(a)]
++
++a = ["a", "b", "c"]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a.clear if x == "c"
++end
++p [seen, a, returned.equal?(a)]
++
++a = [1, "two", 3.0]
++seen = []
++returned = a.reverse_each do |x|
++  seen << x
++  a.clear if x == 3.0
++end
++p [seen, a, returned.equal?(a)]
+diff --git a/test/array_reverse_each_mutation.rb.expected b/test/array_reverse_each_mutation.rb.expected
+new file mode 100644
+--- /dev/null
++++ b/test/array_reverse_each_mutation.rb.expected
+@@ -0,0 +1,7 @@
++[[3], [], true]
++[[4, 2, 1], [1, 2], true]
++[[3, 2, 1], [1, 2], true]
++[[3, 3, 2], [2, 3], true]
++[[3, 2, 1], [1, 2, 3, 4], true]
++[["c"], [], true]
++[[3.0], [], true]

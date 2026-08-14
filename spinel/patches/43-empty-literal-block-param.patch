@@ -1,0 +1,150 @@
+diff --git a/src/codegen_call_recv.c b/src/codegen_call_recv.c
+--- a/src/codegen_call_recv.c
++++ b/src/codegen_call_recv.c
+@@ -1879,6 +1879,9 @@ int emit_recv_call(Compiler *c, int id, Buf *b) {
+          the poly one, whose elements are already boxed (#2892). */
+       if (sp_streq(name, "bsearch") && block >= 0) {
+-        const char *bp = block_param_name(c, block, 0); if (bp) bp = rename_local(bp);
++        const char *bp_orig = block_param_name(c, block, 0);
++        const char *bp = bp_orig ? rename_local(bp_orig) : NULL;
++        Scope *bsc = bp_orig ? comp_scope_of(c, block) : NULL;
++        LocalVar *blv = (bsc && bp_orig) ? scope_local(bsc, bp_orig) : NULL;
+         int body = nt_ref(nt, block, "body");
+         int bn = 0; const int *bb = body >= 0 ? nt_arr(nt, body, "body", &bn) : NULL;
+         if (bn >= 1) {
+@@ -1902,6 +1905,6 @@ int emit_recv_call(Compiler *c, int id, Buf *b) {
+           emit_indent(g_pre, g_indent + 1);
+           buf_printf(g_pre, "mrb_int _t%d = _t%d + (_t%d - _t%d) / 2;\n", tmid, tlo, thi, tlo);
+-          if (bp) { emit_indent(g_pre, g_indent + 1); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", bp, k, trecv, tmid); }
++          if (bp && blv) { emit_indent(g_pre, g_indent + 1); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", bp, k, trecv, tmid); }
+           for (int j = 0; j < bn - 1; j++) emit_stmt(c, bb[j], g_pre, g_indent + 1);
+           int sv = g_indent; g_indent++;
+           Buf cb = expr_buf(c, bb[bn - 1]); g_indent = sv;
+@@ -1960,7 +1963,10 @@ int emit_recv_call(Compiler *c, int id, Buf *b) {
+       if (sp_streq(name, "bsearch_index") && block >= 0) {
+         const char *bk = (rt == TY_POLY_ARRAY) ? "Poly" : array_kind(rt);
+         if (!bk) return 0;
+-        const char *bp = block_param_name(c, block, 0); if (bp) bp = rename_local(bp);
++        const char *bp_orig = block_param_name(c, block, 0);
++        const char *bp = bp_orig ? rename_local(bp_orig) : NULL;
++        Scope *bsc = bp_orig ? comp_scope_of(c, block) : NULL;
++        LocalVar *blv = (bsc && bp_orig) ? scope_local(bsc, bp_orig) : NULL;
+         int body = nt_ref(nt, block, "body");
+         int bn = 0; const int *bb = body >= 0 ? nt_arr(nt, body, "body", &bn) : NULL;
+         if (bn >= 1) {
+@@ -1978,6 +1984,6 @@ int emit_recv_call(Compiler *c, int id, Buf *b) {
+           emit_indent(g_pre, g_indent + 1);
+           buf_printf(g_pre, "mrb_int _t%d = _t%d + (_t%d - _t%d) / 2;\n", tmid, tlo, thi, tlo);
+-          if (bp) { emit_indent(g_pre, g_indent + 1); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", bp, bk, trecv, tmid); }
++          if (bp && blv) { emit_indent(g_pre, g_indent + 1); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", bp, bk, trecv, tmid); }
+           for (int j = 0; j < bn - 1; j++) emit_stmt(c, bb[j], g_pre, g_indent + 1);
+           int sv = g_indent; g_indent++;
+           /* The block value is the search predicate: route through emit_cond so a
+diff --git a/src/codegen_fold.c b/src/codegen_fold.c
+--- a/src/codegen_fold.c
++++ b/src/codegen_fold.c
+@@ -1348,7 +1348,7 @@ int emit_filter_map_expr(Compiler *c, int id, Buf *b) {
+     emit_indent(g_pre, din); buf_puts(g_pre, "{\n"); din++;
+     emit_indent(g_pre, din); emit_ctype(c, et, g_pre); buf_printf(g_pre, " lv_%s = sp_%sArray_get(_t%d, _t%d);\n", p0, k, ta, ti);
+   }
+-  else if (!splat && p0) { emit_indent(g_pre, din); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", p0, k, ta, ti); }
++  else if (!splat && p0 && clv0) { emit_indent(g_pre, din); buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", p0, k, ta, ti); }
+ 
+   for (int j = 0; j < bn - 1; j++) emit_stmt(c, bb[j], g_pre, din);
+   int save = g_indent; g_indent = din;
+@@ -4745,7 +4745,7 @@ int emit_collect_expr(Compiler *c, int id, Buf *b) {
+     emit_indent(g_pre, innerIndent); emit_ctype(c, et_elem, g_pre);
+     buf_printf(g_pre, " lv_%s = sp_%sArray_get(_t%d, _t%d);\n", p0, k, trecv, ti);
+   }
+-  else if (p0) {
++  else if (p0 && clv0) {
+     emit_indent(g_pre, bodyIndent);
+     buf_printf(g_pre, "lv_%s = sp_%sArray_get(_t%d, _t%d);\n", p0, k, trecv, ti);
+   }
+@@ -4798,7 +4798,7 @@ int emit_collect_expr(Compiler *c, int id, Buf *b) {
+     else                   buf_printf(g_pre, "if (%s(_t%d)) ", is_rej ? "!" : "", tv);
+     if (autosplat)
+       buf_printf(g_pre, "sp_%sArray_push(_t%d, _t%d);\n", rk, tres, te_split);
+-    else if (p0)
++    else if (p0 && clv0)
+       buf_printf(g_pre, "sp_%sArray_push(_t%d, lv_%s);\n", rk, tres, p0);
+     else
+       /* splat-only block: push the element straight from the receiver */
+diff --git a/src/codegen_iter.c b/src/codegen_iter.c
+--- a/src/codegen_iter.c
++++ b/src/codegen_iter.c
+@@ -2867,7 +2867,8 @@ int emit_iteration_stmt(Compiler *c, int id, Buf *b, int indent) {
+           buf_puts(b, rb.p); buf_printf(b, ", _t%d).v.p;\n", t);
+           for (int pj = 0; pj < np; pj++) {
+             const char *pname2 = block_param_name(c, block, pj);
+-            if (!pname2) continue;
++            LocalVar *bpj = pname2 ? scope_local(blk_s, pname2) : NULL;
++            if (!pname2 || !bpj) continue;
+             emit_indent(b, indent + 1);
+             buf_printf(b, "lv_%s = sp_%sArray_get(_t%d, %d);\n",
+                        rename_local(pname2), inner_k, tsub, pj);
+@@ -2876,8 +2878,8 @@ int emit_iteration_stmt(Compiler *c, int id, Buf *b, int indent) {
+           goto each_body;
+         }
+       }
+-      emit_indent(b, indent + 1);
+-      if (box_to_poly) {
++      if (bp0) emit_indent(b, indent + 1);
++      if (bp0 && box_to_poly) {
+         if (et == TY_INT) buf_printf(b, "lv_%s = sp_box_int(sp_%sArray_get(", p0, k);
+         else if (et == TY_STRING) buf_printf(b, "lv_%s = sp_box_str(sp_%sArray_get(", p0, k);
+         else if (et == TY_FLOAT) buf_printf(b, "lv_%s = sp_box_float(sp_%sArray_get(", p0, k);
+@@ -2887,7 +2889,7 @@ int emit_iteration_stmt(Compiler *c, int id, Buf *b, int indent) {
+         if (et == TY_INT || et == TY_STRING || et == TY_FLOAT || et == TY_BOOL) buf_puts(b, ")");
+         buf_puts(b, ";\n");
+       }
+-      else {
++      else if (bp0) {
+         buf_printf(b, "lv_%s = sp_%sArray_get(", p0, k);
+         buf_puts(b, rb.p); buf_printf(b, ", _t%d);\n", t);
+       }
+diff --git a/test/array_pruned_block_param.rb b/test/array_pruned_block_param.rb
+new file mode 100644
+--- /dev/null
++++ b/test/array_pruned_block_param.rb
+@@ -0,0 +1,19 @@
++# An unused block parameter may be removed by liveness analysis. Array
++# emitters must not reference its absent C local.
++
++p([].map { |unused| 1 })
++result = [].each { |unused| true }; p result
++p([].select { |unused| true })
++p([].reject { |unused| false })
++p([].filter_map { |unused| 1 })
++p([].bsearch { |unused| true })
++p([].bsearch_index { |unused| true })
++p([].map { |used| used })
++p([].map { 1 })
++p([1].map { |unused| 7 })
++p([1].each { |unused| 7 })
++p([1].select { |unused| true })
++p([1].reject { |unused| false })
++p([1].filter_map { |unused| 7 })
++p([1, 2, 3].bsearch { |unused| true })
++p([1, 2, 3].bsearch_index { |unused| true })
+diff --git a/test/array_pruned_block_param.rb.expected b/test/array_pruned_block_param.rb.expected
+new file mode 100644
+--- /dev/null
++++ b/test/array_pruned_block_param.rb.expected
+@@ -0,0 +1,16 @@
++[]
++[]
++[]
++[]
++[]
++nil
++nil
++[]
++[]
++[7]
++[1]
++[1]
++[1]
++[7]
++1
++0

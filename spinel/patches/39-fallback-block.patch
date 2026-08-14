@@ -1,0 +1,302 @@
+diff --git a/src/analyze_infer.c b/src/analyze_infer.c
+index 6779761..59120e0 100644
+--- a/src/analyze_infer.c
++++ b/src/analyze_infer.c
+@@ -5676,6 +5676,11 @@ else {
+       }
+       return vt;
+     }
++    /* delete(key) normally returns the stored value, but a fallback block can
++       return an unrelated type. Keep the mixed result boxed. This check must
++       precede the generic delete return below. */
++    if (sp_streq(name, "delete") && argc == 1 && nt_ref(nt, id, "block") >= 0)
++      return TY_POLY;
+     if (sp_streq(name, "delete")) return ty_hash_val(rt);
+     if (sp_streq(name, "dig") && argc >= 1) {
+       /* dig(*keys) walks a runtime key list: the depth, and so the value's
+@@ -5689,8 +5694,6 @@ else {
+     if ((sp_streq(name, "<") || sp_streq(name, "<=") ||
+          sp_streq(name, ">") || sp_streq(name, ">=")) && argc == 1)
+       return TY_BOOL;  /* subset/superset comparisons */
+-    if (sp_streq(name, "delete") && argc == 1 && nt_ref(nt, id, "block") >= 0)
+-      return TY_POLY;  /* deleted value, or the block's fallback */
+     if (sp_streq(name, "keys"))   return ty_array_of(ty_hash_key(rt));
+     if (sp_streq(name, "values")) return ty_array_of(ty_hash_val(rt));
+     if (sp_streq(name, "values_at") || sp_streq(name, "fetch_values")) return TY_POLY_ARRAY;
+diff --git a/src/codegen_call_recv.c b/src/codegen_call_recv.c
+index 2592bb3..05d6a68 100644
+--- a/src/codegen_call_recv.c
++++ b/src/codegen_call_recv.c
+@@ -57,6 +57,62 @@ static void emit_filter_bang_result(const char *name, int trecv, int torig,
+     buf_printf(b, "_t%d", trecv);  /* keep_if / delete_if: always self */
+ }
+ 
++/* Emit a conditional fallback block as one branch-scoped boxed expression.
++   The receiver-specific caller owns receiver/argument evaluation and decides
++   whether the branch is taken; this helper owns the Ruby block sequence:
++
++     bind yielded value -> leading statements -> tail prelude -> boxed tail
++
++   Tail emission may append allocation/rooting statements to g_pre. Capturing
++   that prelude here keeps it inside the missing-item/key branch instead of
++   eagerly running it before the delete call. The live-local check mirrors the
++   liveness containment used by iterator emitters: a parsed but pruned block
++   parameter has no lv_* declaration and needs no assignment. */
++static void emit_scoped_fallback_block(Compiler *c, int block,
++                                       TyKind yielded_type,
++                                       const char *yielded_expr, Buf *b) {
++  const NodeTable *nt = c->nt;
++  int body = nt_ref(nt, block, "body");
++  int bn = 0;
++  const int *bb = body >= 0 ? nt_arr(nt, body, "body", &bn) : NULL;
++  const char *p0 = block_param_name(c, block, 0);
++  Scope *bs = p0 ? comp_scope_of(c, block) : NULL;
++  LocalVar *plv = (bs && p0) ? scope_local(bs, p0) : NULL;
++  Buf inner; memset(&inner, 0, sizeof inner);
++  Buf value; memset(&value, 0, sizeof value);
++
++  if (plv) {
++    emit_local_ref(c, block, p0, &inner);
++    buf_puts(&inner, " = ");
++    if (plv->type == TY_POLY && yielded_type != TY_POLY &&
++        yielded_type != TY_UNKNOWN)
++      emit_boxed_text(c, yielded_type, yielded_expr, &inner);
++    else if (yielded_type == TY_POLY && plv->type != TY_POLY &&
++             plv->type != TY_UNKNOWN)
++      emit_unbox_text(c, plv->type, yielded_expr, &inner);
++    else
++      buf_puts(&inner, yielded_expr);
++    buf_puts(&inner, ";\n");
++  }
++
++  Buf *saved_pre = g_pre;
++  int saved_indent = g_indent;
++  g_pre = &inner;
++  g_indent = 0;
++  for (int i = 0; i + 1 < bn; i++) emit_stmt(c, bb[i], &inner, 0);
++  if (bn > 0) emit_boxed(c, bb[bn - 1], &value);
++  else buf_puts(&value, "sp_box_nil()");
++  g_pre = saved_pre;
++  g_indent = saved_indent;
++
++  buf_puts(b, "({\n");
++  if (inner.p) buf_puts(b, inner.p);
++  buf_puts(b, value.p ? value.p : "sp_box_nil()");
++  buf_puts(b, "; })");
++  free(inner.p);
++  free(value.p);
++}
++
+ /* String#<< and String#concat take an Integer as a CODEPOINT, not a string:
+    `s << 100` appends "d". Sent through the string slot, the integer reached
+    sp_str_concat as a char pointer and the program died (#3544). */
+@@ -1729,18 +1785,20 @@ int emit_array_call(Compiler *c, int id, Buf *b) {
+     if (rt == TY_POLY_ARRAY && sp_streq(name, "delete") && argc == 1) {
+       int dblk = nt_ref(nt, id, "block");
+       if (dblk >= 0 && nt_type(nt, dblk) && sp_streq(nt_type(nt, dblk), "BlockNode")) {
+-        /* delete(v) { not-found value }: yield the block's value on a miss */
+-        int dbody = nt_ref(nt, dblk, "body");
+-        int dbn = 0; const int *dbb = dbody >= 0 ? nt_arr(nt, dbody, "body", &dbn) : NULL;
+-        if (dbn >= 1) {
+-          int tdr = ++g_tmp;
+-          buf_printf(b, "({ sp_RbVal _t%d = sp_PolyArray_delete(", tdr);
+-          emit_expr(c, recv, b); buf_puts(b, ", "); emit_boxed(c, argv[0], b);
+-          buf_printf(b, "); _t%d.tag != SP_TAG_NIL ? _t%d : ", tdr, tdr);
+-          emit_boxed(c, dbb[dbn - 1], b);
+-          buf_puts(b, "; })");
+-          return 1;
+-        }
++        /* Hoist the requested value once: it is both the delete argument and
++           the value yielded to the fallback block on a miss. */
++        int ta = ++g_tmp, tv = ++g_tmp, tdr = ++g_tmp;
++        buf_printf(b, "({ sp_PolyArray *_t%d = ", ta); emit_expr(c, recv, b);
++        buf_printf(b, "; SP_GC_ROOT(_t%d); sp_RbVal _t%d = ", ta, tv);
++        emit_boxed(c, argv[0], b);
++        buf_printf(b, "; SP_GC_ROOT_RBVAL(_t%d); sp_RbVal _t%d = "
++                      "sp_PolyArray_delete(_t%d, _t%d); "
++                      "_t%d.tag != SP_TAG_NIL ? _t%d : ",
++                   tv, tdr, ta, tv, tdr, tdr);
++        char src[32]; snprintf(src, sizeof src, "_t%d", tv);
++        emit_scoped_fallback_block(c, dblk, TY_POLY, src, b);
++        buf_puts(b, "; })");
++        return 1;
+       }
+       buf_puts(b, "sp_PolyArray_delete("); emit_expr(c, recv, b); buf_puts(b, ", "); emit_boxed(c, argv[0], b); buf_puts(b, ")");
+       return 1;
+@@ -2633,24 +2691,25 @@ else {
+       if (sp_streq(name, "delete") && argc == 1 && (rt == TY_INT_ARRAY || rt == TY_STR_ARRAY)) {
+         int dblk = nt_ref(nt, id, "block");
+         if (dblk >= 0 && nt_type(nt, dblk) && sp_streq(nt_type(nt, dblk), "BlockNode")) {
+-          int dbody = nt_ref(nt, dblk, "body");
+-          int dbn = 0; const int *dbb = dbody >= 0 ? nt_arr(nt, dbody, "body", &dbn) : NULL;
+-          if (dbn >= 1) {
+-            int tdr = ++g_tmp;
+-            if (rt == TY_INT_ARRAY) {
+-              buf_printf(b, "({ mrb_int _t%d = sp_IntArray_delete(", tdr);
+-              emit_expr(c, recv, b); buf_puts(b, ", "); emit_expr(c, argv[0], b);
+-              buf_printf(b, "); _t%d != SP_INT_NIL ? sp_box_int(_t%d) : ", tdr, tdr);
+-            }
+-            else {
+-              buf_printf(b, "({ const char *_t%d = sp_StrArray_delete(", tdr);
+-              emit_expr(c, recv, b); buf_puts(b, ", "); emit_expr(c, argv[0], b);
+-              buf_printf(b, "); _t%d ? sp_box_str(_t%d) : ", tdr, tdr);
+-            }
+-            emit_boxed(c, dbb[dbn - 1], b);
+-            buf_puts(b, "; })");
+-            return 1;
++          TyKind et = ty_array_elem(rt);
++          int ta = ++g_tmp, tv = ++g_tmp, tdr = ++g_tmp;
++          buf_printf(b, "({ sp_%sArray *_t%d = ", k, ta); emit_expr(c, recv, b);
++          buf_printf(b, "; SP_GC_ROOT(_t%d); %s _t%d = ", ta, c_type_name(et), tv);
++          emit_expr(c, argv[0], b);
++          if (rt == TY_INT_ARRAY) {
++            buf_printf(b, "; mrb_int _t%d = sp_IntArray_delete(_t%d, _t%d); "
++                          "_t%d != SP_INT_NIL ? sp_box_int(_t%d) : ",
++                       tdr, ta, tv, tdr, tdr);
+           }
++          else {
++            buf_printf(b, "; const char *_t%d = sp_StrArray_delete(_t%d, _t%d); "
++                          "_t%d ? sp_box_str(_t%d) : ",
++                       tdr, ta, tv, tdr, tdr);
++          }
++          char src[32]; snprintf(src, sizeof src, "_t%d", tv);
++          emit_scoped_fallback_block(c, dblk, et, src, b);
++          buf_puts(b, "; })");
++          return 1;
+         }
+         buf_printf(b, "sp_%sArray_delete(", k); emit_expr(c, recv, b); buf_puts(b, ", "); emit_expr(c, argv[0], b); buf_puts(b, ")");
+         return 1;
+@@ -5496,15 +5555,14 @@ else {
+         TyKind vt = ty_hash_val(rt);
+         int th = ++g_tmp, tk = ++g_tmp, tv = ++g_tmp;
+         buf_printf(b, "({ %s _t%d = ", c_type_name(rt), th); emit_expr(c, recv, b);
+-        buf_printf(b, "; if (sp_gc_is_frozen(_t%d)) sp_raise_frozen_hash_at(_t%d, %s);", th, th, hash_box_cls(rt));   /* (#3001) */
++        buf_printf(b, "; SP_GC_ROOT(_t%d); if (sp_gc_is_frozen(_t%d)) "
++                      "sp_raise_frozen_hash_at(_t%d, %s);",
++                   th, th, th, hash_box_cls(rt));   /* (#3001) */
+         buf_printf(b, " %s _t%d = ", c_type_name(ty_hash_key(rt)), tk); emit_hash_key(c, argv[0], ty_hash_key(rt), b);
+         int hd_blk = nt_ref(nt, id, "block");
+         if (hd_blk >= 0 && nt_type(nt, hd_blk) && sp_streq(nt_type(nt, hd_blk), "BlockNode")) {
+           /* delete(key) { |k| fallback }: the block's value stands in for a
+              missing key (boxed: the fallback can be any type) */
+-          const char *dp0 = block_param_name(c, hd_blk, 0);
+-          int hdb = nt_ref(nt, hd_blk, "body");
+-          int hdn = 0; const int *hdv = hdb >= 0 ? nt_arr(nt, hdb, "body", &hdn) : NULL;
+           int tvv = ++g_tmp;
+           buf_printf(b, "; sp_RbVal _t%d; if (sp_%sHash_has_key(_t%d, _t%d)) { _t%d = ",
+                      tvv, hn, th, tk, tvv);
+@@ -5512,16 +5570,9 @@ else {
+             if (vt == TY_POLY) buf_puts(b, getx);
+             else emit_boxed_text(c, vt, getx, b); }
+           buf_printf(b, "; sp_%sHash_delete(_t%d, _t%d); }\nelse {", hn, th, tk);
+-          if (dp0) {
+-            char keytmp[32]; snprintf(keytmp, sizeof keytmp, "_t%d", tk);
+-            buf_printf(b, " lv_%s = ", rename_local(dp0));
+-            if (ty_hash_key(rt) == TY_POLY) buf_puts(b, keytmp);
+-            else emit_boxed_text(c, ty_hash_key(rt), keytmp, b);
+-            buf_puts(b, ";");
+-          }
+           buf_printf(b, " _t%d = ", tvv);
+-          if (hdn > 0) emit_boxed(c, hdv[hdn - 1], b);
+-          else buf_puts(b, "sp_box_nil()");
++          char keytmp[32]; snprintf(keytmp, sizeof keytmp, "_t%d", tk);
++          emit_scoped_fallback_block(c, hd_blk, ty_hash_key(rt), keytmp, b);
+           buf_printf(b, "; } _t%d; })", tvv);
+           return 1;
+         }
+diff --git a/test/delete_fallback_scope.rb b/test/delete_fallback_scope.rb
+new file mode 100644
+index 0000000..f8a308f
+--- /dev/null
++++ b/test/delete_fallback_scope.rb
+@@ -0,0 +1,63 @@
++# Conditional Array/Hash delete fallbacks must bind their yielded value, run
++# every body statement, and keep tail construction inside the missing branch.
++
++array_calls = 0
++p [1].delete(2) { |missing| array_calls += 1; [missing] }
++p array_calls
++
++p ["a"].delete("z") { |missing| { missing => missing.upcase } }
++p [1, "a"].delete(:missing) { |missing| [missing] }
++p([].delete(1) { |unused| :empty_array })
++p([1].delete(2) {})
++
++array_seen = []
++p [1].delete(1) { |missing| [array_seen << missing] }
++p array_seen
++
++events = []
++def delete_receiver(events)
++  events << :receiver
++  [1]
++end
++
++def delete_argument(events)
++  events << :argument
++  2
++end
++
++p delete_receiver(events).delete(delete_argument(events)) { |missing|
++  events << :block
++  missing
++}
++p events
++
++hash_calls = 0
++p({ a: 1 }.delete(:missing) { |key| hash_calls += 1; [key] })
++p hash_calls
++
++p({ "a" => 1 }.delete("missing") { |key| [key] })
++p({ 1 => "one" }.delete(2) { |key| [key] })
++p({ 1 => "one", "two" => 2 }.delete(:missing) { |key| [key] })
++p({}.delete(:missing) { |unused| :empty_hash })
++p({ a: 1 }.delete(:missing) {})
++
++hash_events = []
++def delete_hash_receiver(events)
++  events << :receiver
++  { a: 1 }
++end
++
++def delete_hash_key(events)
++  events << :key
++  :missing
++end
++
++p delete_hash_receiver(hash_events).delete(delete_hash_key(hash_events)) { |key|
++  hash_events << :block
++  key
++}
++p hash_events
++
++hash_seen = []
++p({ a: 1 }.delete(:a) { |key| [hash_seen << key] })
++p hash_seen
+diff --git a/test/delete_fallback_scope.rb.expected b/test/delete_fallback_scope.rb.expected
+new file mode 100644
+index 0000000..6f3e01c
+--- /dev/null
++++ b/test/delete_fallback_scope.rb.expected
+@@ -0,0 +1,21 @@
++[2]
++1
++{"z" => "Z"}
++[:missing]
++:empty_array
++nil
++1
++[]
++2
++[:receiver, :argument, :block]
++[:missing]
++1
++["missing"]
++[2]
++[:missing]
++:empty_hash
++nil
++:missing
++[:receiver, :key, :block]
++1
++[]
