@@ -44,7 +44,6 @@ skip.each do |name|
   body =
     case name
     when 'web_predicate' then ->(*) { '' }
-    when 'bypass_window_class_methods' then ->(src, _) { src }
     # `include Ruby2D` is emitted separately by spinel_assemble; the shims exist
     # only to put the DSL's instance methods at top level, which `extend` does.
     when 'dsl_shims' then ->(*) { "extend Ruby2D::DSL\n" }
@@ -54,11 +53,18 @@ skip.each do |name|
 end
 warn "skipping: #{skip.join(', ')}" unless skip.empty?
 
+# Registering an `on` handler is load-bearing, not decoration. Without it the
+# filtered branch of `Interactive#on` is unreachable, so the lambda that
+# `block_param_capture` rewrites is never compiled — and on 2026-08-13 the sweep
+# reported that transform droppable, it was deleted, and every app using `on`
+# stopped building while all five checks stayed green. A transform can only be
+# swept if the subset reaches the code it rewrites.
 MAIN = <<~'RUBY'
   sq = Square.new(x: 10, y: 20, size: 50, color: 'red')
   puts "square: x=#{sq.x} y=#{sq.y} size=#{sq.size}"
   w = Ruby2D::DSL.window
   puts "objects: #{w.instance_variable_get(:@objects).size}"
+  sq.on(click: :left) { |e| puts "click: #{e}" }
   ticks = 0
   update { ticks += 1 }
   5.times { w.tick }

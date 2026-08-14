@@ -39,66 +39,6 @@ def spinel_sub(src, from, to, what)
 end
 
 
-# `Window.<m>` fails to resolve when `m` reaches the class through
-# `extend ClassMethods` (issue 6 in spinel/README.md — cause still unknown after ten
-# reductions, every one of which passed in isolation).
-#
-# It is systemic rather than a fixed list of call sites: Spinel's whole-program
-# inference only analyzes reachable code, so each newly-exercised path surfaces
-# more of them. Rather than chase sites, rewrite by *method*: nearly every
-# ClassMethods entry is exactly `DSL.window.<same name>(...)`, so calling that
-# directly is the same code with one delegation hop inlined. The delegating
-# methods are read out of `window/class_methods.rb` so the list cannot go stale.
-#
-# Methods that are not pure delegations (`shown?`, `render_ready_check`) are
-# handled separately — see spinel_window_guards.
-def spinel_bypass_window_class_methods(src, class_methods_source)
-  # `def NAME(args)` whose entire body is `DSL.window.NAME(...)`.
-  delegating = class_methods_source.scan(
-    /^      def ([a-z_][\w]*[?!=]?)(?:\([^)]*\))?\n\s*DSL\.window\.\1[\s(]/
-  ).flatten.uniq
-
-  if delegating.empty?
-    raise SpinelCompatDrift, 'Spinel compat `Window class-method bypass` found no delegating methods. See spinel/README.md.'
-  end
-
-  delegating.each do |m|
-    # Method call or bare reference, but never a definition or a longer name.
-    src = src.gsub(/\bWindow\.#{Regexp.escape(m)}\b(?!\s*=[^=])/, "DSL.window.#{m}")
-  end
-
-  src
-end
-
-
-# Two ClassMethods entries are not `DSL.window` delegations, so the bypass above
-# cannot reach them, and both hit the same issue-6 resolution failure.
-#
-# `render_ready_check` is a self-contained guard: route it through a module
-# function, which Spinel does resolve. `shown?` is called with an implicit
-# receiver from inside the extended module, which Spinel cannot resolve either,
-# so make that call explicit — `class << self` methods work by constant receiver.
-def spinel_window_guards(src)
-  src = spinel_sub(src, "        return if shown?\n", "        return if Window.shown?\n",
-                   'render_ready_check implicit shown?')
-
-  helper = +"module Ruby2D\n" \
-            "  # See spinel_window_guards.\n" \
-            "  def self.render_ready_check\n" \
-            "    return if Window.shown?\n\n" \
-            "    raise Error, 'Attempting to draw before the window is ready. " \
-            "Please put calls to render() inside of a render block.'\n" \
-            "  end\n" \
-            "end\n\n"
-
-  unless src.include?('Window.render_ready_check')
-    raise SpinelCompatDrift, 'Spinel compat `render_ready_check` matched nothing. See spinel/README.md.'
-  end
-
-  src.gsub('Window.render_ready_check', 'Ruby2D.render_ready_check') + helper
-end
-
-
 # `Ruby2D.web?` is registered from C (`ruby2d.c`), so it disappears along with
 # the binding layer under RUBY2D_NO_RUBY. The Spinel target is native.
 def spinel_web_predicate
@@ -106,19 +46,30 @@ def spinel_web_predicate
 end
 
 
-# An ivar first assigned inside a module body stays polymorphic, and a method
-# name that several core classes share then resolves to the wrong one:
-# `@gamepads_by_id.delete(id)` compiles to `String#delete`. Unambiguous methods
-# (`[]`, `[]=`, `key?`) are unaffected, which is why only `delete` needs this.
+# A proc created inside a method that came from an **included module** cannot
+# capture that method's block parameter: the capture pass looks the name up in
+# the immediately enclosing scope, doesn't find it, and refuses the program with
+# "proc referencing an uncaptured outer variable `proc` (later slice)".
+# `Interactive#on`'s filtered form is the only place in `lib/` with that shape,
+# and `Interactive` is included into `Renderable`, so it reaches every shape.
 #
-# In the compat layer rather than `lib/` because the replacement allocates a new
-# Hash and reads worse than `delete` — it is not defensible Ruby on its own.
-def spinel_expand_hash_delete(src)
+# Aliasing the block parameter to an ordinary local first is enough — the lambda
+# then captures a plain local, which resolves. Drafted as issue 34, unfiled.
+#
+# **This was deleted on 2026-08-13 and put straight back.** `rake sweep` called
+# it droppable, and it was — for the subset, whose main did not register an `on`
+# handler, so the refused lambda was never reachable. Every real app using `on`
+# failed to build. `build_subset.rb`'s MAIN now registers one, so the sweep can
+# see this path; do not drop this transform on a sweep result alone until an
+# `on`-using program builds without it.
+def spinel_block_param_capture(src)
   spinel_sub(src,
-             "        pad = @gamepads_by_id.delete(id)\n",
-             "        pad = @gamepads_by_id[id]\n" \
-             "        @gamepads_by_id = @gamepads_by_id.reject { |k, _v| k == id }\n",
-             'Hash#delete on a poly ivar')
+             "          values = Array(matcher)\n" \
+             "          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }\n",
+             "          values = Array(matcher)\n" \
+             "          handler = proc\n" \
+             "          wrapped = ->(e) { handler.call(e) if values.any? { |v| e.matches?(field, v) } }\n",
+             'lambda capturing a module method’s block parameter')
 end
 
 
@@ -172,12 +123,11 @@ end
 
 
 # Apply every compatibility transformation to the assembled library source.
-# `class_methods_source` is `lib/ruby2d/window/class_methods.rb`, read for the
-# list of delegating class methods rather than hardcoding it.
-def spinel_compat(src, class_methods_source)
-  src = spinel_bypass_window_class_methods(src, class_methods_source)
-  src = spinel_window_guards(src)
-  src = spinel_expand_hash_delete(src)
+# Only two remain, and neither is a compiler bug: the class pattern needs
+# reflection an AOT build cannot provide, and `web?` stands in for a method C
+# registers on the other engines.
+def spinel_compat(src)
+  src = spinel_block_param_capture(src)
   src = spinel_disable_class_pattern(src)
   src + spinel_web_predicate
 end
@@ -425,7 +375,7 @@ def spinel_lib(name, lib_dir) = File.read(File.join(lib_dir, "#{name}.rb"))
 # `lib/` alone with no C and no FFI — that is what the subset check builds.
 def spinel_assemble(app_source, lib_dir:, ffi: true)
   src = SPINEL_LIB_FILES.map { |f| "#{spinel_lib(f, lib_dir)}\n\n" }.join
-  src = spinel_compat(src, spinel_lib('window/class_methods', lib_dir))
+  src = spinel_compat(src)
 
   ext = ffi ? SPINEL_EXT : ''
   src << ext
@@ -498,9 +448,6 @@ def spinel_unsupported_uses(source)
       # No `:` in the lookbehind — `Ruby2D::Image` is a use, `MyImage` isn't.
       found << [n, name, 'shapes and media beyond Square, Rectangle, and Quad'] if line.match?(/(?<![\w.])#{name}\b/)
     end
-    # `on` only counts as a call at the start of a line or after a receiver, so
-    # the word inside an ordinary string doesn't read as event registration.
-    found << [n, 'on', 'input events — blocked on one upstream bug, see spinel/README.md'] if line.match?(/(\A\s*|\.)on(\(|\s+[:\w])/)
     found << [n, 'Window subclass', 'the class pattern — it needs ancestor reflection'] if line.match?(/class\s+\w+\s*<\s*(Ruby2D::)?Window\b/)
   end
 

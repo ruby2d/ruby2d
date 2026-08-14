@@ -6,9 +6,12 @@ require 'open3'
 # Same order as `find_spinel` in lib/ruby2d/cli/spinel.rb, plus a checkout
 # beside this repo — so no recipe in ../README.md needs a machine-specific path.
 def resolve_spinel
+  # Absolute, always. `$SPINEL=../spinel/bin/spinel` resolves here and then
+  # breaks in any tool that chdirs before building — which `motion.rb` does,
+  # and which read as three failed builds rather than as a bad path.
   [ENV['SPINEL'], ENV['RUBY2D_SPINEL'],
    File.expand_path('../../../spinel/bin/spinel', __dir__)].each do |c|
-    return c if c && !c.empty? && File.executable?(c)
+    return File.expand_path(c) if c && !c.empty? && File.executable?(c)
   end
   found = ENV['PATH'].to_s.split(File::PATH_SEPARATOR)
                      .map { |d| File.join(d, 'spinel') }.find { |f| File.executable?(f) }

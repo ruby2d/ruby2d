@@ -12,8 +12,9 @@
 #     the sweep caught it and kept the workaround
 #   - a nested-`include` bug was fixed in a probe while the real library still
 #     failed, for weeks
-#   - #3787 and #3788 were both fixed upstream and both reproducers pass, and
-#     `dsl_shims` and `window_guards` are both still needed
+#   - #3787 and #3788 were both fixed upstream and both reproducers passed while
+#     `dsl_shims` and `window_guards` were both still needed; `window_guards`
+#     only became droppable a day later, on a pull that fixed nothing named
 #
 # A transform is droppable only when the library compiles to zero errors AND
 # runs to the same output as CRuby. Both halves matter: dropping

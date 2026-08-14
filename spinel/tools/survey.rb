@@ -40,11 +40,10 @@ SPINEL_LIB_FILES = Ruby2D::CLI::LIB_FILES
 # engines, absent under RUBY2D_NO_RUBY. Leaving it out would report a missing
 # method that is our artifact rather than anything Spinel does wrong.
 #
-# `bypass_window_class_methods` is applied too — its blocker sits early and
-# would mask everything behind it. It is a compiler bug in its own right, listed
-# under "still worked around" below.
-def spinel_compat(src, class_methods_source)
-  spinel_bypass_window_class_methods(src, class_methods_source) + spinel_web_predicate
+# `bypass_window_class_methods` was applied here too until 2026-08-13, when
+# upstream fixed the resolution failure and the transform was deleted.
+def spinel_compat(src)
+  src + spinel_web_predicate
 end
 
 def spinel_dsl_shims(_dsl_source) = "extend Ruby2D::DSL\n"
@@ -71,8 +70,13 @@ NEUTRALIZE = [
     subs: [['    undef_method :color, :color=, :colour, :colour=',
             '    # survey: undef_method removed']] },
 
+  # Still here after #3912, which cleared a neighboring shape rather than this
+  # one. This entry is what caught the `block_param_capture` regression: the
+  # sweep called that transform droppable, it was deleted, and this survey went
+  # on reporting the same refusal — the disagreement was the finding, and the
+  # survey was the one that was right. Draft 34 is the reduction.
   { kind: :bug, label: 'a lambda capturing the enclosing block parameter (interactive.rb)',
-    note: 'unsupported proc referencing an uncaptured outer variable; same family as issue 11',
+    note: 'unsupported proc referencing an uncaptured outer variable; drafted as issue 34',
     subs: [['          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }',
             '          wrapped = ->(e) { e }']] },
 
@@ -107,16 +111,29 @@ applied.select { |e| e[:kind] == :aot }.each { |e| puts "    #{e[:label]}\n     
 puts "\n  Compiler bugs blocking the build, edited out to see past them:"
 applied.select { |e| e[:kind] == :bug }.each { |e| puts "    #{e[:label]}\n      #{e[:note]}" }
 
-puts "\n  Still worked around by cli/spinel.rb (each a compiler bug):"
-puts '    bypass_window_class_methods — applied above; a class method on a constant receiver via extend'
-puts '    window_guards (#3788) and dsl_shims (#3787) — both fixed upstream, both still needed here'
-puts '    expand_hash_delete, disable_class_pattern (an AOT limit)'
+# Read out of cli/spinel.rb rather than listed here: this summary was a
+# hardcoded copy and went stale the day four transforms were dropped.
+puts "\n  Still worked around by cli/spinel.rb:"
+puts "    #{spinel_transform_names(File.join(ROOT, 'lib/ruby2d/cli/spinel.rb')).join(', ')}"
+puts '    dsl_shims (#3803) is the only compiler bug left; disable_class_pattern is'
+puts '    an AOT limit and web_predicate stands in for a method C registers.'
 
 if File.exist?(BIN)
   puts "\n  Then it compiles. Nothing else blocks a clean build.\n\n"
 else
   census = out.scan(/error: (.+)/).flatten.tally.sort_by { |_, n| -n }
-  puts "\n  Remaining C errors — clang reports these all at once, so this list is complete:"
-  census.each { |msg, n| puts format('    %3d  %s', n, msg) }
-  puts
+  if census.empty?
+    # Spinel's own refusals are `spinel: file:line: unsupported …`, which does
+    # not say `error:`, so the census matched nothing and this branch printed an
+    # empty list — indistinguishable from "nothing left to fix". It read that
+    # way once, on 2026-08-13, and the build had in fact stopped at the first
+    # refused construct with everything behind it unexamined.
+    puts "\n  Spinel refused the program before the C compile ever ran:"
+    out.lines.grep(/^spinel:/).first(10).each { |l| puts "    #{l.strip}" }
+    puts "\n  That is the *first* blocker, not the list — neutralize it above to see past it.\n\n"
+  else
+    puts "\n  Remaining C errors — clang reports these all at once, so this list is complete:"
+    census.each { |msg, n| puts format('    %3d  %s', n, msg) }
+    puts
+  end
 end
