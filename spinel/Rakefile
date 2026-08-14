@@ -49,8 +49,12 @@ rescue Interrupt
   exit(130)
 end
 
-# These three sit outside the default set: they answer roadmap questions rather
-# than regression ones, and each takes minutes.
+# These sit outside the default set: they answer roadmap questions rather than
+# regression ones, and each takes minutes — except `coverage`, which is a source
+# scan and needs no compiler at all.
+
+desc 'Spinel: how much of examples/ and test/ this target accepts, and what to add next'
+task(:coverage) { run_tool('coverage', 'coverage.rb') }
 
 desc 'Spinel: what blocks a clean build of the whole library'
 task(:survey) { run_tool('survey', 'survey.rb') }
@@ -60,6 +64,11 @@ task(:sweep) { run_tool('sweep', 'sweep.rb') }
 
 desc 'Spinel: build the fixture on both engines and diff the pixels'
 task(:compare) { run_tool('compare', 'compare.rb') }
+
+desc 'Spinel: build each example on both engines and check the scene still moves'
+task :motion, [:name] do |_t, args|
+  run_tool('motion', 'motion.rb', args[:name])
+end
 
 desc 'Spinel: compare Ruby-side frame cost across CRuby, mruby and Spinel — rake fps[name,frames]'
 task :fps, [:name, :frames] do |_t, args|
