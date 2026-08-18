@@ -241,10 +241,10 @@ on :key_down do |event|
   end
   next if generating || solving || solved
   move = case event.key
-         when 'up'    then NORTH
-         when 'down'  then SOUTH
-         when 'left'  then WEST
-         when 'right' then EAST
+         when :up    then NORTH
+         when :down  then SOUTH
+         when :left  then WEST
+         when :right then EAST
          end
   next unless move
   if (walls_intact[player_r][player_c] & move) == 0

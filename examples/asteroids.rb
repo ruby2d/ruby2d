@@ -122,15 +122,15 @@ reset.call
 
 on :key_down do |event|
   case event.key
-  when 'left'
+  when :left
     left = true
-  when 'right'
+  when :right
     right = true
-  when 'up'
+  when :up
     thrust = true
-  when 'space'
+  when :space
     firing = true
-  when 'r'
+  when :r
     reset.call
   end
 end

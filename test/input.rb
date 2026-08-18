@@ -270,11 +270,11 @@ end
 
 on :key_down do |event|
   case event.key
-  when 'h'
+  when :h
     set cursor: :hidden
     cursor_status.content = 'hidden'
     cursor_status.color   = DIM
-  when 's'
+  when :s
     set cursor: :visible
     cursor_status.content = 'visible'
     cursor_status.color   = ACCENT

@@ -290,7 +290,7 @@ on :gamepad_button_down do |pad, button|
   end
 end
 
-on key_down: 'r' do
+on key_down: :r do
   reset.call
 end
 

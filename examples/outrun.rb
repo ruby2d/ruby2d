@@ -250,20 +250,20 @@ reset.call
 
 on :key_down do |event|
   case event.key
-  when 'up' then throttle = true
-  when 'down' then brake = true
-  when 'left' then steer = -1
-  when 'right' then steer = 1
-  when 'r' then reset.call
+  when :up then throttle = true
+  when :down then brake = true
+  when :left then steer = -1
+  when :right then steer = 1
+  when :r then reset.call
   end
 end
 
 on :key_up do |event|
   case event.key
-  when 'up' then throttle = false
-  when 'down' then brake = false
-  when 'left' then steer = 0 if steer == -1
-  when 'right' then steer = 0 if steer == 1
+  when :up then throttle = false
+  when :down then brake = false
+  when :left then steer = 0 if steer == -1
+  when :right then steer = 0 if steer == 1
   end
 end
 

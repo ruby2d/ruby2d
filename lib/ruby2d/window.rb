@@ -7,12 +7,12 @@ module Ruby2D
     EventDescriptor       = Struct.new(:type, :id)
     ObjectEventDescriptor = Struct.new(:object, :type, :id)
     MouseEvent            = Struct.new(:type, :button, :direction, :x, :y, :delta_x, :delta_y) do
-      def button?(name) = button == name
+      def button?(name) = button == Mouse.validate!(name)
       def position      = [x, y]
       def delta         = [delta_x, delta_y]
     end
     KeyEvent              = Struct.new(:type, :key) do
-      def key?(name) = key == name.to_s.downcase
+      def key?(name) = key == Keyboard.validate!(name)
     end
 
     include KeyEvents
@@ -251,6 +251,17 @@ module Ruby2D
       gamepad_button_up:   :button?, gamepad_axis: :axis?
     }.freeze
 
+    # Name vocabularies for filter values, so `on(key_down: 'space')` fails
+    # when the handler is registered rather than at the first keypress.
+    EVENT_FILTER_VOCABULARIES = {
+      key_down: Keyboard, key_held: Keyboard, key_up: Keyboard,
+      mouse_down: Mouse, mouse_held: Mouse, mouse_up: Mouse,
+      gamepad_button_down: Gamepad::BUTTONS,
+      gamepad_button_held: Gamepad::BUTTONS,
+      gamepad_button_up:   Gamepad::BUTTONS,
+      gamepad_axis:        Gamepad::AXES
+    }.freeze
+
     # Gamepad events dispatch an internal data struct, but user blocks
     # receive the unpacked args (gamepad / button / axis / value). This map
     # describes the unpack for each gamepad event type.
@@ -317,6 +328,13 @@ module Ruby2D
         unless unpack
           raise Error, "`#{type}` does not support hash filters with `on event: { ... }`"
         end
+        # `gamepad:` matches an object, so only the name-valued keys are checked.
+        matcher.each do |key, value|
+          case key
+          when :button then Gamepad::BUTTONS.validate!(value)
+          when :axis   then Gamepad::AXES.validate!(value)
+          end
+        end
         ->(e) {
           if matcher.all? { |k, v| e.send(:"#{k}?", v) }
             proc.call(*args.call(e))
@@ -326,6 +344,9 @@ module Ruby2D
         predicate = EVENT_FILTER_PREDICATES[type] or
           raise Error, "`#{type}` does not support filtering with `on event: value`"
         values = Array(matcher)
+        if (vocabulary = EVENT_FILTER_VOCABULARIES[type])
+          values.each { |v| vocabulary.validate!(v) }
+        end
         ->(e) {
           if values.any? { |v| e.send(predicate, v) }
             proc.call(*args.call(e))
@@ -587,7 +608,8 @@ module Ruby2D
         cat = raw[i]
         case cat
         when EVT_KEY
-          key_callback(KEY_TYPE_MAP[raw[i + 1]], key_name(raw[i + 2]))
+          # Key events carry their name symbol, not a code — see `R2D_KeyName`.
+          key_callback(KEY_TYPE_MAP[raw[i + 1]], raw[i + 2])
         when EVT_MOUSE
           mouse_callback(
             MOUSE_TYPE_MAP[raw[i + 1]], MOUSE_BTN_MAP[raw[i + 3]],
@@ -628,14 +650,6 @@ module Ruby2D
       return if handlers.empty?
 
       handlers.values.each { |e| e.call(yield) }
-    end
-
-    # Resolve an SDL scancode to its cached, frozen, lowercased name. The
-    # held-key path sends only the integer scancode each frame; the name is
-    # looked up (and downcased + frozen) once per distinct key and reused, so
-    # no per-frame key-name string is allocated.
-    def key_name(code)
-      @key_names[code] ||= Ext.scancode_name(code).downcase.freeze
     end
 
     # Generate a new event key (ID)

@@ -20,12 +20,12 @@ module Ruby2D
 
       GamepadButtonData = Struct.new(:gamepad, :button) do
         def gamepad?(other) = gamepad.equal?(other)
-        def button?(name)   = button == name
+        def button?(name)   = button == Gamepad::BUTTONS.validate!(name)
       end
 
       GamepadAxisData = Struct.new(:gamepad, :axis, :value) do
         def gamepad?(other) = gamepad.equal?(other)
-        def axis?(name)     = axis == name
+        def axis?(name)     = axis == Gamepad::AXES.validate!(name)
       end
 
       # Connected gamepads in connect order. Stable: index 0 is the

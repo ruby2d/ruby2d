@@ -518,6 +518,9 @@ void Init_ruby2d() {
   // Initialize Ruby2D::Audio native parts
   R2D_Audio_Init();
 
+  // Initialize Ruby2D::Ext keyboard bindings
+  R2D_Keyboard_Init();
+
   // Initialize Ruby2D::Window native parts
   R2D_Window_Init();
 

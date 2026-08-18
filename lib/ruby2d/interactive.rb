@@ -36,6 +36,9 @@ module Ruby2D
           predicate = OBJECT_EVENT_FILTER_PREDICATES[type] or
             raise Error, "`#{type}` does not support filtering with `on event: value`"
           values = Array(matcher)
+          # Every filterable object event matches on a mouse button, so a bad
+          # name fails here rather than the first time the user clicks.
+          values.each { |v| Mouse.validate!(v) }
           wrapped = ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
           register_object_event_handler(type, wrapped)
         end

@@ -102,15 +102,15 @@ end
 
 on :key_down do |event|
   case event.key
-  when 'space'
+  when :space
     paused = !paused
-  when 'n'
+  when :n
     step.call
-  when 'r'
+  when :r
     grid.each { |row| row.map! { rand < RANDOM_DENSITY ? 1 : 0 } }
     generation = 0
     step_timer = STEP_INTERVAL
-  when 'c'
+  when :c
     grid.each { |row| row.fill(0) }
     generation = 0
     step_timer = STEP_INTERVAL

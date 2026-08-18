@@ -1061,6 +1061,26 @@ R_VAL ruby2d_ext_canvas_draw_text(RUBY2D_METHOD_ARGS_VARIADIC);
 void R2D_Audio_Init(void);
 
 
+// Keyboard ////////////////////////////////////////////////////////////////////
+
+// Ruby 2D's own scancode-to-name table, defined in keyboard.c along with the
+// reasons it doesn't use SDL's names. Scancodes reach Ruby only as the symbols
+// R2D_KeyName returns, never as integers.
+
+/*
+ * Initialize Ruby2D::Ext keyboard bindings.
+ */
+void R2D_Keyboard_Init(void);
+
+/*
+ * Name for a scancode, never NULL. Unmapped and out-of-range scancodes
+ * resolve to "unknown".
+ */
+const char *R2D_KeyName(int scancode);
+
+R_VAL ruby2d_ext_keyboard_key_names(RUBY2D_METHOD_ARGS_VARIADIC);
+
+
 // Window //////////////////////////////////////////////////////////////////////
 
 /*
@@ -1126,7 +1146,6 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC);
-R_VAL ruby2d_ext_window_scancode_name(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_end_frame(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_now(RUBY2D_METHOD_ARGS_VARIADIC);

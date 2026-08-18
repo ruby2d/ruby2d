@@ -66,42 +66,38 @@ RSpec.describe Ruby2D::Window do
 
   describe 'key events' do
     def fire(window, name)
-      window.key_callback(name, 'example_key')
+      window.key_callback(name, :space)
     end
 
     include_examples 'event family', :key_down,
                      [:key, :key_down, :key_held, :key_up], 'key'
   end
 
-  # The native event buffer carries only the integer scancode for key events;
-  # the name is resolved (once per distinct key) and cached on the Ruby side.
-  describe 'scancode dispatch' do
+  # Key events arrive from the extension already carrying their name symbol —
+  # the SDL scancode is translated in C and never reaches Ruby.
+  describe 'key event dispatch' do
     let(:window) { Ruby2D::Window.new }
 
-    # One held-key event: [category, type, id(scancode), 0.., str=nil]
-    def key_event(type, scancode)
-      [Ruby2D::Window::EVT_KEY, type, scancode, 0, 0, 0, 0, 0, 0, 0, 0, nil]
+    # One key event: [category, type, id(key symbol), 0.., str=nil]
+    def key_event(type, key)
+      [Ruby2D::Window::EVT_KEY, type, key, 0, 0, 0, 0, 0, 0, 0, 0, nil]
     end
 
-    it 'resolves a scancode to its cached, frozen, lowercased name' do
-      allow(Ruby2D::Ext).to receive(:scancode_name).with(44).and_return('Space')
-      name = window.send(:key_name, 44)
-      expect(name).to eq('space')
-      expect(name).to be_frozen
-    end
-
-    it 'looks up each distinct scancode at most once' do
-      allow(Ruby2D::Ext).to receive(:scancode_name).with(44).and_return('Space')
-      3.times { window.send(:key_name, 44) }
-      expect(Ruby2D::Ext).to have_received(:scancode_name).once
-    end
-
-    it 'dispatches a key event by scancode to the matching handler' do
-      allow(Ruby2D::Ext).to receive(:scancode_name).with(44).and_return('Space')
+    it 'dispatches by the symbol the extension supplies' do
       value = 0
-      window.on(key_held: 'space') { value += 1 }
-      window.send(:dispatch_events, key_event(2, 44)) # type 2 → :held
+      window.on(key_held: :space) { value += 1 }
+      window.send(:dispatch_events, key_event(2, :space)) # type 2 → :held
       expect(value).to eq(1)
+    end
+
+    # SDL's own scancode names vary by platform ("Left GUI" vs "Left Windows")
+    # and are display strings, so the extension maps scancodes with its own
+    # table instead of calling SDL_GetScancodeName.
+    it 'supplies names that are neither SDL display names nor scancodes' do
+      expect(Ruby2D::Ext).not_to respond_to(:scancode_name)
+      expect(Ruby2D::Keyboard.names).to include(:left_shift, :digit_1, :keypad_plus)
+      expect(Ruby2D::Keyboard.names).not_to include(:'left shift')
+      expect(Ruby2D::Keyboard.names).to all(be_a(Symbol))
     end
   end
 
@@ -206,15 +202,20 @@ RSpec.describe Ruby2D::Window do
       pad = connect(window)
       hit = 0
       window.on(key_down: :right, gamepad_button_down: :dpad_right) { hit += 1 }
-      window.key_callback(:down, 'right')
+      window.key_callback(:down, :right)
       window.gamepad_callback(pad.id, :button_down, :dpad_right, nil, nil)
       expect(hit).to eq(2)
     end
 
-    it 'unknown button or axis names return safe defaults from polling' do
+    # A "safe default" for a name that does not exist hides the typo: `axis`
+    # in particular used to answer 0.0, which is indistinguishable from a
+    # centered stick, so a misspelled axis read as "not moving" forever.
+    it 'raises on unknown button or axis names instead of defaulting' do
       pad = connect(window)
-      expect(pad.held?(:not_a_button)).to be false
-      expect(pad.axis(:not_an_axis)).to eq(0.0)
+      expect { pad.held?(:not_a_button) }
+        .to raise_error(Ruby2D::Error, /not a valid gamepad button name/)
+      expect { pad.axis(:not_an_axis) }
+        .to raise_error(Ruby2D::Error, /not a valid gamepad axis name/)
     end
 
     it 'axes hash always includes every axis with default 0.0' do
@@ -323,32 +324,35 @@ RSpec.describe Ruby2D::Window do
 
     it 'fires when value matches' do
       value = 0
-      window.on(key_down: 'space') { value += 1 }
-      window.key_callback(:down, 'space')
+      window.on(key_down: :space) { value += 1 }
+      window.key_callback(:down, :space)
       expect(value).to eq(1)
     end
 
     it 'does not fire when value does not match' do
       value = 0
-      window.on(key_down: 'space') { value += 1 }
-      window.key_callback(:down, 'escape')
+      window.on(key_down: :space) { value += 1 }
+      window.key_callback(:down, :escape)
       expect(value).to eq(0)
     end
 
     it 'matches any value when matcher is an array' do
       value = 0
-      window.on(key_down: %w[escape space]) { value += 1 }
-      window.key_callback(:down, 'space')
-      window.key_callback(:down, 'escape')
-      window.key_callback(:down, 'r')
+      window.on(key_down: %i[escape space]) { value += 1 }
+      window.key_callback(:down, :space)
+      window.key_callback(:down, :escape)
+      window.key_callback(:down, :r)
       expect(value).to eq(2)
     end
 
-    it 'accepts a symbol matcher for keys (treated as string)' do
-      value = 0
-      window.on(key_down: :space) { value += 1 }
-      window.key_callback(:down, 'space')
-      expect(value).to eq(1)
+    it 'rejects a string matcher when registering, naming the symbol to use' do
+      expect { window.on(key_down: 'space') {} }
+        .to raise_error(Ruby2D::Error, /key names are symbols, use `:space`/)
+    end
+
+    it 'rejects an unknown key matcher when registering' do
+      expect { window.on(key_down: :spcae) {} }
+        .to raise_error(Ruby2D::Error, /not a valid key name/)
     end
 
     it 'returns a single descriptor for a single filter' do
@@ -445,14 +449,18 @@ RSpec.describe Ruby2D::Window do
       expect(pad.has?(:axis, :left_x)).to be false
     end
 
-    it ':button with an unknown name returns false' do
+    # `false` answers "this pad lacks that input". A name that does not exist
+    # is a different question, and deserves a different answer.
+    it ':button with an unknown name raises' do
       pad = connect(window)
-      expect(pad.has?(:button, :no_such_button)).to be false
+      expect { pad.has?(:button, :no_such_button) }
+        .to raise_error(Ruby2D::Error, /not a valid gamepad button name/)
     end
 
-    it ':axis with an unknown name returns false' do
+    it ':axis with an unknown name raises' do
       pad = connect(window)
-      expect(pad.has?(:axis, :no_such_axis)).to be false
+      expect { pad.has?(:axis, :no_such_axis) }
+        .to raise_error(Ruby2D::Error, /not a valid gamepad axis name/)
     end
 
     it 'caches :rumble / :rumble_triggers / :led — one ext_gamepad_caps call total' do

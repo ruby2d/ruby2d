@@ -399,7 +399,7 @@ on :gamepad_disconnect do |pad|
 end
 
 on :key_down do |event|
-  reset_drift.call if event.key == 'r'
+  reset_drift.call if event.key == :r
 end
 
 rumble_btn.on(:click) do

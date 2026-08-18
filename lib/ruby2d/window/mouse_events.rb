@@ -6,17 +6,17 @@ module Ruby2D
     module MouseEvents
       # Mouse down event method for class pattern
       def mouse_pressed?(btn)
-        @mouse_buttons_down.include? btn
+        @mouse_buttons_down.include? Mouse.validate!(btn)
       end
 
       # Mouse up event method for class pattern
       def mouse_released?(btn)
-        @mouse_buttons_up.include? btn
+        @mouse_buttons_up.include? Mouse.validate!(btn)
       end
 
       # Mouse held event method for class pattern
       def mouse_held?(btn)
-        @mouse_buttons_held.include? btn
+        @mouse_buttons_held.include? Mouse.validate!(btn)
       end
 
       # Current mouse position as a [x, y] pair, for the common case where

@@ -385,7 +385,7 @@ label(16, H - 22, 'V toggles shape visibility', size: 12)
 
 visible = true
 on :key_down do |event|
-  next unless event.key == 'v'
+  next unless event.key == :v
 
   visible = !visible
   matrix_shapes.each { |s| s.visible = visible }

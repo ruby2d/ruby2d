@@ -238,16 +238,16 @@ end
 
 on :key_down do |event|
   case event.key
-  when '1'
+  when :digit_1
     material = SAND
     draw_toolbar(toolbar, material)
-  when '2'
+  when :digit_2
     material = WATER
     draw_toolbar(toolbar, material)
-  when '3'
+  when :digit_3
     material = STONE
     draw_toolbar(toolbar, material)
-  when 'r'
+  when :r
     grid.fill(EMPTY)
     painted.fill(EMPTY)
     active.fill(false)
