@@ -15,6 +15,9 @@ module Ruby2D
       window/mouse_events
       window/gamepad_events
       window/object_events
+      vocabulary
+      keyboard
+      mouse
       gamepad
       window
       interactive

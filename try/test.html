@@ -250,10 +250,10 @@ var examples = [
       "\n" +
       "on :key_held do |event|\n" +
       "  case event.key\n" +
-      "  when 'up'    then s.y -= speed\n" +
-      "  when 'down'  then s.y += speed\n" +
-      "  when 'left'  then s.x -= speed\n" +
-      "  when 'right' then s.x += speed\n" +
+      "  when :up    then s.y -= speed\n" +
+      "  when :down  then s.y += speed\n" +
+      "  when :left  then s.x -= speed\n" +
+      "  when :right then s.x += speed\n" +
       "  end\n" +
       "end\n" +
       "\n" +

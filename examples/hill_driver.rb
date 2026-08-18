@@ -225,21 +225,21 @@ end
 
 on :key_down do |event|
   case event.key
-  when 'right' then gas = true
-  when 'left' then brake = true
-  when 'up' then tilt = -1
-  when 'down' then tilt = 1
-  when 'space' then turbo = true
-  when 'r' then reset.call
+  when :right then gas = true
+  when :left then brake = true
+  when :up then tilt = -1
+  when :down then tilt = 1
+  when :space then turbo = true
+  when :r then reset.call
   end
 end
 
 on :key_up do |event|
   case event.key
-  when 'right' then gas = false
-  when 'left' then brake = false
-  when 'up', 'down' then tilt = 0
-  when 'space' then turbo = false
+  when :right then gas = false
+  when :left then brake = false
+  when :up, :down then tilt = 0
+  when :space then turbo = false
   end
 end
 

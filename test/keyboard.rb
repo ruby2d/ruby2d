@@ -179,7 +179,7 @@ end
 
 def refresh_modifiers(keys, mod_state)
   mod_state.each do |name, state|
-    active = keys.any? { |k| k.include?(name) }
+    active = keys.any? { |k| k.to_s.include?(name) }
     state[:dot].color  = active ? ACCENT : BG
     state[:text].color = active ? HEAD  : DIM
   end

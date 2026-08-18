@@ -181,9 +181,9 @@ on key_down: %i[space up], gamepad_button_down: :south do
   end
 end
 
-on(key_down: '1') { switch_color.call(0) }
-on(key_down: '2') { switch_color.call(1) }
-on(key_down: '3') { switch_color.call(2) }
+on(key_down: :digit_1) { switch_color.call(0) }
+on(key_down: :digit_2) { switch_color.call(1) }
+on(key_down: :digit_3) { switch_color.call(2) }
 on(key_down: :r)  { reset.call }
 
 # === Per-frame update ===

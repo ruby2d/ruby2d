@@ -51,7 +51,7 @@ Events flow **up** through a pull model: C queues raw events into a buffer durin
 ## Key Directories
 
 - **`lib/ruby2d/`** — Ruby classes. Entry point is `ruby2d.rb` which loads `core.rb` (all classes + native extension) then mixes the DSL into `main`. Each drawable type, the window, audio, color parsing, and the CLI live here.
-- **`ext/ruby2d/`** — Native C extension. Roughly one `.c` file per subsystem — `window`, `shapes`, `canvas`, `image`, `text`, `font` (the internal bitmap font for diagnostic overlays, and the native backing for the user-facing `BitmapText` class), `audio` — plus `ext.c` (the `Ruby2D::Ext` method bindings), `ruby2d.c` (initialization, logging, and the mruby entry point), and `fps.c` (the FPS overlay). `ruby2d.h` contains the multi-runtime abstraction macros, structs, and prototypes. `extconf.rb` handles platform-specific build configuration.
+- **`ext/ruby2d/`** — Native C extension. Roughly one `.c` file per subsystem — `window`, `shapes`, `canvas`, `image`, `text`, `font` (the internal bitmap font for diagnostic overlays, and the native backing for the user-facing `BitmapText` class), `audio`, `keyboard` (the scancode-to-name table, so Ruby sees key symbols and never a scancode) — plus `ext.c` (the `Ruby2D::Ext` method bindings), `ruby2d.c` (initialization, logging, and the mruby entry point), and `fps.c` (the FPS overlay). `ruby2d.h` contains the multi-runtime abstraction macros, structs, and prototypes. `extconf.rb` handles platform-specific build configuration.
 - **`assets/`** — Pre-built headers and static libraries for SDL3 and mruby (macOS, Windows), bundled fonts, and test media.
 - **`spec/`** — RSpec automated tests (`*_spec.rb`), the machine-verifiable suite that `rake` runs.
 - **`test/`** — Interactive visual/audio tests (plain `.rb` files run manually for a human to verify).
@@ -84,7 +84,17 @@ On CRuby, `Window#show` runs `tick until @close`. On mruby (native and WASM), a 
 Two input patterns are supported simultaneously:
 
 - **Callback pattern** (DSL-style): register blocks with `on(:key_down) { |e| ... }`. Events are dispatched from Ruby's `dispatch_events` after the C poll returns.
-- **Polling pattern** (class-style): query `key_pressed?('space')` or `mouse_pressed?(:left)` inside `update`. Event stores are populated during dispatch and cleared each frame.
+- **Polling pattern** (class-style): query `key_pressed?(:space)` or `mouse_pressed?(:left)` inside `update`. Event stores are populated during dispatch and cleared each frame.
+
+### Input name vocabularies
+
+Every input is named by a symbol from a closed set, and no SDL value reaches Ruby.
+
+Mouse and gamepad events carry a small integer code that Ruby maps to a symbol (`MOUSE_BTN_MAP`, `GP_BUTTON_MAP`, `GP_AXIS_MAP`). Keys are the exception: there are 246 of them, so the mapping lives in C (`R2D_KeyName` in `keyboard.c`) and the event carries the name symbol itself in the `id` slot. Ruby never sees a scancode. `Ext.key_names` exposes the same table once, so the name list has a single home next to the SDL scancodes it maps.
+
+Each name set is wrapped in a `Ruby2D::Vocabulary`, which gives every input API one behavior: a name outside the set raises instead of returning `false`. The sets are closed and platform-independent, which is what makes validation possible — SDL's own `SDL_GetScancodeName` is documented as unsuitable for a stable name mapping (its names vary per platform), so key names are Ruby 2D's own rather than read back from SDL.
+
+The one place a Ruby-side table holds SDL enum values is `Gamepad::BUTTON_ENUM` / `AXIS_ENUM`, because those integers travel back *down* for capability queries (`Ext.window_gamepad_has_button`). Values only ever consumed on the way up belong in C.
 
 ## Viewport Modes
 

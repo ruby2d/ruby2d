@@ -84,11 +84,11 @@ reset.call
 
 on :key_down do |event|
   case event.key
-  when 'up'    then next_dir = [0, -1] unless dir == [0,  1]
-  when 'down'  then next_dir = [0,  1] unless dir == [0, -1]
-  when 'left'  then next_dir = [-1, 0] unless dir == [1,  0]
-  when 'right' then next_dir = [1,  0] unless dir == [-1, 0]
-  when 'r'     then reset.call
+  when :up    then next_dir = [0, -1] unless dir == [0,  1]
+  when :down  then next_dir = [0,  1] unless dir == [0, -1]
+  when :left  then next_dir = [-1, 0] unless dir == [1,  0]
+  when :right then next_dir = [1,  0] unless dir == [-1, 0]
+  when :r     then reset.call
   end
 end
 

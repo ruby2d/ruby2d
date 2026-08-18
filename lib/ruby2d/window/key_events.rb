@@ -6,22 +6,21 @@ module Ruby2D
     module KeyEvents
       # Key down event method for class pattern
       def key_pressed?(key)
-        @keys_down.include? key
+        @keys_down.include? Keyboard.validate!(key)
       end
 
       # Key held event method for class pattern
       def key_held?(key)
-        @keys_held.include? key
+        @keys_held.include? Keyboard.validate!(key)
       end
 
       # Key up event method for class pattern
       def key_released?(key)
-        @keys_up.include? key
+        @keys_up.include? Keyboard.validate!(key)
       end
 
-      # Key callback method. `key` arrives already normalized (lowercased):
-      # from `dispatch_events` via the cached scancode-name table, or from a
-      # direct caller passing a lowercase key name.
+      # Key callback method. `key` is a key name symbol, supplied by the
+      # extension with the event or passed directly by a caller.
       def key_callback(type, key)
         # All key events
         fire_event_handlers(:key) { KeyEvent.new(type, key) }
@@ -42,7 +41,7 @@ module Ruby2D
       private
 
       def handle_key_down(type, key)
-        close if @close_on_esc && key == 'escape'
+        close if @close_on_esc && key == :escape
 
         @keys_down << key unless @keys_down.include? key
 
@@ -66,8 +65,6 @@ module Ruby2D
         @keys_down = []
         @keys_held = []
         @keys_up   = []
-        # Scancode → frozen lowercased name, filled lazily by `key_name`
-        @key_names = []
       end
     end
   end

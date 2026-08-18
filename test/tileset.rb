@@ -290,14 +290,14 @@ end
 
 on :key_down do |e|
   case e.key
-  when 'c'
+  when :c
     interactive.clear
     ts_status.content = 'cleared'
-  when 'g'
+  when :g
     interactive.clear
     refill_grid(interactive, NAMES, INT_OX, INT_OY, GRID_COLS, GRID_ROWS, TILE)
     ts_status.content = 'refilled'
-  when 'r'
+  when :r
     interactive.delete(INT_OX, INT_OY)
     ts_status.content = 'deleted top-left'
   end

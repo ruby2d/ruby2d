@@ -15,12 +15,12 @@
 require 'ruby2d'
 
 MODES = {
-  '1' => :letterbox,
-  '2' => :stretch,
-  '3' => :integer,
-  '4' => :overscan,
-  '5' => :expand,
-  '6' => :fixed
+  digit_1: :letterbox,
+  digit_2: :stretch,
+  digit_3: :integer,
+  digit_4: :overscan,
+  digit_5: :expand,
+  digit_6: :fixed
 }.freeze
 
 set title: 'Viewport Mode Test', width: 640, height: 480

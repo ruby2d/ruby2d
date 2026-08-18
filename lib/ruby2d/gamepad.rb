@@ -50,6 +50,18 @@ module Ruby2D
       right_trigger: 5
     }.freeze
 
+    BUTTONS = Vocabulary.new(
+      'gamepad button', BUTTON_ENUM.keys,
+      'see `Ruby2D::Gamepad::BUTTON_ENUM` for the full list ' \
+      '(e.g. :south, :start, :dpad_up)'
+    )
+
+    AXES = Vocabulary.new(
+      'gamepad axis', AXIS_ENUM.keys,
+      'one of :left_x, :left_y, :right_x, :right_y, :left_trigger, ' \
+      ':right_trigger'
+    )
+
     # Sticks only — triggers (0.0..1.0) are exempt because they rest at zero
     # and rarely drift. 0.05 should cover typical worst-case stick drift.
     DEFAULT_DEAD_ZONE = 0.05
@@ -113,6 +125,11 @@ module Ruby2D
     #   pad.has?(:button, :paddle1)
     #   pad.has?(:axis, :left_trigger)
     def has?(capability, name = nil)
+      # Validate before the connection check, so a misspelled name is caught
+      # even while the pad happens to be disconnected.
+      BUTTONS.validate!(name) if capability == :button
+      AXES.validate!(name)    if capability == :axis
+
       return false unless @connected
 
       case capability
@@ -146,10 +163,10 @@ module Ruby2D
     end
 
     # Polling — currently held / current axis position.
-    def held?(button) = @buttons_held.include?(button)
+    def held?(button) = @buttons_held.include?(BUTTONS.validate!(button))
 
     def axis(name, raw: false)
-      return 0.0 unless AXIS_ENUM.key?(name)
+      AXES.validate!(name)
 
       v = (raw ? @raw_axis_values : @axis_values)[name]
       v || 0.0
@@ -163,9 +180,9 @@ module Ruby2D
 
     # Polling — frame-scoped transitions. Cleared each frame by
     # `_clear_frame_state`.
-    def pressed?(button)  = @buttons_down.include?(button)
-    def released?(button) = @buttons_up.include?(button)
-    def axis_moved?(axis) = @axes_moved.include?(axis)
+    def pressed?(button)  = @buttons_down.include?(BUTTONS.validate!(button))
+    def released?(button) = @buttons_up.include?(BUTTONS.validate!(button))
+    def axis_moved?(axis) = @axes_moved.include?(AXES.validate!(axis))
     def axes_moved        = @axes_moved.dup
 
     # Feedback. `rumble`, `rumble_triggers`, and `set_led` return `false` when

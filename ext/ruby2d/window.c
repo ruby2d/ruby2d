@@ -60,7 +60,6 @@ void R2D_Window_Init() {
   r_define_class_method(ruby2d_ext_module, "window_show",                       ruby2d_ext_window_show,                       r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "poll_events",                       ruby2d_ext_window_poll_events,                r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "drain_events",                      ruby2d_ext_window_drain_events,               r_args_variadic);
-  r_define_class_method(ruby2d_ext_module, "scancode_name",                     ruby2d_ext_window_scancode_name,              r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "begin_frame",                       ruby2d_ext_window_begin_frame,                r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "end_frame",                         ruby2d_ext_window_end_frame,                  r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "now",                               ruby2d_ext_now,                               r_args_variadic);
@@ -603,9 +602,9 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     }
   }
 
-  // Detect keys held down. Each held key carries only its integer scancode —
-  // Ruby resolves and caches the name once per distinct key, so the per-frame
-  // path allocates no name string.
+  // Detect keys held down. Each held key queues its scancode, which drain
+  // translates to a name symbol via R2D_KeyName; interning is a lookup, not an
+  // allocation, so the per-frame path allocates nothing.
   int num_keys;
   const bool *key_state = SDL_GetKeyboardState(&num_keys);
   for (int i = 0; i < num_keys; i++) {
@@ -686,6 +685,8 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
  *
  * Return queued events as a flat array with R2D_EVT_STRIDE elements per event:
  * [category, type, id, button, direction, axis, x, y, delta_x, delta_y, value, str]
+ * `id` is an Integer for every category except R2D_EVT_KEY, where it is the
+ * key's name Symbol — the scancode is translated here and never reaches Ruby.
  * Returns nil when no events are queued (the common case, every frame).
  */
 R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
@@ -701,7 +702,15 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     R2D_QueuedEvent *ev = &event_buf[i];
     r_ary_push(ary, INT2NUM(ev->category));
     r_ary_push(ary, INT2NUM(ev->type));
-    r_ary_push(ary, INT2NUM(ev->id));
+    // Key events carry their name symbol in the id slot; every other category
+    // carries an integer there. Ruby never sees a scancode: the SDL code goes
+    // no further than this translation. Interning is a lookup, not an
+    // allocation, so the per-frame held-key path allocates nothing.
+    if (ev->category == R2D_EVT_KEY) {
+      r_ary_push(ary, r_char_to_sym(R2D_KeyName(ev->id)));
+    } else {
+      r_ary_push(ary, INT2NUM(ev->id));
+    }
     r_ary_push(ary, INT2NUM(ev->button));
     r_ary_push(ary, INT2NUM(ev->direction));
     r_ary_push(ary, INT2NUM(ev->axis));
@@ -721,22 +730,6 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
   event_count = 0;
   return ary;
-}
-
-
-/*
- * Ext.scancode_name(code) → String
- *
- * Human-readable name for an SDL scancode (e.g. "Space", "Left Shift"), or ""
- * if the scancode has no name. The per-frame held-key path carries only the
- * integer scancode; Ruby calls this at most once per distinct key and caches
- * the result, so no key-name string is allocated each frame.
- */
-R_VAL ruby2d_ext_window_scancode_name(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.scancode_name expects 1 arg (scancode), got %d", (int)argc);
-  const char *name = SDL_GetScancodeName((SDL_Scancode)NUM2INT(argv[0]));
-  return r_str_new(name ? name : "");
 }
 
 

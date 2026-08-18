@@ -99,12 +99,12 @@ end
 # === Per-frame update ===
 
 update do |dt|
-  angle -= TURN_RATE * dt if keys['a'] || keys['left']
-  angle += TURN_RATE * dt if keys['d'] || keys['right']
+  angle -= TURN_RATE * dt if keys[:a] || keys[:left]
+  angle += TURN_RATE * dt if keys[:d] || keys[:right]
 
   move = 0
-  move += MOVE_SPEED * dt if keys['w'] || keys['up']
-  move -= MOVE_SPEED * dt if keys['s'] || keys['down']
+  move += MOVE_SPEED * dt if keys[:w] || keys[:up]
+  move -= MOVE_SPEED * dt if keys[:s] || keys[:down]
   nx = px + Math.cos(angle) * move
   ny = py + Math.sin(angle) * move
   unless wall_at.call(nx.floor, py.floor)

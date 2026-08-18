@@ -81,8 +81,8 @@ class Game < Ruby2D::Window
   end
 
   def update
-    @player.x += 1 if key_held?('right')
-    @player.x -= 1 if key_held?('left')
+    @player.x += 1 if key_held?(:right)
+    @player.x -= 1 if key_held?(:left)
   end
 end
 
@@ -1830,16 +1830,49 @@ on :key_held do |event|
 end
 ```
 
-The `KeyEvent` struct has fields: `type` (`:down`, `:held`, `:up`) and `key` (lowercase string), plus `key?(name)` for matching. `key?` accepts either a string or a symbol: `event.key?(:space)` and `event.key?('space')` are equivalent.
+The `KeyEvent` struct has fields: `type` (`:down`, `:held`, `:up`) and `key` (a symbol), plus `key?(name)` for matching.
 
 **Class pattern polling:**
 
 ```ruby
 def update
-  close if key_pressed?('escape')
-  @x += 1 if key_held?('right')
-  puts 'released space' if key_released?('space')
+  close if key_pressed?(:escape)
+  @x += 1 if key_held?(:right)
+  puts 'released space' if key_released?(:space)
 end
+```
+
+#### Key names
+
+Key names are symbols, and they name a *physical position* rather than the character the key produces. `:a` is wherever QWERTY puts A, so WASD movement stays under the same fingers on AZERTY or Dvorak.
+
+| Group | Names |
+|---|---|
+| Letters | `:a` … `:z` |
+| Number row | `:digit_1` … `:digit_9`, `:digit_0` |
+| Function | `:f1` … `:f24` |
+| Whitespace | `:space`, `:tab`, `:return`, `:backspace`, `:escape` |
+| Arrows | `:left`, `:right`, `:up`, `:down` |
+| Navigation | `:home`, `:end`, `:page_up`, `:page_down`, `:insert`, `:delete` |
+| Modifiers | `:left_shift`, `:right_shift`, `:left_ctrl`, `:right_ctrl`, `:left_alt`, `:right_alt`, `:left_gui`, `:right_gui` |
+| Locks | `:caps_lock`, `:num_lock`, `:scroll_lock` |
+| Punctuation | `:minus`, `:equals`, `:left_bracket`, `:right_bracket`, `:backslash`, `:semicolon`, `:apostrophe`, `:grave`, `:comma`, `:period`, `:slash` |
+| Keypad | `:keypad_0` … `:keypad_9`, `:keypad_plus`, `:keypad_minus`, `:keypad_multiply`, `:keypad_divide`, `:keypad_enter`, `:keypad_period` |
+| Media | `:media_play_pause`, `:media_next_track`, `:media_previous_track`, `:media_stop`, `:mute`, `:volume_up`, `:volume_down` |
+
+Left and right modifiers are separate keys; there is no combined `:shift`. `:left_gui` is one name for one physical key: Command on macOS, Windows on Windows, Super on Linux.
+
+The number row and the keypad are separate keys the same way: `:digit_1` does not fire when a player presses the keypad's 1. Bind both with `on key_down: [:digit_1, :keypad_1]` if either should work. Because these are physical positions, the keypad names report the same key whether Num Lock is on or off, and `:digit_1` fires whether or not Shift is held.
+
+The number row is named `:digit_1` rather than `:1` because `:1` is a Ruby syntax error, not a key name Ruby 2D could reject with a message.
+
+`Ruby2D::Keyboard.names` returns every name: the 246 keys, including the international, application-control, and extended keypad keys not listed above, plus `:unknown`, which a key with no name reports so it still delivers events.
+
+A name outside the set raises rather than silently never matching:
+
+```ruby
+key_pressed?(:spcae)   # Ruby2D::Error: `:spcae` is not a valid key name
+key_pressed?('space')  # Ruby2D::Error: key names are symbols, use `:space`
 ```
 
 ### Mouse Events
@@ -1856,6 +1889,8 @@ end
 | `:mouse_leave` | When the cursor leaves the window | `MouseEvent` |
 
 The `MouseEvent` struct has fields: `type`, `button`, `direction`, `x`, `y`, `delta_x`, `delta_y`, plus `button?(name)` for matching, `position` returning `[x, y]`, and `delta` returning `[delta_x, delta_y]`. `:mouse_enter` / `:mouse_leave` carry only `type`; query `mouse_position` if you need the current location.
+
+Button names are the symbols `:left`, `:middle`, `:right`, `:x1`, `:x2`. As with [key names](#key-names), anything else raises rather than silently never matching.
 
 ```ruby
 on :mouse_down do |event|
@@ -2117,7 +2152,7 @@ pad.axis_moved?(:left_x)      # axis moved this frame
 pad.axes_moved                # Array of axes moved this frame
 ```
 
-Unknown names are safe: `pad.held?(:not_a_button)` returns `false`, `pad.axis(:not_an_axis)` returns `0.0`. `pad.axes` always includes every axis with a default of `0.0` for axes that haven't fired events yet.
+`pad.axes` always includes every axis with a default of `0.0` for axes that haven't fired events yet.
 
 ### Dead zones
 
@@ -2149,6 +2184,8 @@ Labels in parens are Xbox / Nintendo / PlayStation, in that order. The cardinal 
 **Buttons** — `:south`, `:east`, `:west`, `:north`, `:back`, `:guide`, `:start`, `:left_stick`, `:right_stick`, `:left_shoulder`, `:right_shoulder`, `:dpad_up`, `:dpad_down`, `:dpad_left`, `:dpad_right`, `:misc1`, `:paddle1`, `:paddle2`, `:paddle3`, `:paddle4`, `:touchpad`, `:misc2`, `:misc3`, `:misc4`, `:misc5`, `:misc6`. Extended buttons (`:misc*`, `:paddle*`, `:touchpad`) only fire on pads that physically have them; use `pad.has?(:button, :paddle1)` to check.
 
 **Axes** — `:left_x`, `:left_y`, `:right_x`, `:right_y` (range -1.0..1.0); `:left_trigger`, `:right_trigger` (range 0.0..1.0).
+
+A button or axis name outside these sets raises, the same as [key names](#key-names). Note the distinction `has?` draws: `pad.has?(:button, :paddle1)` answers `false` for a pad without paddles, but `pad.has?(:button, :padle1)` raises — "this pad lacks that input" and "that input does not exist" are different answers.
 
 #### User-defined aliases
 

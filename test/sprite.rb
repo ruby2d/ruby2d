@@ -248,7 +248,7 @@ HERO_FLIPS = [nil, :horizontal, :vertical, :both].freeze
 
 on :key_down do |e|
   case e.key
-  when 'b'
+  when :b
     boom_dot.color = ACCENT
     boom_status.content = 'playing…'
     boom_status.color = ACCENT
@@ -257,22 +257,22 @@ on :key_down do |e|
       boom_status.content = 'done'
       boom_status.color = DIM
     end
-  when '1'
+  when :digit_1
     hero.play animation: :walk, loop: true
     hero_status.content = 'walk'
-  when '2'
+  when :digit_2
     hero.play animation: :climb, loop: true
     hero_status.content = 'climb'
-  when '3'
+  when :digit_3
     hero.play animation: :cheer
     hero_status.content = 'cheer'
-  when 'f'
+  when :f
     hero_flip_idx = (hero_flip_idx + 1) % HERO_FLIPS.length
     hero.play animation: :walk, loop: true, flip: HERO_FLIPS[hero_flip_idx]
     hero_status.content = 'walk'
-  when 's'
+  when :s
     ANIMATED.each(&:stop)
-  when 'p'
+  when :p
     coin_full.play; coin_med.play; coin_sm.play
     sheet.play
     hero.play animation: :walk, loop: true
@@ -281,7 +281,7 @@ on :key_down do |e|
     xml_anim.play animation: :count, loop: true
     flip_sprites.each_with_index { |s, i| s.play animation: :walk, loop: true, flip: HERO_FLIPS[i] }
     speed_coins.each(&:play)
-  when 'space'
+  when :space
     ANIMATED.each { |s| s.paused? ? s.resume : s.pause }
   end
 end

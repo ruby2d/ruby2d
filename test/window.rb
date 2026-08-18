@@ -183,14 +183,14 @@ end
 
 on :key_down do |event|
   case event.key
-  when 'f'
+  when :f
     set show_fps: !get(:show_fps)
-  when 'd'
+  when :d
     set diagnostics: !get(:diagnostics)
-  when 'm'
+  when :m
     new_mode = get(:render_mode) == :continuous ? :on_demand : :continuous
     set render_mode: new_mode
-  when 'space'
+  when :space
     request_render
   end
 end
