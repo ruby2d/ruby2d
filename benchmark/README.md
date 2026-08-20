@@ -134,6 +134,7 @@ Optimizations that were measured and dropped. Re-attempting one without a fresh 
 - **A persistent, `SDL_UpdateTexture`-updated text texture on native.** Measured **+75% frame cost** on `text_dynamic` — Metal's fast path is destroy + `SDL_CreateTextureFromSurface` per content change. The web build wants exactly the opposite (fresh per-frame texture objects stall the WebGL pipeline; the persistent texture cut its render slice −61%), so `text.c` platform-splits the strategy. Don't unify the paths without re-running `rake benchmark:text_dynamic` and `rake benchmark:web[text_dynamic]` back-to-back.
 - **Indexed `while` loop over the retained object array** instead of `each` in the native frame traversal. 1.70 ms vs 1.69 ms CPU build on 3,600 retained squares — noise. Block dispatch isn't where the per-object cost lives on CRuby; wasm would need its own measurement.
 - **Conditional Canvas surface locking.** A 3,443-sample profile of the full-repaint canvas benchmark put `SDL_UpdateTexture` at ~38% of main-thread time and lock/unlock at two samples total. Full repaint is software-raster and upload bound; there's nothing to save around the lock.
+- **A `SDL_TEXTUREACCESS_STREAMING` canvas texture** instead of `STATIC`, hoping Metal would skip a copy on the per-frame `SDL_UpdateTexture`. No change on full-repaint or incremental canvas scenes. The canvas upload floor is what it is — about 1.85 ms for a full 1280×720 repaint at 2× (14.7 MB) and 0.5 ms at 1× — and partial edits already upload only their dirty rectangle.
 
 ## Adding a new benchmark
 

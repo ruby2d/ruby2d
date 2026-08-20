@@ -1006,15 +1006,12 @@ R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
       if (y_end > surface->h) y_end = surface->h;
 
       if (ca == 255) {
-        // Color is constant within the cell: pack once, store 32 bits per pixel.
-        Uint32 packed = SDL_MapSurfaceRGBA(surface, cr, cg, cb, 255);
-        for (int y = y_start; y < y_end; y++) {
-          Uint8 *row = (Uint8 *)surface->pixels + y * surface->pitch;
-          for (int x = x_start; x < x_end; x++) {
-            Uint8 *pixel = row + x * 4;
-            SDL_memcpy(pixel, &packed, 4);
-          }
-        }
+        // Color is constant within the cell: one clipped, vectorized fill.
+        // A pixel-at-a-time memcpy loop here was half the frame for a 160x90
+        // grid of 16x16 physical cells.
+        SDL_Rect cell = { x_start, y_start, x_end - x_start, y_end - y_start };
+        if (cell.w > 0 && cell.h > 0)
+          SDL_FillSurfaceRect(surface, &cell, SDL_MapSurfaceRGBA(surface, cr, cg, cb, 255));
       } else {
         for (int y = y_start; y < y_end; y++) {
           Uint8 *row = (Uint8 *)surface->pixels + y * surface->pitch;
