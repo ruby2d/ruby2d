@@ -23,7 +23,7 @@ ROWS = 45  # 720 / 16
 Ruby2D::Benchmark.run('Images (Multi-texture)') do
   set title: 'Ruby 2D Benchmark — Images (Multi-texture)', width: 1280, height: 720
 
-  paths = %w[image.png boom.png hero.png coin.png].map { |f| "#{Ruby2D.test_images}/#{f}" }
+  paths = %w[image.png image.jpg image.bmp colors.png].map { |f| "#{Ruby2D.test_images}/#{f}" }
 
   COLS.times do |i|
     ROWS.times do |j|
