@@ -212,26 +212,21 @@ module Ruby2D
 
     # Build/rebuild flat color cache for the native extension. Line is a quad
     # internally, so the 2-color gradient (start, end) expands to 4 vertex
-    # entries: start→both start corners, end→both end corners.
+    # entries: start→both start corners, end→both end corners. Rebuilt only
+    # when the color's revision changes (see `Color#_rev`); `color=` clears
+    # the cache when the object itself is swapped.
     def ensure_cc
-      if @_cc.nil? || !cc_matches?
-        c0 = @color.vertex(0)
-        c1 = @color.vertex(1)
-        @_cc = [c0.r, c0.g, c0.b, c0.a,
-                c0.r, c0.g, c0.b, c0.a,
-                c1.r, c1.g, c1.b, c1.a,
-                c1.r, c1.g, c1.b, c1.a]
-      end
-    end
+      rev = @color._rev
+      return if @_cc && @_cc_rev == rev
 
-    # Line's 4-vertex expansion is deterministic, so checking the two source
-    # entries (start and end) detects any Color::Set mutation.
-    def cc_matches?
       c0 = @color.vertex(0)
       c1 = @color.vertex(1)
-      return false if @_cc[0] != c0.r || @_cc[1] != c0.g || @_cc[2]  != c0.b || @_cc[3]  != c0.a
-      return false if @_cc[8] != c1.r || @_cc[9] != c1.g || @_cc[10] != c1.b || @_cc[11] != c1.a
-      true
+      @_cc = [c0.r, c0.g, c0.b, c0.a,
+              c0.r, c0.g, c0.b, c0.a,
+              c1.r, c1.g, c1.b, c1.a,
+              c1.r, c1.g, c1.b, c1.a]
+      @_cc_rev = rev
     end
+
   end
 end

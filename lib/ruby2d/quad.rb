@@ -343,14 +343,14 @@ module Ruby2D
     alias_method :_render_scene, :render
     public :_render_scene
 
-    # Build/rebuild flat per-vertex stroke color cache (4 × rgba = 16 floats)
     def ensure_scc
+      rev = @stroke_color._rev
+      return if @_stroke_cc && @_stroke_cc_rev == rev
+
       if @_stroke_color_uniform
         c = @stroke_color
-        if @_stroke_cc.nil? || @_stroke_cc[0] != c.r || @_stroke_cc[1] != c.g || @_stroke_cc[2] != c.b || @_stroke_cc[3] != c.a
-          @_stroke_cc = [c.r, c.g, c.b, c.a]
-        end
-      elsif @_stroke_cc.nil? || !scc_matches?
+        @_stroke_cc = [c.r, c.g, c.b, c.a]
+      else
         @_stroke_cc = Array.new(16)
         4.times do |i|
           c = @stroke_color.vertex(i)
@@ -360,30 +360,23 @@ module Ruby2D
           @_stroke_cc[i * 4 + 3] = c.a
         end
       end
+      @_stroke_cc_rev = rev
     end
 
-    def scc_matches?
-      4.times do |i|
-        c = @stroke_color.vertex(i)
-        return false if @_stroke_cc[i * 4]     != c.r
-        return false if @_stroke_cc[i * 4 + 1] != c.g
-        return false if @_stroke_cc[i * 4 + 2] != c.b
-        return false if @_stroke_cc[i * 4 + 3] != c.a
-      end
-      true
-    end
 
-    # Build/rebuild flat color cache for the native extension
+    # Build/rebuild the flat color cache for the native extension: 4 floats for
+    # a solid fill, 16 for a per-vertex gradient. Rebuilt only when the
+    # color's revision changes (see `Color#_rev`), which covers in-place
+    # mutation such as `color.opacity=` fades; `color=` clears the cache when
+    # the object itself is swapped.
     def ensure_cc
-      # Solid fill: cache 4 floats and validity-check 4 comparisons (the
-      # per-frame check still catches in-place `color.opacity=` fades). Mirrors
-      # the Circle/Ellipse single-color cache.
+      rev = @color._rev
+      return if @_cc && @_cc_rev == rev
+
       if @_color_uniform
         c = @color
-        if @_cc.nil? || @_cc[0] != c.r || @_cc[1] != c.g || @_cc[2] != c.b || @_cc[3] != c.a
-          @_cc = [c.r, c.g, c.b, c.a]
-        end
-      elsif @_cc.nil? || !cc_matches?
+        @_cc = [c.r, c.g, c.b, c.a]
+      else
         @_cc = Array.new(16)
         4.times do |i|
           c = @color.vertex(i)
@@ -393,17 +386,8 @@ module Ruby2D
           @_cc[i * 4 + 3] = c.a
         end
       end
+      @_cc_rev = rev
     end
 
-    def cc_matches?
-      4.times do |i|
-        c = @color.vertex(i)
-        return false if @_cc[i * 4]     != c.r
-        return false if @_cc[i * 4 + 1] != c.g
-        return false if @_cc[i * 4 + 2] != c.b
-        return false if @_cc[i * 4 + 3] != c.a
-      end
-      true
-    end
   end
 end

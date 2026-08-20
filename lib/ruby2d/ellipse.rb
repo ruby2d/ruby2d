@@ -212,17 +212,23 @@ module Ruby2D
     alias_method :_render_scene, :render
     public :_render_scene
 
+    # Build/rebuild the flat color cache for the native extension. Rebuilt
+    # only when the color's revision changes (see `Color#_rev`); `color=`
+    # clears the cache when the object itself is swapped.
     def ensure_cc
-      if @_cc.nil? || @_cc[0] != @color.r || @_cc[1] != @color.g || @_cc[2] != @color.b || @_cc[3] != @color.a
-        @_cc = [@color.r, @color.g, @color.b, @color.a]
-      end
+      rev = @color._rev
+      return if @_cc && @_cc_rev == rev
+
+      @_cc = [@color.r, @color.g, @color.b, @color.a]
+      @_cc_rev = rev
     end
 
     def ensure_scc
-      c = @stroke_color
-      if @_stroke_cc.nil? || @_stroke_cc[0] != c.r || @_stroke_cc[1] != c.g || @_stroke_cc[2] != c.b || @_stroke_cc[3] != c.a
-        @_stroke_cc = [c.r, c.g, c.b, c.a]
-      end
+      rev = @stroke_color._rev
+      return if @_stroke_cc && @_stroke_cc_rev == rev
+
+      @_stroke_cc = [@stroke_color.r, @stroke_color.g, @stroke_color.b, @stroke_color.a]
+      @_stroke_cc_rev = rev
     end
   end
 end

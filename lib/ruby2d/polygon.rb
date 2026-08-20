@@ -239,59 +239,43 @@ module Ruby2D
     alias_method :_render_scene, :render
     public :_render_scene
 
-    # Flatten @color into per-vertex RGBA array. If @color is a Color::Set, use
-    # each entry; otherwise replicate across all vertices.
+    # Flatten @color into a per-vertex RGBA array. If @color is a Color::Set,
+    # use each entry; otherwise replicate across all vertices. Rebuilt only when
+    # the color's revision changes (see `Color#_rev`); `color=` clears the
+    # cache when the object itself is swapped.
     def ensure_cc
       n = vertex_count
-      if @_cc.nil? || @_cc.length != n * 4 || !cc_matches?
-        @_cc = Array.new(n * 4)
-        n.times do |i|
-          c = @color.vertex(i)
-          @_cc[i * 4]     = c.r
-          @_cc[i * 4 + 1] = c.g
-          @_cc[i * 4 + 2] = c.b
-          @_cc[i * 4 + 3] = c.a
-        end
-      end
-    end
+      rev = @color._rev
+      return if @_cc && @_cc_rev == rev && @_cc.length == n * 4
 
-    def cc_matches?
-      n = vertex_count
+      @_cc = Array.new(n * 4)
       n.times do |i|
         c = @color.vertex(i)
-        return false if @_cc[i * 4]     != c.r
-        return false if @_cc[i * 4 + 1] != c.g
-        return false if @_cc[i * 4 + 2] != c.b
-        return false if @_cc[i * 4 + 3] != c.a
+        @_cc[i * 4]     = c.r
+        @_cc[i * 4 + 1] = c.g
+        @_cc[i * 4 + 2] = c.b
+        @_cc[i * 4 + 3] = c.a
       end
-      true
+      @_cc_rev = rev
     end
+
 
     # Build flat per-vertex stroke color cache (vertex_count × rgba floats)
     def ensure_scc
       n = vertex_count
-      if @_stroke_cc.nil? || @_stroke_cc.length != n * 4 || !scc_matches?
-        @_stroke_cc = Array.new(n * 4)
-        n.times do |i|
-          c = @stroke_color.vertex(i)
-          @_stroke_cc[i * 4]     = c.r
-          @_stroke_cc[i * 4 + 1] = c.g
-          @_stroke_cc[i * 4 + 2] = c.b
-          @_stroke_cc[i * 4 + 3] = c.a
-        end
-      end
-    end
+      rev = @stroke_color._rev
+      return if @_stroke_cc && @_stroke_cc_rev == rev && @_stroke_cc.length == n * 4
 
-    def scc_matches?
-      n = vertex_count
+      @_stroke_cc = Array.new(n * 4)
       n.times do |i|
         c = @stroke_color.vertex(i)
-        return false if @_stroke_cc[i * 4]     != c.r
-        return false if @_stroke_cc[i * 4 + 1] != c.g
-        return false if @_stroke_cc[i * 4 + 2] != c.b
-        return false if @_stroke_cc[i * 4 + 3] != c.a
+        @_stroke_cc[i * 4]     = c.r
+        @_stroke_cc[i * 4 + 1] = c.g
+        @_stroke_cc[i * 4 + 2] = c.b
+        @_stroke_cc[i * 4 + 3] = c.a
       end
-      true
+      @_stroke_cc_rev = rev
     end
+
   end
 end

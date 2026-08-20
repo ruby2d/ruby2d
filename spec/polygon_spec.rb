@@ -162,4 +162,37 @@ RSpec.describe Ruby2D::Polygon do
       expect(poly.instance_variable_get(:@coordinates)).to eq([0, 0, 100, 0, 100, 20, 0, 20])
     end
   end
+
+  # The flat color array handed to the native draw is cached against the
+  # color's revision (see `Color#_rev`), so in-place mutation — a vertex
+  # channel, or a whole-set opacity fade — must still reach the draw call.
+  describe 'color cache invalidation' do
+    it 'reflects in-place mutation of a gradient vertex and a set-wide opacity fade' do
+      poly = Polygon.new(points: [[0, 0], [10, 0], [0, 10]],
+                         color: %w[red green blue], add: false)
+      captured = []
+      allow(Ruby2D::Ext).to receive(:draw_polygon) { |_, cc| captured << cc }
+      poly.send(:render)
+      poly.send(:render)
+      expect(captured[0]).to be(captured[1]) # unchanged color: same cached array
+
+      poly.color[1].r = 0.5
+      poly.send(:render)
+      expect(captured.last[4]).to eq(0.5)
+
+      poly.color.opacity = 0.25
+      poly.send(:render)
+      expect(captured.last.values_at(3, 7, 11)).to eq([0.25, 0.25, 0.25])
+    end
+
+    it 'reflects a shape-level opacity change on a solid fill' do
+      poly = Polygon.new(points: [[0, 0], [10, 0], [0, 10]], color: 'red', add: false)
+      captured = []
+      allow(Ruby2D::Ext).to receive(:draw_polygon) { |_, cc| captured << cc }
+      poly.send(:render)
+      poly.opacity = 0.5
+      poly.send(:render)
+      expect(captured.last.values_at(3, 7, 11)).to eq([0.5, 0.5, 0.5])
+    end
+  end
 end
