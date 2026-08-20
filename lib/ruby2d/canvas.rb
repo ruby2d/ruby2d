@@ -36,7 +36,13 @@ module Ruby2D
       @fill_b = @fill.b
       @fill_a = @fill.a
 
-      Ext.canvas_create(self)
+      # The surface is sized once, here. Before `show` the extension's asset
+      # scale doesn't yet reflect `pixel_scale` (it's applied when the window
+      # opens), so tell it when the canvas should be built at logical
+      # resolution; otherwise a canvas created pre-show — the usual case —
+      # would be built at full display resolution regardless of the setting.
+      logical = !Window.shown? && Window.pixel_scale && Window.highdpi
+      Ext.canvas_create(self, logical)
       @visible = visible
       self.add if add
     end

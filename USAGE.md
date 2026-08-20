@@ -1488,7 +1488,7 @@ canvas = Canvas.new(width: 200, height: 200)
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
 | `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 
-A Canvas captures the display scale once, at construction, and bakes it into its pixel buffer; it never re-evaluates (unlike `Text`, which re-rasterizes on scale changes), because doing so would discard your accumulated drawing. With the default settings this is handled for you. With `pixel_scale: true`, construct the Canvas *after* `show` starts so it picks up the physical-pixel size; see the `update`-loop pattern under [Pixel Scale](#pixel-scale).
+A Canvas captures the display scale once, at construction, and bakes it into its pixel buffer; it never re-evaluates (unlike `Text`, which re-rasterizes on scale changes), because doing so would discard your accumulated drawing. This is handled for you, before or after `show`, including with `pixel_scale: true` (where the buffer is 1:1 with physical pixels). The one thing that isn't known before `show` is the window's viewport size, so a Canvas meant to fill the viewport under `pixel_scale` still needs the `update`-loop pattern under [Pixel Scale](#pixel-scale).
 
 ### Filled Shapes
 

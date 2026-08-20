@@ -26,4 +26,22 @@ RSpec.describe 'Window pixel_scale' do
       Ruby2D::Window.shown = false
     end
   end
+
+  # A Canvas bakes its scale in at construction. Before `show` the extension
+  # can't see `pixel_scale` yet, so the Ruby side tells it when to build at
+  # logical (1:1) resolution; see `Canvas#initialize`.
+  describe 'Canvas created before show' do
+    after { Ruby2D::Window.set(pixel_scale: false) }
+
+    it 'asks for a logical-resolution surface when pixel_scale is on' do
+      Ruby2D::Window.set(pixel_scale: true)
+      expect(Ruby2D::Ext).to receive(:canvas_create).with(kind_of(Ruby2D::Canvas), true)
+      Ruby2D::Canvas.new(width: 10, height: 10, add: false)
+    end
+
+    it 'keeps the display scale by default' do
+      expect(Ruby2D::Ext).to receive(:canvas_create).with(kind_of(Ruby2D::Canvas), false)
+      Ruby2D::Canvas.new(width: 10, height: 10, add: false)
+    end
+  end
 end

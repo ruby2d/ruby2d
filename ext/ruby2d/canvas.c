@@ -49,8 +49,9 @@ void R2D_Canvas_Init() {
  */
 R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 1) r_raise("Ruby2D::Ext.canvas_create expects 1 arg (canvas), got %d", (int)argc);
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_create expects 2 args (canvas, logical), got %d", (int)argc);
   R_VAL obj = argv[0];
+  bool logical = r_test(argv[1]);
 
   // Ensure SDL subsystems are initialized (display_scale is set in R2D_Init)
   if (!R2D_Init()) r_raise("Ruby2D: failed to initialize: %s", SDL_GetError());
@@ -65,11 +66,18 @@ R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
      A Canvas captures its scale once, here, and never re-evaluates (unlike
      text, which re-rasterizes from its string when the scale changes — a
      Canvas holds the user's accumulated drawing and can't be recreated).
-     If no window exists yet (a Canvas built as the very first Ruby 2D
-     object), R2D_GetAssetScale() would report 1.0 and freeze the surface at
-     logical resolution. Fall back to the init display scale — known since
-     R2D_Init, before any window — so the common HiDPI case stays crisp. */
-  float scale = R2D_GetWindow() ? R2D_GetAssetScale() : R2D_GetInitDisplayScale();
+     Before `show` (the usual case) the window's asset scale doesn't yet
+     reflect `pixel_scale` — R2D_ApplyPixelScale sets it when the window
+     opens — so the Ruby side passes `logical` when the canvas should be
+     built at 1:1 instead. Otherwise use the window's asset scale, or the
+     init display scale (known since R2D_Init) if there's no window struct
+     at all, so the common HiDPI case stays crisp. */
+  float scale;
+  if (logical) {
+    scale = 1.0f;
+  } else {
+    scale = R2D_GetWindow() ? R2D_GetAssetScale() : R2D_GetInitDisplayScale();
+  }
   int pixel_w = (int)(width  * scale);
   int pixel_h = (int)(height * scale);
 
