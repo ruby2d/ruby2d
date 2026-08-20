@@ -243,4 +243,23 @@ RSpec.describe Ruby2D::Color do
       expect(s[0].r).to eq(1.0)
     end
   end
+
+  describe ".for_render with a numeric array" do
+    it "refills one shared scratch instance instead of allocating or caching" do
+      a = Ruby2D::Color.for_render([0.1, 0.2, 0.3])
+      expect(a.to_a).to eq([0.1, 0.2, 0.3, 1.0])
+      b = Ruby2D::Color.for_render([0.4, 0.5, 0.6, 0.7])
+      expect(b).to be(a)
+      expect(b.to_a).to eq([0.4, 0.5, 0.6, 0.7])
+    end
+
+    it "clamps out-of-range channels like Color.new, warning once" do
+      expect { Ruby2D::Color.for_render([3, 0, 0]) }.to output(/color value 3/).to_stderr
+      expect(Ruby2D::Color.for_render([3, 0, 0]).r).to eq(1.0)
+    end
+
+    it "still raises for a malformed array" do
+      expect { Ruby2D::Color.for_render([0.1, 0.2]) }.to raise_error(Ruby2D::Error, /not a valid color/)
+    end
+  end
 end

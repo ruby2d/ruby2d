@@ -109,9 +109,11 @@ module Ruby2D
     @parse_cache = {}
 
     # Bounded cache of shared Color instances for immediate-mode `.render`
-    # calls, keyed by the color string. See `Color.for_render`.
+    # calls, keyed by the color string, plus one scratch instance refilled for
+    # every flat numeric `[r, g, b(, a)]` input. See `Color.for_render`.
     RENDER_CACHE_MAX = 256
     @render_cache = {}
+    @render_scratch = nil
 
     # Based on clrs.cc
     NAMED_COLORS = {
@@ -177,16 +179,17 @@ module Ruby2D
       end
 
       # Resolve a color for an immediate-mode class-level `.render` call.
-      # Behaves like `.set`, except string colors and flat `[r, g, b(, a)]`
-      # numeric arrays return a shared cached Color instance, skipping the
-      # validation re-scan and object allocation `.new` pays on every call —
-      # those two forms are the common case in per-frame draws, and on the web
-      # (mruby/wasm) that per-call cost dominates the frame budget. The cached
-      # instance is read and forwarded to the native draw call immediately; it
-      # must never be stored on an object or handed to user code (a later
-      # mutation would corrupt every subsequent lookup) — use `.set` anywhere
-      # the color is kept. `'random'` is never cached, so each call still
-      # rolls a fresh color.
+      # Behaves like `.set`, except string colors return a shared cached Color
+      # instance and flat `[r, g, b(, a)]` numeric arrays return one shared
+      # scratch instance refilled in place — both skip the validation re-scan
+      # and object allocation `.new` pays on every call. Those two forms are
+      # the common case in per-frame draws, and on the web (mruby/wasm) that
+      # per-call cost dominates the frame budget. The returned instance is
+      # read and forwarded to the native draw call immediately; it must never
+      # be stored on an object, handed to user code, or held across another
+      # `for_render` call (the next numeric input overwrites the scratch) —
+      # use `.set` anywhere the color is kept. `'random'` is never cached, so
+      # each call still rolls a fresh color.
       def for_render(colors)
         if colors.is_a?(String)
           cached = @render_cache[colors]
@@ -199,16 +202,16 @@ module Ruby2D
           # ^ The two inline checks pre-screen the non-match cases (an array of
           # colors starts with a String/Array/Color, never a Numeric) so this
           # per-draw-call path only pays the `rgba_array?` method call when the
-          # input is almost certainly a cacheable [r, g, b(, a)] array.
-          # Array keys are looked up by value, so mutating a previously seen
-          # array can't corrupt the mapping — it just misses and inserts a new
-          # entry. The stored key is a frozen copy for the same reason.
-          cached = @render_cache[colors]
-          return cached if cached
-
-          c = Color.new(colors)
-          @render_cache.shift if @render_cache.size >= RENDER_CACHE_MAX
-          @render_cache[colors.dup.freeze] = c
+          # input is almost certainly a flat [r, g, b(, a)] array.
+          # Numeric tuples are not cached by value: a hash lookup on a 4-float
+          # key costs more than refilling four channels, and high-cardinality
+          # inputs (a fresh `[rand, rand, rand]` per draw) would miss every
+          # time, each miss allocating a `Color`, a frozen key copy, and the
+          # pair `Hash#shift` returns on eviction.
+          scratch = (@render_scratch ||= Color.new('white'))
+          scratch._set_channels(colors[0], colors[1], colors[2],
+                                colors.length == 4 ? colors[3] : 1.0)
+          scratch
         else
           set(colors)
         end
@@ -328,6 +331,28 @@ module Ruby2D
     # is the same color," so every index returns self. Mirrors `Color::Set#vertex`
     # so per-vertex rendering code can call `color.vertex(i)` without branching.
     def vertex(_i)
+      self
+    end
+
+    # Overwrite all four channels with the same validation `Color.new` applies
+    # to a numeric array (out-of-range warns once and clamps). Backs the
+    # `for_render` scratch instance; deliberately leaves `_rev` alone, since
+    # that instance is never cached against. Internal.
+    def _set_channels(r, g, b, a)
+      # In-range is the overwhelmingly common case; check it inline so the
+      # per-draw-call path pays one method call, not four.
+      if r >= 0.0 && r <= 1.0 && g >= 0.0 && g <= 1.0 &&
+         b >= 0.0 && b <= 1.0 && a >= 0.0 && a <= 1.0
+        @r = r.to_f
+        @g = g.to_f
+        @b = b.to_f
+        @a = a.to_f
+      else
+        @r = channel(r)
+        @g = channel(g)
+        @b = channel(b)
+        @a = channel(a)
+      end
       self
     end
 
