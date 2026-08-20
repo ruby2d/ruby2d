@@ -467,6 +467,7 @@ BENCHMARKS = {
   retained:           'retained-mode rendering (objects added once)',
   mutation:           'retained-mode with per-frame attribute mutation',
   immediate:          'immediate-mode rendering (draw calls per frame)',
+  immediate_gradient: 'immediate-mode rendering with per-vertex gradient colors',
   circles:            'circle rendering (high geometry count)',
   images:             'image/texture rendering (single source texture)',
   images_multi:       'image rendering across multiple source textures (rebind cost)',

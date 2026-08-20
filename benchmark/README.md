@@ -51,6 +51,7 @@ To isolate a C-level cost outside the engine, build a from-source wasm mruby wit
 | `retained` | Retained-mode rendering (objects added once) |
 | `mutation` | Retained-mode with per-frame attribute mutation |
 | `immediate` | Immediate-mode rendering (draw calls per frame) |
+| `immediate_gradient` | Immediate-mode rendering with per-vertex gradient colors |
 | `circles` | Circle rendering (high geometry count) |
 | `images` | Image/texture rendering (single source texture) |
 | `images_multi` | Image rendering across multiple source textures (rebind cost) |

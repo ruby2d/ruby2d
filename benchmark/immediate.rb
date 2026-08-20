@@ -1,8 +1,10 @@
 # Benchmark — Immediate mode
 #
 # Draws 3,600 randomly colored squares every frame via Square.render inside
-# a render block. Measures Ruby method-call and object-allocation overhead
-# on top of the rendering cost.
+# a render block, each with a fresh uniform `[r, g, b, a]` tuple. Measures
+# Ruby method-call and object-allocation overhead on top of the rendering
+# cost. Counterpart to immediate_gradient.rb, which passes four distinct
+# per-vertex colors instead.
 #
 # Why it matters: immediate mode is the right choice for procedural content
 # — effects, particles, debug overlays, charts — where the scene changes
@@ -24,8 +26,7 @@ Ruby2D::Benchmark.run('Immediate (Squares)') do
   render do
     COLS.times do |i|
       ROWS.times do |j|
-        c = [rand, rand, rand, 1.0]
-        Square.render(x: i * 16, y: j * 16, size: 16, color: [c, c, c, c])
+        Square.render(x: i * 16, y: j * 16, size: 16, color: [rand, rand, rand, 1.0])
       end
     end
   end
