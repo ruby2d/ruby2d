@@ -473,6 +473,7 @@ BENCHMARKS = {
   sprites:            'animated sprite rendering (clip-rect updates per frame)',
   text:               'text/font rendering',
   text_dynamic:       'text/font rendering with per-frame content changes',
+  bitmap_text_dynamic: 'bitmap-font text with per-frame content changes',
   tiles:              'tileset rendering throughput (re-randomised per frame)',
   tiles_static:       'tileset rendering of a fixed map (common-case counterpart)',
   canvas:             'canvas drawing throughput (full clear + repaint per frame)',

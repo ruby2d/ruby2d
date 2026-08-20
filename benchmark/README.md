@@ -57,6 +57,7 @@ To isolate a C-level cost outside the engine, build a from-source wasm mruby wit
 | `sprites` | Animated sprite rendering (clip-rect updates per frame) |
 | `text` | Text/font rendering (static content) |
 | `text_dynamic` | Text/font rendering with per-frame content changes |
+| `bitmap_text_dynamic` | Bitmap-font text with per-frame content changes |
 | `tiles` | Tileset rendering throughput (re-randomised per frame; stress) |
 | `tiles_static` | Tileset rendering of a fixed map (common-case counterpart) |
 | `canvas` | Canvas drawing throughput (full clear + repaint per frame; stress) |
