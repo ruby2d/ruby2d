@@ -11,7 +11,18 @@ module Ruby2D
       def initialize(colors)
         raise Error, 'a Color::Set requires at least one color, got an empty array' if colors.empty?
 
-        @colors = colors.map { |c| Color.new(c) }
+        @_rev = 0
+        @colors = colors.map { |c| Color.new(c)._adopt(self) }
+      end
+
+      # Mutation revision of the whole set; see `Color#_rev`. Each member
+      # color bumps it when a channel changes, so a shape holding a gradient
+      # can compare one integer instead of rescanning every vertex color.
+      attr_reader :_rev
+
+      # Called by a member color when it changes (see `Color#_adopt`).
+      def _touch
+        @_rev += 1
       end
 
       # Get a color by index
@@ -63,7 +74,34 @@ module Ruby2D
       end
     end
 
-    attr_accessor :r, :g, :b, :a
+    attr_reader :r, :g, :b, :a
+
+    # Mutation revision: a counter bumped by every in-place channel change
+    # (`r=`, `g=`, `b=`, `a=`, `opacity=`). Shapes cache their flattened RGBA
+    # arrays against it, so an unchanged color costs one integer comparison
+    # per draw instead of a per-channel (per-vertex, for gradients) rescan.
+    # Internal; not part of the public API.
+    attr_reader :_rev
+
+    def r=(value)
+      @r = value
+      _touch
+    end
+
+    def g=(value)
+      @g = value
+      _touch
+    end
+
+    def b=(value)
+      @b = value
+      _touch
+    end
+
+    def a=(value)
+      @a = value
+      _touch
+    end
 
     # Bounded cache of parsed color strings, keyed by the user input.
     # `'random'` is never cached (re-randomized on each call).
@@ -101,6 +139,9 @@ module Ruby2D
     # Create a color from a keyword, hex string, array, or Color
     def initialize(color)
       raise Error, "#{color.inspect} is not a valid color" unless self.class.valid? color
+
+      @_rev = 0
+      @_owner = nil
 
       case color
       when String
@@ -275,6 +316,7 @@ module Ruby2D
       end
 
       @a = opacity.clamp(0.0, 1.0)
+      _touch
     end
 
     # Return the color components as an array
@@ -289,7 +331,20 @@ module Ruby2D
       self
     end
 
+    # Register the `Color::Set` this color belongs to, so channel changes
+    # propagate to the set's revision. A set clones its members on creation,
+    # so each color has at most one owner. Internal; returns self.
+    def _adopt(owner)
+      @_owner = owner
+      self
+    end
+
     private
+
+    def _touch
+      @_rev += 1
+      @_owner._touch if @_owner
+    end
 
     def init_from_string(color)
       @r, @g, @b, @a = self.class.parse_string(color)

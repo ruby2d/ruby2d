@@ -211,4 +211,36 @@ RSpec.describe Ruby2D::Color do
     end
   end
 
+  # Shapes cache their flattened RGBA arrays against this counter instead of
+  # rescanning every channel each frame, so every in-place mutation must bump
+  # it, and a Color::Set must reflect its members' changes.
+  describe "#_rev (mutation revision)" do
+    it "starts at zero and increments on every channel write" do
+      c = Ruby2D::Color.new('red')
+      expect(c._rev).to eq(0)
+      c.r = 0.5
+      c.g = 0.5
+      c.b = 0.5
+      c.a = 0.5
+      c.opacity = 0.25
+      expect(c._rev).to eq(5)
+    end
+
+    it "propagates a member's change to the Color::Set revision" do
+      s = Ruby2D::Color::Set.new(%w[red green blue])
+      expect(s._rev).to eq(0)
+      s[1].r = 0.5
+      expect(s._rev).to eq(1)
+      s.opacity = 0.5
+      expect(s._rev).to eq(4)
+    end
+
+    it "gives a Color::Set its own member copies, so the source color has no owner" do
+      src = Ruby2D::Color.new('red')
+      s = Ruby2D::Color::Set.new([src, 'blue'])
+      src.r = 0.1
+      expect(s._rev).to eq(0)
+      expect(s[0].r).to eq(1.0)
+    end
+  end
 end
