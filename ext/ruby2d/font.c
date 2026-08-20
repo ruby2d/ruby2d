@@ -236,23 +236,6 @@ void R2D_FreeBitmapText(R2D_BitmapText *bt) {
 }
 
 
-// Drop the cached texture and rendered string so the next draw rebuilds them.
-// Used for full re-inits (ext_create reuse, teardown) — content changes go
-// through R2D_UpdateBitmapText, which keeps the texture and uploads in place.
-static void R2D_InvalidateBitmapText(R2D_BitmapText *bt) {
-  if (bt->texture) {
-    SDL_DestroyTexture(bt->texture);
-    bt->texture = NULL;
-  }
-  bt->tex_w = 0;
-  bt->tex_h = 0;
-  bt->content_w = 0;
-  bt->content_h = 0;
-  free(bt->text);
-  bt->text = NULL;
-}
-
-
 /*
  * Render a string to a cached texture. If the string is identical to the
  * previously rendered one, this is a no-op (cache hit). Otherwise the old
@@ -462,15 +445,16 @@ R_VAL ruby2d_ext_bitmap_text_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   const char *msg = obj_str(obj, id_content);
   int scale       = obj_int(obj, id_bt_scale);
 
-  // Check for existing struct — reuse it if present, otherwise allocate new
+  // Reuse the existing struct if present, otherwise allocate new. The cached
+  // texture is deliberately left alone: the next draw's R2D_UpdateBitmapText
+  // sees the changed content/scale key and refreshes it per platform — native
+  // recreates, the web build uploads into its persistent grow-only texture.
+  // Destroying it here would defeat that reuse.
   R2D_BitmapText *bt = NULL;
   bool is_new = false;
   R_VAL existing = r_iv_get(obj, "@ext_bitmap_text");
   if (r_test(existing)) {
     obj_struct(obj, id_bt_ext, R2D_BitmapText, bt);
-    if (bt) {
-      R2D_InvalidateBitmapText(bt);
-    }
   }
 
   // Allocate new struct only if we don't have one to reuse
