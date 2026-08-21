@@ -175,11 +175,6 @@ when 'build'
         puts usage_build
         exit 1
       end
-      if @assets_dir
-        puts "#{'Error:'.error} --assets can't be used with --spinel, which has no way to load media yet"
-        puts usage_build
-        exit 1
-      end
       targets = :native
     end
 

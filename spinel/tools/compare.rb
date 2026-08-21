@@ -81,7 +81,8 @@ FIXTURES = { 'cli' => 'spinel/tools/cli_app.rb',
              'canvas' => 'spinel/tools/canvas_app.rb',
              'triangle' => 'spinel/tools/triangle_app.rb',
              'polyline' => 'spinel/tools/polyline_app.rb',
-             'button' => 'spinel/tools/button_app.rb' }.freeze
+             'button' => 'spinel/tools/button_app.rb',
+             'image' => 'spinel/tools/image_app.rb' }.freeze
 
 # A histogram is how a single-color divergence explains itself — which color
 # gained or lost pixels. A gradient has thousands of colors and the same list
@@ -97,6 +98,12 @@ def screenshots(fixture, dir)
   { 'mruby' => '--native', 'spinel' => '--spinel' }.map do |name, flag|
     shot = File.expand_path("#{dir}/#{name}.png")
     File.write("#{dir}/app.rb", source.sub(/^shot = .*$/, "shot = #{shot.inspect}"))
+    # A fixture's `# ruby2d:assets` directives name directories in this repo;
+    # copy them into the scratch dir so the build finds them where the app does.
+    source.scan(/^# ruby2d:assets (\S+)/).flatten.each do |asset_dir|
+      FileUtils.mkdir_p(File.dirname("#{dir}/#{asset_dir}"))
+      FileUtils.cp_r(File.expand_path(asset_dir), "#{dir}/#{asset_dir}")
+    end
     puts "    building #{name} (#{flag})…"
 
     out, status, code = Dir.chdir(dir) { run_capped(['ruby2d', 'build', flag, 'app.rb'], seconds: 900) }
@@ -114,7 +121,12 @@ def screenshots(fixture, dir)
   end.to_h
 end
 
-diverged = FIXTURES.map do |label, fixture|
+# `ruby compare.rb text image` runs just those fixtures.
+unknown = ARGV - FIXTURES.keys
+abort "unknown fixture#{'s' if unknown.size > 1}: #{unknown.join(', ')} (have: #{FIXTURES.keys.join(', ')})" unless unknown.empty?
+fixtures = ARGV.empty? ? FIXTURES : FIXTURES.slice(*ARGV)
+
+diverged = fixtures.map do |label, fixture|
   dir = "#{DIR}/#{label}"
   FileUtils.rm_rf(dir)
   FileUtils.mkdir_p(dir)

@@ -67,6 +67,9 @@ rake test:ruby shapes
 # Run `test/audio.rb` as a native executable (built with mruby)
 rake test:native audio
 
+# Run `test/image.rb` as a native executable compiled by Spinel (experimental; `ruby2d setup --spinel` first)
+rake test:spinel image
+
 # Run `test/input.rb` as a web app (built with mruby and WebAssembly) in the browser
 rake test:web input
 
@@ -93,6 +96,9 @@ rake examples:ruby asteroids
 
 # Run `examples/snake.rb` as a native executable (built with mruby)
 rake examples:native snake
+
+# Run `examples/nbody.rb` as a native executable compiled by Spinel (experimental)
+rake examples:spinel nbody
 
 # Run `examples/boids.rb` as a web app (built with mruby and WebAssembly) in the browser
 rake examples:web boids

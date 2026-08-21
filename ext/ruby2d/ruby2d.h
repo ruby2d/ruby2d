@@ -561,6 +561,11 @@ typedef struct {
   SDL_Surface *surface;
   SDL_Texture *texture;
   SDL_ScaleMode applied_scale_mode;
+  // Clip state for the Ruby-free handle API (R2D_ImageClip); the Ruby bindings
+  // keep theirs in ivars and pass it per draw.
+  bool clipped;
+  int clip_x, clip_y, clip_w, clip_h;
+  int source_w, source_h, trim_x, trim_y;
 } R2D_Image;
 
 // R2D_FontCacheEntry (defined in text.c)
@@ -1154,6 +1159,27 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC);
 
+/*
+ * Ruby-free image API for a bridge that cannot pass a Ruby object: an image
+ * is an opaque handle from R2D_ImageNew (NULL if the file is missing or
+ * undecodable, with the SDL error set), sized by R2D_ImageWidth /
+ * R2D_ImageHeight, clipped by R2D_ImageClip (off by default), drawn by
+ * R2D_ImageDraw with a scale mode by name (NULL or unknown falls back to the
+ * window's) and a flip in SDL_FlipMode's bits, re-rasterized by
+ * R2D_ImageResize, and released by R2D_ImageFree.
+ */
+void *R2D_ImageNew(const char *path, int width, int height);
+int   R2D_ImageWidth(void *image);
+int   R2D_ImageHeight(void *image);
+void  R2D_ImageClip(void *image, bool clipped, int clip_x, int clip_y,
+                    int clip_w, int clip_h, int source_w, int source_h,
+                    int trim_x, int trim_y);
+bool  R2D_ImageDraw(void *image, float x, float y, float w, float h, float rotate,
+                    float crx, float cry, float r, float g, float b, float a,
+                    int flip, const char *scale_mode);
+bool  R2D_ImageResize(void *image, const char *path, int w, int h, const char *scale_mode);
+void  R2D_ImageFree(void *image);
+
 
 // Text ////////////////////////////////////////////////////////////////////////
 
@@ -1242,6 +1268,8 @@ bool  R2D_CanvasStrokePolygon(void *canvas, const double *a, int len);
 bool  R2D_CanvasStrokePolyline(void *canvas, const double *a, int len);
 bool  R2D_CanvasDrawImage(void *canvas, void *image, const double *a, int len, SDL_ScaleMode mode);
 bool  R2D_CanvasDrawText(void *canvas, void *text, const double *a, int len, SDL_ScaleMode mode);
+bool  R2D_CanvasDrawImageNamed(void *canvas, void *image, double x, double y, double w, double h,
+                               const char *scale_mode);
 bool  R2D_CanvasDrawTextNamed(void *canvas, void *text, double x, double y, double w, double h,
                               double r, double g, double b, double a, const char *scale_mode);
 void  R2D_CanvasFree(void *canvas);

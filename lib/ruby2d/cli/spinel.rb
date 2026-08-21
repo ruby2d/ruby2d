@@ -144,11 +144,43 @@ end
 # so there is no method table to undefine from and Spinel refuses the call.
 # Dropping it loses nothing on this target: a `color` call on a Canvas would
 # be resolved statically either way. An AOT gap, not a bug.
-def spinel_canvas_undef_color(src)
+def spinel_undef_color(src)
+  line = "    undef_method :color, :color=, :colour, :colour=\n"
+  unless src.scan(line).size == 2
+    raise SpinelCompatDrift, 'Spinel compat `undef_color` no longer matches lib/ (expected Canvas and Image). See spinel/README.md.'
+  end
+
+  src.gsub(line, '')
+end
+
+
+# `Image#initialize` takes `_share_from:`, the Image whose decoded texture a
+# `SpriteSheet`'s sprites share, and copies its state with
+# `instance_variable_get` — runtime reflection an AOT build refuses. Neither
+# class is on this target yet, so the branch becomes a raise until they are.
+def spinel_image_share_from(src)
   spinel_sub(src,
-             "    undef_method :color, :color=, :colour, :colour=\n",
-             '',
-             'Canvas undef_method of the color accessors')
+             "      if _share_from\n" \
+             "        # SpriteSheet uses this to give every Sprite the same backing texture\n" \
+             "        # without re-decoding the file or re-uploading to the GPU.\n" \
+             "        @path        = _share_from.path\n" \
+             "        @ext_image   = _share_from.instance_variable_get(:@ext_image)\n" \
+             "        # Inherit the sheet's sampling unless this Sprite asked for its own\n" \
+             "        @scale_mode ||= _share_from.scale_mode\n" \
+             "        @orig_width  = _share_from.instance_variable_get(:@orig_width)\n" \
+             "        @orig_height = _share_from.instance_variable_get(:@orig_height)\n" \
+             "        @width     ||= @orig_width\n" \
+             "        @height    ||= @orig_height\n" \
+             "        @clipped     = false\n" \
+             "        @clip_x      = 0.0\n" \
+             "        @clip_y      = 0.0\n" \
+             "        @clip_width  = @orig_width\n" \
+             "        @clip_height = @orig_height\n" \
+             "      else\n",
+             "      if _share_from\n" \
+             "        raise Error, 'SpriteSheet is not available on the Spinel target'\n" \
+             "      else\n",
+             'Image _share_from state copy')
 end
 
 
@@ -190,7 +222,8 @@ end
 def spinel_compat(src)
   src = spinel_block_param_capture(src)
   src = spinel_hash_delete_if(src)
-  src = spinel_canvas_undef_color(src)
+  src = spinel_undef_color(src)
+  src = spinel_image_share_from(src)
   src = spinel_button_visual_hooks(src)
   src = spinel_disable_class_pattern(src)
   src + spinel_web_predicate
@@ -230,6 +263,7 @@ SPINEL_LIB_FILES = %w[
   line
   font
   text
+  image
   canvas
   polyline
   triangle
@@ -241,7 +275,7 @@ SPINEL_LIB_FILES = %w[
 # The C sources that make up the `RUBY2D_NO_RUBY` core — the `R2D_*` renderer
 # with no Ruby engine in it. The rest of `ext/ruby2d` is either the CRuby/mruby
 # binding layer (`ext.c`) or a subsystem this slice doesn't reach.
-SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard text canvas].freeze
+SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard text image canvas].freeze
 
 # `Ext` on this target.
 #
@@ -314,6 +348,15 @@ SPINEL_EXT = <<~'RUBY'
       ffi_func :R2D_TextStale, [:ptr], :bool
       ffi_func :R2D_TextDraw, [:ptr, :float, :float, :float, :float, :float,
                                :float, :float, :float, :float, :str], :bool
+      # An image is an opaque handle loaded once from its path (the display size
+      # steers the SVG rasterizer), measured back, and drawn each frame with its
+      # geometry, tint, flip and scale mode passed in.
+      ffi_func :R2D_ImageNew, [:str, :int, :int], :ptr
+      ffi_func :R2D_ImageWidth, [:ptr], :int
+      ffi_func :R2D_ImageHeight, [:ptr], :int
+      ffi_func :R2D_ImageDraw, [:ptr, :float, :float, :float, :float, :float, :float, :float,
+                                :float, :float, :float, :float, :int, :str], :bool
+      ffi_func :R2D_ImageResize, [:ptr, :str, :int, :int, :str], :bool
       # A canvas is an opaque handle; packed payloads cross as a Float array
       # with their length, in the layouts `canvas.c` documents per binding.
       ffi_func :R2D_CanvasNew, [:int, :int, :bool, :float, :float, :float, :float], :ptr
@@ -337,6 +380,7 @@ SPINEL_EXT = <<~'RUBY'
       ffi_func :R2D_CanvasDrawLines, [:ptr, :float_array, :int], :bool
       ffi_func :R2D_CanvasStrokePolygon, [:ptr, :float_array, :int], :bool
       ffi_func :R2D_CanvasStrokePolyline, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasDrawImageNamed, [:ptr, :ptr, :double, :double, :double, :double, :str], :bool
       ffi_func :R2D_CanvasDrawTextNamed, [:ptr, :ptr, :double, :double, :double, :double,
                                           :double, :double, :double, :double, :str], :bool
       # 18: three vertices of x, y, r, g, b, a.
@@ -559,6 +603,49 @@ SPINEL_EXT = <<~'RUBY'
         true
       end
 
+      # `image_create(image)` is a pass-self call on the other engines: C reads
+      # the path and any display size off the object, decodes the file, and
+      # writes the decoded size and a reset clip back. Here the Image carries the
+      # native handle in a ptr-typed ivar (see `SPINEL_TEXT_SYNC`) and the
+      # adapter copies the size out. Handles are never freed.
+      def self.image_create(image)
+        w = image.width
+        h = image.height
+        handle = Ext.R2D_ImageNew(image.path, w.nil? ? 0 : w.to_i, h.nil? ? 0 : h.to_i)
+        raise Error, "Failed to load image `#{image.path}`" if handle == nil
+
+        image._spinel_image = handle
+        image._spinel_size(Ext.R2D_ImageWidth(handle), Ext.R2D_ImageHeight(handle))
+        image._spinel_loaded(Ext.R2D_ImageWidth(handle), Ext.R2D_ImageHeight(handle))
+        true
+      end
+
+      def self.image_draw(image)
+        handle = image._spinel_image
+        return nil if handle == nil
+
+        c = image.tint
+        ok = Ext.R2D_ImageDraw(handle, image.x.to_f, image.y.to_f,
+                               image.width.to_f, image.height.to_f, image.rotate.to_f,
+                               image.rx.to_f, image.ry.to_f,
+                               c.r.to_f, c.g.to_f, c.b.to_f, c.a.to_f,
+                               image._spinel_flip, image.scale_mode.to_s)
+        raise Error, 'Failed to draw image' unless ok
+
+        true
+      end
+
+      def self.image_resize(image, width, height)
+        handle = image._spinel_image
+        return nil if handle == nil
+
+        ok = Ext.R2D_ImageResize(handle, image.path, width.to_i, height.to_i, image.scale_mode.to_s)
+        raise Error, 'Image#resize! failed' unless ok
+
+        image._spinel_loaded(Ext.R2D_ImageWidth(handle), Ext.R2D_ImageHeight(handle))
+        true
+      end
+
       # Canvas: the same handle pattern as Text (see `SPINEL_TEXT_SYNC`). Each
       # packed payload is floated first — `:float_array` hands C the storage of
       # an `Array<Float>`, and `lib/` packs counts and coordinates as Integers.
@@ -683,11 +770,14 @@ SPINEL_EXT = <<~'RUBY'
                                                       text.scale_mode.to_s), 'draw_text')
       end
 
-      # `Image` is not on this target yet; the preflight refuses an app that
-      # constructs one, so this is only reachable through an object that is
-      # not an Image.
-      def self.canvas_draw_image(_canvas, _image, _a)
-        raise Error, 'Canvas#draw_image is not available on the Spinel target'
+      # `a` is [x, y, w, h]; the Image's surface is its handle's.
+      def self.canvas_draw_image(canvas, image, a)
+        handle = image._spinel_image
+        raise Error, 'Canvas#draw_image requires an Image that has been created' if handle == nil
+
+        _spinel_canvas_ok(Ext.R2D_CanvasDrawImageNamed(canvas._spinel_canvas, handle,
+                                                       a[0].to_f, a[1].to_f, a[2].to_f, a[3].to_f,
+                                                       image.scale_mode.to_s), 'draw_image')
       end
 
       def self.draw_triangle(x1, y1, r1, g1, b1, a1,
@@ -793,6 +883,36 @@ SPINEL_TEXT_SYNC = <<~'RUBY'
       def _spinel_fill_b = @fill_b
       def _spinel_fill_a = @fill_a
     end
+
+    class Image
+      attr_accessor :_spinel_image
+
+      # Image has no `@flip`; Sprite will, in SDL_FlipMode's bits.
+      def _spinel_flip = 0
+
+      def _spinel_size(w, h)
+        @width = w
+        @height = h
+        nil
+      end
+
+      # What a (re)load writes back: the decoded size, with the clip reset to
+      # cover all of it.
+      def _spinel_loaded(w, h)
+        @orig_width = w
+        @orig_height = h
+        @clipped = false
+        @clip_x = 0.0
+        @clip_y = 0.0
+        @clip_width = w
+        @clip_height = h
+        @source_width = w
+        @source_height = h
+        @trim_x = 0
+        @trim_y = 0
+        nil
+      end
+    end
   end
 RUBY
 
@@ -848,7 +968,7 @@ end
 # define no user-facing class map to nil.
 SPINEL_EXCLUDED_CLASSES = {
   'audio' => 'Audio',
-  'ellipse' => 'Ellipse', 'image' => 'Image',
+  'ellipse' => 'Ellipse',
   'json_parser' => nil, 'atlas_parser' => nil, 'sprite_sheet' => 'SpriteSheet',
   'polygon' => 'Polygon',
   'sprite' => 'Sprite', 'bitmap_text' => 'BitmapText',
@@ -1026,6 +1146,9 @@ def build_spinel(ruby2d_app)
   app_source = strip_require(ruby2d_app)
   spinel_preflight!(app_source, ruby2d_app)
 
+  @asset_dirs = ([@assets_dir] + asset_directives(ruby2d_app)).compact.uniq
+  @asset_dirs.each { |dir| check_asset_dir(dir) }
+
   spinel = find_spinel
   unless spinel
     error "Can't find `spinel`, the Ruby AOT compiler."
@@ -1082,12 +1205,10 @@ def build_spinel(ruby2d_app)
     exit 1
   end
 
-  # The default font ships next to the executable as on the mruby target, so
-  # `Text.new('…')` with no `font:` resolves it. No other asset bundling yet —
-  # nothing else in the slice can read a file, and `--assets` is rejected up
-  # front. The bundle step still expects the list.
+  # The default font and the declared asset directories ship next to the
+  # executable as on the mruby target.
   bundle_default_font
-  @asset_dirs = []
+  bundle_asset_dirs
   create_macos_bundle if AssetsTarget.host_os == 'macos'
   wrote "#{BUILD_DIR}/native/app"
   wrote "#{BUILD_DIR}/native/App.app" if AssetsTarget.host_os == 'macos'

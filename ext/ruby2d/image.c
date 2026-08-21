@@ -2,6 +2,280 @@
 
 #include "ruby2d.h"
 
+// Case-insensitive check for the `.svg` extension on a path.
+static bool path_is_svg(const char *path) {
+  if (!path) return false;
+  size_t len = strlen(path);
+  if (len < 4) return false;
+  const char *ext = path + len - 4;
+  return ext[0] == '.' &&
+         (ext[1] == 's' || ext[1] == 'S') &&
+         (ext[2] == 'v' || ext[2] == 'V') &&
+         (ext[3] == 'g' || ext[3] == 'G');
+}
+
+
+// Cores ///////////////////////////////////////////////////////////////////////
+//
+// The image renderer with no Ruby object in it: the Ruby bindings below read
+// the ivars and call these, and the Ruby-free handle API after them passes the
+// same values in as arguments. Failures set the SDL error and return NULL or
+// false so either caller can report them its own way.
+
+/*
+ * Decode an image file into a surface. SVGs rasterize at their intrinsic size
+ * via IMG_Load and then pixelate when drawn larger, so when the caller knows
+ * the display size (w, h > 0) they rasterize at 2× it: small upscales and
+ * rotations stay crisp, and downscales to the display size are SDL's at draw
+ * time. Raster formats ignore the size.
+ */
+static SDL_Surface *R2D_ImageLoadSurface(const char *path, int w, int h) {
+  SDL_Surface *surface = NULL;
+  if (path_is_svg(path) && w > 0 && h > 0) {
+    SDL_IOStream *io = SDL_IOFromFile(path, "rb");
+    if (io) {
+      surface = IMG_LoadSizedSVG_IO(io, w * 2, h * 2);
+      SDL_CloseIO(io);
+    }
+  }
+  if (!surface) surface = IMG_Load(path);
+  return surface;
+}
+
+
+/*
+ * Upload the surface to a texture the first time it is drawn. The surface
+ * stays alive for canvas blitting; R2D_ImageDestroy releases both.
+ */
+static bool R2D_ImageEnsureTexture(R2D_Image *img) {
+  if (img->texture) return true;
+  img->texture = SDL_CreateTextureFromSurface(R2D_GetRenderer(), img->surface);
+  if (!img->texture) return false;
+  SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
+  img->applied_scale_mode = SDL_SCALEMODE_INVALID;
+  return true;
+}
+
+
+/*
+ * Draw the image into (x, y, w, h), rotated about the world point (crx, cry)
+ * and tinted. `clipped` selects the (clip_x, clip_y, clip_w, clip_h) source
+ * rect, placed inside the destination by the trim metadata: `source_w` /
+ * `source_h` is the original logical frame size, `trim_x` / `trim_y` where
+ * the packed pixels live within it. With the no-trim defaults (source = clip,
+ * trim = 0) the math collapses to drawing the clip rect at (x, y).
+ */
+static bool R2D_ImageDrawWith(R2D_Image *img,
+                              float x, float y, float w, float h, float rotate,
+                              float crx, float cry,
+                              float r, float g, float b, float a,
+                              SDL_FlipMode flip_mode, SDL_ScaleMode mode,
+                              bool clipped, int clip_x, int clip_y,
+                              int clip_w, int clip_h,
+                              int source_w, int source_h, int trim_x, int trim_y) {
+  if (!R2D_ImageEnsureTexture(img)) return false;
+
+  if (mode != img->applied_scale_mode) {
+    SDL_SetTextureScaleMode(img->texture, mode);
+    img->applied_scale_mode = mode;
+  }
+
+  SDL_FRect dst_rect;
+  SDL_FRect clip_rect;
+  SDL_FRect *src_rect = NULL;
+
+  if (clipped) {
+    // Source rect inside the texture, clamped to the area that actually
+    // remains after the clip offset. The public accessors (`clip_x=`,
+    // `clip_width=`, etc.) are unvalidated, so a zero-size, negative, or
+    // past-the-edge clip can reach here; an offset-aware clamp keeps the
+    // src rect inside the texture and the scale math finite.
+    int orig_width  = img->surface->w;
+    int orig_height = img->surface->h;
+
+    if (clip_x < 0) clip_x = 0;
+    if (clip_x > orig_width)  clip_x = orig_width;
+    if (clip_y < 0) clip_y = 0;
+    if (clip_y > orig_height) clip_y = orig_height;
+
+    int avail_w = orig_width  - clip_x;
+    int avail_h = orig_height - clip_y;
+    int clipped_w = clip_w > avail_w ? avail_w : clip_w;
+    int clipped_h = clip_h > avail_h ? avail_h : clip_h;
+
+    // Degenerate or fully out-of-bounds clip: nothing to draw. Bail before
+    // the source_w/source_h division so it can't produce Inf/NaN geometry.
+    if (clipped_w <= 0 || clipped_h <= 0) return true;
+
+    clip_rect.x = clip_x;
+    clip_rect.y = clip_y;
+    clip_rect.w = clipped_w;
+    clip_rect.h = clipped_h;
+    src_rect = &clip_rect;
+
+    if (source_w <= 0) source_w = clipped_w;
+    if (source_h <= 0) source_h = clipped_h;
+
+    // Mirror the trim offset for flipped sprites so the pose flips around
+    // the original frame's center, not around the trimmed rect's center.
+    if (flip_mode & SDL_FLIP_HORIZONTAL) trim_x = source_w - trim_x - clipped_w;
+    if (flip_mode & SDL_FLIP_VERTICAL)   trim_y = source_h - trim_y - clipped_h;
+
+    float scale_x = w / (float)source_w;
+    float scale_y = h / (float)source_h;
+
+    dst_rect.x = x + trim_x * scale_x;
+    dst_rect.y = y + trim_y * scale_y;
+    dst_rect.w = clipped_w * scale_x;
+    dst_rect.h = clipped_h * scale_y;
+  } else {
+    dst_rect.x = x;
+    dst_rect.y = y;
+    dst_rect.w = w;
+    dst_rect.h = h;
+  }
+
+  SDL_SetTextureColorModFloat(img->texture, r, g, b);
+  SDL_SetTextureAlphaModFloat(img->texture, a);
+
+  // Rotation center: world coords minus dst_rect's top-left. With trim, the
+  // dst rect shifts by (trim_x*scale_x, trim_y*scale_y), so the
+  // center-relative offset shifts by the same amount.
+  SDL_FPoint center = { crx - dst_rect.x, cry - dst_rect.y };
+
+  bool ok = SDL_RenderTextureRotated(
+    R2D_GetRenderer(), img->texture, src_rect, &dst_rect, rotate, &center, flip_mode
+  );
+  R2D_CheckSDL(ok, "SDL_RenderTextureRotated");
+  return ok;
+}
+
+
+/*
+ * Re-rasterize the source at a new pixel size. SVG sources reload at 2× the
+ * requested size; raster sources reload and resample via SDL_ScaleSurface in
+ * the given mode. The cached texture is freed and recreated lazily on the
+ * next draw.
+ */
+static bool R2D_ImageReload(R2D_Image *img, const char *path, int w, int h,
+                            SDL_ScaleMode mode) {
+  SDL_Surface *new_surface = NULL;
+
+  if (path_is_svg(path)) {
+    new_surface = R2D_ImageLoadSurface(path, w, h);
+  } else {
+    SDL_Surface *src = IMG_Load(path);
+    if (src) {
+      new_surface = SDL_ScaleSurface(src, w, h, mode);
+      SDL_DestroySurface(src);
+    }
+  }
+  if (!new_surface) return false;
+
+  if (img->surface) SDL_DestroySurface(img->surface);
+  if (img->texture) {
+    SDL_DestroyTexture(img->texture);
+    img->texture = NULL;
+  }
+  img->surface = new_surface;
+  return true;
+}
+
+
+/*
+ * Free the memory and resources associated with an R2D_Image
+ */
+static void R2D_ImageDestroy(R2D_Image *img) {
+  if (!img) return;
+  if (img->surface) {
+    SDL_DestroySurface(img->surface);
+    img->surface = NULL;
+  }
+  if (img->texture) {
+    if (R2D_RendererAlive()) SDL_DestroyTexture(img->texture);
+    img->texture = NULL;
+  }
+  free(img);
+}
+
+
+// Ruby-free image API /////////////////////////////////////////////////////////
+//
+// What the Spinel build calls over FFI, since it cannot hand a Ruby object to
+// C: an image is an opaque handle loaded from a path, its size is read back,
+// and every draw passes the geometry, tint and clip in as arguments. Clip
+// state sits on the handle (R2D_ImageClip) rather than on the draw call, so a
+// plain Image never mentions it; a Sprite sets it before each draw.
+
+void *R2D_ImageNew(const char *path, int width, int height) {
+  if (!path || !R2D_FileExists(path)) {
+    SDL_SetError("Image file `%s` not found", path ? path : "");
+    return NULL;
+  }
+  R2D_Image *img = (R2D_Image *)calloc(1, sizeof(R2D_Image));
+  if (!img) return NULL;
+  img->surface = R2D_ImageLoadSurface(path, width, height);
+  if (!img->surface) {
+    free(img);
+    return NULL;
+  }
+  img->applied_scale_mode = SDL_SCALEMODE_INVALID;
+  return img;
+}
+
+int R2D_ImageWidth(void *image)  { return image ? ((R2D_Image *)image)->surface->w : 0; }
+int R2D_ImageHeight(void *image) { return image ? ((R2D_Image *)image)->surface->h : 0; }
+
+void R2D_ImageClip(void *image, bool clipped, int clip_x, int clip_y,
+                   int clip_w, int clip_h, int source_w, int source_h,
+                   int trim_x, int trim_y) {
+  R2D_Image *img = (R2D_Image *)image;
+  if (!img) return;
+  img->clipped  = clipped;
+  img->clip_x   = clip_x;
+  img->clip_y   = clip_y;
+  img->clip_w   = clip_w;
+  img->clip_h   = clip_h;
+  img->source_w = source_w;
+  img->source_h = source_h;
+  img->trim_x   = trim_x;
+  img->trim_y   = trim_y;
+}
+
+// `flip`: 0 none, 1 horizontal, 2 vertical, 3 both — SDL_FlipMode's bits.
+bool R2D_ImageDraw(void *image, float x, float y, float w, float h, float rotate,
+                   float crx, float cry, float r, float g, float b, float a,
+                   int flip, const char *scale_mode) {
+  R2D_Image *img = (R2D_Image *)image;
+  if (!img) return false;
+  R2D_Window *window = R2D_GetWindow();
+  SDL_ScaleMode fallback = window ? window->scale_mode : SDL_SCALEMODE_LINEAR;
+  return R2D_ImageDrawWith(img, x, y, w, h, rotate, crx, cry, r, g, b, a,
+                           (SDL_FlipMode)(flip & 3),
+                           R2D_ParseScaleModeName(scale_mode, fallback),
+                           img->clipped, img->clip_x, img->clip_y,
+                           img->clip_w, img->clip_h,
+                           img->source_w, img->source_h, img->trim_x, img->trim_y);
+}
+
+// Resampling is a CPU blit, so PIXELART degrades to nearest as
+// R2D_ResolveSurfaceScaleMode does.
+bool R2D_ImageResize(void *image, const char *path, int w, int h, const char *scale_mode) {
+  if (!image || !path || w <= 0 || h <= 0) return false;
+  R2D_Window *window = R2D_GetWindow();
+  SDL_ScaleMode mode = R2D_ParseScaleModeName(scale_mode, window ? window->scale_mode : SDL_SCALEMODE_LINEAR);
+  if (mode == SDL_SCALEMODE_PIXELART) mode = SDL_SCALEMODE_NEAREST;
+  return R2D_ImageReload((R2D_Image *)image, path, w, h, mode);
+}
+
+void R2D_ImageFree(void *image) {
+  R2D_ImageDestroy((R2D_Image *)image);
+}
+
+
+// Ruby bindings ///////////////////////////////////////////////////////////////
+
+#ifndef RUBY2D_NO_RUBY
 R2D_DEFINE_DATA_TYPE(R2D_Image);
 
 // Image-specific ivar IDs. Shared ivar IDs (id_x, id_y, id_width, id_height,
@@ -46,16 +320,20 @@ void R2D_Image_Init() {
 }
 
 
-// Case-insensitive check for the `.svg` extension on a path.
-static bool path_is_svg(const char *path) {
-  if (!path) return false;
-  size_t len = strlen(path);
-  if (len < 4) return false;
-  const char *ext = path + len - 4;
-  return ext[0] == '.' &&
-         (ext[1] == 's' || ext[1] == 'S') &&
-         (ext[2] == 'v' || ext[2] == 'V') &&
-         (ext[3] == 'g' || ext[3] == 'G');
+// The sizes image_create and image_resize write back onto the object after a
+// (re)load: the surface's, with the clip reset to cover all of it.
+static void R2D_ImageSyncSize(R_VAL obj, R2D_Image *img) {
+  obj_set_int(obj, id_orig_width, img->surface->w);
+  obj_set_int(obj, id_orig_height, img->surface->h);
+  obj_set_bool(obj, id_clipped, false);
+  obj_set_float(obj, id_clip_x, 0.0);
+  obj_set_float(obj, id_clip_y, 0.0);
+  obj_set_int(obj, id_clip_width, img->surface->w);
+  obj_set_int(obj, id_clip_height, img->surface->h);
+  obj_set_int(obj, id_source_width, img->surface->w);
+  obj_set_int(obj, id_source_height, img->surface->h);
+  obj_set_int(obj, id_trim_x, 0);
+  obj_set_int(obj, id_trim_y, 0);
 }
 
 
@@ -74,52 +352,28 @@ R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC) {
     return R_NIL;
   }
 
-  R2D_Image *img = ALLOC(R2D_Image);
-  img->surface = NULL;
-
-  // SVGs rasterize at their intrinsic size via IMG_Load and then pixelate when
-  // drawn larger. If the user supplied a width and height, rasterize at 2× the
-  // requested size so small upscales and rotations stay crisp; downscales to
-  // the user's size are handled by SDL at draw time.
-  if (path_is_svg(path)) {
-    R_VAL w_val = r_ivar_get(obj, id_width);
-    R_VAL h_val = r_ivar_get(obj, id_height);
-    if (r_test(w_val) && r_test(h_val)) {
-      int w = (int)NUM2DBL(w_val);
-      int h = (int)NUM2DBL(h_val);
-      if (w > 0 && h > 0) {
-        SDL_IOStream *io = SDL_IOFromFile(path, "rb");
-        if (io) {
-          img->surface = IMG_LoadSizedSVG_IO(io, w * 2, h * 2);
-          SDL_CloseIO(io);
-        }
-      }
-    }
+  // The user's display size, if given, steers the SVG rasterizer.
+  int w = 0, h = 0;
+  R_VAL w_val = r_ivar_get(obj, id_width);
+  R_VAL h_val = r_ivar_get(obj, id_height);
+  if (r_test(w_val) && r_test(h_val)) {
+    w = (int)NUM2DBL(w_val);
+    h = (int)NUM2DBL(h_val);
   }
 
-  if (!img->surface) img->surface = IMG_Load(path);
+  R2D_Image *img = (R2D_Image *)calloc(1, sizeof(R2D_Image));
+  img->surface = R2D_ImageLoadSurface(path, w, h);
   if (!img->surface) {
-    xfree(img);
+    free(img);
     r_error("Failed to load image `%s`: %s", path, SDL_GetError());
     return R_NIL;
   }
-
-  img->texture = NULL;
+  img->applied_scale_mode = SDL_SCALEMODE_INVALID;
 
   obj_set_struct(obj, id_ext_image, R2D_Image, img);
   obj_set_int(obj, id_width, img->surface->w);
   obj_set_int(obj, id_height, img->surface->h);
-  obj_set_int(obj, id_orig_width, img->surface->w);
-  obj_set_int(obj, id_orig_height, img->surface->h);
-  obj_set_bool(obj, id_clipped, false);
-  obj_set_float(obj, id_clip_x, 0.0);
-  obj_set_float(obj, id_clip_y, 0.0);
-  obj_set_int(obj, id_clip_width, img->surface->w);
-  obj_set_int(obj, id_clip_height, img->surface->h);
-  obj_set_int(obj, id_source_width, img->surface->w);
-  obj_set_int(obj, id_source_height, img->surface->h);
-  obj_set_int(obj, id_trim_x, 0);
-  obj_set_int(obj, id_trim_y, 0);
+  R2D_ImageSyncSize(obj, img);
   obj_set_float(obj, id_rotate, 0.0);
 
   return R_TRUE;
@@ -137,21 +391,6 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Image *img;
   obj_struct(obj, id_ext_image, R2D_Image, img);
 
-  // Create texture from surface if not already done
-  if (img->texture == NULL) {
-    img->texture = SDL_CreateTextureFromSurface(R2D_GetRenderer(), img->surface);
-    if (!img->texture) {
-      r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
-      return R_NIL;
-    }
-    SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
-    img->applied_scale_mode = SDL_SCALEMODE_INVALID;
-    // Keep the surface alive for canvas blitting; R2D_Image_free handles cleanup
-  }
-
-  R2D_ApplyScaleMode(img->texture, obj, &img->applied_scale_mode);
-
-  // Determine flip mode early — affects trim-offset mirroring below.
   SDL_FlipMode flip_mode = SDL_FLIP_NONE;
   R_VAL flip_val = r_ivar_get(obj, id_flip);
   if (r_test(flip_val)) {
@@ -169,104 +408,31 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
   float img_w = obj_float(obj, id_width);
   float img_h = obj_float(obj, id_height);
 
-  SDL_FRect dst_rect;
-  SDL_FRect clip_rect;
-  SDL_FRect *src_rect = NULL;
-
-  if (obj_bool(obj, id_clipped)) {
-    // Source rect inside the texture, clamped to the area that actually
-    // remains after the clip offset. The public accessors (`clip_x=`,
-    // `clip_width=`, etc.) are unvalidated, so a zero-size, negative, or
-    // past-the-edge clip can reach here; an offset-aware clamp keeps the
-    // src rect inside the texture and the scale math finite.
-    int orig_width  = obj_int(obj, id_orig_width);
-    int orig_height = obj_int(obj, id_orig_height);
-    int clip_w_int  = obj_int(obj, id_clip_width);
-    int clip_h_int  = obj_int(obj, id_clip_height);
-
-    int clip_x = (int)obj_float(obj, id_clip_x);
-    int clip_y = (int)obj_float(obj, id_clip_y);
-    if (clip_x < 0) clip_x = 0;
-    if (clip_x > orig_width)  clip_x = orig_width;
-    if (clip_y < 0) clip_y = 0;
-    if (clip_y > orig_height) clip_y = orig_height;
-
-    int avail_w = orig_width  - clip_x;
-    int avail_h = orig_height - clip_y;
-    int clipped_w = clip_w_int > avail_w ? avail_w : clip_w_int;
-    int clipped_h = clip_h_int > avail_h ? avail_h : clip_h_int;
-
-    // Degenerate or fully out-of-bounds clip: nothing to draw. Bail before
-    // the source_w/source_h division so it can't produce Inf/NaN geometry.
-    if (clipped_w <= 0 || clipped_h <= 0) return R_TRUE;
-
-    clip_rect.x = clip_x;
-    clip_rect.y = clip_y;
-    clip_rect.w = clipped_w;
-    clip_rect.h = clipped_h;
-    src_rect = &clip_rect;
-
-    // Trim metadata: `source_width`/`source_height` is the original logical
-    // frame size, `trim_x`/`trim_y` is where the packed pixels live within
-    // it. With the no-trim defaults (source = clip, trim = 0), the math
-    // collapses to drawing the clip rect at (img_x, img_y).
-    int source_w = obj_int(obj, id_source_width);
-    int source_h = obj_int(obj, id_source_height);
-    int trim_x   = obj_int(obj, id_trim_x);
-    int trim_y   = obj_int(obj, id_trim_y);
-    if (source_w <= 0) source_w = clipped_w;
-    if (source_h <= 0) source_h = clipped_h;
-
-    // Mirror the trim offset for flipped sprites so the pose flips around
-    // the original frame's center, not around the trimmed rect's center.
-    if (flip_mode & SDL_FLIP_HORIZONTAL) trim_x = source_w - trim_x - clipped_w;
-    if (flip_mode & SDL_FLIP_VERTICAL)   trim_y = source_h - trim_y - clipped_h;
-
-    float scale_x = img_w / (float)source_w;
-    float scale_y = img_h / (float)source_h;
-
-    dst_rect.x = img_x + trim_x * scale_x;
-    dst_rect.y = img_y + trim_y * scale_y;
-    dst_rect.w = clipped_w * scale_x;
-    dst_rect.h = clipped_h * scale_y;
-  } else {
-    dst_rect.x = img_x;
-    dst_rect.y = img_y;
-    dst_rect.w = img_w;
-    dst_rect.h = img_h;
-  }
-
   // Read color directly from the Color object
   R_VAL color_obj = r_ivar_get(obj, id_color);
-  SDL_SetTextureColorModFloat(img->texture,
-    NUM2DBL(r_ivar_get(color_obj, id_r)),
-    NUM2DBL(r_ivar_get(color_obj, id_g)),
-    NUM2DBL(r_ivar_get(color_obj, id_b))
-  );
-  SDL_SetTextureAlphaModFloat(img->texture, NUM2DBL(r_ivar_get(color_obj, id_a)));
 
-  // Rotation center: world coords minus dst_rect's top-left. With trim,
-  // the dst rect shifts by (trim_x*scale_x, trim_y*scale_y), so the
-  // center-relative offset shifts by the same amount.
+  // Rotation center: the user's, or the image's center.
   R_VAL urx = r_ivar_get(obj, id_user_rx);
   R_VAL ury = r_ivar_get(obj, id_user_ry);
   float center_rx = r_test(urx) ? NUM2DBL(urx) : img_x + img_w / 2.0f;
   float center_ry = r_test(ury) ? NUM2DBL(ury) : img_y + img_h / 2.0f;
 
-  SDL_FPoint center = {
-    center_rx - dst_rect.x,
-    center_ry - dst_rect.y
-  };
-
-  R2D_CheckSDL(SDL_RenderTextureRotated(
-    R2D_GetRenderer(),
-    img->texture,
-    src_rect,
-    &dst_rect,
-    obj_float(obj, id_rotate),
-    &center,
-    flip_mode
-  ), "SDL_RenderTextureRotated");
+  bool ok = R2D_ImageDrawWith(img, img_x, img_y, img_w, img_h,
+                              obj_float(obj, id_rotate), center_rx, center_ry,
+                              NUM2DBL(r_ivar_get(color_obj, id_r)),
+                              NUM2DBL(r_ivar_get(color_obj, id_g)),
+                              NUM2DBL(r_ivar_get(color_obj, id_b)),
+                              NUM2DBL(r_ivar_get(color_obj, id_a)),
+                              flip_mode, R2D_ResolveScaleMode(obj),
+                              obj_bool(obj, id_clipped),
+                              (int)obj_float(obj, id_clip_x), (int)obj_float(obj, id_clip_y),
+                              obj_int(obj, id_clip_width), obj_int(obj, id_clip_height),
+                              obj_int(obj, id_source_width), obj_int(obj, id_source_height),
+                              obj_int(obj, id_trim_x), obj_int(obj, id_trim_y));
+  if (!ok && !img->texture) {
+    r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
+    return R_NIL;
+  }
 
   return R_TRUE;
 }
@@ -318,17 +484,9 @@ R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC) {
   int count = (int)r_ary_len(coords_batch);
   if (count <= 0) return R_TRUE;
 
-  // Create texture from surface if not already done
-  if (img->texture == NULL) {
-    img->texture = SDL_CreateTextureFromSurface(
-      R2D_GetRenderer(), img->surface
-    );
-    if (!img->texture) {
-      r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
-      return R_NIL;
-    }
-    SDL_SetTextureBlendMode(img->texture, SDL_BLENDMODE_BLEND);
-    img->applied_scale_mode = SDL_SCALEMODE_INVALID;
+  if (!R2D_ImageEnsureTexture(img)) {
+    r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
+    return R_NIL;
   }
 
   R2D_ApplyScaleMode(img->texture, obj, &img->applied_scale_mode);
@@ -404,10 +562,8 @@ R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC) {
 /*
  * Ruby2D::Image#ext_resize
  *
- * Re-rasterizes the source at a new pixel size. SVG sources reload via
- * IMG_LoadSizedSVG_IO at 2× the requested size; raster sources reload and
- * resample via SDL_ScaleSurface. The cached texture is freed and recreated
- * lazily on the next draw.
+ * Re-rasterize the source at a new pixel size (see R2D_ImageReload) and write
+ * the resulting size back onto the object.
  */
 R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
@@ -426,64 +582,22 @@ R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC) {
     return R_NIL;
   }
 
-  const char *path = obj_str(obj, id_path);
-  SDL_Surface *new_surface = NULL;
-
-  if (path_is_svg(path)) {
-    SDL_IOStream *io = SDL_IOFromFile(path, "rb");
-    if (io) {
-      new_surface = IMG_LoadSizedSVG_IO(io, new_w * 2, new_h * 2);
-      SDL_CloseIO(io);
-    }
-  } else {
-    SDL_Surface *src = IMG_Load(path);
-    if (src) {
-      new_surface = SDL_ScaleSurface(src, new_w, new_h, R2D_ResolveSurfaceScaleMode(obj));
-      SDL_DestroySurface(src);
-    }
-  }
-
-  if (!new_surface) {
+  if (!R2D_ImageReload(img, obj_str(obj, id_path), new_w, new_h,
+                       R2D_ResolveSurfaceScaleMode(obj))) {
     r_raise("Image#resize! failed: %s", SDL_GetError());
     return R_NIL;
   }
 
-  if (img->surface) SDL_DestroySurface(img->surface);
-  if (img->texture) {
-    SDL_DestroyTexture(img->texture);
-    img->texture = NULL;
-  }
-  img->surface = new_surface;
-
-  obj_set_int(obj, id_orig_width, new_surface->w);
-  obj_set_int(obj, id_orig_height, new_surface->h);
-  obj_set_bool(obj, id_clipped, false);
-  obj_set_float(obj, id_clip_x, 0.0);
-  obj_set_float(obj, id_clip_y, 0.0);
-  obj_set_int(obj, id_clip_width, new_surface->w);
-  obj_set_int(obj, id_clip_height, new_surface->h);
-  obj_set_int(obj, id_source_width, new_surface->w);
-  obj_set_int(obj, id_source_height, new_surface->h);
-  obj_set_int(obj, id_trim_x, 0);
-  obj_set_int(obj, id_trim_y, 0);
+  R2D_ImageSyncSize(obj, img);
 
   return R_TRUE;
 }
 
 
 /*
- * Free the memory and resources associated with an R2D_Image object
+ * GC hook: the object's R2D_Image is released with it
  */
 static void R2D_Image_free(void *p) {
-  if (!p) return;
-  R2D_Image *img = (R2D_Image *)p;
-  if (img->surface) {
-    SDL_DestroySurface(img->surface);
-    img->surface = NULL;
-  }
-  if (img->texture) {
-    if (R2D_RendererAlive()) SDL_DestroyTexture(img->texture);
-    img->texture = NULL;
-  }
-  xfree(img);
+  R2D_ImageDestroy((R2D_Image *)p);
 }
+#endif

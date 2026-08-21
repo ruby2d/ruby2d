@@ -9,7 +9,7 @@ module Ruby2D
     class << self
       # List all fonts, names only
       def all
-        all_paths.map { |path| path.split('/').last.chomp('.ttf').downcase }.uniq.sort
+        all_paths.map { |file| name_of(file) }.uniq.sort
       end
 
       # Find a font file path from its name (case-insensitive, matching `all`)
@@ -17,7 +17,7 @@ module Ruby2D
         font_name = font_name.to_s.downcase
         # Match against the file's basename (as `all` computes names), not the
         # whole path — otherwise a directory component like 'fonts' matches.
-        all_paths.find { |path| path.split('/').last.chomp('.ttf').downcase.include?(font_name) }
+        all_paths.find { |file| name_of(file).include?(font_name) }
       end
 
       # Get full path to the default font. CRuby runs from the installed gem;
@@ -33,10 +33,14 @@ module Ruby2D
 
       private
 
+      # A font file's name as `all` lists it: the basename, lowercased
+      def name_of(file)
+        file.split('/').last.chomp('.ttf').downcase
+      end
+
       # Get all fonts with full file paths
       def all_paths
-        # memoize so we only calculate once
-        @all_paths ||= platform_font_paths
+        platform_font_paths
       end
 
       # Compute and return all platform font file paths, removing variants by style
@@ -51,11 +55,13 @@ module Ruby2D
         fonts.sort_by { |f| f.downcase.chomp '.ttf' }
       end
 
-      # Return all font files in the platform's font location
+      # Return all font files in the platform's font location. The scan is the
+      # expensive part, so it is what gets memoized; the filtering above is a
+      # pass over a few dozen strings.
       def find_os_font_files
         return [] unless directory
 
-        if RUBY_ENGINE == 'mruby'
+        @font_files ||= if RUBY_ENGINE == 'mruby'
           # MRuby does not have `Dir` defined
           `find #{directory} -name *.ttf`.split("\n")
         else

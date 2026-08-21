@@ -7,6 +7,7 @@ This directory contains the interactive visual tests for Ruby 2D — runnable de
 ```
 rake test:ruby <name>      # run with CRuby
 rake test:native <name>    # run as a native mruby executable
+rake test:spinel <name>    # run as a native executable compiled by Spinel (needs `ruby2d setup --spinel`)
 rake test:web <name>       # run as a web app (mruby + WebAssembly)
 rake test                  # alias for test:ruby
 rake test:all [target]     # run all tests sequentially (target: native, web)
@@ -15,7 +16,7 @@ rake test:auto             # auto-run each test briefly to catch crashes
 
 `<name>` is the test filename without the `.rb` extension — `rake test:ruby keyboard` runs `test/keyboard.rb`. Most tests print a one-line summary of what to look for at the top; the window stays open until you press <kbd>ESC</kbd>.
 
-Note that `rake test:native` and `rake test:web` build from the **installed** gem's `lib/`, not the working tree — after editing `lib/`, run `rake` (which reinstalls the gem) first, or the build silently won't include your change.
+Note that `rake test:native`, `rake test:spinel` and `rake test:web` build from the **installed** gem's `lib/`, not the working tree — after editing `lib/`, run `rake` (which reinstalls the gem) first, or the build silently won't include your change.
 
 ## Tests
 

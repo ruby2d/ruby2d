@@ -1548,6 +1548,14 @@ bool R2D_CanvasDrawNamed(void *canvas, float x, float y, float w, float h, float
                         canvas_mode_named(scale_mode));
 }
 
+bool R2D_CanvasDrawImageNamed(void *canvas, void *image, double x, double y, double w, double h,
+                              const char *scale_mode) {
+  double vals[4] = { x, y, w, h };
+  SDL_ScaleMode mode = canvas_mode_named(scale_mode);
+  if (mode == SDL_SCALEMODE_PIXELART) mode = SDL_SCALEMODE_NEAREST;
+  return R2D_CanvasDrawImage(canvas, image, vals, 4, mode);
+}
+
 bool R2D_CanvasDrawTextNamed(void *canvas, void *text, double x, double y, double w, double h,
                              double r, double g, double b, double a, const char *scale_mode) {
   double vals[8] = { x, y, w, h, r, g, b, a };

@@ -82,8 +82,9 @@ def print_test_help
   puts "    rake test #{'<name>'.dim}           # Run with CRuby (standard Ruby)"
   puts "    rake test:ruby #{'<name>'.dim}      # Run with CRuby (standard Ruby)"
   puts "    rake test:native #{'<name>'.dim}    # Run as a native executable (mruby)"
+  puts "    rake test:spinel #{'<name>'.dim}    # Run as a native executable (Spinel)"
   puts "    rake test:web #{'<name>'.dim}       # Run as a web app (mruby + WebAssembly)"
-  puts "    rake test:all #{'[target]'.dim}     # Run all tests sequentially (target: native, web)"
+  puts "    rake test:all #{'[target]'.dim}     # Run all tests sequentially (target: native, web, spinel)"
   puts "    rake test:auto             # Auto-run each test briefly (for CI)"
   puts ''
 end
@@ -96,8 +97,9 @@ def print_examples_help
   puts "    rake examples #{'<name>'.dim}          # Run an example with CRuby (standard Ruby)"
   puts "    rake examples:ruby #{'<name>'.dim}     # Run with CRuby (standard Ruby)"
   puts "    rake examples:native #{'<name>'.dim}   # Run as a native executable (mruby)"
+  puts "    rake examples:spinel #{'<name>'.dim}   # Run as a native executable (Spinel)"
   puts "    rake examples:web #{'<name>'.dim}      # Run as a web app (mruby + WebAssembly)"
-  puts "    rake examples:all #{'[target]'.dim}    # Run all examples sequentially (target: native, web)"
+  puts "    rake examples:all #{'[target]'.dim}    # Run all examples sequentially (target: native, web, spinel)"
   puts "    rake examples:auto            # Auto-run each example briefly (for CI)"
   puts ''
 end
@@ -123,15 +125,15 @@ def with_test_name
 end
 
 # Run every test or example in sequence for one target — 'ruby' (default),
-# 'native', or 'web' from the command line. The test/example differences come
+# 'native', 'web', or 'spinel' from the command line. The test/example differences come
 # in as arguments: the item names, the labels for messaging, how to run one
 # with CRuby, and how to build one for a bundled target.
 def run_all_task(names, label:, item:, run_ruby:, build:)
   target = consume_arg_names || 'ruby'
 
-  unless %w[ruby native web].include?(target)
+  unless %w[ruby native web spinel].include?(target)
     error "Unknown target: #{target}"
-    puts 'Use one of: ruby, native, web'
+    puts 'Use one of: ruby, native, web, spinel'
     exit 1
   end
 
@@ -148,8 +150,8 @@ def run_all_task(names, label:, item:, run_ruby:, build:)
     case target
     when 'ruby'
       run_ruby.call(name)
-    when 'native'
-      system(launch_native_cmd(build.call(:native, name)))
+    when 'native', 'spinel'
+      system(launch_native_cmd(build.call(target.to_sym, name)))
     when 'web'
       pid = spawn('ruby2d', 'launch', '--web', chdir: build.call(:web, name))
       print "\nPress Enter to advance to the next #{item}..."
@@ -217,7 +219,7 @@ def prepare_portable_test(test_file, work_dir)
   File.write(File.join(work_dir, "#{test_file}.rb"), source)
 end
 
-# Build a test for a target (:native or :web) in test/build/<target>; returns
+# Build a test for a target (:native, :web or :spinel) in test/build/<target>; returns
 # the working directory. The rewritten test source and the test media are
 # staged into the work dir, and `--assets media` bundles the media for either
 # target (prepare_portable_test rewrites the test's media references to
@@ -228,8 +230,15 @@ def build_test(target, test_file)
   FileUtils.mkdir_p(work_dir)
   prepare_portable_test(test_file, work_dir)
   FileUtils.cp_r(File.expand_path('assets/test_media', __dir__), File.join(work_dir, 'media'))
-  run_cmd "( cd #{work_dir} && ruby2d build --#{target} --assets media #{test_file}.rb --debug )"
+  run_cmd "( cd #{work_dir} && ruby2d build --#{target} --assets media #{test_file}.rb#{build_debug_flag(target)} )"
   work_dir
+end
+
+# `--debug` echoes the compile commands. Not for Spinel: there it also drops
+# the `-w` the generated C needs, and upstream's `-Werror` turns two known
+# warnings into a failed build (spinel/issues/46 and 47) until they are fixed.
+def build_debug_flag(target)
+  target == :spinel ? '' : ' --debug'
 end
 
 # Shell command to launch a built native app (tests and examples).
@@ -257,7 +266,7 @@ def example_asset_dirs(example)
   end
 end
 
-# Build an example for a target (:native or :web) in examples/build/<target>,
+# Build an example for a target (:native, :web or :spinel) in examples/build/<target>,
 # the way tests build in test/build/. Returns the working directory. Any asset
 # dirs the example declares (repo-relative, e.g. assets/resources/...) are
 # mirrored into the work dir at the same relative path — `ruby2d build`
@@ -275,7 +284,7 @@ def build_example(target, example)
     FileUtils.mkdir_p(File.join(work_dir, File.dirname(dir)))
     FileUtils.cp_r(src, File.join(work_dir, dir))
   end
-  run_cmd "( cd #{work_dir} && ruby2d build --#{target} ../../#{example}.rb --debug )"
+  run_cmd "( cd #{work_dir} && ruby2d build --#{target} ../../#{example}.rb#{build_debug_flag(target)} )"
   work_dir
 end
 
@@ -365,6 +374,15 @@ namespace :test do
     end
   end
 
+  desc "Run a test as a native executable (Spinel)"
+  task :spinel do
+    with_test_name do |test_file|
+      print_task "Running `#{test_file}.rb` as a native executable (Spinel)", spaced: false
+      work_dir = build_test(:spinel, test_file)
+      run_cmd launch_native_cmd(work_dir)
+    end
+  end
+
   desc "Run a test as a web app (mruby + WebAssembly)"
   task :web do
     with_test_name do |test_file|
@@ -411,6 +429,16 @@ namespace :examples do
       print_task "Running `#{example}.rb` as a native executable (mruby)", spaced: false
       show_example_header(example)
       work_dir = build_example(:native, example)
+      run_cmd launch_native_cmd(work_dir)
+    end
+  end
+
+  desc "Run an example as a native executable (Spinel)"
+  task :spinel do
+    with_example_name do |example|
+      print_task "Running `#{example}.rb` as a native executable (Spinel)", spaced: false
+      show_example_header(example)
+      work_dir = build_example(:spinel, example)
       run_cmd launch_native_cmd(work_dir)
     end
   end

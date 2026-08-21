@@ -430,17 +430,7 @@ def compile_native
   end
 
   bundle_default_font
-
-  # Bundle each declared asset directory next to the executable — the native
-  # counterpart to the web build's virtual-filesystem preload. The app resolves
-  # them at runtime from its working directory (`build/native`, set by
-  # `ruby2d launch --native`), so a dir mounts at the same relative path it was
-  # given, matching how the app references it (`Image.new('media/x.png')`).
-  @asset_dirs.each do |dir|
-    dest = File.join('build/native', dir)
-    FileUtils.mkdir_p File.dirname(dest)
-    FileUtils.cp_r dir, dest
-  end
+  bundle_asset_dirs
 
   create_macos_bundle if AssetsTarget.host_os == 'macos'
   wrote 'build/native/app'
@@ -467,6 +457,19 @@ def bundle_default_font
   fonts_dest = 'build/native/ruby2d/fonts'
   FileUtils.mkdir_p fonts_dest
   FileUtils.cp_r "#{fonts_src}/.", fonts_dest
+end
+
+# Bundle each declared asset directory next to the executable — the native
+# counterpart to the web build's virtual-filesystem preload. The app resolves
+# them at runtime from its working directory (`build/native`, set by
+# `ruby2d launch --native`), so a dir mounts at the same relative path it was
+# given, matching how the app references it (`Image.new('media/x.png')`).
+def bundle_asset_dirs
+  @asset_dirs.each do |dir|
+    dest = File.join('build/native', dir)
+    FileUtils.mkdir_p File.dirname(dest)
+    FileUtils.cp_r dir, dest
+  end
 end
 
 def check_asset_dir(dir)
