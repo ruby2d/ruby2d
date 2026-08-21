@@ -260,6 +260,7 @@ SPINEL_LIB_FILES = %w[
   rectangle
   square
   circle
+  ellipse
   line
   font
   text
@@ -325,6 +326,8 @@ SPINEL_EXT = <<~'RUBY'
                                  :float, :float, :float, :float, :float, :float,
                                  :float, :float, :float, :float, :float, :float,
                                  :float, :float, :float, :float, :float, :float], :void
+      ffi_func :R2D_DrawEllipse, [:float, :float, :float, :float, :float, :int,
+                                  :float, :float, :float, :float], :void
       ffi_func :R2D_DrawCircle, [:float, :float, :float, :int,
                                  :float, :float, :float, :float], :void
       # 21: the endpoints and stroke width, then four corner colors.
@@ -542,6 +545,19 @@ SPINEL_EXT = <<~'RUBY'
       # Equal radii, no tilt — the circle case of the ellipse stroke.
       def self.stroke_circle(x, y, radius, sectors, sw, r, g, b, a)
         Ext.R2D_StrokeEllipse(x.to_f, y.to_f, radius.to_f, radius.to_f, 0.0,
+                              sectors.to_i, sw.to_f,
+                              r.to_f, g.to_f, b.to_f, a.to_f)
+      end
+
+      # `rad` is the tilt in radians, computed in `ellipse.rb`; the stroke takes
+      # it too, so a rotated ring stays on its rotated rim.
+      def self.draw_ellipse(x, y, xradius, yradius, rad, sectors, r, g, b, a)
+        Ext.R2D_DrawEllipse(x.to_f, y.to_f, xradius.to_f, yradius.to_f, rad.to_f, sectors.to_i,
+                            r.to_f, g.to_f, b.to_f, a.to_f)
+      end
+
+      def self.stroke_ellipse(x, y, xradius, yradius, rad, sectors, sw, r, g, b, a)
+        Ext.R2D_StrokeEllipse(x.to_f, y.to_f, xradius.to_f, yradius.to_f, rad.to_f,
                               sectors.to_i, sw.to_f,
                               r.to_f, g.to_f, b.to_f, a.to_f)
       end
@@ -968,7 +984,6 @@ end
 # define no user-facing class map to nil.
 SPINEL_EXCLUDED_CLASSES = {
   'audio' => 'Audio',
-  'ellipse' => 'Ellipse',
   'json_parser' => nil, 'atlas_parser' => nil, 'sprite_sheet' => 'SpriteSheet',
   'polygon' => 'Polygon',
   'sprite' => 'Sprite', 'bitmap_text' => 'BitmapText',

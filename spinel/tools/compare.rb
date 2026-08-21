@@ -82,7 +82,8 @@ FIXTURES = { 'cli' => 'spinel/tools/cli_app.rb',
              'triangle' => 'spinel/tools/triangle_app.rb',
              'polyline' => 'spinel/tools/polyline_app.rb',
              'button' => 'spinel/tools/button_app.rb',
-             'image' => 'spinel/tools/image_app.rb' }.freeze
+             'image' => 'spinel/tools/image_app.rb',
+             'ellipse' => 'spinel/tools/ellipse_app.rb' }.freeze
 
 # A histogram is how a single-color divergence explains itself — which color
 # gained or lost pixels. A gradient has thousands of colors and the same list

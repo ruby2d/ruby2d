@@ -193,14 +193,14 @@ def check_preflight
   # features reads as "accepted an app it can't build" below.
   File.write("#{dir}/unsupported.rb", <<~'RUBY')
     require 'ruby2d'
-    Ellipse.new(x: 10, y: 10, width: 10, height: 10)
+    Polygon.new(x: 10, y: 10, width: 10, height: 10)
     Sprite.new('missing.png', width: 10, height: 10)
   RUBY
 
   out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'unsupported.rb') }
   return ['preflight', :fail, "accepted an app it can't build"] if ok
 
-  missing = %w[Ellipse Sprite].reject { |name| out.include?(name) }
+  missing = %w[Polygon Sprite].reject { |name| out.include?(name) }
   return ['preflight', :fail, "didn't name #{missing.join(' or ')}:\n#{out}"] unless missing.empty?
 
   ['preflight', :pass, 'rejected unsupported features by name']
