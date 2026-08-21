@@ -101,7 +101,7 @@ def check_cli
 
   ENV['FRAMES'] = '30'
   ENV['SHOT'] = shot
-  run, status = run_capped([File.expand_path(binary)], seconds: 60)
+  run, status = run_capped([File.expand_path(binary)], seconds: 60, chdir: File.dirname(binary))
   return ['cli', :fail, 'hung'] if status == :timeout
   return ['cli', :fail, "no screenshot written:\n#{run}"] unless File.exist?(shot)
 
@@ -141,7 +141,7 @@ def check_input
   binary = "#{dir}/build/native/app"
   return ['input', :fail, "no executable at #{binary}"] unless File.exist?(binary)
 
-  run, status = run_capped([File.expand_path(binary)], seconds: 60)
+  run, status = run_capped([File.expand_path(binary)], seconds: 60, chdir: File.dirname(binary))
   return ['input', :fail, 'hung'] if status == :timeout
 
   expected = <<~'LINES'.lines.map(&:chomp)
@@ -188,18 +188,19 @@ end
 def check_preflight
   dir = "#{SCRATCH}/cli"
   FileUtils.mkdir_p(dir)
+  # Two classes the target does not draw yet. When one of them lands, swap it
+  # for another from `SPINEL_EXCLUDED_CLASSES` — a fixture using only supported
+  # features reads as "accepted an app it can't build" below.
   File.write("#{dir}/unsupported.rb", <<~'RUBY')
     require 'ruby2d'
-    Text.new('hello', x: 10, y: 10)
-    on :key_down do
-      close
-    end
+    Canvas.new(width: 10, height: 10)
+    Image.new('missing.png')
   RUBY
 
   out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'unsupported.rb') }
   return ['preflight', :fail, "accepted an app it can't build"] if ok
 
-  missing = %w[Text on].reject { |name| out.include?(name) }
+  missing = %w[Canvas Image].reject { |name| out.include?(name) }
   return ['preflight', :fail, "didn't name #{missing.join(' or ')}:\n#{out}"] unless missing.empty?
 
   ['preflight', :pass, 'rejected unsupported features by name']

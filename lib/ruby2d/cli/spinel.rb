@@ -161,6 +161,9 @@ SPINEL_LIB_FILES = %w[
   rectangle
   square
   circle
+  line
+  font
+  text
   vertices
   dsl
 ].freeze
@@ -168,7 +171,7 @@ SPINEL_LIB_FILES = %w[
 # The C sources that make up the `RUBY2D_NO_RUBY` core — the `R2D_*` renderer
 # with no Ruby engine in it. The rest of `ext/ruby2d` is either the CRuby/mruby
 # binding layer (`ext.c`) or a subsystem this slice doesn't reach.
-SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard].freeze
+SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard text].freeze
 
 # `Ext` on this target.
 #
@@ -220,6 +223,27 @@ SPINEL_EXT = <<~'RUBY'
                                  :float, :float, :float, :float, :float, :float], :void
       ffi_func :R2D_DrawCircle, [:float, :float, :float, :int,
                                  :float, :float, :float, :float], :void
+      # 21: the endpoints and stroke width, then four corner colors.
+      ffi_func :R2D_DrawLine, [:float, :float, :float, :float, :float,
+                               :float, :float, :float, :float,
+                               :float, :float, :float, :float,
+                               :float, :float, :float, :float,
+                               :float, :float, :float, :float], :void
+      # 23: the same with the dash and gap lengths after the stroke width.
+      ffi_func :R2D_DrawDashedLine, [:float, :float, :float, :float, :float, :float, :float,
+                                     :float, :float, :float, :float,
+                                     :float, :float, :float, :float,
+                                     :float, :float, :float, :float,
+                                     :float, :float, :float, :float], :void
+      # Text is an opaque handle: created once, re-rasterized on every
+      # content/size/style/font change, measured back, and drawn each frame.
+      ffi_func :R2D_TextNew, [], :ptr
+      ffi_func :R2D_TextUpdate, [:ptr, :str, :str, :int, :int], :bool
+      ffi_func :R2D_TextWidth, [:ptr], :int
+      ffi_func :R2D_TextHeight, [:ptr], :int
+      ffi_func :R2D_TextStale, [:ptr], :bool
+      ffi_func :R2D_TextDraw, [:ptr, :float, :float, :float, :float, :float,
+                               :float, :float, :float, :float, :str], :bool
       # No `R2D_StrokeCircle` exists — `ext.c` strokes a circle as an
       # axis-aligned ellipse with equal radii, and so does `stroke_circle` below.
       ffi_func :R2D_StrokeEllipse, [:float, :float, :float, :float, :float,
@@ -377,6 +401,74 @@ SPINEL_EXT = <<~'RUBY'
                               sectors.to_i, sw.to_f,
                               r.to_f, g.to_f, b.to_f, a.to_f)
       end
+
+      # Four corner colors in `R2D_DrawLine`'s order: start+perp, start-perp,
+      # end-perp, end+perp. `line.rb` passes the start color twice then the end
+      # color twice, so a gradient runs along the line.
+      def self.draw_line(x1, y1, x2, y2, sw,
+                         r1, g1, b1, a1, r2, g2, b2, a2,
+                         r3, g3, b3, a3, r4, g4, b4, a4)
+        Ext.R2D_DrawLine(x1.to_f, y1.to_f, x2.to_f, y2.to_f, sw.to_f,
+                         r1.to_f, g1.to_f, b1.to_f, a1.to_f,
+                         r2.to_f, g2.to_f, b2.to_f, a2.to_f,
+                         r3.to_f, g3.to_f, b3.to_f, a3.to_f,
+                         r4.to_f, g4.to_f, b4.to_f, a4.to_f)
+      end
+
+      # `text_create(text)` is a pass-self call on the other engines: C reads the
+      # font, content, size and style off the object and writes the measured
+      # size back. Here the Text carries the native handle in a ptr-typed ivar
+      # (see `SPINEL_TEXT_SYNC`), the adapter passes the ivars in, and reads
+      # the size out. Handles are never freed — Spinel has no finalizers — so
+      # a program churning Text objects leaks them; rewrite `content=` instead.
+      def self.text_create(text)
+        handle = text._spinel_text
+        if handle == nil
+          handle = Ext.R2D_TextNew()
+          raise Error, 'Ruby2D: failed to initialize' if handle == nil
+
+          text._spinel_text = handle
+        end
+        _spinel_text_update(text, handle)
+        true
+      end
+
+      def self._spinel_text_update(text, handle)
+        ok = Ext.R2D_TextUpdate(handle, text.font, text.content, text.size.to_i,
+                                text._spinel_style_flags)
+        raise Error, "Failed to render text (font `#{text.font}`)" unless ok
+
+        text._spinel_measure(Ext.R2D_TextWidth(handle), Ext.R2D_TextHeight(handle))
+        nil
+      end
+
+      # Re-rasterize first when the asset scale moved since the last update
+      # (a Text built before a HiDPI window opened), as the Ruby bridge does.
+      def self.text_draw(text, rx, ry)
+        handle = text._spinel_text
+        return nil if handle == nil
+
+        _spinel_text_update(text, handle) if Ext.R2D_TextStale(handle)
+        c = text.color
+        ok = Ext.R2D_TextDraw(handle, text.x.to_f, text.y.to_f, text.rotate.to_f,
+                              rx.to_f, ry.to_f,
+                              c.r.to_f, c.g.to_f, c.b.to_f, c.a.to_f,
+                              text.scale_mode.to_s)
+        raise Error, 'Failed to draw text' unless ok
+
+        true
+      end
+
+      def self.draw_dashed_line(x1, y1, x2, y2, sw, dash, gap,
+                                r1, g1, b1, a1, r2, g2, b2, a2,
+                                r3, g3, b3, a3, r4, g4, b4, a4)
+        Ext.R2D_DrawDashedLine(x1.to_f, y1.to_f, x2.to_f, y2.to_f,
+                               sw.to_f, dash.to_f, gap.to_f,
+                               r1.to_f, g1.to_f, b1.to_f, a1.to_f,
+                               r2.to_f, g2.to_f, b2.to_f, a2.to_f,
+                               r3.to_f, g3.to_f, b3.to_f, a3.to_f,
+                               r4.to_f, g4.to_f, b4.to_f, a4.to_f)
+      end
     end
   end
 RUBY
@@ -399,6 +491,27 @@ SPINEL_WINDOW_SYNC = <<~'RUBY'
         @close = true if closed
         @frames = frames
         @fps = fps
+        nil
+      end
+    end
+  end
+RUBY
+
+# The Text side of the `text_create` / `text_draw` seam: where the native handle
+# lives, and how the measured size gets back onto the object. Reopened here,
+# like `Window#_spinel_sync`, rather than in `text.rb` — these exist for one
+# target. `@_spinel_text` holds a `:ptr`, which Spinel allows in a typed ivar
+# but not in a Hash or Array.
+SPINEL_TEXT_SYNC = <<~'RUBY'
+  module Ruby2D
+    class Text
+      attr_accessor :_spinel_text
+
+      def _spinel_style_flags = @style_flags
+
+      def _spinel_measure(w, h)
+        @width = w
+        @height = h
         nil
       end
     end
@@ -437,6 +550,7 @@ def spinel_assemble(app_source, lib_dir:, ffi: true)
   src << "  end\nend\n\n"
 
   src << SPINEL_WINDOW_SYNC << "\n"
+  src << SPINEL_TEXT_SYNC << "\n"
   src << "include Ruby2D\n"
   src << spinel_dsl_shims(spinel_lib('dsl', lib_dir))
   src << "\n" << app_source
@@ -456,10 +570,10 @@ end
 # define no user-facing class map to nil.
 SPINEL_EXCLUDED_CLASSES = {
   'audio' => 'Audio', 'canvas' => 'Canvas',
-  'ellipse' => 'Ellipse', 'font' => 'Font', 'image' => 'Image',
+  'ellipse' => 'Ellipse', 'image' => 'Image',
   'json_parser' => nil, 'atlas_parser' => nil, 'sprite_sheet' => 'SpriteSheet',
-  'line' => 'Line', 'polygon' => 'Polygon', 'polyline' => 'Polyline',
-  'sprite' => 'Sprite', 'text' => 'Text', 'bitmap_text' => 'BitmapText',
+  'polygon' => 'Polygon', 'polyline' => 'Polyline',
+  'sprite' => 'Sprite', 'bitmap_text' => 'BitmapText',
   'tileset' => 'Tileset', 'triangle' => 'Triangle', 'button' => 'Button'
 }.freeze
 
@@ -690,8 +804,11 @@ def build_spinel(ruby2d_app)
     exit 1
   end
 
-  # No asset bundling on this target — nothing in the slice can read a file, and
-  # `--assets` is rejected up front. The bundle step still expects the list.
+  # The default font ships next to the executable as on the mruby target, so
+  # `Text.new('…')` with no `font:` resolves it. No other asset bundling yet —
+  # nothing else in the slice can read a file, and `--assets` is rejected up
+  # front. The bundle step still expects the list.
+  bundle_default_font
   @asset_dirs = []
   create_macos_bundle if AssetsTarget.host_os == 'macos'
   wrote "#{BUILD_DIR}/native/app"

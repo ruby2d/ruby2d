@@ -597,6 +597,10 @@ typedef struct {
   int tex_w;
   int tex_h;
   SDL_ScaleMode applied_scale_mode;
+  // Measured size in logical (window) coordinates, set by rasterization. The
+  // Ruby bridge mirrors these onto the Text's @width/@height.
+  int width;
+  int height;
 } R2D_Text;
 
 // R2D_Canvas
@@ -1150,6 +1154,25 @@ R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC);
  * Initialize Ruby2D::Ext text bindings (TTF-backed text).
  */
 void R2D_Text_Init(void);
+
+/*
+ * Ruby-free text API for a bridge that cannot pass a Ruby object: a text is an
+ * opaque handle from R2D_TextNew (NULL if the engine failed to initialize),
+ * rasterized by R2D_TextUpdate from its font path, content, size and style
+ * flags, measured by R2D_TextWidth / R2D_TextHeight, and drawn by R2D_TextDraw
+ * with its position, rotation about (crx, cry), color, and scale mode by name
+ * (NULL or unknown falls back to the window's). R2D_TextStale says the asset
+ * scale moved since the last update; the caller should update before drawing.
+ * R2D_TextFree releases the handle.
+ */
+void *R2D_TextNew(void);
+bool  R2D_TextUpdate(void *text, const char *font, const char *content, int size, int style);
+int   R2D_TextWidth(void *text);
+int   R2D_TextHeight(void *text);
+bool  R2D_TextStale(void *text);
+bool  R2D_TextDraw(void *text, float x, float y, float rotate, float crx, float cry,
+                   float r, float g, float b, float a, const char *scale_mode);
+void  R2D_TextFree(void *text);
 
 R_VAL ruby2d_ext_text_create(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_text_draw(RUBY2D_METHOD_ARGS_VARIADIC);

@@ -77,7 +77,8 @@ def moves?(name, engine, flag)
   out, status, code = Dir.chdir(dir) { run_capped(['ruby2d', 'build', flag, 'app.rb'], seconds: 900) }
   return [nil, "build failed:\n#{out}"] unless status == :ok && code&.zero?
 
-  ran, status = run_capped([File.join(dir, 'build/native/app')], seconds: 120)
+  ran, status = run_capped([File.expand_path(File.join(dir, 'build/native/app'))], seconds: 120,
+                           chdir: File.join(dir, 'build/native'))
   return [nil, 'hung'] if status == :timeout
   return [nil, "wrote no screenshot:\n#{ran}"] unless File.exist?(early) && File.exist?(late)
 

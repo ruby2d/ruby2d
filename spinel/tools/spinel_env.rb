@@ -33,11 +33,15 @@ end
 # Returns [output, :ok | :timeout | :error, exit code]. The exit code is
 # separate from the status because they answer different questions: whether the
 # command finished, and whether it succeeded. A killed process has no code.
-def run_capped(cmd, seconds: 20)
+# `chdir:` runs the command from a directory — a built app must run from its
+# `build/native`, where the bundled fonts and assets sit, as `ruby2d launch`
+# arranges; from anywhere else `Text.new` cannot find its font.
+def run_capped(cmd, seconds: 20, chdir: nil)
   out = nil
   code = nil
   status = :ok
-  Open3.popen2e(*cmd) do |_in, o, t|
+  opts = chdir ? { chdir: chdir } : {}
+  Open3.popen2e(*cmd, **opts) do |_in, o, t|
     killer = Thread.new do
       sleep seconds
       status = :timeout

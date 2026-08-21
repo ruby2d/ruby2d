@@ -75,7 +75,9 @@ end
 # first two was in fact broken while the other passed.
 FIXTURES = { 'cli' => 'spinel/tools/cli_app.rb',
              'gradient' => 'spinel/tools/gradient_app.rb',
-             'circle' => 'spinel/tools/circle_app.rb' }.freeze
+             'circle' => 'spinel/tools/circle_app.rb',
+             'line' => 'spinel/tools/line_app.rb',
+             'text' => 'spinel/tools/text_app.rb' }.freeze
 
 # A histogram is how a single-color divergence explains itself — which color
 # gained or lost pixels. A gradient has thousands of colors and the same list
@@ -99,7 +101,7 @@ def screenshots(fixture, dir)
     binary = File.expand_path("#{dir}/build/native/app")
     abort "\n#{name}: nothing at #{binary}" unless File.exist?(binary)
 
-    ran, status = run_capped([binary], seconds: 60)
+    ran, status = run_capped([binary], seconds: 60, chdir: File.dirname(binary))
     abort "\n#{name} hung" if status == :timeout
     abort "\n#{name} wrote no screenshot:\n#{ran}" unless File.exist?(shot)
 

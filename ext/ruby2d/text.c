@@ -2,6 +2,7 @@
 
 #include "ruby2d.h"
 
+#ifndef RUBY2D_NO_RUBY
 R2D_DEFINE_DATA_TYPE(R2D_Text);
 
 // Text-specific ivar IDs. Shared ivar IDs live in ext.c.
@@ -19,6 +20,7 @@ void R2D_Text_Init() {
   r_define_class_method(ruby2d_ext_module, "text_create", ruby2d_ext_text_create, r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "text_draw",   ruby2d_ext_text_draw,   r_args_variadic);
 }
+#endif
 
 
 // Font Cache //////////////////////////////////////////////////////////////////
@@ -326,13 +328,16 @@ static void R2D_TextReleaseResources(R2D_Text *txt) {
  * scale has changed since the surface was built — e.g. a Text constructed
  * before the window opened, when R2D_GetAssetScale() was still 1.0.
  */
-static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
-  const char *font = obj_str(obj, id_font);
-  const char *msg  = obj_str(obj, id_content);
-  size_t msg_len   = obj_str_len(obj, id_content);
-  int size         = obj_int(obj, id_size);
-  int style        = obj_int(obj, id_style_flags);
-
+/*
+ * Rasterize `msg` with `font` at `size` and `style` into `txt`, replacing what
+ * was there. Ruby-free: the Ruby bridge reads these off the Text's ivars and
+ * copies the resulting `width`/`height` back; the Spinel build passes them in
+ * and reads the size through R2D_TextWidth / R2D_TextHeight. Returns false on
+ * failure with the SDL error set, leaving `txt` as it was.
+ */
+static bool R2D_TextRasterizeWith(R2D_Text *txt, const char *font,
+                                  const char *msg, size_t msg_len,
+                                  int size, int style) {
   float scale = R2D_GetAssetScale();
   int effective_size = (int)(size * scale);
 
@@ -365,8 +370,8 @@ static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
     txt->cached_text_len = 0;
     txt->empty = true;
     txt->rendered_scale = scale;
-    obj_set_int(obj, id_width, 0);
-    obj_set_int(obj, id_height, new_height);
+    txt->width = 0;
+    txt->height = new_height;
     return true;
   }
 
@@ -411,11 +416,176 @@ static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
   /* The surface dimensions are in renderer pixels. To present sizes in
      window/logical coordinates (so R2D_WindowToRendererCoordinatesRect()
      scales them correctly on HiDPI displays), divide by the asset scale. */
-  int logical_w = (int) ((float)new_surface->w / scale);
-  int logical_h = (int) ((float)new_surface->h / scale);
-  obj_set_int(obj, id_width, logical_w);
-  obj_set_int(obj, id_height, logical_h);
+  txt->width  = (int) ((float)new_surface->w / scale);
+  txt->height = (int) ((float)new_surface->h / scale);
 
+  return true;
+}
+
+
+/*
+ * Upload the rasterized surface to the GPU if it changed, then draw it at
+ * (x, y) at the text's own size, rotated about (crx, cry), tinted by the color.
+ * Ruby-free core behind Ext.text_draw. Returns false on a texture failure with
+ * the SDL error set. Does not re-rasterize on an asset-scale change — callers
+ * check R2D_TextStale first, since only they hold the font and content.
+ */
+static bool R2D_TextDrawWith(R2D_Text *txt, float x, float y, float rotate,
+                             float crx, float cry,
+                             float r, float g, float b, float a,
+                             SDL_ScaleMode scale_mode) {
+  if (txt->empty) return true;  // empty content: nothing to draw
+
+  /* Refresh the GPU texture from the (re)rasterized surface. The strategy is
+     platform-split, and both arms were measured on the dynamic-text bench —
+     intuition points the wrong way on each side:
+
+     - Web (WebGL): a persistent grow-only texture updated in place. Fresh
+       glTexImage2D texture objects every frame churn the browser GPU
+       pipeline; switching to SDL_UpdateTexture cut the wasm render slice by
+       ~60% (and SwiftShader understates the real-browser win).
+     - Native: destroy + SDL_CreateTextureFromSurface per change. Metal is
+       far faster at create-fresh than at updating a live texture — the
+       persistent path measured +75% frame cost (~18µs per SDL_UpdateTexture
+       across 360 texts/frame). */
+  if (txt->texture == NULL || txt->texture_stale) {
+    SDL_Surface *s = txt->surface;
+#ifdef __EMSCRIPTEN__
+    if (txt->texture == NULL || s->w > txt->tex_w || s->h > txt->tex_h) {
+      int new_w = s->w > txt->tex_w ? s->w : txt->tex_w;
+      int new_h = s->h > txt->tex_h ? s->h : txt->tex_h;
+      if (txt->texture) SDL_DestroyTexture(txt->texture);
+      txt->texture = SDL_CreateTexture(R2D_GetRenderer(), SDL_PIXELFORMAT_RGBA32,
+                                       SDL_TEXTUREACCESS_STREAMING, new_w, new_h);
+      if (!txt->texture) {
+        txt->tex_w = 0;
+        txt->tex_h = 0;
+        return false;
+      }
+      SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
+      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
+      txt->tex_w = new_w;
+      txt->tex_h = new_h;
+    }
+    SDL_Rect upload_rect = { 0, 0, s->w, s->h };
+    R2D_CheckSDL(SDL_UpdateTexture(txt->texture, &upload_rect, s->pixels, s->pitch),
+                 "SDL_UpdateTexture");
+#else
+    // Rasterize already destroyed the old texture (update phase), so this is
+    // always a fresh create — the exact pre-persistent-texture flow.
+    if (txt->texture == NULL) {
+      txt->texture = SDL_CreateTextureFromSurface(R2D_GetRenderer(), s);
+      if (!txt->texture) return false;
+      SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
+      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
+    }
+#endif
+    txt->texture_stale = false;
+    // Keep surface alive for canvas blitting; R2D_Text_free handles cleanup
+  }
+
+  if (scale_mode != txt->applied_scale_mode) {
+    SDL_SetTextureScaleMode(txt->texture, scale_mode);
+    txt->applied_scale_mode = scale_mode;
+  }
+
+#ifdef __EMSCRIPTEN__
+  // The persistent texture's capacity can exceed the content — clip to it.
+  // Native textures are always content-sized, so NULL (whole texture) is
+  // equivalent and keeps that path identical to what was benchmarked.
+  SDL_FRect src_rect = { 0, 0, (float)txt->surface->w, (float)txt->surface->h };
+  const SDL_FRect *src = &src_rect;
+#else
+  const SDL_FRect *src = NULL;
+#endif
+  SDL_FRect dst_rect = { x, y, (float)txt->width, (float)txt->height };
+
+  SDL_SetTextureColorModFloat(txt->texture, r, g, b);
+  SDL_SetTextureAlphaModFloat(txt->texture, a);
+
+  SDL_FPoint center = { crx - x, cry - y };
+
+  R2D_CheckSDL(SDL_RenderTextureRotated(
+    R2D_GetRenderer(), txt->texture, src, &dst_rect, rotate, &center, SDL_FLIP_NONE
+  ), "SDL_RenderTextureRotated");
+
+  return true;
+}
+
+
+/*
+ * Release everything a text holds, then the text itself
+ */
+static void R2D_TextDestroy(R2D_Text *txt) {
+  if (!txt) return;
+  R2D_TextReleaseResources(txt);
+  if (txt->texture) {
+    if (R2D_RendererAlive()) SDL_DestroyTexture(txt->texture);
+    txt->texture = NULL;
+  }
+  free(txt);
+}
+
+
+// Ruby-free text API //////////////////////////////////////////////////////////
+//
+// What the Spinel build calls over FFI, since it cannot hand a Ruby object to
+// C: a text is an opaque handle, its font and content arrive as arguments, and
+// its measured size is read back. The Ruby bindings below share every core
+// these call.
+
+void *R2D_TextNew(void) {
+  if (!R2D_Init()) return NULL;
+  R2D_Text *txt = (R2D_Text *)calloc(1, sizeof(R2D_Text));
+  return txt;
+}
+
+bool R2D_TextUpdate(void *text, const char *font, const char *content,
+                    int size, int style) {
+  if (!text || !font || !content) return false;
+  return R2D_TextRasterizeWith((R2D_Text *)text, font, content, strlen(content),
+                               size, style);
+}
+
+int R2D_TextWidth(void *text)  { return text ? ((R2D_Text *)text)->width  : 0; }
+int R2D_TextHeight(void *text) { return text ? ((R2D_Text *)text)->height : 0; }
+
+// True when the asset scale moved since the last rasterization — e.g. the
+// text was built before a HiDPI window opened — and the caller should update
+// before drawing, as the Ruby bridge does on its own.
+bool R2D_TextStale(void *text) {
+  return text && ((R2D_Text *)text)->rendered_scale != R2D_GetAssetScale();
+}
+
+bool R2D_TextDraw(void *text, float x, float y, float rotate,
+                  float crx, float cry,
+                  float r, float g, float b, float a,
+                  const char *scale_mode) {
+  if (!text) return false;
+  R2D_Window *window = R2D_GetWindow();
+  SDL_ScaleMode fallback = window ? window->scale_mode : SDL_SCALEMODE_LINEAR;
+  return R2D_TextDrawWith((R2D_Text *)text, x, y, rotate, crx, cry, r, g, b, a,
+                          R2D_ParseScaleModeName(scale_mode, fallback));
+}
+
+void R2D_TextFree(void *text) {
+  R2D_TextDestroy((R2D_Text *)text);
+}
+
+
+#ifndef RUBY2D_NO_RUBY
+/*
+ * Rasterize from the Text's ivars and write the measured size back onto it
+ */
+static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
+  if (!R2D_TextRasterizeWith(txt,
+                             obj_str(obj, id_font),
+                             obj_str(obj, id_content), obj_str_len(obj, id_content),
+                             obj_int(obj, id_size), obj_int(obj, id_style_flags))) {
+    return false;
+  }
+  obj_set_int(obj, id_width, txt->width);
+  obj_set_int(obj, id_height, txt->height);
   return true;
 }
 
@@ -490,100 +660,19 @@ R_VAL ruby2d_ext_text_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
     }
   }
 
-  if (txt->empty) return R_NIL;  // empty content: nothing to draw
-
-  /* Refresh the GPU texture from the (re)rasterized surface. The strategy is
-     platform-split, and both arms were measured on the dynamic-text bench —
-     intuition points the wrong way on each side:
-
-     - Web (WebGL): a persistent grow-only texture updated in place. Fresh
-       glTexImage2D texture objects every frame churn the browser GPU
-       pipeline; switching to SDL_UpdateTexture cut the wasm render slice by
-       ~60% (and SwiftShader understates the real-browser win).
-     - Native: destroy + SDL_CreateTextureFromSurface per change. Metal is
-       far faster at create-fresh than at updating a live texture — the
-       persistent path measured +75% frame cost (~18µs per SDL_UpdateTexture
-       across 360 texts/frame). */
-  if (txt->texture == NULL || txt->texture_stale) {
-    SDL_Surface *s = txt->surface;
-#ifdef __EMSCRIPTEN__
-    if (txt->texture == NULL || s->w > txt->tex_w || s->h > txt->tex_h) {
-      int new_w = s->w > txt->tex_w ? s->w : txt->tex_w;
-      int new_h = s->h > txt->tex_h ? s->h : txt->tex_h;
-      if (txt->texture) SDL_DestroyTexture(txt->texture);
-      txt->texture = SDL_CreateTexture(R2D_GetRenderer(), SDL_PIXELFORMAT_RGBA32,
-                                       SDL_TEXTUREACCESS_STREAMING, new_w, new_h);
-      if (!txt->texture) {
-        txt->tex_w = 0;
-        txt->tex_h = 0;
-        r_raise("SDL_CreateTexture failed: %s", SDL_GetError());
-        return R_NIL;
-      }
-      SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
-      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
-      txt->tex_w = new_w;
-      txt->tex_h = new_h;
-    }
-    SDL_Rect upload_rect = { 0, 0, s->w, s->h };
-    R2D_CheckSDL(SDL_UpdateTexture(txt->texture, &upload_rect, s->pixels, s->pitch),
-                 "SDL_UpdateTexture");
-#else
-    // Rasterize already destroyed the old texture (update phase), so this is
-    // always a fresh create — the exact pre-persistent-texture flow.
-    if (txt->texture == NULL) {
-      txt->texture = SDL_CreateTextureFromSurface(R2D_GetRenderer(), s);
-      if (!txt->texture) {
-        r_raise("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
-        return R_NIL;
-      }
-      SDL_SetTextureBlendMode(txt->texture, SDL_BLENDMODE_BLEND);
-      txt->applied_scale_mode = SDL_SCALEMODE_INVALID;
-    }
-#endif
-    txt->texture_stale = false;
-    // Keep surface alive for canvas blitting; R2D_Text_free handles cleanup
-  }
-
-  R2D_ApplyScaleMode(txt->texture, obj, &txt->applied_scale_mode);
-
-#ifdef __EMSCRIPTEN__
-  // The persistent texture's capacity can exceed the content — clip to it.
-  // Native textures are always content-sized, so NULL (whole texture) is
-  // equivalent and keeps that path identical to what was benchmarked.
-  SDL_FRect src_rect = { 0, 0, (float)txt->surface->w, (float)txt->surface->h };
-  const SDL_FRect *src = &src_rect;
-#else
-  const SDL_FRect *src = NULL;
-#endif
-  SDL_FRect dst_rect = {
-    obj_float(obj, id_x),
-    obj_float(obj, id_y),
-    obj_float(obj, id_width),
-    obj_float(obj, id_height)
-  };
-
+  SDL_ScaleMode mode = R2D_ResolveScaleMode(obj);
   R_VAL color_obj = r_ivar_get(obj, id_color);
-  SDL_SetTextureColorModFloat(txt->texture,
-    NUM2DBL(r_ivar_get(color_obj, id_r)),
-    NUM2DBL(r_ivar_get(color_obj, id_g)),
-    NUM2DBL(r_ivar_get(color_obj, id_b))
-  );
-  SDL_SetTextureAlphaModFloat(txt->texture, NUM2DBL(r_ivar_get(color_obj, id_a)));
-
-  SDL_FPoint center = {
-    crx - obj_float(obj, id_x),
-    cry - obj_float(obj, id_y)
-  };
-
-  R2D_CheckSDL(SDL_RenderTextureRotated(
-    R2D_GetRenderer(),
-    txt->texture,
-    src,
-    &dst_rect,
-    obj_float(obj, id_rotate),
-    &center,
-    SDL_FLIP_NONE
-  ), "SDL_RenderTextureRotated");
+  if (!R2D_TextDrawWith(txt,
+                        obj_float(obj, id_x), obj_float(obj, id_y),
+                        obj_float(obj, id_rotate), crx, cry,
+                        NUM2DBL(r_ivar_get(color_obj, id_r)),
+                        NUM2DBL(r_ivar_get(color_obj, id_g)),
+                        NUM2DBL(r_ivar_get(color_obj, id_b)),
+                        NUM2DBL(r_ivar_get(color_obj, id_a)),
+                        mode)) {
+    r_raise("Failed to draw text: %s", SDL_GetError());
+    return R_NIL;
+  }
 
   return R_TRUE;
 }
@@ -593,12 +682,6 @@ R_VAL ruby2d_ext_text_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
  * Free the memory and resources associated with an R2D_Text object
  */
 static void R2D_Text_free(void *p) {
-  if (!p) return;
-  R2D_Text *txt = (R2D_Text *)p;
-  R2D_TextReleaseResources(txt);
-  if (txt->texture) {
-    if (R2D_RendererAlive()) SDL_DestroyTexture(txt->texture);
-    txt->texture = NULL;
-  }
-  xfree(txt);
+  R2D_TextDestroy((R2D_Text *)p);
 }
+#endif

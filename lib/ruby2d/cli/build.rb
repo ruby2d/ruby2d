@@ -429,16 +429,7 @@ def compile_native
     exit 1
   end
 
-  # Bundle the default font next to the executable so apps using the built-in
-  # font (`Text.new('…')` with no `font:`) resolve it at runtime. The native app
-  # reads `ruby2d/fonts/…` relative to its working directory — which
-  # `ruby2d launch --native` sets to `build/native` — mirroring the WASM preload.
-  fonts_src = "#{Ruby2D.assets}/resources/fonts"
-  if Dir.exist?(fonts_src)
-    fonts_dest = 'build/native/ruby2d/fonts'
-    FileUtils.mkdir_p fonts_dest
-    FileUtils.cp_r "#{fonts_src}/.", fonts_dest
-  end
+  bundle_default_font
 
   # Bundle each declared asset directory next to the executable — the native
   # counterpart to the web build's virtual-filesystem preload. The app resolves
@@ -464,6 +455,20 @@ end
 # the web VFS mounts it there, the native build copies it there next to the
 # executable — so an absolute dir lands at that same absolute path, which the
 # relative references apps use won't find; warn rather than silently mislead.
+# Bundle the default font next to the executable so apps using the built-in
+# font (`Text.new('…')` with no `font:`) resolve it at runtime. The native app
+# reads `ruby2d/fonts/…` relative to its working directory — which
+# `ruby2d launch --native` sets to `build/native` — mirroring the WASM preload.
+# Shared by the mruby and Spinel native builds.
+def bundle_default_font
+  fonts_src = "#{Ruby2D.assets}/resources/fonts"
+  return unless Dir.exist?(fonts_src)
+
+  fonts_dest = 'build/native/ruby2d/fonts'
+  FileUtils.mkdir_p fonts_dest
+  FileUtils.cp_r "#{fonts_src}/.", fonts_dest
+end
+
 def check_asset_dir(dir)
   unless Dir.exist?(dir)
     error "asset directory not found: #{dir}"

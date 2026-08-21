@@ -14,20 +14,20 @@ It is four gates, and a program can pass three of them and still be broken — w
 
 | Gate | Checked by | Passing |
 |---|---|---|
-| 1. the preflight accepts it | `rake coverage` | 3 of 55 |
-| 2. it builds | `rake cli`, and a real `ruby2d build` | 3 of 3 |
-| 3. it draws the right pixels | `rake compare` | not measured per program |
-| 4. it behaves | `rake motion` for animation, `rake input` for input | 1 of 3 animate; input reaches every handler kind |
+| 1. the preflight accepts it | `rake coverage` | 20 of 55 |
+| 2. it builds | `rake cli`, and a real `ruby2d build` | 17 of 20 — see [Line and Text](#line-and-text-2026-08-20) for the three |
+| 3. it draws the right pixels | `rake compare` | five fixtures byte-identical to mruby; not measured per program |
+| 4. it behaves | `rake motion` for animation, `rake input` for input | input reaches every handler kind; 4 of the 9 animating on mruby also animate on Spinel (2026-08-20, before Text landed) |
 
-Read gate 1 as "not refused outright". All three accepted programs build; `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **Input works as of 2026-08-20**: keys, mouse, scroll, close, window-level and per-object, filtered or not — `rake input` injects all of them into a built app and checks every handler fires in order. See [Input reaches the app](#input-reaches-the-app-2026-08-20). 49 of the 55 programs register an `on` handler, so this was the widest gap; what remains on gate 4 is the animation freeze.
+Read gate 1 as "not refused outright". `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **Input works as of 2026-08-20**: keys, mouse, scroll, close, window-level and per-object, filtered or not — `rake input` injects all of them into a built app and checks every handler fires in order. See [Input reaches the app](#input-reaches-the-app-2026-08-20). 49 of the 55 programs register an `on` handler, so this was the widest gap; what remains on gate 4 is the animation freeze.
 
-`rake coverage` also ranks what to add next by how many programs each feature unblocks, greedily rather than by raw appearances: `Text` first at +8, then `Line` at +9, reaching 100% at `BitmapText`. That ranking is about breadth only. It says nothing about cost — `Line` is pure geometry on the pattern `Circle` already proved, while `Text` needs the font stack — and nothing about gates 3 and 4.
+`rake coverage` also ranks what to add next by how many programs each feature unblocks, greedily rather than by raw appearances: from 20 today, `Canvas` first at +7, then `Polyline` +5, `Triangle` +5, `Button` +5, `Image` +3, reaching 100% at the `Window` subclass pattern. That ranking is about breadth only. It says nothing about cost — `Polyline` and `Triangle` are geometry on the pattern `Line` and `Quad` proved, `Canvas` and `Image` are pass-self calls with textures behind them like `Text` was — and nothing about gates 3 and 4.
 
 ### Status
 
 **The feature is wired: `ruby2d build --spinel app.rb` compiles an ordinary Ruby 2D script to a standalone 5.2 MB binary.** No hand-run scripts, no paths to set — get the compiler with `ruby2d setup --spinel`, then build. The app goes through `lib/`'s own scene graph into the real `R2D_*` core, with Ruby owning the frame loop. See [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10).
 
-What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, `Quad` and `Circle`, and nothing else yet. All four draw **filled and stroked**, the quad family in a single color or per-vertex — each of which needed its own fixture before it could be trusted — see [Lessons](#lessons). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
+What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, `Quad`, `Circle`, `Line` and `Text`, and nothing else yet. The shapes draw **filled and stroked**, the quad family in a single color or per-vertex, lines solid, dashed and gradient, text in any bundled or system font with styles — each of which needed its own fixture before it could be trusted — see [Lessons](#lessons). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
 **Real example programs build and run, unmodified**, on a stock compiler:
 
@@ -856,6 +856,28 @@ The evidence was already in hand and went unused, which is the more uncomfortabl
 The same question is now open about one of the three that did drop. The `const char *` C error survey still reports was attributed to `expand_hash_delete`, dropped today for a bug (#3806) that is fixed. Slice clean, library not — possibly the same pattern a second time. Nobody has checked whether that is a different `delete` site or the same one behaving differently once more code is reachable.
 
 **`survey.rb` hid all of this for one run, and that is now fixed.** With the `interactive.rb` entry removed to test whether it was stale, the tool printed an empty "Remaining C errors" list — which reads as *nothing left to fix*. Spinel had refused the program before clang ever ran, and its diagnostics say `spinel: file:line: unsupported …`, never `error:`, so the census matched nothing. An empty list and a clean build were indistinguishable. It now prints the refusal and says plainly that it is the first blocker rather than the list.
+
+## Line and Text (2026-08-20)
+
+**The target now draws `Line` and `Text`, and the preflight accepts 20 of the 55 programs — up from 3 this morning.** Both are byte-identical to mruby under `rake compare`, which now has five fixtures: `line_app.rb` (solid, dashed, rotated, gradient) and `text_app.rb` (regular, bold with alpha, rotated, and a size change on a later frame so the re-rasterize path runs).
+
+**`Line` was the easy one**, as predicted: two entry points of 21 and 23 floats through the `Circle` pattern, an afternoon's worth of `.to_f`.
+
+**`Text` was the first pass-self seam with a native object behind it**, and it set the pattern for `Canvas` and `Image`. `text.c` now has Ruby-free cores — `R2D_TextRasterizeWith` and `R2D_TextDrawWith` — that both the Ruby bindings and a small FFI surface call: `R2D_TextNew` returns an opaque handle, `R2D_TextUpdate` rasterizes it from the font path, content, size and style flags, `R2D_TextWidth` / `R2D_TextHeight` read the measured size back, `R2D_TextStale` says the asset scale moved (a Text built before a HiDPI window opened), `R2D_TextDraw` takes position, pivot, color and the scale mode by name, and `R2D_TextFree` releases it. The measured size moved onto the `R2D_Text` struct, where the Ruby bridge mirrors it to `@width`/`@height` and the adapter reads it. On the Ruby side the adapter reopens `Text` with a `:ptr`-typed ivar for the handle — Spinel allows a pointer in a typed ivar but not in a Hash or Array — plus a `_spinel_measure` writer, the way `Window#_spinel_sync` was done. **Handles are never freed**: Spinel has no finalizers, so a program that churns `Text` objects leaks a surface per object; `content=` reuses one.
+
+Two things outside the adapter had to move for the default font to resolve. `ruby2d build --spinel` now bundles `ruby2d/fonts/` next to the binary, through a `bundle_default_font` helper the mruby native build shares. And `Font.default` no longer asks `RUBY_ENGINE == 'mruby'`: the question was really "does this run from the gem or from a bundle", so it asks `RUBY_ENGINE == 'ruby'` and every built binary takes the bundled path — the same reasoning as `Ruby2D.ruby_owned_loop?`.
+
+The contract that a built app runs from its `build/native` — where `ruby2d launch --native` puts it, and where the fonts are — was not something the tools honored: `check.rb`, `compare.rb`, `motion.rb` and `fps.rb` all launched the binary from the fixture directory, which no shape fixture ever noticed. `run_capped` grew a `chdir:` and all four run from the bundle now. The `preflight` fixture had used `Text` as its unsupported feature; it uses `Canvas` and `Image` now, with a note to swap again when one of those lands.
+
+**Three of the 20 accepted programs do not build**, all for reasons in the app rather than the library, found by the first `rake motion` over the wider set and not yet reduced:
+
+| Program | Engine | What stops it |
+|---|---|---|
+| `marching_squares.rb` | Spinel | `b[:x] += b[:vx] * dt` on a Hash with Symbol keys: `invalid operands to binary expression ('sp_int' and 'sp_RbVal')` in the generated C |
+| `maze.rb` | Spinel | `unsupported proc referencing an uncaptured outer variable 'phase' (later slice)` — a lambda capturing a local, the shape of [issue 34](issues/34-proc-capturing-a-block-parameter-refused-in-an-included-module.md) outside an `include` |
+| `swarm.rb` | both | `ruby2d build --native` succeeds on its own, so this is `motion.rb`'s source injection, not the compiler |
+
+The next two drafts are the first two rows. The ranking for what to add next is in [The goal](#the-goal): `Canvas` first at +7.
 
 ## Input reaches the app (2026-08-20)
 

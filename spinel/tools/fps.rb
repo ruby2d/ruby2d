@@ -135,12 +135,15 @@ def measure(flag, dir)
   if flag
     out, status, code = Dir.chdir(dir) { run_capped(['ruby2d', 'build', flag, 'app.rb'], seconds: 900) }
     abort "\n  build failed:\n#{out}" unless status == :ok && code&.zero?
-    cmd = [File.join(dir, 'build/native/app')]
+    # From `build/native`, where the bundled fonts sit, as `ruby2d launch` runs it
+    cmd = [File.expand_path(File.join(dir, 'build/native/app'))]
+    run_dir = File.join(dir, 'build/native')
   else
     cmd = ['ruby', File.join(dir, 'app.rb')]
+    run_dir = dir
   end
 
-  out, status, code = Dir.chdir(dir) { run_capped(cmd, seconds: 600) }
+  out, status, code = run_capped(cmd, seconds: 600, chdir: run_dir)
   abort "\n  run hung" if status == :timeout
   abort "\n  run failed (exit #{code}):\n#{out}" unless code&.zero?
 

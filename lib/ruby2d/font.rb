@@ -20,13 +20,14 @@ module Ruby2D
         all_paths.find { |path| path.split('/').last.chomp('.ttf').downcase.include?(font_name) }
       end
 
-      # Get full path to the default font
+      # Get full path to the default font. CRuby runs from the installed gem;
+      # every built binary (mruby native, WASM, Spinel) bundles the fonts at
+      # `ruby2d/fonts/` relative to where it runs.
       def default
-        if RUBY_ENGINE == 'mruby'
-          # Native and WASM builds bundle fonts at ruby2d/fonts/ relative to the binary
-          'ruby2d/fonts/outfit/outfit.ttf'
-        else
+        if RUBY_ENGINE == 'ruby'
           File.expand_path('../../assets/resources/fonts/outfit/outfit.ttf', __dir__)
+        else
+          'ruby2d/fonts/outfit/outfit.ttf'
         end
       end
 
