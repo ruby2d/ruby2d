@@ -64,9 +64,7 @@ end
 # `on`-using program builds without it.
 def spinel_block_param_capture(src)
   spinel_sub(src,
-             "          values = Array(matcher)\n" \
              "          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.matches?(field, v) } }\n",
-             "          values = Array(matcher)\n" \
              "          handler = proc\n" \
              "          wrapped = ->(e) { handler.call(e) if values.any? { |v| e.matches?(field, v) } }\n",
              'lambda capturing a module method’s block parameter')
@@ -151,6 +149,9 @@ SPINEL_LIB_FILES = %w[
   window/mouse_events
   window/gamepad_events
   window/object_events
+  vocabulary
+  keyboard
+  mouse
   gamepad
   window
   interactive
@@ -175,12 +176,12 @@ SPINEL_CORE_FILES = %w[ruby2d window shapes fps font].freeze
 # Spinel's FFI cannot read a Ruby object and C can never call back into Ruby, so
 # each entry point is a Ruby method here that reads the ivars itself and calls a
 # flattened `R2D_*` function. That is the whole shape of the adapter, and why
-# `R2D_ShowWindow` takes twelve parameters.
+# `R2D_ShowWindow` takes thirteen parameters.
 SPINEL_EXT = <<~'RUBY'
   module Ruby2D
     module Ext
       ffi_func :R2D_ShowWindow, [:str, :int, :int, :bool, :bool, :bool, :double,
-                                 :int, :int, :str, :str, :str], :bool
+                                 :int, :int, :str, :str, :str, :str], :bool
       ffi_func :R2D_CreateWindow, [:str, :int, :int, :int, :int, :str], :bool
       ffi_func :R2D_CloseWindow, [], :void
       ffi_func :R2D_LastError, [], :str
@@ -235,7 +236,7 @@ SPINEL_EXT = <<~'RUBY'
                                 win.fps_cap ? win.fps_cap.to_f : -1.0,
                                 win.viewport_width, win.viewport_height,
                                 win.viewport_mode.to_s, win.render_mode.to_s,
-                                win.icon || '')
+                                win.scale_mode.to_s, win.icon || '')
         raise Error, "failed to create the window: #{Ext.R2D_LastError()}" unless ok
 
         ok
@@ -363,7 +364,7 @@ RUBY
 
 # What an inert `Ext` stub returns when the default `nil` would break the caller.
 SPINEL_EXT_STUB_RETURNS = {
-  'window_cursor_visible' => 'true', 'scancode_name' => "'space'",
+  'window_cursor_visible' => 'true',
   'render' => 'nil', 'now' => '0.016', 'begin_frame' => 'true',
   'window_show' => 'true', 'window_create' => 'true'
 }.freeze

@@ -484,7 +484,7 @@ Each follows the format of [#3765](https://github.com/matz/spinel/issues/3765) a
 
 Two homes, and the choice is deliberate:
 
-- **`lib/`** — when the change is defensible Ruby on its own merits, it goes in the library, the way mruby accommodations already do. `@key_names = {}` instead of `[]` is the model: scancodes are sparse, so a Hash was the better structure anyway, and an empty Array literal gives an AOT compiler no element type to infer from. These changes stay correct under CRuby and mruby and need no build-time machinery.
+- **`lib/`** — when the change is defensible Ruby on its own merits, it goes in the library, the way mruby accommodations already do. `@key_names = {}` instead of `[]` was the model (the cache itself is gone now that key events carry name symbols): scancodes are sparse, so a Hash was the better structure anyway, and an empty Array literal gives an AOT compiler no element type to infer from. These changes stay correct under CRuby and mruby and need no build-time machinery.
 - **`cli/spinel.rb`** — only when the change would make `lib/` worse to read, or is pure build-time synthesis (the DSL top-level shims, `Ruby2D.web?`). Each transform asserts it still matches, so drift fails the build.
 
 Prefer `lib/`. The transforms are string matching against library source and are the fragile half.
@@ -611,7 +611,7 @@ The build prints the commit it used, read from the checkout's git rather than fr
 
 Mapping `lib/`'s `Ext` calls onto the `R2D_*` core is mostly mechanical — of the 41 the square slice references, 12 are gamepad and the rest are largely one-line window setters. Two are not mechanical, and both were found by reading the call sites rather than by compiling:
 
-**`Ext.window_show(self)` is a pass-self call.** The CRuby path hands the `Window` object to C, which reads its ivars. Spinel FFI cannot do that — there are no callbacks and no way to read a Ruby object from C. This is why `R2D_ShowWindow` takes twelve flattened parameters (title, size, flags, viewport and render mode, icon): the adapter reads the ivars **in Ruby** and passes them positionally. Any other pass-self call needs the same treatment, which is the pattern that will bite when images, text, and canvas are wired up.
+**`Ext.window_show(self)` is a pass-self call.** The CRuby path hands the `Window` object to C, which reads its ivars. Spinel FFI cannot do that — there are no callbacks and no way to read a Ruby object from C. This is why `R2D_ShowWindow` takes thirteen flattened parameters (title, size, flags, viewport, render and scale mode, icon): the adapter reads the ivars **in Ruby** and passes them positionally. Any other pass-self call needs the same treatment, which is the pattern that will bite when images, text, and canvas are wired up.
 
 **`RUBY_ENGINE` is `"spinel"`, so `Window#show` takes the wrong branch.** The condition is `RUBY_ENGINE == 'ruby'`, so Spinel falls through to the mruby/WASM path where *C owns the loop* — precisely what FFI cannot support. Spinel needs the CRuby-shaped branch, where Ruby runs `tick until @close`.
 

@@ -324,10 +324,12 @@ static SDL_ScaleMode R2D_ParseScaleMode(R_VAL sm_val, SDL_ScaleMode fallback) {
  * Resolve a renderable's scale mode: its own `scale_mode:` when set, and the
  * window-wide default when nil.
  */
+#ifndef RUBY2D_NO_RUBY
 SDL_ScaleMode R2D_ResolveScaleMode(R_VAL obj) {
   SDL_ScaleMode fallback = r2d_window ? r2d_window->scale_mode : SDL_SCALEMODE_LINEAR;
   return R2D_ParseScaleMode(r_ivar_get(obj, id_scale_mode), fallback);
 }
+#endif
 
 
 /*
@@ -2203,6 +2205,7 @@ R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
 /*
  * Ruby2D::Window#ext_set_scale_mode
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 1) r_raise("Ruby2D::Ext.window_set_scale_mode expects 1 arg (window), got %d", (int)argc);
@@ -2212,6 +2215,7 @@ R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_SetAtomicInt(&r2d_window->render_pending, 1);
   return R_TRUE;
 }
+#endif
 
 
 /*
