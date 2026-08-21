@@ -17,7 +17,7 @@ It is four gates, and a program can pass three of them and still be broken — w
 | 1. the preflight accepts it | `rake coverage` | 20 of 55 |
 | 2. it builds | `rake cli`, and a real `ruby2d build` | 17 of 20 — see [Line and Text](#line-and-text-2026-08-20) for the three |
 | 3. it draws the right pixels | `rake compare` | five fixtures byte-identical to mruby; not measured per program |
-| 4. it behaves | `rake motion` for animation, `rake input` for input | input reaches every handler kind; 4 of the 9 animating on mruby also animate on Spinel (2026-08-20, before Text landed) |
+| 4. it behaves | `rake motion` for animation, `rake input` for input | input reaches every handler kind; of the 8 programs that animate on mruby and build on Spinel, 5 animate on Spinel — `bouncing_balls` is frozen (issue 33), two more do not build |
 
 Read gate 1 as "not refused outright". `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **Input works as of 2026-08-20**: keys, mouse, scroll, close, window-level and per-object, filtered or not — `rake input` injects all of them into a built app and checks every handler fires in order. See [Input reaches the app](#input-reaches-the-app-2026-08-20). 49 of the 55 programs register an `on` handler, so this was the widest gap; what remains on gate 4 is the animation freeze.
 
@@ -45,7 +45,7 @@ ruby2d build --spinel examples/nbody.rb && ruby2d launch --native
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 15 reproduce, 2 parked: the fifteen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, 46 and 47 from the 2026-08-20 upstream pull, and 48 and 49 from wiring input the same day, none of them filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
+**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 17 reproduce, 3 parked: the seventeen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, 46 and 47 from the 2026-08-20 upstream pull, 48 and 49 from wiring input the same day, and 51 and 52 from the first motion sweep over 20 programs; the third parked is draft 50, which reproduces only in the assembled library. None is filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
 
 **Three workarounds were dropped on 2026-08-13 and a fourth was dropped and put straight back** — see [Three workarounds dropped](#three-workarounds-dropped-and-one-that-could-not-be-2026-08-13). Two compiler bugs still hold a transform each: `dsl_shims` ([#3803](https://github.com/matz/spinel/issues/3803), fixed upstream with an unreduced residue) and `block_param_capture` (drafted as issue 34, unfiled). `rake sweep` answers whether a transform can go — but only for the code its fixture reaches, which is how `block_param_capture` was wrongly dropped and broke every app using `on`. See [Lessons](#lessons).
 
@@ -514,6 +514,7 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | Workaround | Why it is still there |
 |---|---|
 | `block_param_capture` | The lambda in `Interactive#on`'s filtered form captures the method's block parameter, and the method arrives through an `include`. Refused with `uncaptured outer variable 'proc' (later slice)`. Reduced as issue 34, **not yet filed**. Dropped on a sweep result on 2026-08-13 and restored the same day — it is the reason `build_subset.rb`'s fixture now registers an `on` handler |
+| `hash_delete_if` | `@pressed_objects.delete_if` in `ObjectEventDispatch#cleanup_interaction_state` raises `undefined method 'delete_if' for an instance of Hash` in the assembled library and nowhere smaller; the transform iterates a snapshot of the keys and deletes by key. Draft 50, research notes. Added 2026-08-20 when `snake.rb` first ran. **`rake sweep` cannot grade it** until the `-Werror` gate clears; re-check with `scratch/input/state_harness.rb` |
 | `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is filed as [#3803](https://github.com/matz/spinel/issues/3803), which is *also* closed with its reproducer passing, and the transform is still load-bearing. It is the only compiler bug left in this table, and the only row whose residue has never been reduced |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
 | `disable_class_pattern` | An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
@@ -869,15 +870,19 @@ Two things outside the adapter had to move for the default font to resolve. `rub
 
 The contract that a built app runs from its `build/native` — where `ruby2d launch --native` puts it, and where the fonts are — was not something the tools honored: `check.rb`, `compare.rb`, `motion.rb` and `fps.rb` all launched the binary from the fixture directory, which no shape fixture ever noticed. `run_capped` grew a `chdir:` and all four run from the bundle now. The `preflight` fixture had used `Text` as its unsupported feature; it uses `Canvas` and `Image` now, with a note to swap again when one of those lands.
 
-**Three of the 20 accepted programs do not build**, all for reasons in the app rather than the library, found by the first `rake motion` over the wider set and not yet reduced:
+**The first `rake motion` over the wider set found five of the 20 that did not run.** Two were library-side and are fixed the same evening; three are app-side compiler bugs, one drafted:
 
-| Program | Engine | What stops it |
+| Program | What stopped it | Now |
 |---|---|---|
-| `marching_squares.rb` | Spinel | `b[:x] += b[:vx] * dt` on a Hash with Symbol keys: `invalid operands to binary expression ('sp_int' and 'sp_RbVal')` in the generated C |
-| `maze.rb` | Spinel | `unsupported proc referencing an uncaptured outer variable 'phase' (later slice)` — a lambda capturing a local, the shape of [issue 34](issues/34-proc-capturing-a-block-parameter-refused-in-an-included-module.md) outside an `include` |
-| `swarm.rb` | both | `ruby2d build --native` succeeds on its own, so this is `motion.rb`'s source injection, not the compiler |
+| `outrun.rb` | `Rectangle.render` in `update` raised "draw before the window is ready": `Window.render_ready_check` calls `shown?` implicitly from `ClassMethods`, and an `alias_method` of a singleton `attr_reader` answers stale state there — [draft 52](issues/52-an-alias-of-an-attr-reader-in-the-singleton-class-reads-stale-state-from-an-extended-module.md), 12 lines | runs; `shown?` is a plain `def` in `lib/` |
+| `snake.rb` | removing a segment after a click: `undefined method 'delete_if' for an instance of Hash` on `@pressed_objects`. Reproduces only in the assembled library — every standalone replica is correct — so it is [draft 50](issues/50-hash-delete-if-missing-on-the-pressed-object-map-in-the-assembled-library.md) as research notes, with `scratch/input/state_harness.rb` as the reproducer | animates; the `hash_delete_if` transform iterates the keys instead |
+| `swarm.rb` | `d.vx, d.vy = random_velocity`: multiple assignment to attribute writers is refused on a user class, and **silently truncates Floats** on a `Struct` — [draft 51](issues/51-multiple-assignment-to-attribute-writers-truncates-floats-or-is-refused.md) | does not build |
+| `marching_squares.rb` | `b[:x] += b[:vx] * dt` on a Symbol-keyed Hash: `invalid operands to binary expression ('sp_int' and 'sp_RbVal')` in the generated C | does not build; not reduced |
+| `maze.rb` | `unsupported proc referencing an uncaptured outer variable 'phase' (later slice)` — a lambda capturing a local, the shape of [issue 34](issues/34-proc-capturing-a-block-parameter-refused-in-an-included-module.md) outside an `include` | does not build; not reduced |
 
-The next two drafts are the first two rows. The ranking for what to add next is in [The goal](#the-goal): `Canvas` first at +7.
+`rake motion` itself says FROZEN for `outrun`, `breakout`, `gamepads`, `fireworks` and `ray_casting_maze` **on mruby too** — scenes that wait for input or an event before moving — so those rows are about the check, not the target. `bouncing_balls.rb` remains the one frozen-on-Spinel-only program ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)).
+
+The ranking for what to add next is in [The goal](#the-goal): `Canvas` first at +7.
 
 ## Input reaches the app (2026-08-20)
 

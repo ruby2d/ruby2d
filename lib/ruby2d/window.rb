@@ -117,8 +117,10 @@ module Ruby2D
     @shown = false
 
     class << self
-      attr_reader :shown
-      alias_method :shown?, :shown
+      # A method rather than an alias of an `attr_reader`: called implicitly
+      # from `ClassMethods`, the alias answers stale state under Spinel (see
+      # spinel/issues/52), and nothing reads the bare `shown`.
+      def shown? = @shown
 
       attr_writer :shown
     end

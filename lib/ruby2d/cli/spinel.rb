@@ -120,12 +120,32 @@ def spinel_dsl_shims(dsl_source)
 end
 
 
+# `Window::ObjectEventDispatch#cleanup_interaction_state` drops a released
+# button's press record with `Hash#delete_if`. In the assembled library that
+# Hash compiles to a kind with no `delete_if` (nor `reject!`), and the first
+# object removed after a press raises `undefined method 'delete_if' for an
+# instance of Hash`. Every standalone replica — plain, in an included module,
+# with poly objects as values — compiles and runs correctly, so the kind is
+# decided by something in the wider program that has not been isolated; draft
+# 50 holds the harness that reproduces it. Iterating a snapshot of the keys
+# and deleting by key is the same operation with methods the kind does have.
+def spinel_hash_delete_if(src)
+  spinel_sub(src,
+             "        @pressed_objects.delete_if { |_btn, info| info[:object] == object }\n",
+             "        @pressed_objects.keys.each do |btn|\n" \
+             "          @pressed_objects.delete(btn) if @pressed_objects[btn][:object] == object\n" \
+             "        end\n",
+             'Hash#delete_if on the pressed-object map')
+end
+
+
 # Apply every compatibility transformation to the assembled library source.
-# Only two remain, and neither is a compiler bug: the class pattern needs
-# reflection an AOT build cannot provide, and `web?` stands in for a method C
-# registers on the other engines.
+# Two of the three are not compiler bugs: the class pattern needs reflection an
+# AOT build cannot provide, and `web?` stands in for a method C registers on the
+# other engines.
 def spinel_compat(src)
   src = spinel_block_param_capture(src)
+  src = spinel_hash_delete_if(src)
   src = spinel_disable_class_pattern(src)
   src + spinel_web_predicate
 end
