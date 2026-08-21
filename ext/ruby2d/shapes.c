@@ -204,6 +204,35 @@ void R2D_StrokePath(const float *verts, int n, int closed,
 
 
 /*
+ * R2D_StrokePath over doubles, for a bridge whose arrays cross as `double *`:
+ * `verts` holds n (x, y) pairs and `colors` n (r, g, b, a) quads. Small paths
+ * convert on the stack; `colors_len` is checked so a short array is refused
+ * rather than read past.
+ */
+void R2D_StrokePathD(const double *verts, int n, int closed, double stroke_width,
+                     const double *colors, int colors_len) {
+  if (n < 2 || stroke_width <= 0.0 || !verts || !colors) return;
+  if (colors_len < n * 4) {
+    R2D_Error("R2D_StrokePathD", "%d color values for %d vertices (need %d)", colors_len, n, n * 4);
+    return;
+  }
+  float pts_stack[R2D_STROKE_STACK_N * 2];
+  float colors_stack[R2D_STROKE_STACK_N * 4];
+  float *pts = pts_stack, *cols = colors_stack;
+  bool heap = n > R2D_STROKE_STACK_N;
+  if (heap) {
+    pts  = (float *)malloc(n * 2 * sizeof(float));
+    cols = (float *)malloc(n * 4 * sizeof(float));
+    if (!pts || !cols) { free(pts); free(cols); return; }
+  }
+  for (int k = 0; k < n * 2; k++) pts[k]  = (float)verts[k];
+  for (int k = 0; k < n * 4; k++) cols[k] = (float)colors[k];
+  R2D_StrokePath(pts, n, closed, (float)stroke_width, R2D_MITER_LIMIT, cols);
+  if (heap) { free(cols); free(pts); }
+}
+
+
+/*
  * Unit-circle lookup cache, keyed by sector count.
  *
  * The cos/sin of each sector angle depend only on the sector count — not on

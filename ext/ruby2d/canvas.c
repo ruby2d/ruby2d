@@ -2,6 +2,9 @@
 
 #include "ruby2d.h"
 
+#include <stdarg.h>
+
+#ifndef RUBY2D_NO_RUBY
 R2D_DEFINE_DATA_TYPE(R2D_Canvas);
 
 // Canvas-specific ivar IDs. Shared ivar IDs live in ext.c. Note that canvas
@@ -42,162 +45,7 @@ void R2D_Canvas_Init() {
   r_define_class_method(ruby2d_ext_module, "canvas_draw_image",         ruby2d_ext_canvas_draw_image,         r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "canvas_draw_text",          ruby2d_ext_canvas_draw_text,          r_args_variadic);
 }
-
-
-/*
- * Ruby2D::Canvas#ext_create
- */
-R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_create expects 2 args (canvas, logical), got %d", (int)argc);
-  R_VAL obj = argv[0];
-  bool logical = r_test(argv[1]);
-
-  // Ensure SDL subsystems are initialized (display_scale is set in R2D_Init)
-  if (!R2D_Init()) r_raise("Ruby2D: failed to initialize: %s", SDL_GetError());
-
-  int width  = obj_int(obj, id_width);
-  int height = obj_int(obj, id_height);
-
-  /* Create the surface at physical pixel dimensions so canvas content is
-     crisp on HiDPI displays. The Ruby-side width/height remain in logical
-     coordinates; drawing methods scale inputs by the same factor.
-
-     A Canvas captures its scale once, here, and never re-evaluates (unlike
-     text, which re-rasterizes from its string when the scale changes — a
-     Canvas holds the user's accumulated drawing and can't be recreated).
-     Before `show` (the usual case) the window's asset scale doesn't yet
-     reflect `pixel_scale` — R2D_ApplyPixelScale sets it when the window
-     opens — so the Ruby side passes `logical` when the canvas should be
-     built at 1:1 instead. Otherwise use the window's asset scale, or the
-     init display scale (known since R2D_Init) if there's no window struct
-     at all, so the common HiDPI case stays crisp. */
-  float scale;
-  if (logical) {
-    scale = 1.0f;
-  } else {
-    scale = R2D_GetWindow() ? R2D_GetAssetScale() : R2D_GetInitDisplayScale();
-  }
-  int pixel_w = (int)(width  * scale);
-  int pixel_h = (int)(height * scale);
-
-  SDL_Surface *surface = SDL_CreateSurface(pixel_w, pixel_h, SDL_PIXELFORMAT_RGBA32);
-  if (!surface) {
-    r_raise("SDL_CreateSurface failed: %s", SDL_GetError());
-    return R_NIL;
-  }
-
-  // Fill with the fill color
-  float fr = obj_float(obj, id_fill_r);
-  float fg = obj_float(obj, id_fill_g);
-  float fb = obj_float(obj, id_fill_b);
-  float fa = obj_float(obj, id_fill_a);
-
-  Uint8 r = (Uint8)(fr * 255);
-  Uint8 g = (Uint8)(fg * 255);
-  Uint8 b = (Uint8)(fb * 255);
-  Uint8 a = (Uint8)(fa * 255);
-
-  Uint32 color = SDL_MapSurfaceRGBA(surface, r, g, b, a);
-  SDL_FillSurfaceRect(surface, NULL, color);
-  SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
-
-  R2D_Canvas *can = ALLOC(R2D_Canvas);
-  can->surface = surface;
-  can->texture = NULL;
-  can->scale   = scale;
-  can->dirty   = false;
-  can->dirty_rect = (SDL_Rect){ 0, 0, 0, 0 };
-
-  obj_set_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  return R_TRUE;
-}
-
-
-static void canvas_mark_dirty(R2D_Canvas *can, float min_x, float min_y,
-                              float max_x, float max_y);
-static void canvas_mark_dirty_all(R2D_Canvas *can);
-
-
-/*
- * Ruby2D::Canvas#ext_draw
- */
-R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 3) r_raise("Ruby2D::Ext.canvas_draw expects 3 args (canvas, rx, ry), got %d", (int)argc);
-  R_VAL obj = argv[0];
-  float crx = NUM2DBL(argv[1]);
-  float cry = NUM2DBL(argv[2]);
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  /* Create the persistent GPU texture on first draw. Created explicitly in
-     the surface's pixel format (rather than SDL_CreateTextureFromSurface) so
-     the incremental SDL_UpdateTexture uploads below can pass surface pixel
-     rows through unconverted. The texture then lives for the canvas's
-     lifetime — mutations upload into it instead of re-creating it. */
-  if (can->texture == NULL) {
-    can->texture = SDL_CreateTexture(R2D_GetRenderer(), SDL_PIXELFORMAT_RGBA32,
-                                     SDL_TEXTUREACCESS_STATIC,
-                                     can->surface->w, can->surface->h);
-    if (!can->texture) {
-      r_raise("SDL_CreateTexture failed: %s", SDL_GetError());
-      return R_NIL;
-    }
-    SDL_SetTextureBlendMode(can->texture, SDL_BLENDMODE_BLEND);
-    can->applied_scale_mode = SDL_SCALEMODE_INVALID;
-    canvas_mark_dirty_all(can);  // populate with a full first upload
-    // Don't destroy the surface — Canvas needs it for future draw operations
-  }
-
-  // Upload pending surface mutations — just the dirty union, not the whole
-  // surface. A settled canvas skips this entirely.
-  if (can->dirty) {
-    const SDL_Rect *dr = &can->dirty_rect;
-    const Uint8 *pixels = (const Uint8 *)can->surface->pixels
-                        + (size_t)dr->y * can->surface->pitch
-                        + (size_t)dr->x * 4;
-    R2D_CheckSDL(SDL_UpdateTexture(can->texture, dr, pixels, can->surface->pitch),
-                 "SDL_UpdateTexture");
-    can->dirty = false;
-  }
-
-  R2D_ApplyScaleMode(can->texture, obj, &can->applied_scale_mode);
-
-  SDL_FRect dst_rect = {
-    obj_float(obj, id_x),
-    obj_float(obj, id_y),
-    obj_float(obj, id_width),
-    obj_float(obj, id_height)
-  };
-
-  R_VAL color_obj = r_ivar_get(obj, id_tint);
-  SDL_SetTextureColorModFloat(can->texture,
-    NUM2DBL(r_ivar_get(color_obj, id_r)),
-    NUM2DBL(r_ivar_get(color_obj, id_g)),
-    NUM2DBL(r_ivar_get(color_obj, id_b))
-  );
-  SDL_SetTextureAlphaModFloat(can->texture, NUM2DBL(r_ivar_get(color_obj, id_a)));
-
-  SDL_FPoint center = {
-    crx - obj_float(obj, id_x),
-    cry - obj_float(obj, id_y)
-  };
-
-  R2D_CheckSDL(SDL_RenderTextureRotated(
-    R2D_GetRenderer(),
-    can->texture,
-    NULL,
-    &dst_rect,
-    obj_float(obj, id_rotate),
-    &center,
-    SDL_FLIP_NONE
-  ), "SDL_RenderTextureRotated");
-
-  return R_TRUE;
-}
+#endif
 
 
 /*
@@ -681,101 +529,6 @@ static void canvas_mark_dirty_verts(R2D_Canvas *can, const float *verts,
 
 
 /*
- * Ruby2D::Canvas#ext_fill_triangle
- * Arguments: [x1, y1, x2, y2, x3, y3, r, g, b, a]
- */
-R_VAL ruby2d_ext_canvas_fill_triangle(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 11) r_raise("Ruby2D::Ext.canvas_fill_triangle expects 11 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  float scale = can->scale;
-  float x1 = (float)NUM2DBL(argv[1]) * scale;
-  float y1 = (float)NUM2DBL(argv[2]) * scale;
-  float x2 = (float)NUM2DBL(argv[3]) * scale;
-  float y2 = (float)NUM2DBL(argv[4]) * scale;
-  float x3 = (float)NUM2DBL(argv[5]) * scale;
-  float y3 = (float)NUM2DBL(argv[6]) * scale;
-  float r  = (float)NUM2DBL(argv[7]);
-  float g  = (float)NUM2DBL(argv[8]);
-  float b  = (float)NUM2DBL(argv[9]);
-  float af = (float)NUM2DBL(argv[10]);
-
-  Uint8 cr = (Uint8)(r * 255);
-  Uint8 cg = (Uint8)(g * 255);
-  Uint8 cb = (Uint8)(b * 255);
-  Uint8 ca = (Uint8)(af * 255);
-
-  if (ca == 0) return R_TRUE;  // fully transparent: skip lock and texture rebuild
-
-  SDL_LockSurface(can->surface);
-  canvas_fill_triangle_on_surface(can->surface, x1, y1, x2, y2, x3, y3, cr, cg, cb, ca);
-  SDL_UnlockSurface(can->surface);
-
-  canvas_mark_dirty(can,
-    fminf(x1, fminf(x2, x3)), fminf(y1, fminf(y2, y3)),
-    fmaxf(x1, fmaxf(x2, x3)), fmaxf(y1, fmaxf(y2, y3)));
-
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Canvas#ext_fill_triangle_lerp
- * Arguments: [x1, y1, r1, g1, b1, a1, x2, y2, r2, g2, b2, a2, x3, y3, r3, g3, b3, a3]
- * Each vertex has its own color; colors are interpolated across the triangle.
- */
-R_VAL ruby2d_ext_canvas_fill_triangle_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_triangle_lerp expects 2 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-  R_VAL a   = argv[1];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  float scale = can->scale;
-
-  float x1 = (float)NUM2DBL(r_ary_entry(a, 0))  * scale;
-  float y1 = (float)NUM2DBL(r_ary_entry(a, 1))  * scale;
-  float r1 = (float)NUM2DBL(r_ary_entry(a, 2));
-  float g1 = (float)NUM2DBL(r_ary_entry(a, 3));
-  float b1 = (float)NUM2DBL(r_ary_entry(a, 4));
-  float a1 = (float)NUM2DBL(r_ary_entry(a, 5));
-
-  float x2 = (float)NUM2DBL(r_ary_entry(a, 6))  * scale;
-  float y2 = (float)NUM2DBL(r_ary_entry(a, 7))  * scale;
-  float r2 = (float)NUM2DBL(r_ary_entry(a, 8));
-  float g2 = (float)NUM2DBL(r_ary_entry(a, 9));
-  float b2 = (float)NUM2DBL(r_ary_entry(a, 10));
-  float a2 = (float)NUM2DBL(r_ary_entry(a, 11));
-
-  float x3 = (float)NUM2DBL(r_ary_entry(a, 12)) * scale;
-  float y3 = (float)NUM2DBL(r_ary_entry(a, 13)) * scale;
-  float r3 = (float)NUM2DBL(r_ary_entry(a, 14));
-  float g3 = (float)NUM2DBL(r_ary_entry(a, 15));
-  float b3 = (float)NUM2DBL(r_ary_entry(a, 16));
-  float a3 = (float)NUM2DBL(r_ary_entry(a, 17));
-
-  SDL_LockSurface(can->surface);
-  canvas_fill_triangle_lerp_on_surface(can->surface,
-    x1, y1, (Uint8)(r1 * 255), (Uint8)(g1 * 255), (Uint8)(b1 * 255), (Uint8)(a1 * 255),
-    x2, y2, (Uint8)(r2 * 255), (Uint8)(g2 * 255), (Uint8)(b2 * 255), (Uint8)(a2 * 255),
-    x3, y3, (Uint8)(r3 * 255), (Uint8)(g3 * 255), (Uint8)(b3 * 255), (Uint8)(a3 * 255));
-  SDL_UnlockSurface(can->surface);
-
-  canvas_mark_dirty(can,
-    fminf(x1, fminf(x2, x3)), fminf(y1, fminf(y2, y3)),
-    fmaxf(x1, fmaxf(x2, x3)), fmaxf(y1, fmaxf(y2, y3)));
-
-  return R_TRUE;
-}
-
-
-/*
  * Fill a rectangle on an SDL_Surface.
  * Coordinates are in surface pixel space (pre-scaled). Color components are 0-255.
  * Opaque fills use SDL_FillSurfaceRect; semi-transparent fills alpha-blend
@@ -827,250 +580,174 @@ static void canvas_fill_rectangle_on_surface(
 }
 
 
-/*
- * Ruby2D::Canvas#ext_fill_rectangle
- * Arguments: [x, y, width, height, r, g, b, a]
- */
-R_VAL ruby2d_ext_canvas_fill_rectangle(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 9) r_raise("Ruby2D::Ext.canvas_fill_rectangle expects 9 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
+// Ruby-free cores ////////////////////////////////////////////////////////////
+//
+// Every Ext.canvas_* binding below parses its Ruby arguments into doubles and
+// calls one of these; the Spinel build calls them directly over FFI, with a
+// packed array crossing as a `const double *` and its length. A core answers
+// false with the SDL error set where the binding used to raise.
 
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+static bool canvas_fail(const char *fmt, ...) {
+  char buf[256];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof buf, fmt, ap);
+  va_end(ap);
+  SDL_SetError("%s", buf);
+  return false;
+}
+
+
+/*
+ * Shared body for stroke_polygon/stroke_polyline. `vbase` is the array index
+ * of the first vertex coordinate (the leading args differ between the two);
+ * `closed` joins the last vertex back to the first.
+ */
+static bool canvas_stroke_impl(R2D_Canvas *can, const double *a, int len, int n, int vbase, int closed) {
+  if (n < 2) return true;
+  if ((long)len < (long)vbase + (long)n * 6 + 1)
+    return canvas_fail("Ruby2D::Ext.canvas_stroke: array has %d values for %d vertices", len, n);
 
   float scale = can->scale;
-  float fx = (float)NUM2DBL(argv[1]) * scale;
-  float fy = (float)NUM2DBL(argv[2]) * scale;
-  float fw = (float)NUM2DBL(argv[3]) * scale;
-  float fh = (float)NUM2DBL(argv[4]) * scale;
-  float rf = (float)NUM2DBL(argv[5]);
-  float gf = (float)NUM2DBL(argv[6]);
-  float bf = (float)NUM2DBL(argv[7]);
-  float af = (float)NUM2DBL(argv[8]);
+  // Small strokes use stack scratch; heap only past the threshold.
+  float verts_stack[R2D_STROKE_STACK_N * 2];
+  Uint8 colors_stack[R2D_STROKE_STACK_N * 4];
+  float *verts;
+  Uint8 *colors;
+  bool heap = n > R2D_STROKE_STACK_N;
+
+  if (heap) {
+    verts = (float *)malloc(n * 2 * sizeof(float));
+    colors = (Uint8 *)malloc(n * 4 * sizeof(Uint8));
+    if (!verts || !colors) { free(verts); free(colors); return true; }
+  } else {
+    verts = verts_stack;
+    colors = colors_stack;
+  }
+
+  for (int i = 0; i < n; i++) {
+    verts[i*2]   = (float)a[vbase + i*2] * scale;
+    verts[i*2+1] = (float)a[vbase + 1 + i*2] * scale;
+  }
+
+  int base = vbase + n * 2;
+  float sw = (float)a[base] * scale;
+
+  int has_any_alpha = 0;
+  for (int i = 0; i < n; i++) {
+    colors[i*4]     = (Uint8)(a[base + 1 + i*4]     * 255);
+    colors[i*4 + 1] = (Uint8)(a[base + 2 + i*4]     * 255);
+    colors[i*4 + 2] = (Uint8)(a[base + 3 + i*4]     * 255);
+    colors[i*4 + 3] = (Uint8)(a[base + 4 + i*4]     * 255);
+    if (colors[i*4 + 3] > 0) has_any_alpha = 1;
+  }
+
+  if (has_any_alpha) {
+    SDL_LockSurface(can->surface);
+    canvas_stroke_polyline_on_surface(can->surface, verts, n, closed, sw, colors);
+    SDL_UnlockSurface(can->surface);
+    // Miter joins extend past the vertices by up to hw * R2D_MITER_LIMIT
+    canvas_mark_dirty_verts(can, verts, n, 0.5f * sw * R2D_MITER_LIMIT);
+  }
+
+  if (heap) {
+    free(verts);
+    free(colors);
+  }
+  return true;
+}
+
+
+bool R2D_CanvasFillTriangle(void *canvas, double v1, double v2, double v3, double v4, double v5, double v6, double v7, double v8, double v9, double v10) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  float scale = can->scale;
+  float x1 = (float)v1 * scale;
+  float y1 = (float)v2 * scale;
+  float x2 = (float)v3 * scale;
+  float y2 = (float)v4 * scale;
+  float x3 = (float)v5 * scale;
+  float y3 = (float)v6 * scale;
+  float r  = (float)v7;
+  float g  = (float)v8;
+  float b  = (float)v9;
+  float af = (float)v10;
+
+  Uint8 cr = (Uint8)(r * 255);
+  Uint8 cg = (Uint8)(g * 255);
+  Uint8 cb = (Uint8)(b * 255);
+  Uint8 ca = (Uint8)(af * 255);
+
+  if (ca == 0) return true;  // fully transparent: skip lock and texture rebuild
+
+  SDL_LockSurface(can->surface);
+  canvas_fill_triangle_on_surface(can->surface, x1, y1, x2, y2, x3, y3, cr, cg, cb, ca);
+  SDL_UnlockSurface(can->surface);
+
+  canvas_mark_dirty(can,
+    fminf(x1, fminf(x2, x3)), fminf(y1, fminf(y2, y3)),
+    fmaxf(x1, fmaxf(x2, x3)), fmaxf(y1, fmaxf(y2, y3)));
+
+  return true;
+}
+
+bool R2D_CanvasFillRectangle(void *canvas, double v1, double v2, double v3, double v4, double v5, double v6, double v7, double v8) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  float scale = can->scale;
+  float fx = (float)v1 * scale;
+  float fy = (float)v2 * scale;
+  float fw = (float)v3 * scale;
+  float fh = (float)v4 * scale;
+  float rf = (float)v5;
+  float gf = (float)v6;
+  float bf = (float)v7;
+  float af = (float)v8;
 
   Uint8 cr = (Uint8)(rf * 255);
   Uint8 cg = (Uint8)(gf * 255);
   Uint8 cb = (Uint8)(bf * 255);
   Uint8 ca = (Uint8)(af * 255);
 
-  if (ca == 0) return R_TRUE;  // fully transparent: skip fill and texture rebuild
+  if (ca == 0) return true;  // fully transparent: skip fill and texture rebuild
 
   canvas_fill_rectangle_on_surface(can->surface, fx, fy, fw, fh, cr, cg, cb, ca);
   canvas_mark_dirty(can, fx, fy, fx + fw, fy + fh);
 
-  return R_TRUE;
+  return true;
 }
 
-
-/*
- * Ruby2D::Canvas#ext_fill_rectangles
- * Arguments: [n, x1, y1, w1, h1, x2, y2, w2, h2, ..., r, g, b, a]
- * Fills n rectangles with a single shared color in one FFI crossing.
- */
-R_VAL ruby2d_ext_canvas_fill_rectangles(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_rectangles expects 2 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-  R_VAL a   = argv[1];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  if ((int)r_ary_len(a) < 1) return R_TRUE;
-  int n = (int)NUM2INT(r_ary_entry(a, 0));
-  if (n < 1) return R_TRUE;
-
-  // Guard the array length: [count] + n*[x,y,w,h] + [r,g,b,a]. A short array
-  // would make r_ary_entry return nil and NUM2DBL(nil) error (mruby aborts).
-  long need = 5L + (long)n * 4;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_rectangles: array has %d values for %d rects (need %ld)",
-            (int)r_ary_len(a), n, need);
-
-  int base = 1 + n * 4;
-  float rf = (float)NUM2DBL(r_ary_entry(a, base));
-  float gf = (float)NUM2DBL(r_ary_entry(a, base + 1));
-  float bf = (float)NUM2DBL(r_ary_entry(a, base + 2));
-  float af = (float)NUM2DBL(r_ary_entry(a, base + 3));
-
-  Uint8 cr = (Uint8)(rf * 255);
-  Uint8 cg = (Uint8)(gf * 255);
-  Uint8 cb = (Uint8)(bf * 255);
-  Uint8 ca = (Uint8)(af * 255);
-
-  if (ca == 0) return R_TRUE;
-
-  float scale = can->scale;
-  for (int i = 0; i < n; i++) {
-    int o = 1 + i * 4;
-    float fx = (float)NUM2DBL(r_ary_entry(a, o))     * scale;
-    float fy = (float)NUM2DBL(r_ary_entry(a, o + 1)) * scale;
-    float fw = (float)NUM2DBL(r_ary_entry(a, o + 2)) * scale;
-    float fh = (float)NUM2DBL(r_ary_entry(a, o + 3)) * scale;
-    canvas_fill_rectangle_on_surface(can->surface, fx, fy, fw, fh, cr, cg, cb, ca);
-    canvas_mark_dirty(can, fx, fy, fx + fw, fy + fh);
-  }
-
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Canvas#ext_fill_pixel_grid
- * Arguments:
- *   header = [cols, rows, cell_w, cell_h, ox, oy]
- *   colors = flat array of cols*rows*4 floats in 0..1
- *            (r0, g0, b0, a0, r1, g1, b1, a1, ...)
- * Fills a regular cols x rows grid of equal-size rectangles, each with its
- * own RGBA color. Cell (col, row) is the rect at
- * (ox + col*cell_w, oy + row*cell_h, cell_w, cell_h), colored by
- * colors[(row*cols + col)*4 .. +3]. Single FFI crossing for the whole grid:
- * one surface lock, one texture invalidate, cells with a==0 skipped.
- */
-R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 3) r_raise("Ruby2D::Ext.canvas_fill_pixel_grid expects 3 args, got %d", (int)argc);
-  R_VAL obj    = argv[0];
-  R_VAL header = argv[1];
-  R_VAL colors = argv[2];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  // Guard array lengths before the read loops: a short array would make
-  // r_ary_entry return nil and NUM2DBL/NUM2INT(nil) error (hard-abort on mruby).
-  if ((int)r_ary_len(header) < 6)
-    r_raise("Ruby2D::Ext.canvas_fill_pixel_grid: header needs 6 values, got %d",
-            (int)r_ary_len(header));
-
-  int cols = (int)NUM2INT(r_ary_entry(header, 0));
-  int rows = (int)NUM2INT(r_ary_entry(header, 1));
-  if (cols < 1 || rows < 1) return R_TRUE;
-
-  long need = (long)cols * rows * 4;
-  if ((long)r_ary_len(colors) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_pixel_grid: %d color values for a %dx%d grid (need %ld)",
-            (int)r_ary_len(colors), cols, rows, need);
-
-  float scale  = can->scale;
-  float cell_w = (float)NUM2DBL(r_ary_entry(header, 2)) * scale;
-  float cell_h = (float)NUM2DBL(r_ary_entry(header, 3)) * scale;
-  float ox     = (float)NUM2DBL(r_ary_entry(header, 4)) * scale;
-  float oy     = (float)NUM2DBL(r_ary_entry(header, 5)) * scale;
-
-  // A non-finite cell size or origin (NaN/Inf) would make the per-cell
-  // (int)ceilf casts below undefined behavior; every cell derives from these
-  // four values, so skip the whole grid.
-  if (!isfinite(cell_w) || !isfinite(cell_h) || !isfinite(ox) || !isfinite(oy))
-    return R_TRUE;
-
-  SDL_Surface *surface = can->surface;
-
-  SDL_LockSurface(surface);
-  for (int gr = 0; gr < rows; gr++) {
-    for (int gc = 0; gc < cols; gc++) {
-      int o = (gr * cols + gc) * 4;
-      // Clamp channels to [0,1] before the 8-bit cast. This is the one
-      // user-facing color path that builds no Color object, so it has no
-      // Ruby-side clamp; an out-of-range value would wrap (1.5 -> 126) rather
-      // than saturate.
-      float af = (float)NUM2DBL(r_ary_entry(colors, o + 3));
-      if (af < 0.0f) af = 0.0f; else if (af > 1.0f) af = 1.0f;
-      Uint8 ca = (Uint8)(af * 255);
-      if (ca == 0) continue;
-
-      float rf = (float)NUM2DBL(r_ary_entry(colors, o));
-      float gf = (float)NUM2DBL(r_ary_entry(colors, o + 1));
-      float bf = (float)NUM2DBL(r_ary_entry(colors, o + 2));
-      if (rf < 0.0f) rf = 0.0f; else if (rf > 1.0f) rf = 1.0f;
-      if (gf < 0.0f) gf = 0.0f; else if (gf > 1.0f) gf = 1.0f;
-      if (bf < 0.0f) bf = 0.0f; else if (bf > 1.0f) bf = 1.0f;
-      Uint8 cr = (Uint8)(rf * 255);
-      Uint8 cg = (Uint8)(gf * 255);
-      Uint8 cb = (Uint8)(bf * 255);
-
-      // Half-open pixel coverage, matching canvas_fill_rectangle_on_surface
-      float fx = ox + gc * cell_w;
-      float fy = oy + gr * cell_h;
-      int rx = (int)ceilf(fx);
-      int ry = (int)ceilf(fy);
-      int rw = (int)ceilf(fx + cell_w) - rx;
-      int rh = (int)ceilf(fy + cell_h) - ry;
-
-      int x_start = rx < 0 ? 0 : rx;
-      int y_start = ry < 0 ? 0 : ry;
-      int x_end = rx + rw;
-      int y_end = ry + rh;
-      if (x_end > surface->w) x_end = surface->w;
-      if (y_end > surface->h) y_end = surface->h;
-
-      if (ca == 255) {
-        // Color is constant within the cell: one clipped, vectorized fill.
-        // A pixel-at-a-time memcpy loop here was half the frame for a 160x90
-        // grid of 16x16 physical cells.
-        SDL_Rect cell = { x_start, y_start, x_end - x_start, y_end - y_start };
-        if (cell.w > 0 && cell.h > 0)
-          SDL_FillSurfaceRect(surface, &cell, SDL_MapSurfaceRGBA(surface, cr, cg, cb, 255));
-      } else {
-        for (int y = y_start; y < y_end; y++) {
-          Uint8 *row = (Uint8 *)surface->pixels + y * surface->pitch;
-          for (int x = x_start; x < x_end; x++) {
-            Uint8 *pixel = row + x * 4;
-            canvas_blend_over(pixel, cr, cg, cb, ca);
-          }
-        }
-      }
-    }
-  }
-  SDL_UnlockSurface(surface);
-
-  canvas_mark_dirty(can, ox, oy, ox + cols * cell_w, oy + rows * cell_h);
-
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Canvas#ext_fill_ellipse
- * Arguments: [x, y, xradius, yradius, r, g, b, a]
- */
-R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 9) r_raise("Ruby2D::Ext.canvas_fill_ellipse expects 9 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+bool R2D_CanvasFillEllipse(void *canvas, double v1, double v2, double v3, double v4, double v5, double v6, double v7, double v8) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
 
   float scale   = can->scale;
-  float cx      = (float)NUM2DBL(argv[1]) * scale;
-  float cy      = (float)NUM2DBL(argv[2]) * scale;
-  float xradius = (float)NUM2DBL(argv[3]) * scale;
-  float yradius = (float)NUM2DBL(argv[4]) * scale;
-  float rf      = (float)NUM2DBL(argv[5]);
-  float gf      = (float)NUM2DBL(argv[6]);
-  float bf      = (float)NUM2DBL(argv[7]);
-  float af      = (float)NUM2DBL(argv[8]);
+  float cx      = (float)v1 * scale;
+  float cy      = (float)v2 * scale;
+  float xradius = (float)v3 * scale;
+  float yradius = (float)v4 * scale;
+  float rf      = (float)v5;
+  float gf      = (float)v6;
+  float bf      = (float)v7;
+  float af      = (float)v8;
 
   Uint8 cr = (Uint8)(rf * 255);
   Uint8 cg = (Uint8)(gf * 255);
   Uint8 cb = (Uint8)(bf * 255);
   Uint8 ca = (Uint8)(af * 255);
 
-  if (ca == 0) return R_TRUE;
+  if (ca == 0) return true;
 
   // A non-finite center or radius (NaN/Inf) would make the (int)ceilf/floorf
   // casts below undefined behavior (and `radius <= 0` does not catch NaN, since
   // every NaN comparison is false). Skip the draw before the scanline math.
   if (!isfinite(cx) || !isfinite(cy) || !isfinite(xradius) || !isfinite(yradius))
-    return R_TRUE;
+    return true;
 
   // A zero (or negative) radius has no area to fill. Guard before the scanline
   // math below: yradius == 0 makes yr2 == 0, so (dy * dy) / yr2 is 0.0 / 0.0 ==
   // NaN, and converting the resulting NaN pixel bounds to int is undefined
   // behavior that produces an out-of-bounds heap write.
-  if (xradius <= 0.0f || yradius <= 0.0f) return R_TRUE;
+  if (xradius <= 0.0f || yradius <= 0.0f) return true;
 
   SDL_Surface *surface = can->surface;
   float yr2 = yradius * yradius;
@@ -1111,184 +788,31 @@ R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   canvas_mark_dirty(can, cx - xradius, cy - yradius, cx + xradius, cy + yradius);
 
-  return R_TRUE;
+  return true;
 }
 
-
-/*
- * Ruby2D::Canvas#ext_fill_polygon
- * Arguments: [n, x1, y1, x2, y2, ..., r, g, b, a]
- * Uses ear-clipping triangulation (R2D_TriangulatePolygon) so concave
- * polygons fill correctly.
- */
-R_VAL ruby2d_ext_canvas_fill_polygon(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_polygon expects 2 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-  R_VAL a   = argv[1];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  if ((int)r_ary_len(a) < 1) return R_TRUE;
-  int n = (int)NUM2INT(r_ary_entry(a, 0));
-  if (n < 3) return R_TRUE;
-
-  // [n, x1, y1, ... xn, yn, r, g, b, a] — guard before indexing (a short array
-  // would hard-abort under mruby), matching the sibling fill_* methods.
-  long need = 1 + (long)n * 2 + 4;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_polygon: array has %d values for %d vertices (need %ld)",
-            (int)r_ary_len(a), n, need);
+bool R2D_CanvasDrawLine(void *canvas, double v1, double v2, double v3, double v4, double v5, double v6, double v7, double v8, double v9, double v10, double v11) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
 
   float scale = can->scale;
-  float *verts = (float *)malloc(n * 2 * sizeof(float));
-  if (!verts) return R_TRUE;
-
-  for (int i = 0; i < n; i++) {
-    verts[i*2]   = (float)NUM2DBL(r_ary_entry(a, 1 + i*2)) * scale;
-    verts[i*2+1] = (float)NUM2DBL(r_ary_entry(a, 2 + i*2)) * scale;
-  }
-
-  int base = 1 + n * 2;
-  float rf = (float)NUM2DBL(r_ary_entry(a, base));
-  float gf = (float)NUM2DBL(r_ary_entry(a, base + 1));
-  float bf = (float)NUM2DBL(r_ary_entry(a, base + 2));
-  float af = (float)NUM2DBL(r_ary_entry(a, base + 3));
+  float x1 = (float)v1 * scale;
+  float y1 = (float)v2 * scale;
+  float x2 = (float)v3 * scale;
+  float y2 = (float)v4 * scale;
+  float sw = (float)v5 * scale;
+  float rf = (float)v6;
+  float gf = (float)v7;
+  float bf = (float)v8;
+  float af = (float)v9;
+  float dash = (float)v10 * scale;
+  float gap  = (float)v11 * scale;
 
   Uint8 cr = (Uint8)(rf * 255);
   Uint8 cg = (Uint8)(gf * 255);
   Uint8 cb = (Uint8)(bf * 255);
   Uint8 ca = (Uint8)(af * 255);
 
-  if (ca > 0) {
-    int tri_count = 0;
-    int *indices = R2D_TriangulatePolygon(verts, n, &tri_count);
-    if (indices && tri_count > 0) {
-      SDL_LockSurface(can->surface);
-      for (int t = 0; t < tri_count; t++) {
-        int i1 = indices[t * 3];
-        int i2 = indices[t * 3 + 1];
-        int i3 = indices[t * 3 + 2];
-        canvas_fill_triangle_on_surface(can->surface,
-          verts[i1*2], verts[i1*2+1],
-          verts[i2*2], verts[i2*2+1],
-          verts[i3*2], verts[i3*2+1],
-          cr, cg, cb, ca);
-      }
-      SDL_UnlockSurface(can->surface);
-      canvas_mark_dirty_verts(can, verts, n, 0.0f);
-    }
-    free(indices);
-  }
-
-  free(verts);
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Canvas#ext_fill_polygon_lerp
- * Arguments: [n, x1, y1, r1, g1, b1, a1, x2, y2, r2, g2, b2, a2, ...]
- * Per-vertex colors. Triangulated via ear clipping; each emitted triangle
- * is rasterized with barycentric color interpolation between its three
- * source vertices' colors.
- */
-R_VAL ruby2d_ext_canvas_fill_polygon_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp expects 2 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-  R_VAL a   = argv[1];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  if ((int)r_ary_len(a) < 1) return R_TRUE;
-  int n = (int)NUM2INT(r_ary_entry(a, 0));
-  if (n < 3) return R_TRUE;
-
-  // [n, x1, y1, r1, g1, b1, a1, ...] — 6 entries per vertex. Guard before
-  // indexing (a short array would hard-abort under mruby).
-  long need = 1 + (long)n * 6;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp: array has %d values for %d vertices (need %ld)",
-            (int)r_ary_len(a), n, need);
-
-  float scale = can->scale;
-  float *verts  = (float *)malloc(n * 2 * sizeof(float));
-  Uint8 *colors = (Uint8 *)malloc(n * 4 * sizeof(Uint8));
-  if (!verts || !colors) { free(verts); free(colors); return R_TRUE; }
-
-  // Each vertex packs as (x, y, r, g, b, a) — 6 entries.
-  for (int i = 0; i < n; i++) {
-    int o = 1 + i * 6;
-    verts[i*2]     = (float)NUM2DBL(r_ary_entry(a, o))     * scale;
-    verts[i*2+1]   = (float)NUM2DBL(r_ary_entry(a, o + 1)) * scale;
-    colors[i*4]    = (Uint8)((float)NUM2DBL(r_ary_entry(a, o + 2)) * 255);
-    colors[i*4+1]  = (Uint8)((float)NUM2DBL(r_ary_entry(a, o + 3)) * 255);
-    colors[i*4+2]  = (Uint8)((float)NUM2DBL(r_ary_entry(a, o + 4)) * 255);
-    colors[i*4+3]  = (Uint8)((float)NUM2DBL(r_ary_entry(a, o + 5)) * 255);
-  }
-
-  int tri_count = 0;
-  int *indices = R2D_TriangulatePolygon(verts, n, &tri_count);
-  if (indices && tri_count > 0) {
-    SDL_LockSurface(can->surface);
-    for (int t = 0; t < tri_count; t++) {
-      int i1 = indices[t * 3];
-      int i2 = indices[t * 3 + 1];
-      int i3 = indices[t * 3 + 2];
-      canvas_fill_triangle_lerp_on_surface(can->surface,
-        verts[i1*2], verts[i1*2+1],
-        colors[i1*4], colors[i1*4+1], colors[i1*4+2], colors[i1*4+3],
-        verts[i2*2], verts[i2*2+1],
-        colors[i2*4], colors[i2*4+1], colors[i2*4+2], colors[i2*4+3],
-        verts[i3*2], verts[i3*2+1],
-        colors[i3*4], colors[i3*4+1], colors[i3*4+2], colors[i3*4+3]);
-    }
-    SDL_UnlockSurface(can->surface);
-    canvas_mark_dirty_verts(can, verts, n, 0.0f);
-  }
-  free(indices);
-
-  free(verts);
-  free(colors);
-  return R_TRUE;
-}
-
-
-/*
- * Ruby2D::Canvas#ext_draw_line
- * Arguments: [x1, y1, x2, y2, stroke_width, r, g, b, a, dash, gap]
- * When dash > 0, draws a dashed line; otherwise a solid line.
- */
-R_VAL ruby2d_ext_canvas_draw_line(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 12) r_raise("Ruby2D::Ext.canvas_draw_line expects 12 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
-
-  float scale = can->scale;
-  float x1 = (float)NUM2DBL(argv[1]) * scale;
-  float y1 = (float)NUM2DBL(argv[2]) * scale;
-  float x2 = (float)NUM2DBL(argv[3]) * scale;
-  float y2 = (float)NUM2DBL(argv[4]) * scale;
-  float sw = (float)NUM2DBL(argv[5]) * scale;
-  float rf = (float)NUM2DBL(argv[6]);
-  float gf = (float)NUM2DBL(argv[7]);
-  float bf = (float)NUM2DBL(argv[8]);
-  float af = (float)NUM2DBL(argv[9]);
-  float dash = (float)NUM2DBL(argv[10]) * scale;
-  float gap  = (float)NUM2DBL(argv[11]) * scale;
-
-  Uint8 cr = (Uint8)(rf * 255);
-  Uint8 cg = (Uint8)(gf * 255);
-  Uint8 cb = (Uint8)(bf * 255);
-  Uint8 ca = (Uint8)(af * 255);
-
-  if (ca == 0) return R_TRUE;
+  if (ca == 0) return true;
 
   SDL_LockSurface(can->surface);
 
@@ -1332,55 +856,236 @@ R_VAL ruby2d_ext_canvas_draw_line(RUBY2D_METHOD_ARGS_VARIADIC) {
                            fmaxf(x1, x2) + hw, fmaxf(y1, y2) + hw);
   }
 
-  return R_TRUE;
+  return true;
 }
 
-
-/*
- * Ruby2D::Canvas#ext_draw_line_lerp
- * Arguments: [x1, y1, x2, y2, stroke_width,
- *             r1, g1, b1, a1, r2, g2, b2, a2,
- *             r3, g3, b3, a3, r4, g4, b4, a4,
- *             dash, gap]
- * 4 per-corner colors mirror R2D_DrawLine's vertex layout
- * (c1=start+perp, c2=start-perp, c3=end-perp, c4=end+perp). When dash > 0,
- * draws a dashed line and interpolates endpoint colors along the length.
- */
-R_VAL ruby2d_ext_canvas_draw_line_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 2) r_raise("Ruby2D::Ext.canvas_draw_line_lerp expects 2 args, got %d", (int)argc);
-  R_VAL obj = argv[0];
-  R_VAL a   = argv[1];
-
-  R2D_Canvas *can;
-  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+bool R2D_CanvasFillTriangleLerp(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 18) return canvas_fail("Ruby2D::Ext.canvas_fill_triangle_lerp: needs 18 values, got %d", len);
 
   float scale = can->scale;
-  float x1 = (float)NUM2DBL(r_ary_entry(a, 0)) * scale;
-  float y1 = (float)NUM2DBL(r_ary_entry(a, 1)) * scale;
-  float x2 = (float)NUM2DBL(r_ary_entry(a, 2)) * scale;
-  float y2 = (float)NUM2DBL(r_ary_entry(a, 3)) * scale;
-  float sw = (float)NUM2DBL(r_ary_entry(a, 4)) * scale;
 
-  Uint8 r1 = (Uint8)(NUM2DBL(r_ary_entry(a,  5)) * 255);
-  Uint8 g1 = (Uint8)(NUM2DBL(r_ary_entry(a,  6)) * 255);
-  Uint8 b1 = (Uint8)(NUM2DBL(r_ary_entry(a,  7)) * 255);
-  Uint8 a1 = (Uint8)(NUM2DBL(r_ary_entry(a,  8)) * 255);
-  Uint8 r2 = (Uint8)(NUM2DBL(r_ary_entry(a,  9)) * 255);
-  Uint8 g2 = (Uint8)(NUM2DBL(r_ary_entry(a, 10)) * 255);
-  Uint8 b2 = (Uint8)(NUM2DBL(r_ary_entry(a, 11)) * 255);
-  Uint8 a2 = (Uint8)(NUM2DBL(r_ary_entry(a, 12)) * 255);
-  Uint8 r3 = (Uint8)(NUM2DBL(r_ary_entry(a, 13)) * 255);
-  Uint8 g3 = (Uint8)(NUM2DBL(r_ary_entry(a, 14)) * 255);
-  Uint8 b3 = (Uint8)(NUM2DBL(r_ary_entry(a, 15)) * 255);
-  Uint8 a3 = (Uint8)(NUM2DBL(r_ary_entry(a, 16)) * 255);
-  Uint8 r4 = (Uint8)(NUM2DBL(r_ary_entry(a, 17)) * 255);
-  Uint8 g4 = (Uint8)(NUM2DBL(r_ary_entry(a, 18)) * 255);
-  Uint8 b4 = (Uint8)(NUM2DBL(r_ary_entry(a, 19)) * 255);
-  Uint8 a4 = (Uint8)(NUM2DBL(r_ary_entry(a, 20)) * 255);
+  float x1 = (float)a[0]  * scale;
+  float y1 = (float)a[1]  * scale;
+  float r1 = (float)a[2];
+  float g1 = (float)a[3];
+  float b1 = (float)a[4];
+  float a1 = (float)a[5];
 
-  float dash = (float)NUM2DBL(r_ary_entry(a, 21)) * scale;
-  float gap  = (float)NUM2DBL(r_ary_entry(a, 22)) * scale;
+  float x2 = (float)a[6]  * scale;
+  float y2 = (float)a[7]  * scale;
+  float r2 = (float)a[8];
+  float g2 = (float)a[9];
+  float b2 = (float)a[10];
+  float a2 = (float)a[11];
+
+  float x3 = (float)a[12] * scale;
+  float y3 = (float)a[13] * scale;
+  float r3 = (float)a[14];
+  float g3 = (float)a[15];
+  float b3 = (float)a[16];
+  float a3 = (float)a[17];
+
+  SDL_LockSurface(can->surface);
+  canvas_fill_triangle_lerp_on_surface(can->surface,
+    x1, y1, (Uint8)(r1 * 255), (Uint8)(g1 * 255), (Uint8)(b1 * 255), (Uint8)(a1 * 255),
+    x2, y2, (Uint8)(r2 * 255), (Uint8)(g2 * 255), (Uint8)(b2 * 255), (Uint8)(a2 * 255),
+    x3, y3, (Uint8)(r3 * 255), (Uint8)(g3 * 255), (Uint8)(b3 * 255), (Uint8)(a3 * 255));
+  SDL_UnlockSurface(can->surface);
+
+  canvas_mark_dirty(can,
+    fminf(x1, fminf(x2, x3)), fminf(y1, fminf(y2, y3)),
+    fmaxf(x1, fmaxf(x2, x3)), fmaxf(y1, fmaxf(y2, y3)));
+
+  return true;
+}
+
+bool R2D_CanvasFillRectangles(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  if (len < 1) return true;
+  int n = (int)a[0];
+  if (n < 1) return true;
+
+  // Guard the array length: [count] + n*[x,y,w,h] + [r,g,b,a]. A short array
+  // would make r_ary_entry return nil and NUM2DBL(nil) error (mruby aborts).
+  long need = 5L + (long)n * 4;
+  if ((long)len < need)
+    return canvas_fail("Ruby2D::Ext.canvas_fill_rectangles: array has %d values for %d rects (need %ld)",
+            len, n, need);
+
+  int base = 1 + n * 4;
+  float rf = (float)a[base];
+  float gf = (float)a[base + 1];
+  float bf = (float)a[base + 2];
+  float af = (float)a[base + 3];
+
+  Uint8 cr = (Uint8)(rf * 255);
+  Uint8 cg = (Uint8)(gf * 255);
+  Uint8 cb = (Uint8)(bf * 255);
+  Uint8 ca = (Uint8)(af * 255);
+
+  if (ca == 0) return true;
+
+  float scale = can->scale;
+  for (int i = 0; i < n; i++) {
+    int o = 1 + i * 4;
+    float fx = (float)a[o]     * scale;
+    float fy = (float)a[o + 1] * scale;
+    float fw = (float)a[o + 2] * scale;
+    float fh = (float)a[o + 3] * scale;
+    canvas_fill_rectangle_on_surface(can->surface, fx, fy, fw, fh, cr, cg, cb, ca);
+    canvas_mark_dirty(can, fx, fy, fx + fw, fy + fh);
+  }
+
+  return true;
+}
+
+bool R2D_CanvasFillPolygon(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  if (len < 1) return true;
+  int n = (int)a[0];
+  if (n < 3) return true;
+
+  // [n, x1, y1, ... xn, yn, r, g, b, a] — guard before indexing (a short array
+  // would hard-abort under mruby), matching the sibling fill_* methods.
+  long need = 1 + (long)n * 2 + 4;
+  if ((long)len < need)
+    return canvas_fail("Ruby2D::Ext.canvas_fill_polygon: array has %d values for %d vertices (need %ld)",
+            len, n, need);
+
+  float scale = can->scale;
+  float *verts = (float *)malloc(n * 2 * sizeof(float));
+  if (!verts) return true;
+
+  for (int i = 0; i < n; i++) {
+    verts[i*2]   = (float)a[1 + i*2] * scale;
+    verts[i*2+1] = (float)a[2 + i*2] * scale;
+  }
+
+  int base = 1 + n * 2;
+  float rf = (float)a[base];
+  float gf = (float)a[base + 1];
+  float bf = (float)a[base + 2];
+  float af = (float)a[base + 3];
+
+  Uint8 cr = (Uint8)(rf * 255);
+  Uint8 cg = (Uint8)(gf * 255);
+  Uint8 cb = (Uint8)(bf * 255);
+  Uint8 ca = (Uint8)(af * 255);
+
+  if (ca > 0) {
+    int tri_count = 0;
+    int *indices = R2D_TriangulatePolygon(verts, n, &tri_count);
+    if (indices && tri_count > 0) {
+      SDL_LockSurface(can->surface);
+      for (int t = 0; t < tri_count; t++) {
+        int i1 = indices[t * 3];
+        int i2 = indices[t * 3 + 1];
+        int i3 = indices[t * 3 + 2];
+        canvas_fill_triangle_on_surface(can->surface,
+          verts[i1*2], verts[i1*2+1],
+          verts[i2*2], verts[i2*2+1],
+          verts[i3*2], verts[i3*2+1],
+          cr, cg, cb, ca);
+      }
+      SDL_UnlockSurface(can->surface);
+      canvas_mark_dirty_verts(can, verts, n, 0.0f);
+    }
+    free(indices);
+  }
+
+  free(verts);
+  return true;
+}
+
+bool R2D_CanvasFillPolygonLerp(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  if (len < 1) return true;
+  int n = (int)a[0];
+  if (n < 3) return true;
+
+  // [n, x1, y1, r1, g1, b1, a1, ...] — 6 entries per vertex. Guard before
+  // indexing (a short array would hard-abort under mruby).
+  long need = 1 + (long)n * 6;
+  if ((long)len < need)
+    return canvas_fail("Ruby2D::Ext.canvas_fill_polygon_lerp: array has %d values for %d vertices (need %ld)",
+            len, n, need);
+
+  float scale = can->scale;
+  float *verts  = (float *)malloc(n * 2 * sizeof(float));
+  Uint8 *colors = (Uint8 *)malloc(n * 4 * sizeof(Uint8));
+  if (!verts || !colors) { free(verts); free(colors); return true; }
+
+  // Each vertex packs as (x, y, r, g, b, a) — 6 entries.
+  for (int i = 0; i < n; i++) {
+    int o = 1 + i * 6;
+    verts[i*2]     = (float)a[o]     * scale;
+    verts[i*2+1]   = (float)a[o + 1] * scale;
+    colors[i*4]    = (Uint8)((float)a[o + 2] * 255);
+    colors[i*4+1]  = (Uint8)((float)a[o + 3] * 255);
+    colors[i*4+2]  = (Uint8)((float)a[o + 4] * 255);
+    colors[i*4+3]  = (Uint8)((float)a[o + 5] * 255);
+  }
+
+  int tri_count = 0;
+  int *indices = R2D_TriangulatePolygon(verts, n, &tri_count);
+  if (indices && tri_count > 0) {
+    SDL_LockSurface(can->surface);
+    for (int t = 0; t < tri_count; t++) {
+      int i1 = indices[t * 3];
+      int i2 = indices[t * 3 + 1];
+      int i3 = indices[t * 3 + 2];
+      canvas_fill_triangle_lerp_on_surface(can->surface,
+        verts[i1*2], verts[i1*2+1],
+        colors[i1*4], colors[i1*4+1], colors[i1*4+2], colors[i1*4+3],
+        verts[i2*2], verts[i2*2+1],
+        colors[i2*4], colors[i2*4+1], colors[i2*4+2], colors[i2*4+3],
+        verts[i3*2], verts[i3*2+1],
+        colors[i3*4], colors[i3*4+1], colors[i3*4+2], colors[i3*4+3]);
+    }
+    SDL_UnlockSurface(can->surface);
+    canvas_mark_dirty_verts(can, verts, n, 0.0f);
+  }
+  free(indices);
+
+  free(verts);
+  free(colors);
+  return true;
+}
+
+bool R2D_CanvasDrawLineLerp(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 23) return canvas_fail("Ruby2D::Ext.canvas_draw_line_lerp: needs 23 values, got %d", len);
+
+  float scale = can->scale;
+  float x1 = (float)a[0] * scale;
+  float y1 = (float)a[1] * scale;
+  float x2 = (float)a[2] * scale;
+  float y2 = (float)a[3] * scale;
+  float sw = (float)a[4] * scale;
+
+  Uint8 r1 = (Uint8)(a[ 5] * 255);
+  Uint8 g1 = (Uint8)(a[ 6] * 255);
+  Uint8 b1 = (Uint8)(a[ 7] * 255);
+  Uint8 a1 = (Uint8)(a[ 8] * 255);
+  Uint8 r2 = (Uint8)(a[ 9] * 255);
+  Uint8 g2 = (Uint8)(a[10] * 255);
+  Uint8 b2 = (Uint8)(a[11] * 255);
+  Uint8 a2 = (Uint8)(a[12] * 255);
+  Uint8 r3 = (Uint8)(a[13] * 255);
+  Uint8 g3 = (Uint8)(a[14] * 255);
+  Uint8 b3 = (Uint8)(a[15] * 255);
+  Uint8 a3 = (Uint8)(a[16] * 255);
+  Uint8 r4 = (Uint8)(a[17] * 255);
+  Uint8 g4 = (Uint8)(a[18] * 255);
+  Uint8 b4 = (Uint8)(a[19] * 255);
+  Uint8 a4 = (Uint8)(a[20] * 255);
+
+  float dash = (float)a[21] * scale;
+  float gap  = (float)a[22] * scale;
 
   SDL_LockSurface(can->surface);
 
@@ -1445,6 +1150,714 @@ R_VAL ruby2d_ext_canvas_draw_line_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
                            fmaxf(x1, x2) + hw, fmaxf(y1, y2) + hw);
   }
 
+  return true;
+}
+
+bool R2D_CanvasDrawLines(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 1) return true;
+
+  int n = (int)a[0];
+  if (n < 1) return true;
+
+  float scale = can->scale;
+  int base = 1 + n * 4;
+  float sw = (float)a[base]     * scale;
+  float rf = (float)a[base + 1];
+  float gf = (float)a[base + 2];
+  float bf = (float)a[base + 3];
+  float af = (float)a[base + 4];
+
+  Uint8 cr = (Uint8)(rf * 255);
+  Uint8 cg = (Uint8)(gf * 255);
+  Uint8 cb = (Uint8)(bf * 255);
+  Uint8 ca = (Uint8)(af * 255);
+
+  if (ca == 0) return true;
+
+  float hw = sw * 0.5f;
+  SDL_LockSurface(can->surface);
+  for (int i = 0; i < n; i++) {
+    int o = 1 + i * 4;
+    float x1 = (float)a[o]     * scale;
+    float y1 = (float)a[o + 1] * scale;
+    float x2 = (float)a[o + 2] * scale;
+    float y2 = (float)a[o + 3] * scale;
+    canvas_draw_line_on_surface(can->surface, x1, y1, x2, y2, sw, cr, cg, cb, ca);
+    canvas_mark_dirty(can, fminf(x1, x2) - hw, fminf(y1, y2) - hw,
+                           fmaxf(x1, x2) + hw, fmaxf(y1, y2) + hw);
+  }
+  SDL_UnlockSurface(can->surface);
+
+  return true;
+}
+
+bool R2D_CanvasClear(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 8) return canvas_fail("Ruby2D::Ext.canvas_clear: needs 8 values, got %d", len);
+
+  Uint8 cr = (Uint8)((float)a[0] * 255);
+  Uint8 cg = (Uint8)((float)a[1] * 255);
+  Uint8 cb = (Uint8)((float)a[2] * 255);
+  Uint8 ca = (Uint8)((float)a[3] * 255);
+
+  float scale = can->scale;
+  int rx = (int)(a[4] * scale);
+  int ry = (int)(a[5] * scale);
+  int rw = (int)(a[6] * scale);
+  int rh = (int)(a[7] * scale);
+
+  Uint32 color = SDL_MapSurfaceRGBA(can->surface, cr, cg, cb, ca);
+
+  // If the rect covers the entire surface, pass NULL for a full clear
+  if (rx == 0 && ry == 0 && rw == can->surface->w && rh == can->surface->h) {
+    SDL_FillSurfaceRect(can->surface, NULL, color);
+  } else {
+    SDL_Rect rect = { rx, ry, rw, rh };
+    SDL_FillSurfaceRect(can->surface, &rect, color);
+  }
+
+  canvas_mark_dirty(can, (float)rx, (float)ry, (float)(rx + rw), (float)(ry + rh));
+
+  return true;
+}
+
+bool R2D_CanvasStrokePolygon(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 1) return true;
+  int n = (int)a[0];
+  return canvas_stroke_impl(can, a, len, n, 1, 1);
+}
+
+bool R2D_CanvasStrokePolyline(void *canvas, const double *a, int len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (len < 2) return true;
+  int closed = (int)a[0];
+  int n      = (int)a[1];
+  return canvas_stroke_impl(can, a, len, n, 2, closed);
+}
+
+bool R2D_CanvasFillPixelGrid(void *canvas, const double *header, int header_len,
+                             const double *colors, int colors_len) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+
+  // Guard array lengths before the read loops: a short array would make
+  // r_ary_entry return nil and NUM2DBL/NUM2INT(nil) error (hard-abort on mruby).
+  if (header_len < 6)
+    return canvas_fail("Ruby2D::Ext.canvas_fill_pixel_grid: header needs 6 values, got %d",
+            header_len);
+
+  int cols = (int)header[0];
+  int rows = (int)header[1];
+  if (cols < 1 || rows < 1) return true;
+
+  long need = (long)cols * rows * 4;
+  if ((long)colors_len < need)
+    return canvas_fail("Ruby2D::Ext.canvas_fill_pixel_grid: %d color values for a %dx%d grid (need %ld)",
+            colors_len, cols, rows, need);
+
+  float scale  = can->scale;
+  float cell_w = (float)header[2] * scale;
+  float cell_h = (float)header[3] * scale;
+  float ox     = (float)header[4] * scale;
+  float oy     = (float)header[5] * scale;
+
+  // A non-finite cell size or origin (NaN/Inf) would make the per-cell
+  // (int)ceilf casts below undefined behavior; every cell derives from these
+  // four values, so skip the whole grid.
+  if (!isfinite(cell_w) || !isfinite(cell_h) || !isfinite(ox) || !isfinite(oy))
+    return true;
+
+  SDL_Surface *surface = can->surface;
+
+  SDL_LockSurface(surface);
+  for (int gr = 0; gr < rows; gr++) {
+    for (int gc = 0; gc < cols; gc++) {
+      int o = (gr * cols + gc) * 4;
+      // Clamp channels to [0,1] before the 8-bit cast. This is the one
+      // user-facing color path that builds no Color object, so it has no
+      // Ruby-side clamp; an out-of-range value would wrap (1.5 -> 126) rather
+      // than saturate.
+      float af = (float)colors[o + 3];
+      if (af < 0.0f) af = 0.0f; else if (af > 1.0f) af = 1.0f;
+      Uint8 ca = (Uint8)(af * 255);
+      if (ca == 0) continue;
+
+      float rf = (float)colors[o];
+      float gf = (float)colors[o + 1];
+      float bf = (float)colors[o + 2];
+      if (rf < 0.0f) rf = 0.0f; else if (rf > 1.0f) rf = 1.0f;
+      if (gf < 0.0f) gf = 0.0f; else if (gf > 1.0f) gf = 1.0f;
+      if (bf < 0.0f) bf = 0.0f; else if (bf > 1.0f) bf = 1.0f;
+      Uint8 cr = (Uint8)(rf * 255);
+      Uint8 cg = (Uint8)(gf * 255);
+      Uint8 cb = (Uint8)(bf * 255);
+
+      // Half-open pixel coverage, matching canvas_fill_rectangle_on_surface
+      float fx = ox + gc * cell_w;
+      float fy = oy + gr * cell_h;
+      int rx = (int)ceilf(fx);
+      int ry = (int)ceilf(fy);
+      int rw = (int)ceilf(fx + cell_w) - rx;
+      int rh = (int)ceilf(fy + cell_h) - ry;
+
+      int x_start = rx < 0 ? 0 : rx;
+      int y_start = ry < 0 ? 0 : ry;
+      int x_end = rx + rw;
+      int y_end = ry + rh;
+      if (x_end > surface->w) x_end = surface->w;
+      if (y_end > surface->h) y_end = surface->h;
+
+      if (ca == 255) {
+        // Color is constant within the cell: one clipped, vectorized fill.
+        // A pixel-at-a-time memcpy loop here was half the frame for a 160x90
+        // grid of 16x16 physical cells.
+        SDL_Rect cell = { x_start, y_start, x_end - x_start, y_end - y_start };
+        if (cell.w > 0 && cell.h > 0)
+          SDL_FillSurfaceRect(surface, &cell, SDL_MapSurfaceRGBA(surface, cr, cg, cb, 255));
+      } else {
+        for (int y = y_start; y < y_end; y++) {
+          Uint8 *row = (Uint8 *)surface->pixels + y * surface->pitch;
+          for (int x = x_start; x < x_end; x++) {
+            Uint8 *pixel = row + x * 4;
+            canvas_blend_over(pixel, cr, cg, cb, ca);
+          }
+        }
+      }
+    }
+  }
+  SDL_UnlockSurface(surface);
+
+  canvas_mark_dirty(can, ox, oy, ox + cols * cell_w, oy + rows * cell_h);
+
+  return true;
+}
+
+bool R2D_CanvasDrawImage(void *canvas, void *img_handle, const double *a, int len, SDL_ScaleMode mode) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  R2D_Image *img = (R2D_Image *)img_handle;
+  if (!img) return canvas_fail("Ruby2D::Ext.canvas_draw_image: no img");
+  if (len < 4) return canvas_fail("Ruby2D::Ext.canvas_draw_image: needs 4 values, got %d", len);
+
+  if (!img->surface) {
+    return canvas_fail("Image surface is not available for canvas blitting");
+    return false;
+  }
+
+  float scale = can->scale;
+  int dx = (int)(a[0] * scale);
+  int dy = (int)(a[1] * scale);
+  int dw = (int)(a[2] * scale);
+  int dh = (int)(a[3] * scale);
+
+  // Nothing to draw for a degenerate (zero/negative) destination rect.
+  if (dw <= 0 || dh <= 0) return true;
+
+  SDL_Rect dst_rect = { dx, dy, dw, dh };
+
+  // The source image's mode, not the canvas's: a :nearest sprite stamped
+  // into a :linear canvas stays crisp.
+  SDL_SetSurfaceBlendMode(img->surface, SDL_BLENDMODE_BLEND);
+  SDL_BlitSurfaceScaled(img->surface, NULL, can->surface, &dst_rect,
+                        mode);
+
+  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
+
+  return true;
+}
+
+bool R2D_CanvasDrawText(void *canvas, void *txt_handle, const double *a, int len, SDL_ScaleMode mode) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  R2D_Text *txt = (R2D_Text *)txt_handle;
+  if (!txt) return canvas_fail("Ruby2D::Ext.canvas_draw_text: no txt");
+  if (len < 8) return canvas_fail("Ruby2D::Ext.canvas_draw_text: needs 8 values, got %d", len);
+
+  if (txt->empty) return true;  // empty content: nothing to blit
+
+  if (!txt->surface) {
+    return canvas_fail("Text surface is not available for canvas blitting");
+    return false;
+  }
+
+  float scale = can->scale;
+  int dx = (int)(a[0] * scale);
+  int dy = (int)(a[1] * scale);
+  int dw = (int)(a[2] * scale);
+  int dh = (int)(a[3] * scale);
+
+  // Nothing to draw for a degenerate (zero/negative) destination rect.
+  if (dw <= 0 || dh <= 0) return true;
+
+  float rf = (float)a[4];
+  float gf = (float)a[5];
+  float bf = (float)a[6];
+  float af = (float)a[7];
+
+  // Apply color/alpha modulation to tint the white text surface
+  SDL_SetSurfaceColorMod(txt->surface, (Uint8)(rf * 255), (Uint8)(gf * 255), (Uint8)(bf * 255));
+  SDL_SetSurfaceAlphaMod(txt->surface, (Uint8)(af * 255));
+  SDL_SetSurfaceBlendMode(txt->surface, SDL_BLENDMODE_BLEND);
+
+  SDL_Rect dst_rect = { dx, dy, dw, dh };
+  SDL_BlitSurfaceScaled(txt->surface, NULL, can->surface, &dst_rect,
+                        mode);
+
+  // Reset color/alpha mod to defaults so GPU rendering is unaffected
+  SDL_SetSurfaceColorMod(txt->surface, 255, 255, 255);
+  SDL_SetSurfaceAlphaMod(txt->surface, 255);
+
+  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
+
+  return true;
+}
+
+/*
+ * Allocate a canvas of `width` x `height` logical pixels filled with the given
+ * color. Ruby-free core behind Ext.canvas_create; returns NULL on failure with
+ * the SDL error set.
+ */
+void *R2D_CanvasNew(int width, int height, bool logical, float fr, float fg, float fb, float fa) {
+  if (!R2D_Init()) return NULL;
+
+  float scale;
+  if (logical) {
+    scale = 1.0f;
+  } else {
+    scale = R2D_GetWindow() ? R2D_GetAssetScale() : R2D_GetInitDisplayScale();
+  }
+  int pixel_w = (int)(width  * scale);
+  int pixel_h = (int)(height * scale);
+
+  SDL_Surface *surface = SDL_CreateSurface(pixel_w, pixel_h, SDL_PIXELFORMAT_RGBA32);
+  if (!surface) {
+    return NULL;
+  }
+
+  // Fill with the fill color
+  Uint8 r = (Uint8)(fr * 255);
+  Uint8 g = (Uint8)(fg * 255);
+  Uint8 b = (Uint8)(fb * 255);
+  Uint8 a = (Uint8)(fa * 255);
+
+  Uint32 color = SDL_MapSurfaceRGBA(surface, r, g, b, a);
+  SDL_FillSurfaceRect(surface, NULL, color);
+  SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
+
+  R2D_Canvas *can = (R2D_Canvas *)calloc(1, sizeof(R2D_Canvas));
+  if (!can) { SDL_DestroySurface(surface); return NULL; }
+  can->surface = surface;
+  can->texture = NULL;
+  can->scale   = scale;
+  can->dirty   = false;
+  can->dirty_rect = (SDL_Rect){ 0, 0, 0, 0 };
+
+  return can;
+}
+
+/*
+ * Upload what changed since the last draw and render the canvas at (x, y) of
+ * size w x h, rotated about (crx, cry), tinted. Ruby-free core behind
+ * Ext.canvas_draw; returns false on a texture failure with the SDL error set.
+ */
+bool R2D_CanvasDraw(void *canvas, float x, float y, float w, float h, float rotate,
+                    float crx, float cry, float r, float g, float b, float a,
+                    SDL_ScaleMode mode) {
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  /* Create the persistent GPU texture on first draw. Created explicitly in
+     the surface's pixel format (rather than SDL_CreateTextureFromSurface) so
+     the incremental SDL_UpdateTexture uploads below can pass surface pixel
+     rows through unconverted. The texture then lives for the canvas's
+     lifetime — mutations upload into it instead of re-creating it. */
+  if (can->texture == NULL) {
+    can->texture = SDL_CreateTexture(R2D_GetRenderer(), SDL_PIXELFORMAT_RGBA32,
+                                     SDL_TEXTUREACCESS_STATIC,
+                                     can->surface->w, can->surface->h);
+    if (!can->texture) {
+      return false;
+    }
+    SDL_SetTextureBlendMode(can->texture, SDL_BLENDMODE_BLEND);
+    can->applied_scale_mode = SDL_SCALEMODE_INVALID;
+    canvas_mark_dirty_all(can);  // populate with a full first upload
+    // Don't destroy the surface — Canvas needs it for future draw operations
+  }
+
+  // Upload pending surface mutations — just the dirty union, not the whole
+  // surface. A settled canvas skips this entirely.
+  if (can->dirty) {
+    const SDL_Rect *dr = &can->dirty_rect;
+    const Uint8 *pixels = (const Uint8 *)can->surface->pixels
+                        + (size_t)dr->y * can->surface->pitch
+                        + (size_t)dr->x * 4;
+    R2D_CheckSDL(SDL_UpdateTexture(can->texture, dr, pixels, can->surface->pitch),
+                 "SDL_UpdateTexture");
+    can->dirty = false;
+  }
+
+  if (mode != can->applied_scale_mode) {
+    SDL_SetTextureScaleMode(can->texture, mode);
+    can->applied_scale_mode = mode;
+  }
+
+  SDL_FRect dst_rect = { x, y, w, h };
+
+  SDL_SetTextureColorModFloat(can->texture, r, g, b);
+  SDL_SetTextureAlphaModFloat(can->texture, a);
+
+  SDL_FPoint center = { crx - x, cry - y };
+
+  R2D_CheckSDL(SDL_RenderTextureRotated(
+    R2D_GetRenderer(),
+    can->texture,
+    NULL,
+    &dst_rect,
+    rotate,
+    &center,
+    SDL_FLIP_NONE
+  ), "SDL_RenderTextureRotated");
+
+  return true;
+}
+
+void R2D_CanvasFree(void *canvas) {
+  if (!canvas) return;
+  R2D_Canvas *can = (R2D_Canvas *)canvas;
+  if (can->surface) {
+    SDL_DestroySurface(can->surface);
+    can->surface = NULL;
+  }
+  if (can->texture) {
+    if (R2D_RendererAlive()) SDL_DestroyTexture(can->texture);
+    can->texture = NULL;
+  }
+  free(can);
+}
+
+// Name-taking variants for a bridge that has no SDL_ScaleMode: NULL or an
+// unknown name falls back to the window's default, and PIXELART becomes
+// NEAREST for surface blits as R2D_ResolveSurfaceScaleMode does.
+static SDL_ScaleMode canvas_mode_named(const char *name) {
+  R2D_Window *window = R2D_GetWindow();
+  SDL_ScaleMode fallback = window ? window->scale_mode : SDL_SCALEMODE_LINEAR;
+  return R2D_ParseScaleModeName(name, fallback);
+}
+
+bool R2D_CanvasDrawNamed(void *canvas, float x, float y, float w, float h, float rotate,
+                         float crx, float cry, float r, float g, float b, float a,
+                         const char *scale_mode) {
+  return R2D_CanvasDraw(canvas, x, y, w, h, rotate, crx, cry, r, g, b, a,
+                        canvas_mode_named(scale_mode));
+}
+
+bool R2D_CanvasDrawTextNamed(void *canvas, void *text, double x, double y, double w, double h,
+                             double r, double g, double b, double a, const char *scale_mode) {
+  double vals[8] = { x, y, w, h, r, g, b, a };
+  SDL_ScaleMode mode = canvas_mode_named(scale_mode);
+  if (mode == SDL_SCALEMODE_PIXELART) mode = SDL_SCALEMODE_NEAREST;
+  return R2D_CanvasDrawText(canvas, text, vals, 8, mode);
+}
+
+
+// Ruby bindings ///////////////////////////////////////////////////////////////
+
+#ifndef RUBY2D_NO_RUBY
+/*
+ * Copy a Ruby array of numbers into a malloc'd double array (NULL and a length
+ * of 0 for an empty array). The caller frees it.
+ */
+static double *canvas_ary_doubles(R_VAL a, int *len_out) {
+  int len = (int)r_ary_len(a);
+  *len_out = len;
+  if (len <= 0) return NULL;
+  double *vals = (double *)malloc(sizeof(double) * len);
+  if (!vals) { *len_out = 0; return NULL; }
+  for (int i = 0; i < len; i++) vals[i] = NUM2DBL(r_ary_entry(a, i));
+  return vals;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_create
+ */
+R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_create expects 2 args (canvas, logical), got %d", (int)argc);
+  R_VAL obj = argv[0];
+  bool logical = r_test(argv[1]);
+
+  int width  = obj_int(obj, id_width);
+  int height = obj_int(obj, id_height);
+
+  R2D_Canvas *can = (R2D_Canvas *)R2D_CanvasNew(width, height, logical,
+    obj_float(obj, id_fill_r), obj_float(obj, id_fill_g),
+    obj_float(obj, id_fill_b), obj_float(obj, id_fill_a));
+  if (!can) {
+    r_raise("Ruby2D: failed to create canvas: %s", SDL_GetError());
+    return R_NIL;
+  }
+
+  obj_set_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  return R_TRUE;
+}
+
+
+static void canvas_mark_dirty(R2D_Canvas *can, float min_x, float min_y,
+                              float max_x, float max_y);
+static void canvas_mark_dirty_all(R2D_Canvas *can);
+
+
+/*
+ * Ruby2D::Canvas#ext_draw
+ */
+R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 3) r_raise("Ruby2D::Ext.canvas_draw expects 3 args (canvas, rx, ry), got %d", (int)argc);
+  R_VAL obj = argv[0];
+  float crx = NUM2DBL(argv[1]);
+  float cry = NUM2DBL(argv[2]);
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  R_VAL tint = r_ivar_get(obj, id_tint);
+  if (!R2D_CanvasDraw(can,
+                      obj_float(obj, id_x), obj_float(obj, id_y),
+                      obj_float(obj, id_width), obj_float(obj, id_height),
+                      obj_float(obj, id_rotate), crx, cry,
+                      NUM2DBL(r_ivar_get(tint, id_r)), NUM2DBL(r_ivar_get(tint, id_g)),
+                      NUM2DBL(r_ivar_get(tint, id_b)), NUM2DBL(r_ivar_get(tint, id_a)),
+                      R2D_ResolveScaleMode(obj))) {
+    r_raise("Ruby2D::Ext.canvas_draw: %s", SDL_GetError());
+    return R_NIL;
+  }
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_triangle
+ * Arguments: [x1, y1, x2, y2, x3, y3, r, g, b, a]
+ */
+R_VAL ruby2d_ext_canvas_fill_triangle(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 11) r_raise("Ruby2D::Ext.canvas_fill_triangle expects 11 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  if (!R2D_CanvasFillTriangle(can, NUM2DBL(argv[1]), NUM2DBL(argv[2]), NUM2DBL(argv[3]), NUM2DBL(argv[4]), NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7]), NUM2DBL(argv[8]), NUM2DBL(argv[9]), NUM2DBL(argv[10]))) r_raise("Ruby2D::Ext.canvas_fill_triangle: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_triangle_lerp
+ * Arguments: [x1, y1, r1, g1, b1, a1, x2, y2, r2, g2, b2, a2, x3, y3, r3, g3, b3, a3]
+ * Each vertex has its own color; colors are interpolated across the triangle.
+ */
+R_VAL ruby2d_ext_canvas_fill_triangle_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_triangle_lerp expects 2 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+  R_VAL a   = argv[1];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasFillTriangleLerp(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_fill_triangle_lerp: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_rectangle
+ * Arguments: [x, y, width, height, r, g, b, a]
+ */
+R_VAL ruby2d_ext_canvas_fill_rectangle(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 9) r_raise("Ruby2D::Ext.canvas_fill_rectangle expects 9 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  if (!R2D_CanvasFillRectangle(can, NUM2DBL(argv[1]), NUM2DBL(argv[2]), NUM2DBL(argv[3]), NUM2DBL(argv[4]), NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7]), NUM2DBL(argv[8]))) r_raise("Ruby2D::Ext.canvas_fill_rectangle: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_rectangles
+ * Arguments: [n, x1, y1, w1, h1, x2, y2, w2, h2, ..., r, g, b, a]
+ * Fills n rectangles with a single shared color in one FFI crossing.
+ */
+R_VAL ruby2d_ext_canvas_fill_rectangles(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_rectangles expects 2 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+  R_VAL a   = argv[1];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasFillRectangles(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_fill_rectangles: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_pixel_grid
+ * Arguments:
+ *   header = [cols, rows, cell_w, cell_h, ox, oy]
+ *   colors = flat array of cols*rows*4 floats in 0..1
+ *            (r0, g0, b0, a0, r1, g1, b1, a1, ...)
+ * Fills a regular cols x rows grid of equal-size rectangles, each with its
+ * own RGBA color. Cell (col, row) is the rect at
+ * (ox + col*cell_w, oy + row*cell_h, cell_w, cell_h), colored by
+ * colors[(row*cols + col)*4 .. +3]. Single FFI crossing for the whole grid:
+ * one surface lock, one texture invalidate, cells with a==0 skipped.
+ */
+R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 3) r_raise("Ruby2D::Ext.canvas_fill_pixel_grid expects 3 args, got %d", (int)argc);
+  R_VAL obj    = argv[0];
+  R_VAL header = argv[1];
+  R_VAL colors = argv[2];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int header_len = 0, colors_len = 0;
+  double *h = canvas_ary_doubles(header, &header_len);
+  double *c = canvas_ary_doubles(colors, &colors_len);
+  bool ok = R2D_CanvasFillPixelGrid(can, h, header_len, c, colors_len);
+  free(h);
+  free(c);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_fill_pixel_grid: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_ellipse
+ * Arguments: [x, y, xradius, yradius, r, g, b, a]
+ */
+R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 9) r_raise("Ruby2D::Ext.canvas_fill_ellipse expects 9 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  if (!R2D_CanvasFillEllipse(can, NUM2DBL(argv[1]), NUM2DBL(argv[2]), NUM2DBL(argv[3]), NUM2DBL(argv[4]), NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7]), NUM2DBL(argv[8]))) r_raise("Ruby2D::Ext.canvas_fill_ellipse: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_polygon
+ * Arguments: [n, x1, y1, x2, y2, ..., r, g, b, a]
+ * Uses ear-clipping triangulation (R2D_TriangulatePolygon) so concave
+ * polygons fill correctly.
+ */
+R_VAL ruby2d_ext_canvas_fill_polygon(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_polygon expects 2 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+  R_VAL a   = argv[1];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasFillPolygon(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_fill_polygon: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_fill_polygon_lerp
+ * Arguments: [n, x1, y1, r1, g1, b1, a1, x2, y2, r2, g2, b2, a2, ...]
+ * Per-vertex colors. Triangulated via ear clipping; each emitted triangle
+ * is rasterized with barycentric color interpolation between its three
+ * source vertices' colors.
+ */
+R_VAL ruby2d_ext_canvas_fill_polygon_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp expects 2 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+  R_VAL a   = argv[1];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasFillPolygonLerp(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_draw_line
+ * Arguments: [x1, y1, x2, y2, stroke_width, r, g, b, a, dash, gap]
+ * When dash > 0, draws a dashed line; otherwise a solid line.
+ */
+R_VAL ruby2d_ext_canvas_draw_line(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 12) r_raise("Ruby2D::Ext.canvas_draw_line expects 12 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  if (!R2D_CanvasDrawLine(can, NUM2DBL(argv[1]), NUM2DBL(argv[2]), NUM2DBL(argv[3]), NUM2DBL(argv[4]), NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7]), NUM2DBL(argv[8]), NUM2DBL(argv[9]), NUM2DBL(argv[10]), NUM2DBL(argv[11]))) r_raise("Ruby2D::Ext.canvas_draw_line: %s", SDL_GetError());
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Canvas#ext_draw_line_lerp
+ * Arguments: [x1, y1, x2, y2, stroke_width,
+ *             r1, g1, b1, a1, r2, g2, b2, a2,
+ *             r3, g3, b3, a3, r4, g4, b4, a4,
+ *             dash, gap]
+ * 4 per-corner colors mirror R2D_DrawLine's vertex layout
+ * (c1=start+perp, c2=start-perp, c3=end-perp, c4=end+perp). When dash > 0,
+ * draws a dashed line and interpolates endpoint colors along the length.
+ */
+R_VAL ruby2d_ext_canvas_draw_line_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_draw_line_lerp expects 2 args, got %d", (int)argc);
+  R_VAL obj = argv[0];
+  R_VAL a   = argv[1];
+
+  R2D_Canvas *can;
+  obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasDrawLineLerp(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_draw_line_lerp: %s", SDL_GetError());
   return R_TRUE;
 }
 
@@ -1464,96 +1877,11 @@ R_VAL ruby2d_ext_canvas_draw_lines(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Canvas *can;
   obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
 
-  int n = (int)NUM2INT(r_ary_entry(a, 0));
-  if (n < 1) return R_TRUE;
-
-  float scale = can->scale;
-  int base = 1 + n * 4;
-  float sw = (float)NUM2DBL(r_ary_entry(a, base))     * scale;
-  float rf = (float)NUM2DBL(r_ary_entry(a, base + 1));
-  float gf = (float)NUM2DBL(r_ary_entry(a, base + 2));
-  float bf = (float)NUM2DBL(r_ary_entry(a, base + 3));
-  float af = (float)NUM2DBL(r_ary_entry(a, base + 4));
-
-  Uint8 cr = (Uint8)(rf * 255);
-  Uint8 cg = (Uint8)(gf * 255);
-  Uint8 cb = (Uint8)(bf * 255);
-  Uint8 ca = (Uint8)(af * 255);
-
-  if (ca == 0) return R_TRUE;
-
-  float hw = sw * 0.5f;
-  SDL_LockSurface(can->surface);
-  for (int i = 0; i < n; i++) {
-    int o = 1 + i * 4;
-    float x1 = (float)NUM2DBL(r_ary_entry(a, o))     * scale;
-    float y1 = (float)NUM2DBL(r_ary_entry(a, o + 1)) * scale;
-    float x2 = (float)NUM2DBL(r_ary_entry(a, o + 2)) * scale;
-    float y2 = (float)NUM2DBL(r_ary_entry(a, o + 3)) * scale;
-    canvas_draw_line_on_surface(can->surface, x1, y1, x2, y2, sw, cr, cg, cb, ca);
-    canvas_mark_dirty(can, fminf(x1, x2) - hw, fminf(y1, y2) - hw,
-                           fmaxf(x1, x2) + hw, fmaxf(y1, y2) + hw);
-  }
-  SDL_UnlockSurface(can->surface);
-
-  return R_TRUE;
-}
-
-
-/*
- * Shared body for stroke_polygon/stroke_polyline. `vbase` is the array index
- * of the first vertex coordinate (the leading args differ between the two);
- * `closed` joins the last vertex back to the first.
- */
-static R_VAL canvas_stroke_impl(R2D_Canvas *can, R_VAL a, int n, int vbase, int closed) {
-  if (n < 2) return R_TRUE;
-
-  float scale = can->scale;
-  // Small strokes use stack scratch; heap only past the threshold.
-  float verts_stack[R2D_STROKE_STACK_N * 2];
-  Uint8 colors_stack[R2D_STROKE_STACK_N * 4];
-  float *verts;
-  Uint8 *colors;
-  bool heap = n > R2D_STROKE_STACK_N;
-
-  if (heap) {
-    verts = (float *)malloc(n * 2 * sizeof(float));
-    colors = (Uint8 *)malloc(n * 4 * sizeof(Uint8));
-    if (!verts || !colors) { free(verts); free(colors); return R_TRUE; }
-  } else {
-    verts = verts_stack;
-    colors = colors_stack;
-  }
-
-  for (int i = 0; i < n; i++) {
-    verts[i*2]   = (float)NUM2DBL(r_ary_entry(a, vbase + i*2)) * scale;
-    verts[i*2+1] = (float)NUM2DBL(r_ary_entry(a, vbase + 1 + i*2)) * scale;
-  }
-
-  int base = vbase + n * 2;
-  float sw = (float)NUM2DBL(r_ary_entry(a, base)) * scale;
-
-  int has_any_alpha = 0;
-  for (int i = 0; i < n; i++) {
-    colors[i*4]     = (Uint8)(NUM2DBL(r_ary_entry(a, base + 1 + i*4))     * 255);
-    colors[i*4 + 1] = (Uint8)(NUM2DBL(r_ary_entry(a, base + 2 + i*4))     * 255);
-    colors[i*4 + 2] = (Uint8)(NUM2DBL(r_ary_entry(a, base + 3 + i*4))     * 255);
-    colors[i*4 + 3] = (Uint8)(NUM2DBL(r_ary_entry(a, base + 4 + i*4))     * 255);
-    if (colors[i*4 + 3] > 0) has_any_alpha = 1;
-  }
-
-  if (has_any_alpha) {
-    SDL_LockSurface(can->surface);
-    canvas_stroke_polyline_on_surface(can->surface, verts, n, closed, sw, colors);
-    SDL_UnlockSurface(can->surface);
-    // Miter joins extend past the vertices by up to hw * R2D_MITER_LIMIT
-    canvas_mark_dirty_verts(can, verts, n, 0.5f * sw * R2D_MITER_LIMIT);
-  }
-
-  if (heap) {
-    free(verts);
-    free(colors);
-  }
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasDrawLines(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_draw_lines: %s", SDL_GetError());
   return R_TRUE;
 }
 
@@ -1571,8 +1899,12 @@ R_VAL ruby2d_ext_canvas_stroke_polygon(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Canvas *can;
   obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
 
-  int n = (int)NUM2INT(r_ary_entry(a, 0));
-  return canvas_stroke_impl(can, a, n, 1, 1);
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasStrokePolygon(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_stroke_polygon: %s", SDL_GetError());
+  return R_TRUE;
 }
 
 
@@ -1589,9 +1921,12 @@ R_VAL ruby2d_ext_canvas_stroke_polyline(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Canvas *can;
   obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
 
-  int closed = (int)NUM2INT(r_ary_entry(a, 0));
-  int n      = (int)NUM2INT(r_ary_entry(a, 1));
-  return canvas_stroke_impl(can, a, n, 2, closed);
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasStrokePolyline(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_stroke_polyline: %s", SDL_GetError());
+  return R_TRUE;
 }
 
 
@@ -1620,30 +1955,11 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
   R2D_Image *img = (R2D_Image *)r_data_ptr(ext_image_val);
 
-  if (!img->surface) {
-    r_error("Image surface is not available for canvas blitting");
-    return R_NIL;
-  }
-
-  float scale = can->scale;
-  int dx = (int)(NUM2DBL(r_ary_entry(a, 0)) * scale);
-  int dy = (int)(NUM2DBL(r_ary_entry(a, 1)) * scale);
-  int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
-  int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
-
-  // Nothing to draw for a degenerate (zero/negative) destination rect.
-  if (dw <= 0 || dh <= 0) return R_TRUE;
-
-  SDL_Rect dst_rect = { dx, dy, dw, dh };
-
-  // The source image's mode, not the canvas's: a :nearest sprite stamped
-  // into a :linear canvas stays crisp.
-  SDL_SetSurfaceBlendMode(img->surface, SDL_BLENDMODE_BLEND);
-  SDL_BlitSurfaceScaled(img->surface, NULL, can->surface, &dst_rect,
-                        R2D_ResolveSurfaceScaleMode(img_obj));
-
-  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
-
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasDrawImage(can, img, vals, len, R2D_ResolveSurfaceScaleMode(img_obj));
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_draw_image: %s", SDL_GetError());
   return R_TRUE;
 }
 
@@ -1673,42 +1989,11 @@ R_VAL ruby2d_ext_canvas_draw_text(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
   R2D_Text *txt = (R2D_Text *)r_data_ptr(ext_text_val);
 
-  if (txt->empty) return R_TRUE;  // empty content: nothing to blit
-
-  if (!txt->surface) {
-    r_error("Text surface is not available for canvas blitting");
-    return R_NIL;
-  }
-
-  float scale = can->scale;
-  int dx = (int)(NUM2DBL(r_ary_entry(a, 0)) * scale);
-  int dy = (int)(NUM2DBL(r_ary_entry(a, 1)) * scale);
-  int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
-  int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
-
-  // Nothing to draw for a degenerate (zero/negative) destination rect.
-  if (dw <= 0 || dh <= 0) return R_TRUE;
-
-  float rf = (float)NUM2DBL(r_ary_entry(a, 4));
-  float gf = (float)NUM2DBL(r_ary_entry(a, 5));
-  float bf = (float)NUM2DBL(r_ary_entry(a, 6));
-  float af = (float)NUM2DBL(r_ary_entry(a, 7));
-
-  // Apply color/alpha modulation to tint the white text surface
-  SDL_SetSurfaceColorMod(txt->surface, (Uint8)(rf * 255), (Uint8)(gf * 255), (Uint8)(bf * 255));
-  SDL_SetSurfaceAlphaMod(txt->surface, (Uint8)(af * 255));
-  SDL_SetSurfaceBlendMode(txt->surface, SDL_BLENDMODE_BLEND);
-
-  SDL_Rect dst_rect = { dx, dy, dw, dh };
-  SDL_BlitSurfaceScaled(txt->surface, NULL, can->surface, &dst_rect,
-                        R2D_ResolveSurfaceScaleMode(txt_obj));
-
-  // Reset color/alpha mod to defaults so GPU rendering is unaffected
-  SDL_SetSurfaceColorMod(txt->surface, 255, 255, 255);
-  SDL_SetSurfaceAlphaMod(txt->surface, 255);
-
-  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
-
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasDrawText(can, txt, vals, len, R2D_ResolveSurfaceScaleMode(txt_obj));
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_draw_text: %s", SDL_GetError());
   return R_TRUE;
 }
 
@@ -1728,29 +2013,11 @@ R_VAL ruby2d_ext_canvas_clear(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_Canvas *can;
   obj_struct(obj, id_ext_canvas, R2D_Canvas, can);
 
-  Uint8 cr = (Uint8)((float)NUM2DBL(r_ary_entry(a, 0)) * 255);
-  Uint8 cg = (Uint8)((float)NUM2DBL(r_ary_entry(a, 1)) * 255);
-  Uint8 cb = (Uint8)((float)NUM2DBL(r_ary_entry(a, 2)) * 255);
-  Uint8 ca = (Uint8)((float)NUM2DBL(r_ary_entry(a, 3)) * 255);
-
-  float scale = can->scale;
-  int rx = (int)(NUM2DBL(r_ary_entry(a, 4)) * scale);
-  int ry = (int)(NUM2DBL(r_ary_entry(a, 5)) * scale);
-  int rw = (int)(NUM2DBL(r_ary_entry(a, 6)) * scale);
-  int rh = (int)(NUM2DBL(r_ary_entry(a, 7)) * scale);
-
-  Uint32 color = SDL_MapSurfaceRGBA(can->surface, cr, cg, cb, ca);
-
-  // If the rect covers the entire surface, pass NULL for a full clear
-  if (rx == 0 && ry == 0 && rw == can->surface->w && rh == can->surface->h) {
-    SDL_FillSurfaceRect(can->surface, NULL, color);
-  } else {
-    SDL_Rect rect = { rx, ry, rw, rh };
-    SDL_FillSurfaceRect(can->surface, &rect, color);
-  }
-
-  canvas_mark_dirty(can, (float)rx, (float)ry, (float)(rx + rw), (float)(ry + rh));
-
+  int len = 0;
+  double *vals = canvas_ary_doubles(a, &len);
+  bool ok = R2D_CanvasClear(can, vals, len);
+  free(vals);
+  if (!ok) r_raise("Ruby2D::Ext.canvas_clear: %s", SDL_GetError());
   return R_TRUE;
 }
 
@@ -1759,15 +2026,6 @@ R_VAL ruby2d_ext_canvas_clear(RUBY2D_METHOD_ARGS_VARIADIC) {
  * Free canvas
  */
 static void R2D_Canvas_free(void *p) {
-  if (!p) return;
-  R2D_Canvas *can = (R2D_Canvas *)p;
-  if (can->surface) {
-    SDL_DestroySurface(can->surface);
-    can->surface = NULL;
-  }
-  if (can->texture) {
-    if (R2D_RendererAlive()) SDL_DestroyTexture(can->texture);
-    can->texture = NULL;
-  }
-  xfree(can);
+  R2D_CanvasFree(p);
 }
+#endif

@@ -14,20 +14,20 @@ It is four gates, and a program can pass three of them and still be broken — w
 
 | Gate | Checked by | Passing |
 |---|---|---|
-| 1. the preflight accepts it | `rake coverage` | 20 of 55 |
-| 2. it builds | `rake cli`, and a real `ruby2d build` | 17 of 20 — see [Line and Text](#line-and-text-2026-08-20) for the three |
-| 3. it draws the right pixels | `rake compare` | five fixtures byte-identical to mruby; not measured per program |
+| 1. the preflight accepts it | `rake coverage` | 42 of 55 |
+| 2. it builds | `rake cli`, and a real `ruby2d build` | 17 of the first 20 — see [Line and Text](#line-and-text-2026-08-20); the 22 added by [Canvas, Polyline, Triangle and Button](#canvas-polyline-triangle-and-button-2026-08-20) are unswept |
+| 3. it draws the right pixels | `rake compare` | nine fixtures byte-identical to mruby; not measured per program |
 | 4. it behaves | `rake motion` for animation, `rake input` for input | input reaches every handler kind; of the 8 programs that animate on mruby and build on Spinel, 5 animate on Spinel — `bouncing_balls` is frozen (issue 33), two more do not build |
 
 Read gate 1 as "not refused outright". `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **Input works as of 2026-08-20**: keys, mouse, scroll, close, window-level and per-object, filtered or not — `rake input` injects all of them into a built app and checks every handler fires in order. See [Input reaches the app](#input-reaches-the-app-2026-08-20). 49 of the 55 programs register an `on` handler, so this was the widest gap; what remains on gate 4 is the animation freeze.
 
-`rake coverage` also ranks what to add next by how many programs each feature unblocks, greedily rather than by raw appearances: from 20 today, `Canvas` first at +7, then `Polyline` +5, `Triangle` +5, `Button` +5, `Image` +3, reaching 100% at the `Window` subclass pattern. That ranking is about breadth only. It says nothing about cost — `Polyline` and `Triangle` are geometry on the pattern `Line` and `Quad` proved, `Canvas` and `Image` are pass-self calls with textures behind them like `Text` was — and nothing about gates 3 and 4.
+`rake coverage` also ranks what to add next by how many programs each feature unblocks, greedily rather than by raw appearances: from 42 today, `Image` first at +3, then `Ellipse` +2, `Audio`, `Sprite`, `SpriteSheet`, `Polygon`, `Tileset`, `BitmapText`, and the `Window` subclass pattern last. That ranking is about breadth only. It says nothing about cost — `Ellipse` and `Polygon` are geometry on proven patterns, `Image` and `Sprite` are textures behind a handle like `Text` and `Canvas` — and nothing about gates 3 and 4.
 
 ### Status
 
 **The feature is wired: `ruby2d build --spinel app.rb` compiles an ordinary Ruby 2D script to a standalone 5.2 MB binary.** No hand-run scripts, no paths to set — get the compiler with `ruby2d setup --spinel`, then build. The app goes through `lib/`'s own scene graph into the real `R2D_*` core, with Ruby owning the frame loop. See [The CLI](#the-cli-ruby2d-build---spinel-2026-08-10).
 
-What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, `Quad`, `Circle`, `Line` and `Text`, and nothing else yet. The shapes draw **filled and stroked**, the quad family in a single color or per-vertex, lines solid, dashed and gradient, text in any bundled or system font with styles — each of which needed its own fixture before it could be trusted — see [Lessons](#lessons). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
+What's left is coverage, not plumbing: the target draws `Square`, `Rectangle`, `Quad`, `Triangle`, `Circle`, `Line`, `Polyline`, `Text`, `Canvas` and `Button`. The shapes draw **filled and stroked**, single-color or per-vertex, lines solid, dashed and gradient, text in any bundled or system font with styles, and every canvas operation — each of which needed its own fixture before it could be trusted — see [Lessons](#lessons). An app using anything more stops before compiling with a message naming it — see [Preflight](#preflight).
 
 **Real example programs build and run, unmodified**, on a stock compiler:
 
@@ -45,7 +45,7 @@ ruby2d build --spinel examples/nbody.rb && ruby2d launch --native
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 17 reproduce, 3 parked: the seventeen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, 46 and 47 from the 2026-08-20 upstream pull, 48 and 49 from wiring input the same day, and 51 and 52 from the first motion sweep over 20 programs; the third parked is draft 50, which reproduces only in the assembled library. None is filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
+**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 20 reproduce, 3 parked: the twenty reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, 46 and 47 from the 2026-08-20 upstream pull, 48 and 49 from wiring input the same day, 51 and 52 from the first motion sweep over 20 programs, and 53, 54 and 55 from `Canvas` and `Button`; the third parked is draft 50, which reproduces only in the assembled library. None is filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
 
 **Three workarounds were dropped on 2026-08-13 and a fourth was dropped and put straight back** — see [Three workarounds dropped](#three-workarounds-dropped-and-one-that-could-not-be-2026-08-13). Two compiler bugs still hold a transform each: `dsl_shims` ([#3803](https://github.com/matz/spinel/issues/3803), fixed upstream with an unreduced residue) and `block_param_capture` (drafted as issue 34, unfiled). `rake sweep` answers whether a transform can go — but only for the code its fixture reaches, which is how `block_param_capture` was wrongly dropped and broke every app using `on`. See [Lessons](#lessons).
 
@@ -514,6 +514,8 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | Workaround | Why it is still there |
 |---|---|
 | `block_param_capture` | The lambda in `Interactive#on`'s filtered form captures the method's block parameter, and the method arrives through an `include`. Refused with `uncaptured outer variable 'proc' (later slice)`. Reduced as issue 34, **not yet filed**. Dropped on a sweep result on 2026-08-13 and restored the same day — it is the reason `build_subset.rb`'s fixture now registers an `on` handler |
+| `canvas_undef_color` | `Canvas` removes `Renderable`'s `color` accessors with `undef_method`; whole-program AOT has no method table to undefine from and refuses the call. Dropping the line loses nothing on this target. An AOT gap, not a bug — see [Deliberate feature gaps](#deliberate-feature-gaps-on-the-spinel-target) |
+| `button_visual_hooks` | `Button` wraps a visual's alignment resolver with `define_singleton_method` and reads its anchor offset with `send`; both are reflection. On this target a Button wrapping a visual keeps its label on the visual's top-left anchor and ignores a later symbolic `align:`. No program passes a visual or `align:` to a Button. An AOT gap, not a bug |
 | `hash_delete_if` | `@pressed_objects.delete_if` in `ObjectEventDispatch#cleanup_interaction_state` raises `undefined method 'delete_if' for an instance of Hash` in the assembled library and nowhere smaller; the transform iterates a snapshot of the keys and deletes by key. Draft 50, research notes. Added 2026-08-20 when `snake.rb` first ran. **`rake sweep` cannot grade it** until the `-Werror` gate clears; re-check with `scratch/input/state_harness.rb` |
 | `dsl_shims` | `extend Ruby2D::DSL` at top level: a method declaring `&block` is called with the block dropped. [#3787](https://github.com/matz/spinel/issues/3787) is closed and its reproducer passes; the residue is filed as [#3803](https://github.com/matz/spinel/issues/3803), which is *also* closed with its reproducer passing, and the transform is still load-bearing. It is the only compiler bug left in this table, and the only row whose residue has never been reduced |
 | `web_predicate` | `Ruby2D.web?` is registered from C, so it is absent under `RUBY2D_NO_RUBY` — not a compiler issue |
@@ -857,6 +859,25 @@ The evidence was already in hand and went unused, which is the more uncomfortabl
 The same question is now open about one of the three that did drop. The `const char *` C error survey still reports was attributed to `expand_hash_delete`, dropped today for a bug (#3806) that is fixed. Slice clean, library not — possibly the same pattern a second time. Nobody has checked whether that is a different `delete` site or the same one behaving differently once more code is reachable.
 
 **`survey.rb` hid all of this for one run, and that is now fixed.** With the `interactive.rb` entry removed to test whether it was stale, the tool printed an empty "Remaining C errors" list — which reads as *nothing left to fix*. Spinel had refused the program before clang ever ran, and its diagnostics say `spinel: file:line: unsupported …`, never `error:`, so the census matched nothing. An empty list and a clean build were indistinguishable. It now prints the refusal and says plainly that it is the first blocker rather than the list.
+
+## Canvas, Polyline, Triangle and Button (2026-08-20)
+
+**Four more classes, 27 → 42 programs accepted (76%), nine `rake compare` fixtures byte-identical to mruby.** `Polyline` and `Triangle` were geometry: `R2D_DrawTriangle` takes 18 floats, and both strokes go through `R2D_StrokePath`, which grew a `double *` entry (`R2D_StrokePathD`) because Spinel's arrays cross as doubles. `Button` composes `Rectangle` and `Text`, so it needed no entry point — its fixture is the first whose hover state is painted by a per-object event, the yellow "Hover me" in `button_app.rb` coming from an injected mouse move.
+
+**`Canvas` was the large one, and it set the pattern for `Image` and `Sprite`.** `canvas.c` is now Ruby-free cores with thin bindings: every `Ext.canvas_*` parses its Ruby arguments into doubles and calls a `R2D_Canvas*` function that takes the canvas handle, scalars, and packed arrays as `const double *` with a length — the same layouts the bindings always documented. The Spinel adapter floats each packed payload (`lib/` packs counts and coordinates as Integers) and hands it over as a `:float_array`. Scale modes cross by name through `*Named` variants, and `R2D_CanvasDrawText` takes the `Text` handle the adapter already holds. The refactor was a script over the file rather than a rewrite, and the 957-example suite passed on the first compile. `draw_image` raises on this target until `Image` lands.
+
+Four things in `lib/` had to change, each one line-sized, three of them compiler bugs drafted:
+
+| Draft | Shape | Change |
+|---|---|---|
+| [53](issues/53-multiple-assignment-from-ivars-emits-invalid-c-when-a-keyword-can-reassign-one.md) | `saved_w, saved_h = @width, @height` emits invalid C when a nil-defaulted keyword may reassign the ivar in the same method | `Canvas#render` saves and restores with plain assignments |
+| [54](issues/54-an-implicit-self-call-inside-a-class-resolves-to-a-top-level-def-over-an-included-module.md) | an implicit-self call inside a class resolves to a live top-level `def` of the same name over the included module's — `on(:hover)` in `Button` went to the window | `Button` writes `self.on` |
+| [55](issues/55-a-poly-dispatched-call-emits-a-miscast-arm-for-a-method-with-ivar-defaulted-keywords.md) | a poly-dispatched `clear` emits a miscast arm for `Canvas#clear`, whose keywords default to ivars — every app stopped compiling at `@events[:close].clear` once `Canvas` was reachable | `Window#register_event_handler` assigns a fresh Hash |
+| — | `Triangle.render` ended in an `elsif` returning an Array beside branches ending in void `Ext` calls, and Spinel cannot type a method whose value is Array-or-nothing | the method returns `nil` on every path, which is what a render method means |
+
+Two AOT gaps got transforms rather than `lib/` changes — `canvas_undef_color` and `button_visual_hooks`, both in [Workarounds to re-check](#workarounds-to-re-check) — because the code they neutralize is right on the other engines and there is nothing to reduce.
+
+The `preflight` fixture moved again, to `Image` and `Sprite`. The 22 programs this round accepted have not been through `rake motion` yet; the previous round's three non-building programs stand.
 
 ## Line and Text (2026-08-20)
 

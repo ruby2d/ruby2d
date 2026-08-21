@@ -1076,6 +1076,13 @@ void R2D_StrokePath(
 );
 
 /*
+ * R2D_StrokePath over doubles, with the color array's length checked — what
+ * the Spinel build calls, since its arrays cross as `double *`
+ */
+void R2D_StrokePathD(const double *verts, int n, int closed, double stroke_width,
+                     const double *colors, int colors_len);
+
+/*
  * Stroke an ellipse outline as a ring of triangles via SDL_RenderGeometry.
  * `angle` (radians) tilts the ellipse off-axis; pass 0 for axis-aligned.
  */
@@ -1199,6 +1206,45 @@ R_VAL ruby2d_ext_bitmap_text_draw(RUBY2D_METHOD_ARGS_VARIADIC);
  * Initialize Ruby2D::Ext canvas bindings.
  */
 void R2D_Canvas_Init(void);
+
+/*
+ * Ruby-free canvas API for a bridge that cannot pass a Ruby object. A canvas
+ * is an opaque handle from R2D_CanvasNew (NULL on failure); every draw takes
+ * logical coordinates and 0..1 colors, packed arrays cross as a `const double *`
+ * with their length in the layout the matching Ext.canvas_* binding documents,
+ * and each call answers false with the SDL error set where the binding raises.
+ * The *Named variants take a scale mode by name (NULL: the window's default).
+ */
+void *R2D_CanvasNew(int width, int height, bool logical, float fr, float fg, float fb, float fa);
+bool  R2D_CanvasDraw(void *canvas, float x, float y, float w, float h, float rotate,
+                     float crx, float cry, float r, float g, float b, float a, SDL_ScaleMode mode);
+bool  R2D_CanvasDrawNamed(void *canvas, float x, float y, float w, float h, float rotate,
+                          float crx, float cry, float r, float g, float b, float a,
+                          const char *scale_mode);
+bool  R2D_CanvasClear(void *canvas, const double *a, int len);
+bool  R2D_CanvasFillTriangle(void *canvas, double x1, double y1, double x2, double y2,
+                             double x3, double y3, double r, double g, double b, double a);
+bool  R2D_CanvasFillTriangleLerp(void *canvas, const double *a, int len);
+bool  R2D_CanvasFillRectangle(void *canvas, double x, double y, double w, double h,
+                              double r, double g, double b, double a);
+bool  R2D_CanvasFillRectangles(void *canvas, const double *a, int len);
+bool  R2D_CanvasFillPixelGrid(void *canvas, const double *header, int header_len,
+                              const double *colors, int colors_len);
+bool  R2D_CanvasFillEllipse(void *canvas, double x, double y, double xradius, double yradius,
+                            double r, double g, double b, double a);
+bool  R2D_CanvasFillPolygon(void *canvas, const double *a, int len);
+bool  R2D_CanvasFillPolygonLerp(void *canvas, const double *a, int len);
+bool  R2D_CanvasDrawLine(void *canvas, double x1, double y1, double x2, double y2, double stroke_width,
+                         double r, double g, double b, double a, double dash, double gap);
+bool  R2D_CanvasDrawLineLerp(void *canvas, const double *a, int len);
+bool  R2D_CanvasDrawLines(void *canvas, const double *a, int len);
+bool  R2D_CanvasStrokePolygon(void *canvas, const double *a, int len);
+bool  R2D_CanvasStrokePolyline(void *canvas, const double *a, int len);
+bool  R2D_CanvasDrawImage(void *canvas, void *image, const double *a, int len, SDL_ScaleMode mode);
+bool  R2D_CanvasDrawText(void *canvas, void *text, const double *a, int len, SDL_ScaleMode mode);
+bool  R2D_CanvasDrawTextNamed(void *canvas, void *text, double x, double y, double w, double h,
+                              double r, double g, double b, double a, const char *scale_mode);
+void  R2D_CanvasFree(void *canvas);
 
 R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC);

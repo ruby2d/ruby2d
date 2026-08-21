@@ -96,7 +96,10 @@ module Ruby2D
       end
       hook_visual_alignment if @owns_visual
 
-      on(:click) { |e| on_click.call(e) } if on_click
+      # `self.on`, not `on`: the receiver is explicit because Spinel resolves
+      # an implicit-self `on` here to the DSL's top-level `on` rather than
+      # `Interactive#on` (see spinel/issues/54).
+      self.on(:click) { |e| on_click.call(e) } if on_click
 
       # Honor `add: false` for interactivity, not just rendering. Registering the
       # click/tint handlers above auto-added this Button to the interactive
@@ -280,10 +283,11 @@ module Ruby2D
       @is_hovering = false
       @is_pressed = false
 
-      on(:hover)      { @is_hovering = true;  apply_state }
-      on(:hover_out)  { @is_hovering = false; apply_state }
-      on(:mouse_down) { @is_pressed = true;   apply_state }
-      on(:mouse_up)   { @is_pressed = false;  apply_state }
+      # Explicit receivers for the reason given at the `:click` registration
+      self.on(:hover)      { @is_hovering = true;  apply_state }
+      self.on(:hover_out)  { @is_hovering = false; apply_state }
+      self.on(:mouse_down) { @is_pressed = true;   apply_state }
+      self.on(:mouse_up)   { @is_pressed = false;  apply_state }
     end
 
     # Resolve a state-color input into a concrete Color or Color::Set. `:auto`

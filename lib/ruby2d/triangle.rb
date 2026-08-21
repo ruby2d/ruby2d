@@ -236,6 +236,10 @@ module Ruby2D
       elsif stroke_color || stroke_colour
         Renderable.flatten_color(stroke_color || stroke_colour, 3, opacity, label: self)
       end
+      # Every branch draws or validates; none has a value. Said explicitly so
+      # the method's type is the same on every path (Spinel cannot type a
+      # method that returns an Array on one branch and nothing on another).
+      nil
     end
 
     private

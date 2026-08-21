@@ -491,8 +491,12 @@ module Ruby2D
 
       Window.render_ready_check
 
-      saved_x, saved_y = @x, @y
-      saved_width, saved_height = @width, @height
+      # Plain assignments rather than `a, b = @a, @b`: a multiple assignment
+      # from ivars emits invalid C under Spinel (see spinel/issues/53).
+      saved_x = @x
+      saved_y = @y
+      saved_width = @width
+      saved_height = @height
       saved_rotate = @rotate
       saved_tint = @tint
 
@@ -510,8 +514,10 @@ module Ruby2D
       begin
         Ext.canvas_draw(self, rx, ry)
       ensure
-        @x, @y = saved_x, saved_y
-        @width, @height = saved_width, saved_height
+        @x = saved_x
+        @y = saved_y
+        @width = saved_width
+        @height = saved_height
         @rotate = saved_rotate
         @tint = saved_tint
       end

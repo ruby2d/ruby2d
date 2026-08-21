@@ -334,8 +334,11 @@ module Ruby2D
     private def register_event_handler(event, proc)
       raise Error, "`#{event}` is not a valid event type" unless @events.key? event
 
-      # Only one close handler is allowed; registering a new one replaces the old
-      @events[:close].clear if event == :close
+      # Only one close handler is allowed; registering a new one replaces the
+      # old. A fresh Hash rather than `clear`: `@events[:close]` is a poly value
+      # to Spinel, and its `clear` dispatch emits a miscast arm for
+      # `Canvas#clear`'s ivar-defaulted keywords (see spinel/issues/55).
+      @events[:close] = {} if event == :close
 
       event_id = new_event_key
       @events[event][event_id] = proc

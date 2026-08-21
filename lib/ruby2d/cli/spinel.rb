@@ -139,13 +139,59 @@ def spinel_hash_delete_if(src)
 end
 
 
+# `Canvas` removes `Renderable`'s `color` accessors with `undef_method`, since it
+# has `tint` instead. Whole-program AOT compiles every call to a direct C call,
+# so there is no method table to undefine from and Spinel refuses the call.
+# Dropping it loses nothing on this target: a `color` call on a Canvas would
+# be resolved statically either way. An AOT gap, not a bug.
+def spinel_canvas_undef_color(src)
+  spinel_sub(src,
+             "    undef_method :color, :color=, :colour, :colour=\n",
+             '',
+             'Canvas undef_method of the color accessors')
+end
+
+
+# `Button` reaches into a wrapped visual two ways an AOT build cannot follow:
+# `define_singleton_method` to wrap the visual's alignment resolver so a
+# symbolic `align:` keeps the label centered, and `send` to read a private
+# anchor offset for a center-anchored visual. Both are runtime reflection
+# (`rake survey` lists `define_singleton_method` as the remaining AOT limit),
+# so on this target a Button wrapping a visual keeps its label centered on
+# the visual's top-left anchor and does not follow a later symbolic
+# alignment. No program in `examples/` or `test/` passes a visual or `align:`
+# to a Button. A feature gap, not a compiler bug.
+def spinel_button_visual_hooks(src)
+  src = spinel_sub(src,
+                   "      if @visual && !@owns_visual && @visual.respond_to?(:_alignment_anchor_dx, true)\n" \
+                   "        [@visual.send(:_alignment_anchor_dx), @visual.send(:_alignment_anchor_dy)]\n" \
+                   "      else\n" \
+                   "        [0, 0]\n" \
+                   "      end\n",
+                   "      [0, 0]\n",
+                   'Button visual anchor offset')
+  spinel_sub(src,
+             "      return unless @visual.respond_to?(:_resolve_alignment)\n\n" \
+             "      button = self\n" \
+             "      @visual.define_singleton_method(:_resolve_alignment) do\n" \
+             "        super()\n" \
+             "        button.send(:_sync_from_visual)\n" \
+             "      end\n",
+             "      nil\n",
+             'Button alignment hook')
+end
+
+
 # Apply every compatibility transformation to the assembled library source.
-# Two of the three are not compiler bugs: the class pattern needs reflection an
-# AOT build cannot provide, and `web?` stands in for a method C registers on the
-# other engines.
+# Four of the five are not compiler bugs: the class pattern and Button's visual
+# hooks need reflection an AOT build cannot provide, `undef_method` needs a
+# method table it does not have, and `web?` stands in for a method C registers
+# on the other engines.
 def spinel_compat(src)
   src = spinel_block_param_capture(src)
   src = spinel_hash_delete_if(src)
+  src = spinel_canvas_undef_color(src)
+  src = spinel_button_visual_hooks(src)
   src = spinel_disable_class_pattern(src)
   src + spinel_web_predicate
 end
@@ -184,6 +230,10 @@ SPINEL_LIB_FILES = %w[
   line
   font
   text
+  canvas
+  polyline
+  triangle
+  button
   vertices
   dsl
 ].freeze
@@ -191,7 +241,7 @@ SPINEL_LIB_FILES = %w[
 # The C sources that make up the `RUBY2D_NO_RUBY` core — the `R2D_*` renderer
 # with no Ruby engine in it. The rest of `ext/ruby2d` is either the CRuby/mruby
 # binding layer (`ext.c`) or a subsystem this slice doesn't reach.
-SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard text].freeze
+SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard text canvas].freeze
 
 # `Ext` on this target.
 #
@@ -264,6 +314,36 @@ SPINEL_EXT = <<~'RUBY'
       ffi_func :R2D_TextStale, [:ptr], :bool
       ffi_func :R2D_TextDraw, [:ptr, :float, :float, :float, :float, :float,
                                :float, :float, :float, :float, :str], :bool
+      # A canvas is an opaque handle; packed payloads cross as a Float array
+      # with their length, in the layouts `canvas.c` documents per binding.
+      ffi_func :R2D_CanvasNew, [:int, :int, :bool, :float, :float, :float, :float], :ptr
+      ffi_func :R2D_CanvasDrawNamed, [:ptr, :float, :float, :float, :float, :float,
+                                      :float, :float, :float, :float, :float, :float, :str], :bool
+      ffi_func :R2D_CanvasClear, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasFillTriangle, [:ptr, :double, :double, :double, :double, :double, :double,
+                                         :double, :double, :double, :double], :bool
+      ffi_func :R2D_CanvasFillTriangleLerp, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasFillRectangle, [:ptr, :double, :double, :double, :double,
+                                          :double, :double, :double, :double], :bool
+      ffi_func :R2D_CanvasFillRectangles, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasFillPixelGrid, [:ptr, :float_array, :int, :float_array, :int], :bool
+      ffi_func :R2D_CanvasFillEllipse, [:ptr, :double, :double, :double, :double,
+                                        :double, :double, :double, :double], :bool
+      ffi_func :R2D_CanvasFillPolygon, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasFillPolygonLerp, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasDrawLine, [:ptr, :double, :double, :double, :double, :double,
+                                     :double, :double, :double, :double, :double, :double], :bool
+      ffi_func :R2D_CanvasDrawLineLerp, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasDrawLines, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasStrokePolygon, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasStrokePolyline, [:ptr, :float_array, :int], :bool
+      ffi_func :R2D_CanvasDrawTextNamed, [:ptr, :ptr, :double, :double, :double, :double,
+                                          :double, :double, :double, :double, :str], :bool
+      # 18: three vertices of x, y, r, g, b, a.
+      ffi_func :R2D_DrawTriangle, [:float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float, :float], :void
+      # A stroked path: n (x, y) pairs, closed flag, width, n (r, g, b, a) quads
+      # and their count.
+      ffi_func :R2D_StrokePathD, [:float_array, :int, :int, :double, :float_array, :int], :void
       # No `R2D_StrokeCircle` exists — `ext.c` strokes a circle as an
       # axis-aligned ellipse with equal radii, and so does `stroke_circle` below.
       ffi_func :R2D_StrokeEllipse, [:float, :float, :float, :float, :float,
@@ -479,6 +559,175 @@ SPINEL_EXT = <<~'RUBY'
         true
       end
 
+      # Canvas: the same handle pattern as Text (see `SPINEL_TEXT_SYNC`). Each
+      # packed payload is floated first — `:float_array` hands C the storage of
+      # an `Array<Float>`, and `lib/` packs counts and coordinates as Integers.
+      def self.canvas_create(canvas, logical)
+        handle = Ext.R2D_CanvasNew(canvas.width.to_i, canvas.height.to_i, logical ? true : false,
+                                   canvas._spinel_fill_r.to_f, canvas._spinel_fill_g.to_f,
+                                   canvas._spinel_fill_b.to_f, canvas._spinel_fill_a.to_f)
+        raise Error, 'Ruby2D: failed to create canvas' if handle == nil
+
+        canvas._spinel_canvas = handle
+        true
+      end
+
+      def self.canvas_draw(canvas, rx, ry)
+        t = canvas.tint
+        ok = Ext.R2D_CanvasDrawNamed(canvas._spinel_canvas,
+                                     canvas.x.to_f, canvas.y.to_f, canvas.width.to_f, canvas.height.to_f,
+                                     canvas.rotate.to_f, rx.to_f, ry.to_f,
+                                     t.r.to_f, t.g.to_f, t.b.to_f, t.a.to_f,
+                                     canvas.scale_mode.to_s)
+        raise Error, 'Failed to draw canvas' unless ok
+
+        true
+      end
+
+      def self._spinel_floats(values)
+        out = []
+        values.each { |v| out << v.to_f }
+        out
+      end
+
+      def self._spinel_canvas_ok(ok, what)
+        raise Error, "Canvas##{what} failed" unless ok
+
+        true
+      end
+
+      def self.canvas_clear(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasClear(canvas._spinel_canvas, f, f.size), 'clear')
+      end
+
+      def self.canvas_fill_triangle(canvas, x1, y1, x2, y2, x3, y3, r, g, b, a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillTriangle(canvas._spinel_canvas,
+                                                     x1.to_f, y1.to_f, x2.to_f, y2.to_f, x3.to_f, y3.to_f,
+                                                     r.to_f, g.to_f, b.to_f, a.to_f), 'fill_triangle')
+      end
+
+      def self.canvas_fill_triangle_lerp(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillTriangleLerp(canvas._spinel_canvas, f, f.size), 'fill_triangle')
+      end
+
+      def self.canvas_fill_rectangle(canvas, x, y, w, h, r, g, b, a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillRectangle(canvas._spinel_canvas,
+                                                      x.to_f, y.to_f, w.to_f, h.to_f,
+                                                      r.to_f, g.to_f, b.to_f, a.to_f), 'fill_rectangle')
+      end
+
+      def self.canvas_fill_rectangles(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillRectangles(canvas._spinel_canvas, f, f.size), 'fill_rectangles')
+      end
+
+      def self.canvas_fill_pixel_grid(canvas, header, colors)
+        h = _spinel_floats(header)
+        c = _spinel_floats(colors)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillPixelGrid(canvas._spinel_canvas, h, h.size, c, c.size), 'fill_pixel_grid')
+      end
+
+      def self.canvas_fill_ellipse(canvas, x, y, xr, yr, r, g, b, a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillEllipse(canvas._spinel_canvas,
+                                                    x.to_f, y.to_f, xr.to_f, yr.to_f,
+                                                    r.to_f, g.to_f, b.to_f, a.to_f), 'fill_ellipse')
+      end
+
+      def self.canvas_fill_polygon(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillPolygon(canvas._spinel_canvas, f, f.size), 'fill_polygon')
+      end
+
+      def self.canvas_fill_polygon_lerp(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasFillPolygonLerp(canvas._spinel_canvas, f, f.size), 'fill_polygon')
+      end
+
+      def self.canvas_draw_line(canvas, x1, y1, x2, y2, sw, r, g, b, a, dash, gap)
+        _spinel_canvas_ok(Ext.R2D_CanvasDrawLine(canvas._spinel_canvas,
+                                                 x1.to_f, y1.to_f, x2.to_f, y2.to_f, sw.to_f,
+                                                 r.to_f, g.to_f, b.to_f, a.to_f,
+                                                 dash.to_f, gap.to_f), 'draw_line')
+      end
+
+      def self.canvas_draw_line_lerp(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasDrawLineLerp(canvas._spinel_canvas, f, f.size), 'draw_line')
+      end
+
+      def self.canvas_draw_lines(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasDrawLines(canvas._spinel_canvas, f, f.size), 'draw_lines')
+      end
+
+      def self.canvas_stroke_polygon(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasStrokePolygon(canvas._spinel_canvas, f, f.size), 'stroke')
+      end
+
+      def self.canvas_stroke_polyline(canvas, a)
+        f = _spinel_floats(a)
+        _spinel_canvas_ok(Ext.R2D_CanvasStrokePolyline(canvas._spinel_canvas, f, f.size), 'draw_polyline')
+      end
+
+      # `a` is [x, y, w, h, r, g, b, a]; the Text's surface is its handle's.
+      def self.canvas_draw_text(canvas, text, a)
+        handle = text._spinel_text
+        raise Error, 'Canvas#draw_text requires a Text that has been created' if handle == nil
+
+        _spinel_canvas_ok(Ext.R2D_CanvasDrawTextNamed(canvas._spinel_canvas, handle,
+                                                      a[0].to_f, a[1].to_f, a[2].to_f, a[3].to_f,
+                                                      a[4].to_f, a[5].to_f, a[6].to_f, a[7].to_f,
+                                                      text.scale_mode.to_s), 'draw_text')
+      end
+
+      # `Image` is not on this target yet; the preflight refuses an app that
+      # constructs one, so this is only reachable through an object that is
+      # not an Image.
+      def self.canvas_draw_image(_canvas, _image, _a)
+        raise Error, 'Canvas#draw_image is not available on the Spinel target'
+      end
+
+      def self.draw_triangle(x1, y1, r1, g1, b1, a1,
+                             x2, y2, r2, g2, b2, a2,
+                             x3, y3, r3, g3, b3, a3)
+        Ext.R2D_DrawTriangle(x1.to_f, y1.to_f, r1.to_f, g1.to_f, b1.to_f, a1.to_f,
+                             x2.to_f, y2.to_f, r2.to_f, g2.to_f, b2.to_f, a2.to_f,
+                             x3.to_f, y3.to_f, r3.to_f, g3.to_f, b3.to_f, a3.to_f)
+        nil
+      end
+
+      def self.draw_triangle_uniform(x1, y1, x2, y2, x3, y3, r, g, b, a)
+        Ext.R2D_DrawTriangle(x1.to_f, y1.to_f, r.to_f, g.to_f, b.to_f, a.to_f,
+                             x2.to_f, y2.to_f, r.to_f, g.to_f, b.to_f, a.to_f,
+                             x3.to_f, y3.to_f, r.to_f, g.to_f, b.to_f, a.to_f)
+        nil
+      end
+
+      def self.stroke_triangle(x1, y1, x2, y2, x3, y3, sw,
+                               r1, g1, b1, a1, r2, g2, b2, a2, r3, g3, b3, a3)
+        pts = [x1.to_f, y1.to_f, x2.to_f, y2.to_f, x3.to_f, y3.to_f]
+        cols = [r1.to_f, g1.to_f, b1.to_f, a1.to_f, r2.to_f, g2.to_f, b2.to_f, a2.to_f,
+                r3.to_f, g3.to_f, b3.to_f, a3.to_f]
+        Ext.R2D_StrokePathD(pts, 3, 1, sw.to_f, cols, 12)
+        nil
+      end
+
+      def self.stroke_triangle_uniform(x1, y1, x2, y2, x3, y3, sw, r, g, b, a)
+        stroke_triangle(x1, y1, x2, y2, x3, y3, sw, r, g, b, a, r, g, b, a, r, g, b, a)
+      end
+
+      # `coords` is n (x, y) pairs and `colors` n (r, g, b, a) quads, as `lib/`
+      # packs them; both are floated for the `:float_array` crossing.
+      def self.stroke_path(coords, sw, colors, closed)
+        pts = _spinel_floats(coords)
+        cols = _spinel_floats(colors)
+        Ext.R2D_StrokePathD(pts, pts.size / 2, closed ? 1 : 0, sw.to_f, cols, cols.size)
+        nil
+      end
+
       def self.draw_dashed_line(x1, y1, x2, y2, sw, dash, gap,
                                 r1, g1, b1, a1, r2, g2, b2, a2,
                                 r3, g3, b3, a3, r4, g4, b4, a4)
@@ -535,6 +784,15 @@ SPINEL_TEXT_SYNC = <<~'RUBY'
         nil
       end
     end
+
+    class Canvas
+      attr_accessor :_spinel_canvas
+
+      def _spinel_fill_r = @fill_r
+      def _spinel_fill_g = @fill_g
+      def _spinel_fill_b = @fill_b
+      def _spinel_fill_a = @fill_a
+    end
   end
 RUBY
 
@@ -589,12 +847,12 @@ end
 # widening SPINEL_LIB_FILES can't leave a stale rejection behind. Files that
 # define no user-facing class map to nil.
 SPINEL_EXCLUDED_CLASSES = {
-  'audio' => 'Audio', 'canvas' => 'Canvas',
+  'audio' => 'Audio',
   'ellipse' => 'Ellipse', 'image' => 'Image',
   'json_parser' => nil, 'atlas_parser' => nil, 'sprite_sheet' => 'SpriteSheet',
-  'polygon' => 'Polygon', 'polyline' => 'Polyline',
+  'polygon' => 'Polygon',
   'sprite' => 'Sprite', 'bitmap_text' => 'BitmapText',
-  'tileset' => 'Tileset', 'triangle' => 'Triangle', 'button' => 'Button'
+  'tileset' => 'Tileset'
 }.freeze
 
 # The classes to reject, with the reason. Fails loudly if a file was added to
