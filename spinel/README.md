@@ -17,9 +17,9 @@ It is four gates, and a program can pass three of them and still be broken — w
 | 1. the preflight accepts it | `rake coverage` | 3 of 55 |
 | 2. it builds | `rake cli`, and a real `ruby2d build` | 3 of 3 |
 | 3. it draws the right pixels | `rake compare` | not measured per program |
-| 4. it behaves | `rake motion`; **nothing yet for input** | 1 of 3 |
+| 4. it behaves | `rake motion` for animation, `rake input` for input | 1 of 3 animate; input reaches every handler kind |
 
-Read gate 1 as "not refused outright". All three accepted programs build; `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **None of the three responds to input**, because `drain_events` returns `nil` — and 49 of the 55 programs register an `on` handler, so gate 4 is the widest gap by far and no amount of shape work narrows it.
+Read gate 1 as "not refused outright". All three accepted programs build; `nbody.rb` animates, and `bouncing_balls.rb` and `fireworks.rb` render a correct opening frame and then never move ([issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md)). **Input works as of 2026-08-20**: keys, mouse, scroll, close, window-level and per-object, filtered or not — `rake input` injects all of them into a built app and checks every handler fires in order. See [Input reaches the app](#input-reaches-the-app-2026-08-20). 49 of the 55 programs register an `on` handler, so this was the widest gap; what remains on gate 4 is the animation freeze.
 
 `rake coverage` also ranks what to add next by how many programs each feature unblocks, greedily rather than by raw appearances: `Text` first at +8, then `Line` at +9, reaching 100% at `BitmapText`. That ranking is about breadth only. It says nothing about cost — `Line` is pure geometry on the pattern `Circle` already proved, while `Text` needs the font stack — and nothing about gates 3 and 4.
 
@@ -45,13 +45,13 @@ ruby2d build --spinel examples/nbody.rb && ruby2d launch --native
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 13 reproduce, 2 parked: the thirteen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, and 46 and 47 from the 2026-08-20 upstream pull, none of them filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
+**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 15 reproduce, 2 parked: the fifteen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, 46 and 47 from the 2026-08-20 upstream pull, and 48 and 49 from wiring input the same day, none of them filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
 
 **Three workarounds were dropped on 2026-08-13 and a fourth was dropped and put straight back** — see [Three workarounds dropped](#three-workarounds-dropped-and-one-that-could-not-be-2026-08-13). Two compiler bugs still hold a transform each: `dsl_shims` ([#3803](https://github.com/matz/spinel/issues/3803), fixed upstream with an unreduced residue) and `block_param_capture` (drafted as issue 34, unfiled). `rake sweep` answers whether a transform can go — but only for the code its fixture reaches, which is how `block_param_capture` was wrongly dropped and broke every app using `on`. See [Lessons](#lessons).
 
 **What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#what-blocks-a-clean-build-of-the-whole-library) on the full 37-file library reported exactly one unsupported construct, the event filter's runtime-name `send`, until `lib/` removed it on 2026-08-12; the rest is FFI adapter work. On the compiler side there are now exactly two: `dsl_shims`, filed as [#3803](https://github.com/matz/spinel/issues/3803) and fixed upstream with a residue that has not been reduced, and `block_param_capture`, reduced and drafted as issue 34 but not yet filed. A third, `vocabulary_string_hint`, lived for one day: drafted as issue 45 on 2026-08-20 and found fixed by `f13e0ada` the same afternoon. **Every compiler-bug workaround on this branch has a minimal reproducer.**
 
-Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them: the `send` that made them inherently incompatible is gone, all four compiler blockers are cleared, and **a script registering `on` handlers compiles, links and runs**. What it does not yet do is receive events — `drain_events` still returns `nil`, which is adapter work. See [Input compiles, and the first example programs build](#input-compiles-and-the-first-example-programs-build-2026-08-13).
+Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them: the `send` that made them inherently incompatible is gone, the compiler blockers are cleared, and **a script registering `on` handlers compiles, runs, and receives its events** — `drain_events` is wired over FFI as of 2026-08-20. See [Input reaches the app](#input-reaches-the-app-2026-08-20).
 
 ### Setup
 
@@ -83,7 +83,7 @@ export RUBY2D_SPINEL=/wherever/spinel/bin/spinel   # also what cli/spinel.rb hon
 ### Check where things stand
 
 ```sh
-cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
+cd spinel && rake     # all six checks; or `rake subset`, `rake cli`, …
 ```
 
 ```
@@ -97,6 +97,7 @@ cd spinel && rake     # all five checks; or `rake subset`, `rake cli`, …
 - **subset** compiles the `lib/` slice and diffs it against the same program run under CRuby. Any divergence is a compiler difference, because the control has to pass first.
 - **demo** builds the square and checks the **pixels**, not the exit status.
 - **cli** builds `tools/cli_app.rb` with `ruby2d build --spinel` and checks its pixels and its frame count. Both are load-bearing: a zero frame count would mean #3783 is back, and the fixture's shape is stroked so the color count is exactly three — two means a stroke went inert again.
+- **input** builds `tools/input_app.rb`, which injects a keypress, a mouse move, a click, a wheel tick and a quit into SDL from inside itself, and checks that all 21 handler lines — window-level, filtered, and per-object — come out in dispatch order. Real input cannot be driven headlessly; injected SDL events travel the identical path.
 - **preflight** builds an app using `Circle` and `on` and checks the build refuses it *by name*.
 - **issues** re-runs every filed reproducer. A `FIXED` row is the cue to drop the matching workaround with `SPINEL_SKIP=` and rebuild.
 
@@ -116,7 +117,7 @@ cd spinel && rake upstream   # pull, rebuild, then re-run issues and sweep
 
 **`rake compare` is the one that answers "does it draw the same thing mruby does".** Every other check grades the Spinel target against itself, and a whole feature can be missing without any of them noticing — which is exactly how strokes stayed inert.
 
-**`cli` and `preflight` go through the installed gem**, not the working tree — so run `rake` in the repo root first or they test your last install. Everything else reads `lib/` directly.
+**`cli`, `input` and `preflight` go through the installed gem**, not the working tree — so run `rake` in the repo root first or they test your last install. Everything else reads `lib/` directly.
 
 `spinel/tools/check.rb` is what these run, and it encodes the things that wasted the most time when they were manual:
 
@@ -855,6 +856,27 @@ The evidence was already in hand and went unused, which is the more uncomfortabl
 The same question is now open about one of the three that did drop. The `const char *` C error survey still reports was attributed to `expand_hash_delete`, dropped today for a bug (#3806) that is fixed. Slice clean, library not — possibly the same pattern a second time. Nobody has checked whether that is a different `delete` site or the same one behaving differently once more code is reachable.
 
 **`survey.rb` hid all of this for one run, and that is now fixed.** With the `interactive.rb` entry removed to test whether it was stale, the tool printed an empty "Remaining C errors" list — which reads as *nothing left to fix*. Spinel had refused the program before clang ever ran, and its diagnostics say `spinel: file:line: unsupported …`, never `error:`, so the census matched nothing. An empty list and a clean build were indistinguishable. It now prints the refusal and says plainly that it is the first blocker rather than the list.
+
+## Input reaches the app (2026-08-20)
+
+**Every kind of input now arrives on the Spinel target**: key down/up, mouse move, buttons, scroll and close, window-level and per-object, through `on(:event)` and the filtered `on(event: value)` form alike. `rake input` proves it on a built app, 21 handler lines in dispatch order.
+
+The adapter work was the shape the README predicted. FFI cannot return an array, and `drain_events` is one flat array of `R2D_EVT_STRIDE` values per event. So `window.c` grew six Ruby-free accessors — `R2D_EventCount`, `R2D_EventInt(i, field)`, `R2D_EventDelta(i, which)`, `R2D_EventStr(i)`, `R2D_EventKeyName(i)` and `R2D_EventsClear` — and the adapter's `drain_events` rebuilds the same array from scalar reads, interning a key event's name with `to_sym`, so `Window#dispatch_events` runs unchanged. The Ruby bridge's own drain now releases the queue through the same `R2D_EventsClear`, so there is one ownership path for the gamepad-name strings poll allocates. `keyboard.c` joined the Ruby-free core for `R2D_KeyName`, with its Ruby binding behind `RUBY2D_NO_RUBY` like the rest, and the adapter's `key_names` walks the scancode table so `Keyboard.keys` is the real vocabulary rather than a stub.
+
+Two compiler bugs stood between "events arrive" and "handlers run", and both got a `lib/` change that reads at least as well as what it replaced:
+
+| Draft | Shape | In `lib/` | Change |
+|---|---|---|---|
+| [48](issues/48-a-hash-mixing-a-module-and-an-instance-dispatches-to-class.md) | a Hash whose values mix a Module with singleton methods and an ordinary instance cannot dispatch through a value — `for an instance of Class` | `EVENT_FILTER_VOCABULARIES` mapped to `Keyboard`/`Mouse` (modules) and `Gamepad::BUTTONS` (a `Vocabulary`) | a `filter_vocabulary(type)` method answering a `Vocabulary` every time, which also lets the key set stay lazy |
+| [49](issues/49-a-lambda-that-is-the-value-of-a-conditional-has-its-parameter-typed-integer.md) | a lambda that is the value of a conditional — `?:` or `if`/`else` with a lambda in each arm — has its parameter typed Integer | `build_filter_wrapper` chose `args` with a ternary and returned its lambda from an `if`/`else` | assign in each arm; return the Hash-matcher lambda early |
+
+49 is the one the 2026-08-12 table called "an escaping lambda's parameter inferred as Integer — not reduced". It reduces to twelve lines.
+
+**How it was tested, since no keyboard can be driven headlessly.** `tools/input_app.rb` carries a few lines of C through Spinel's `ffi_source` that push SDL events — `SDL_PushEvent` with a scancode, a motion, a button, a wheel tick, `SDL_EVENT_QUIT` — one per frame with a frame between, so each is drained and dispatched alone and the output order is the dispatch order. The quit is the last injection, and the check requires it to close the window through the event path rather than a frame cap. Two harnesses in `scratch/input/` compile the real `lib/` slice with stubs and call `key_callback` / `mouse_callback` directly; they reproduce a dispatch bug in seconds where an app build takes a minute, and are how 48 and 49 were found.
+
+**One false alarm worth recording:** per-object events appeared not to fire for an hour, and the bisect ran to nine app builds before a `diff` of the working and failing fixtures showed the failing one had no `sq.on` lines at all — a `String#replace` keyed on whitespace a `sed` had already collapsed, matching nothing and saying so to no one. Diff the fixtures before bisecting the compiler.
+
+The three accepted examples all register `on` handlers (`mouse_down`, `mouse_move`, `key_down: :r`) and now receive them; whether each *reacts* correctly is still gated by the animation freeze in [issue 33](issues/33-float-argument-to-a-stored-proc-truncated-to-integer-zero.md) for two of them.
 
 ## Upstream pull to `f13e0ada` (2026-08-20)
 

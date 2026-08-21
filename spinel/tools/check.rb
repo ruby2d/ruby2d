@@ -122,6 +122,67 @@ def check_cli
   ['cli', :pass, "built an app that drew #{colors} colors over #{frames} frames"]
 end
 
+# Input: does a keypress, a mouse move, a click, a wheel tick and a quit reach
+# the app's handlers — window-level, filtered, and per-object — on this target?
+# The fixture injects them into SDL from inside the binary, so no keyboard or
+# mouse is driven; see tools/input_app.rb. Goes through the installed gem like
+# `cli`, and compares the handler output line for line against what the same
+# events produce on CRuby.
+def check_input
+  dir = "#{SCRATCH}/input_check"
+  FileUtils.rm_rf(dir)
+  FileUtils.mkdir_p(dir)
+  include_dir = File.expand_path('assets/platform/include')
+  File.write("#{dir}/app.rb", File.read('spinel/tools/input_app.rb').gsub('__INCLUDE__', include_dir))
+
+  out, ok = Dir.chdir(dir) { sh!('ruby2d', 'build', '--spinel', 'app.rb') }
+  return ['input', :fail, "build failed:\n#{out}"] unless ok
+
+  binary = "#{dir}/build/native/app"
+  return ['input', :fail, "no executable at #{binary}"] unless File.exist?(binary)
+
+  run, status = run_capped([File.expand_path(binary)], seconds: 60)
+  return ['input', :fail, 'hung'] if status == :timeout
+
+  expected = <<~'LINES'.lines.map(&:chomp)
+    key_down :space
+    key_up :space
+    key_down :r
+    filter key_down: :r
+    key_up :r
+    mouse_move 100 50 3.0,-2.0
+    mouse_down :left 100 50
+    filter mouse_down: :left 100,50
+    mouse_up :left
+    mouse_scroll :normal 0.0,-1.0
+    mouse_move 160 120 60.0,70.0
+    object hover 160,120
+    mouse_down :left 160 120
+    filter mouse_down: :left 160,120
+    object mouse_down :left
+    mouse_up :left
+    object click :left
+    object filter click: :left
+    mouse_move 10 10 -150.0,-110.0
+    object hover_out
+    close
+  LINES
+  actual = run.lines.map(&:chomp).reject(&:empty?)
+  return ['input', :fail, "the quit event never closed the window:\n#{run}"] if actual.any? { |l| l.start_with?('TIMEOUT') }
+
+  missing = expected - actual
+  extra   = actual - expected
+  unless missing.empty? && extra.empty? && actual == expected
+    detail = +"handler output differs from CRuby's\n"
+    detail << "  missing: #{missing.join(' | ')}\n" unless missing.empty?
+    detail << "  extra:   #{extra.join(' | ')}\n" unless extra.empty?
+    detail << "  order:   #{actual.join(' | ')}" if missing.empty? && extra.empty?
+    return ['input', :fail, detail]
+  end
+
+  ['input', :pass, "#{actual.size} events reached their handlers in order, window and object alike"]
+end
+
 # The preflight: does an app using unsupported features stop with a message
 # naming them, rather than a wall of generated-C errors?
 def check_preflight
@@ -166,6 +227,7 @@ end
 CHECKS = { 'subset' => method(:check_subset),
            'demo' => method(:check_demo),
            'cli' => method(:check_cli),
+           'input' => method(:check_input),
            'preflight' => method(:check_preflight),
            'issues' => method(:check_issues) }.freeze
 

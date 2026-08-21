@@ -784,6 +784,68 @@ bool R2D_PollClosed(void) {
 
 
 /*
+ * Read the queued events one scalar at a time. The Ruby bridge returns them as
+ * a flat array from `drain_events`; the Spinel build cannot receive an array
+ * over FFI, so its adapter rebuilds the same array from these and then calls
+ * R2D_EventsClear. `field` indexes the integer members in stride order:
+ * 0 category, 1 type, 2 id, 3 button, 4 direction, 5 axis, 6 x, 7 y, 8 value.
+ * Out-of-range indexes read as 0 / 0.0 / "" rather than faulting.
+ */
+int R2D_EventCount(void) {
+  return event_count;
+}
+
+int R2D_EventInt(int i, int field) {
+  if (i < 0 || i >= event_count) return 0;
+  R2D_QueuedEvent *ev = &event_buf[i];
+  switch (field) {
+    case 0: return ev->category;
+    case 1: return ev->type;
+    case 2: return ev->id;
+    case 3: return ev->button;
+    case 4: return ev->direction;
+    case 5: return ev->axis;
+    case 6: return ev->x;
+    case 7: return ev->y;
+    case 8: return ev->value;
+    default: return 0;
+  }
+}
+
+double R2D_EventDelta(int i, int which) {
+  if (i < 0 || i >= event_count) return 0.0;
+  return which == 0 ? event_buf[i].delta_x : event_buf[i].delta_y;
+}
+
+// Never NULL: an FFI `:str` return is read with strlen.
+const char *R2D_EventStr(int i) {
+  if (i < 0 || i >= event_count || !event_buf[i].str) return "";
+  return event_buf[i].str;
+}
+
+// The key name for a key event's `id`, as the Ruby bridge interns it in drain
+const char *R2D_EventKeyName(int i) {
+  if (i < 0 || i >= event_count) return R2D_KeyName(-1);
+  return R2D_KeyName(event_buf[i].id);
+}
+
+/*
+ * Empty the queue, releasing what poll allocated. Ownership contract: poll
+ * strdups gamepad-connect names into ev->str; everything else leaves it NULL
+ * via designated init, so freeing every non-NULL ev->str is correct.
+ */
+void R2D_EventsClear(void) {
+  for (int i = 0; i < event_count; i++) {
+    if (event_buf[i].str) {
+      SDL_free((void *)event_buf[i].str);
+      event_buf[i].str = NULL;
+    }
+  }
+  event_count = 0;
+}
+
+
+/*
  * Ext.poll_events(window) → nil
  *
  * Ruby bridge over R2D_PollEvents: poll, then sync the resulting C state to the
@@ -858,15 +920,8 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     r_ary_push(ary, DBL2NUM(ev->delta_y));
     r_ary_push(ary, INT2NUM(ev->value));
     r_ary_push(ary, ev->str ? r_str_new(ev->str) : R_NIL);
-    // Ownership contract: poll strdups gamepad-connect names into ev->str, drain
-    // frees them here. All other events leave ev->str NULL via designated init,
-    // so freeing every non-NULL ev->str is correct.
-    if (ev->str) {
-      SDL_free((void *)ev->str);
-      ev->str = NULL;
-    }
   }
-  event_count = 0;
+  R2D_EventsClear();
   return ary;
 }
 #endif

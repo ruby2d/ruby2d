@@ -5,9 +5,11 @@
 /*
  * Initialize
  */
+#ifndef RUBY2D_NO_RUBY
 void R2D_Keyboard_Init() {
   r_define_class_method(ruby2d_ext_module, "key_names", ruby2d_ext_keyboard_key_names, r_args_variadic);
 }
+#endif
 
 
 // Ruby 2D owns the keyboard's names rather than passing through SDL's
@@ -323,6 +325,7 @@ const char *R2D_KeyName(int scancode) {
  * once to build its key vocabulary, so the name list has a single home — here,
  * next to the SDL scancodes it maps.
  */
+#ifndef RUBY2D_NO_RUBY
 R_VAL ruby2d_ext_keyboard_key_names(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   (void)argc; (void)argv;
@@ -334,3 +337,4 @@ R_VAL ruby2d_ext_keyboard_key_names(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
   return ary;
 }
+#endif

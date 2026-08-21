@@ -168,7 +168,7 @@ SPINEL_LIB_FILES = %w[
 # The C sources that make up the `RUBY2D_NO_RUBY` core — the `R2D_*` renderer
 # with no Ruby engine in it. The rest of `ext/ruby2d` is either the CRuby/mruby
 # binding layer (`ext.c`) or a subsystem this slice doesn't reach.
-SPINEL_CORE_FILES = %w[ruby2d window shapes fps font].freeze
+SPINEL_CORE_FILES = %w[ruby2d window shapes fps font keyboard].freeze
 
 # `Ext` on this target.
 #
@@ -187,6 +187,13 @@ SPINEL_EXT = <<~'RUBY'
       ffi_func :R2D_LastError, [], :str
       ffi_func :R2D_PollEvents, [], :void
       ffi_func :R2D_PollClosed, [], :bool
+      ffi_func :R2D_EventCount, [], :int
+      ffi_func :R2D_EventInt, [:int, :int], :int
+      ffi_func :R2D_EventDelta, [:int, :int], :double
+      ffi_func :R2D_EventStr, [:int], :str
+      ffi_func :R2D_EventKeyName, [:int], :str
+      ffi_func :R2D_EventsClear, [], :void
+      ffi_func :R2D_KeyName, [:int], :str
       ffi_func :R2D_PollMouseX, [], :int
       ffi_func :R2D_PollMouseY, [], :int
       ffi_func :R2D_PollWidth, [], :int
@@ -256,9 +263,45 @@ SPINEL_EXT = <<~'RUBY'
         nil
       end
 
-      # No input on this target: window-level `on` does not compile, so there is
-      # nothing to dispatch. `nil` makes `tick` skip dispatch entirely.
-      def self.drain_events(_win) = nil
+      # The other engines return the queue as one flat array built in C. FFI
+      # cannot return an array, so this rebuilds the same array — R2D_EVT_STRIDE
+      # values per event, a key event's id as its name symbol — from scalar
+      # reads, and `Window#dispatch_events` consumes it unchanged. `nil` on an
+      # empty queue keeps `tick` skipping dispatch on the common frame.
+      def self.drain_events(_win)
+        n = Ext.R2D_EventCount()
+        return nil if n == 0
+
+        raw = []
+        i = 0
+        while i < n
+          cat = Ext.R2D_EventInt(i, 0)
+          raw << cat << Ext.R2D_EventInt(i, 1)
+          raw << (cat == Window::EVT_KEY ? Ext.R2D_EventKeyName(i).to_sym : Ext.R2D_EventInt(i, 2))
+          raw << Ext.R2D_EventInt(i, 3) << Ext.R2D_EventInt(i, 4) << Ext.R2D_EventInt(i, 5)
+          raw << Ext.R2D_EventInt(i, 6) << Ext.R2D_EventInt(i, 7)
+          raw << Ext.R2D_EventDelta(i, 0) << Ext.R2D_EventDelta(i, 1)
+          raw << Ext.R2D_EventInt(i, 8)
+          str = Ext.R2D_EventStr(i)
+          raw << (str.empty? ? nil : str)
+          i += 1
+        end
+        Ext.R2D_EventsClear()
+        raw
+      end
+
+      # Every key name the C table holds, as the Ruby bridge's `key_names`
+      # returns them: `:unknown` first, then each named scancode in order.
+      def self.key_names
+        names = [:unknown]
+        code = 0
+        while code < 512
+          name = Ext.R2D_KeyName(code)
+          names << name.to_sym unless name == 'unknown'
+          code += 1
+        end
+        names
+      end
 
       def self.begin_frame(win)
         bg = win.background
@@ -365,6 +408,8 @@ RUBY
 # What an inert `Ext` stub returns when the default `nil` would break the caller.
 SPINEL_EXT_STUB_RETURNS = {
   'window_cursor_visible' => 'true',
+  # A key vocabulary wide enough for a fixture to register and fire key events
+  'key_names' => '%i[unknown a b r space escape left right]',
   'render' => 'nil', 'now' => '0.016', 'begin_frame' => 'true',
   'window_show' => 'true', 'window_create' => 'true'
 }.freeze

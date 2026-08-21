@@ -280,16 +280,21 @@ module Ruby2D
       gamepad_button_up:   :button, gamepad_axis: :axis
     }.freeze
 
-    # Name vocabularies for filter values, so `on(key_down: 'space')` fails
-    # when the handler is registered rather than at the first keypress.
-    EVENT_FILTER_VOCABULARIES = {
-      key_down: Keyboard, key_held: Keyboard, key_up: Keyboard,
-      mouse_down: Mouse, mouse_held: Mouse, mouse_up: Mouse,
-      gamepad_button_down: Gamepad::BUTTONS,
-      gamepad_button_held: Gamepad::BUTTONS,
-      gamepad_button_up:   Gamepad::BUTTONS,
-      gamepad_axis:        Gamepad::AXES
-    }.freeze
+    # The name vocabulary a filter value for `type` is checked against, so
+    # `on(key_down: 'space')` fails when the handler is registered rather than
+    # at the first keypress. Nil for an event whose values are not names. A
+    # method rather than a constant map so every answer is a `Vocabulary` and
+    # the key set can be built on first use (see `Keyboard.keys`).
+    def filter_vocabulary(type)
+      case type
+      when :key_down, :key_held, :key_up       then Keyboard.keys
+      when :mouse_down, :mouse_held, :mouse_up then Mouse::BUTTONS
+      when :gamepad_button_down, :gamepad_button_held, :gamepad_button_up
+        Gamepad::BUTTONS
+      when :gamepad_axis then Gamepad::AXES
+      end
+    end
+    private :filter_vocabulary
 
     # Gamepad events dispatch an internal data struct, but user blocks
     # receive the unpacked args (gamepad / button / axis / value). This map
@@ -351,7 +356,16 @@ module Ruby2D
     # the dispatch struct into multi-arg form.
     private def build_filter_wrapper(type, matcher, proc)
       unpack = GAMEPAD_EVENT_UNPACK[type]
-      args = unpack ? ->(e) { unpack.call(e) } : ->(e) { [e] }
+      # Two lambdas are never the arms of one conditional here — neither
+      # `a ? ->{} : ->{}` nor an `if`/`else` whose value is the lambda — because
+      # Spinel types the chosen lambda's parameter as Integer in that shape (see
+      # spinel/issues/49). Assigning in each arm, and returning early, read the
+      # same and compile correctly.
+      if unpack
+        args = ->(e) { unpack.call(e) }
+      else
+        args = ->(e) { [e] }
+      end
 
       if matcher.is_a?(Hash)
         unless unpack
@@ -364,24 +378,24 @@ module Ruby2D
           when :axis   then Gamepad::AXES.validate!(value)
           end
         end
-        ->(e) {
+        return ->(e) {
           if matcher.all? { |k, v| e.matches?(k, v) }
             proc.call(*args.call(e))
           end
         }
-      else
-        field = EVENT_FILTER_FIELDS[type] or
-          raise Error, "`#{type}` does not support filtering with `on event: value`"
-        values = Array(matcher)
-        if (vocabulary = EVENT_FILTER_VOCABULARIES[type])
-          values.each { |v| vocabulary.validate!(v) }
-        end
-        ->(e) {
-          if values.any? { |v| e.matches?(field, v) }
-            proc.call(*args.call(e))
-          end
-        }
       end
+
+      field = EVENT_FILTER_FIELDS[type] or
+        raise Error, "`#{type}` does not support filtering with `on event: value`"
+      values = Array(matcher)
+      if (vocabulary = filter_vocabulary(type))
+        values.each { |v| vocabulary.validate!(v) }
+      end
+      ->(e) {
+        if values.any? { |v| e.matches?(field, v) }
+          proc.call(*args.call(e))
+        end
+      }
     end
 
     # Remove an event handler (or several). Accepts a descriptor returned by

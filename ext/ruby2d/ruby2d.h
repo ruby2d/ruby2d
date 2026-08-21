@@ -803,6 +803,20 @@ int  R2D_PollViewportHeight(void);
 bool R2D_PollClosed(void);
 
 /*
+ * The events R2D_PollEvents queued, one scalar at a time, for a bridge that
+ * cannot take an array: `field` is the stride position of an integer member
+ * (0 category … 8 value), `which` selects delta_x (0) or delta_y (1). Strings
+ * are never NULL. R2D_EventsClear empties the queue and frees what poll owned;
+ * the Ruby bridge's drain calls it too, so there is one release path.
+ */
+int         R2D_EventCount(void);
+int         R2D_EventInt(int i, int field);
+double      R2D_EventDelta(int i, int which);
+const char *R2D_EventStr(int i);
+const char *R2D_EventKeyName(int i);
+void        R2D_EventsClear(void);
+
+/*
  * Takes the background color as flat components, decides whether to render
  * this frame, and clears. Returns true if the caller should draw the scene.
  */
