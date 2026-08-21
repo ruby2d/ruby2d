@@ -6,12 +6,12 @@ require 'fileutils'
 require 'shellwords'
 require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/messages'
-require 'ruby2d/cli/lib_files'
+require 'ruby2d/lib_files'
 require_relative '../../../assets/target'
 
 
-# The Ruby 2D library files (shared with the WASM/Try build — see cli/lib_files)
-@ruby2d_lib_files = Ruby2D::CLI::LIB_FILES
+# The Ruby 2D library files (shared with the WASM/Try build — see `lib_files.rb`)
+@ruby2d_lib_files = Ruby2D::LIB_FILES
 
 
 # Helpers ######################################################################

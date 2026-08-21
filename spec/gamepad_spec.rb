@@ -38,5 +38,24 @@ RSpec.describe Ruby2D::Gamepad do
     it 'is internally consistent (the two maps are inverses)' do
       enum.each { |sym, int| expect(name_map[int]).to eq(sym) }
     end
+
+    it 'returns nil for an unknown event code' do
+      expect(name_map[-1]).to be_nil
+      expect(name_map[26]).to be_nil
+    end
+  end
+
+  describe 'axis enum coverage' do
+    let(:enum)     { Ruby2D::Gamepad::AXIS_ENUM }
+    let(:name_map) { Ruby2D::Window::GP_AXIS_MAP }
+
+    it 'covers the full SDL axis range 0..5 in both maps' do
+      expect(enum.values.sort).to eq((0..5).to_a)
+      expect(name_map.keys.sort).to eq((0..5).to_a)
+    end
+
+    it 'is internally consistent (the two maps are inverses)' do
+      enum.each { |sym, int| expect(name_map[int]).to eq(sym) }
+    end
   end
 end

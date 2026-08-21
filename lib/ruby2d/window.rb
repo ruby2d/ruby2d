@@ -589,18 +589,10 @@ module Ruby2D
                        5 => :held, 6 => :enter, 7 => :leave }.freeze
     MOUSE_BTN_MAP  = { 1 => :left, 2 => :middle, 3 => :right, 4 => :x1, 5 => :x2 }.freeze
     SCROLL_DIR_MAP = { 0 => :normal, 1 => :inverted }.freeze
-    GP_AXIS_MAP    = { 0 => :left_x, 1 => :left_y, 2 => :right_x, 3 => :right_y,
-                       4 => :left_trigger, 5 => :right_trigger }.freeze
-    GP_BUTTON_MAP  = { 0 => :south, 1 => :east, 2 => :west, 3 => :north,
-                       4 => :back, 5 => :guide, 6 => :start,
-                       7 => :left_stick, 8 => :right_stick,
-                       9 => :left_shoulder, 10 => :right_shoulder,
-                       11 => :dpad_up, 12 => :dpad_down,
-                       13 => :dpad_left, 14 => :dpad_right,
-                       15 => :misc1, 16 => :paddle1, 17 => :paddle2,
-                       18 => :paddle3, 19 => :paddle4, 20 => :touchpad,
-                       21 => :misc2, 22 => :misc3, 23 => :misc4,
-                       24 => :misc5, 25 => :misc6 }.freeze
+    # Event code → symbol, the inverse of the capability-query tables in
+    # `Gamepad` — derived so the two can't drift.
+    GP_AXIS_MAP    = Gamepad::AXIS_ENUM.invert.freeze
+    GP_BUTTON_MAP  = Gamepad::BUTTON_ENUM.invert.freeze
 
     def dispatch_events(raw)
       i = 0

@@ -14,7 +14,7 @@ end
 require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/cli/examples'
 require_relative 'lib/ruby2d/cli/launch'
-require_relative 'lib/ruby2d/cli/lib_files'
+require_relative 'lib/ruby2d/lib_files'
 require_relative 'assets/target'
 require_relative 'lib/ruby2d/version'
 
@@ -864,7 +864,7 @@ end
 # Source files the "Try Ruby 2D" build is compiled from — the same library list
 # the build itself reads, plus the C extension and the build's own inputs.
 def try_source_files
-  Ruby2D::CLI::LIB_FILES.map { |f| File.expand_path("lib/ruby2d/#{f}.rb", __dir__) } +
+  Ruby2D::LIB_FILES.map { |f| File.expand_path("lib/ruby2d/#{f}.rb", __dir__) } +
     Dir[File.expand_path('ext/ruby2d/*.{c,h}', __dir__)] +
     [File.expand_path('try/try_main.c', __dir__), File.expand_path('try/build.rb', __dir__)]
 end

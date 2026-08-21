@@ -1,5 +1,6 @@
 require 'mkmf'
 require_relative '../../lib/ruby2d/deps_help'
+require_relative '../../lib/ruby2d/cli/colorize'
 require_relative '../../lib/ruby2d/cli/messages'
 require_relative '../../lib/ruby2d/version'
 

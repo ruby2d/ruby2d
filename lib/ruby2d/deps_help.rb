@@ -6,7 +6,6 @@
 # `require_relative` (not `require`) so it resolves both at install time, when
 # `lib/` isn't on the load path, and at run time, when it is.
 
-require_relative 'cli/colorize'
 require_relative '../../assets/target'
 
 module Ruby2D
@@ -70,16 +69,16 @@ module Ruby2D
       body << ''
       if cmd
         body << '• Install SDL3 with your package manager (easiest), then rebuild:'
-        body << "    #{cmd.bold}"
-        body << "    #{'gem pristine ruby2d'.bold}"
+        body << "    #{bold(cmd)}"
+        body << "    #{bold('gem pristine ruby2d')}"
       else
-        body << "• Install the SDL3 development libraries, then run #{'gem pristine ruby2d'.bold}"
+        body << "• Install the SDL3 development libraries, then run #{bold('gem pristine ruby2d')}"
       end
       body << ''
       body << '• Build the libraries locally (no system packages needed):'
-      body << "    #{'ruby2d setup'.bold}"
+      body << "    #{bold('ruby2d setup')}"
       body << ''
-      body << "See #{'ruby2d.com'.bold} for help."
+      body << "See #{bold('ruby2d.com')} for help."
 
       framed(body)
     end
@@ -97,15 +96,20 @@ module Ruby2D
       body << 'To finish, choose one:'
       body << ''
       body << '• Build current libraries locally (no system packages needed):'
-      body << "    #{'ruby2d setup'.bold}"
+      body << "    #{bold('ruby2d setup')}"
       body << ''
       body << '• Upgrade the SDL3 packages to 3.4+, then rebuild:'
-      body << "    #{'gem pristine ruby2d'.bold}"
+      body << "    #{bold('gem pristine ruby2d')}"
       body << ''
-      body << "See #{'ruby2d.com'.bold} for help."
+      body << "See #{bold('ruby2d.com')} for help."
 
       framed(body)
     end
+
+    # Bold a command or name for the terminal. Inline rather than the CLI's
+    # `String` extension (`cli/colorize.rb`) so this file stays extension-free
+    # and the runtime doesn't load that patch into every Ruby 2D process.
+    def bold(text) = "\e[1m#{text}\e[0m"
 
     # Frame a message body like the install banner.
     def framed(body)

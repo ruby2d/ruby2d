@@ -7,7 +7,7 @@
 # Usage: ruby try/build.rb
 
 require 'fileutils'
-require_relative '../lib/ruby2d/cli/lib_files'
+require_relative '../lib/ruby2d/lib_files'
 require_relative '../lib/ruby2d/cli/colorize'
 require_relative '../lib/ruby2d/cli/messages'
 
@@ -25,8 +25,8 @@ WASM_LIB_DIR  = File.join(ASSETS_DIR, 'platform', 'wasm', 'lib')
 FONTS_DIR     = File.join(ASSETS_DIR, 'resources', 'fonts')
 
 # The Ruby 2D library files — shared with the native/web build via the single
-# source of truth in lib/ruby2d/cli/lib_files.rb, so the two can't drift.
-RUBY2D_LIB_FILES = Ruby2D::CLI::LIB_FILES
+# source of truth in lib/ruby2d/lib_files.rb, so the two can't drift.
+RUBY2D_LIB_FILES = Ruby2D::LIB_FILES
 
 
 # Collapse consecutive blank lines. `rake try:build` runs this script right after

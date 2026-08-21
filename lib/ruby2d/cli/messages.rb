@@ -4,7 +4,7 @@
 # and the build scripts. The label carries the color and the message stays
 # normal weight, so the eye lands on the label first.
 #
-# Kept out of `LIB_FILES` (see `cli/lib_files.rb`) on purpose: these write to a
+# Kept out of `LIB_FILES` (see `lib_files.rb`) on purpose: these write to a
 # terminal, and compiling them into every native and web app would ship CLI-only
 # code inside a user's game.
 

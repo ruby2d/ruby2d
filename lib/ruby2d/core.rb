@@ -1,44 +1,13 @@
 # Ruby2D module and native extension loader
 
 unless RUBY_ENGINE == 'mruby'
-  require 'ruby2d/cli/colorize'
-  require 'ruby2d/exceptions'
-  require 'ruby2d/warnings'
-  require 'ruby2d/window/class_methods'
-  require 'ruby2d/window/key_events'
-  require 'ruby2d/window/mouse_events'
-  require 'ruby2d/window/gamepad_events'
-  require 'ruby2d/window/object_events'
-  require 'ruby2d/vocabulary'
-  require 'ruby2d/keyboard'
-  require 'ruby2d/mouse'
-  require 'ruby2d/gamepad'
-  require 'ruby2d/window'
-  require 'ruby2d/interactive'
-  require 'ruby2d/renderable'
-  require 'ruby2d/color'
-  require 'ruby2d/audio'
-  require 'ruby2d/canvas'
-  require 'ruby2d/circle'
-  require 'ruby2d/ellipse'
-  require 'ruby2d/font'
-  require 'ruby2d/image'
-  require 'ruby2d/json_parser'
-  require 'ruby2d/atlas_parser'
-  require 'ruby2d/sprite_sheet'
-  require 'ruby2d/line'
-  require 'ruby2d/polygon'
-  require 'ruby2d/polyline'
-  require 'ruby2d/quad'
-  require 'ruby2d/rectangle'
-  require 'ruby2d/sprite'
-  require 'ruby2d/square'
-  require 'ruby2d/text'
-  require 'ruby2d/bitmap_text'
-  require 'ruby2d/tileset'
-  require 'ruby2d/triangle'
-  require 'ruby2d/button'
-  require 'ruby2d/vertices'
+  # One load order for every Ruby: CRuby requires these files; the native/web
+  # and Try builds concatenate the same list for mruby (`lib_files.rb`).
+  require 'ruby2d/lib_files'
+  Ruby2D::LIB_FILES.each do |f|
+    next if f == 'mruby_compat' || f == 'dsl'
+    require "ruby2d/#{f}"
+  end
   begin
     require 'ruby2d/ruby2d' # load native extension
   rescue LoadError
