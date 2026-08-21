@@ -1,6 +1,6 @@
 # Spinel build path
 
-Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 onward on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `42649df7` (2026-08-13)** — `cd spinel && rake` green on all five checks.
+Research notes and working checklist for compiling Ruby 2D apps with [Spinel](https://github.com/matz/spinel), Matz's Ruby AOT compiler, as an opt-in alternative to the mruby default. Findings are from 2026-08-07 onward on macOS arm64; mruby stays the default for `ruby2d build`. Spinel moves fast, so the commit matters: the initial research ran against `8b029022e663`, the MVP work against `f0f7dc0d7131`, and **everything was last re-verified against `f13e0ada` (2026-08-20)** — see [Upstream pull to `f13e0ada`](#upstream-pull-to-f13e0ada-2026-08-20): two drafts fixed, and `subset`/`demo` red behind a new `-Werror` gate.
 
 ## Start here
 
@@ -45,11 +45,11 @@ ruby2d build --spinel examples/nbody.rb && ruby2d launch --native
 
 **The `lib/` blocker is gone.** All seven of [#3771-#3777](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody) are fixed upstream, including #3773, and `verify_issues.rb` confirms all seven independently. The square-only slice now compiles to zero C errors and runs end to end: it constructs a `Square`, registers it, dispatches through the scene graph, and prints `SUBSET OK`. Two workarounds were deleted as a result.
 
-**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `42649df7` `verify_issues.rb` reports 30 fixed, 12 reproduce, 2 parked: the twelve reproducing are drafts 33, 34 and 35 plus 36-44 from the differential survey, none of them filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
+**Thirty issues are filed and every one of them is closed** ([#3771-#3912](https://github.com/matz/spinel/issues?q=%22porting+Ruby+2D%22+in%3Abody)). At `f13e0ada` `verify_issues.rb` reports 32 fixed, 13 reproduce, 2 parked: the thirteen reproducing are drafts 33, 34 and 35, 36-42 and 44 from the differential survey, and 46 and 47 from the 2026-08-20 upstream pull, none of them filed; the two parked are draft 18, filed as #3804 but not machine-checkable, and draft 30, which has no single reproducer. Draft 24's residue — the one that needed reading by hand — was reduced, filed as [#3911](https://github.com/matz/spinel/issues/3911), and is fixed.
 
 **Three workarounds were dropped on 2026-08-13 and a fourth was dropped and put straight back** — see [Three workarounds dropped](#three-workarounds-dropped-and-one-that-could-not-be-2026-08-13). Two compiler bugs still hold a transform each: `dsl_shims` ([#3803](https://github.com/matz/spinel/issues/3803), fixed upstream with an unreduced residue) and `block_param_capture` (drafted as issue 34, unfiled). `rake sweep` answers whether a transform can go — but only for the code its fixture reaches, which is how `block_param_capture` was wrongly dropped and broke every app using `on`. See [Lessons](#lessons).
 
-**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#what-blocks-a-clean-build-of-the-whole-library) on the full 37-file library reported exactly one unsupported construct, the event filter's runtime-name `send`, until `lib/` removed it on 2026-08-12; the rest is FFI adapter work. On the compiler side there are now exactly two: `dsl_shims`, filed as [#3803](https://github.com/matz/spinel/issues/3803) and fixed upstream with a residue that has not been reduced, and `block_param_capture`, reduced and drafted as issue 34 but not yet filed. **Every compiler-bug workaround on this branch has a minimal reproducer.**
+**What stands between here and zero workarounds is a finite, known list.** [`spinel-doctor`](#what-blocks-a-clean-build-of-the-whole-library) on the full 37-file library reported exactly one unsupported construct, the event filter's runtime-name `send`, until `lib/` removed it on 2026-08-12; the rest is FFI adapter work. On the compiler side there are now exactly two: `dsl_shims`, filed as [#3803](https://github.com/matz/spinel/issues/3803) and fixed upstream with a residue that has not been reduced, and `block_param_capture`, reduced and drafted as issue 34 but not yet filed. A third, `vocabulary_string_hint`, lived for one day: drafted as issue 45 on 2026-08-20 and found fixed by `f13e0ada` the same afternoon. **Every compiler-bug workaround on this branch has a minimal reproducer.**
 
 Two things remain gaps rather than bugs, both inherent to AOT: the class pattern needs `Module#ancestors` reflection, and `button.rb` needs `define_singleton_method`. Input events are no longer among them: the `send` that made them inherently incompatible is gone, all four compiler blockers are cleared, and **a script registering `on` handlers compiles, links and runs**. What it does not yet do is receive events — `drain_events` still returns `nil`, which is adapter work. See [Input compiles, and the first example programs build](#input-compiles-and-the-first-example-programs-build-2026-08-13).
 
@@ -519,6 +519,8 @@ Names are the `spinel_*` functions in `cli/spinel.rb` minus the prefix. Compile 
 | `ffi_func` type arrays spelled out instead of `[:double]*6` | The computed form is dropped with no diagnostic — filed as [#3804](https://github.com/matz/spinel/issues/3804), now closed. **Not covered by `rake sweep`**, which only sees the `spinel_*` transforms, so this row is unverified since it was written |
 | `emcc` shim rewriting `-Wl,-dead_strip` → `-Wl,--gc-sections` | `spinel hello.rb --cc=emcc` against a wasm-built runtime |
 
+**Dropped on 2026-08-20**, at `f13e0ada`: `vocabulary_string_hint`, added that morning for draft 45 (`Vocabulary#validate!`'s String-spelling hint made every Symbol lookup miss) and fixed upstream before the day was out. Verified by building the slice past the `-Werror` gate with `--cc='cc -w'` and matching CRuby with the fixture's `on(click: :left)` exercising the lookup.
+
 **Dropped on 2026-08-13**, at `42649df7`, after the pull that closed the last six filed issues:
 
 | Dropped | Was working around | Filed as |
@@ -853,6 +855,25 @@ The evidence was already in hand and went unused, which is the more uncomfortabl
 The same question is now open about one of the three that did drop. The `const char *` C error survey still reports was attributed to `expand_hash_delete`, dropped today for a bug (#3806) that is fixed. Slice clean, library not — possibly the same pattern a second time. Nobody has checked whether that is a different `delete` site or the same one behaving differently once more code is reachable.
 
 **`survey.rb` hid all of this for one run, and that is now fixed.** With the `interactive.rb` entry removed to test whether it was stale, the tool printed an empty "Remaining C errors" list — which reads as *nothing left to fix*. Spinel had refused the program before clang ever ran, and its diagnostics say `spinel: file:line: unsupported …`, never `error:`, so the census matched nothing. An empty list and a clean build were indistinguishable. It now prints the refusal and says plainly that it is the first blocker rather than the list.
+
+## Upstream pull to `f13e0ada` (2026-08-20)
+
+220 commits since `42649df7`. Two drafts fixed — **43** (empty-literal block parameter) and **45** (the `Vocabulary` lookup, fixed within days of being drafted) — and its transform dropped. `rake issues`: 32 fixed, 13 reproduce, 2 parked.
+
+**`subset` and `demo` are red, and `rake sweep` is blind, until two new drafts are fixed.** [`77cc33c9`](https://github.com/matz/spinel/commit/77cc33c9) adds `-Werror=incompatible-pointer-types -Werror=int-conversion` to Spinel's C compile, after the `--cc` string. Five pointer mismatches that had been warnings in the slice's build log since at least `42649df7` — the binary built and `rake compare` was byte-identical — are now fatal. They reduce to two bugs, both ordinary code:
+
+| Draft | Shape | In `lib/` |
+|---|---|---|
+| [46](issues/46-a-string-method-that-interpolates-self-is-called-with-the-wrong-receiver-type.md) | a `String` method interpolating `self`, called from another `String` method | `cli/colorize.rb` |
+| [47](issues/47-a-float-destructured-from-an-array-element-is-stored-as-its-bit-pattern.md) | `x1, _ = points[0]` into an Integer-defaulted keyword, then `[@x1, …].max` | `Quad#initialize` / `#width` |
+
+47 is the one to read: standalone it **compiles and answers a Float's bit pattern** (`4602678819172646912` for `0.5`), which is the miscompile upstream's new gate exists to catch. The gate is right; it has only made a latent bug loud.
+
+Three things follow from the gate sitting after `--cc`:
+
+- `-Wno-error=…` on `--cc` does nothing — the later `-Werror=` wins. `-w` does win, from the front, which is why **`rake cli` still passes**: `build_spinel` passes `-w` unless `--debug`, so a real `ruby2d build --spinel` builds the same mis-typed C silently, exactly as before the pull. Do not read `cli` green as "the gate is satisfied".
+- `rake sweep` reports every transform as "still needed — 5 C errors". Those are the same five errors regardless of which transform is dropped; the sweep cannot grade anything until 46 and 47 are fixed. To re-check a transform meanwhile, build `scratch/subset.rb` by hand with `--cc='cc -w -ferror-limit=0'` and diff against CRuby, which is how `vocabulary_string_hint` was cleared.
+- Whether the check tools should pass `-w` to get the five checks green again is an open call. Against: it hides the exact class of bug 47 demonstrates. For: it is what the shipped build path already does. Left red for now.
 
 ## Working artifacts
 
