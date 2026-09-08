@@ -390,7 +390,8 @@ module Ruby2D
     # rendered fill" consistently — matching the fill for simple polygons (convex
     # and concave). Self-intersecting input isn't fully supported by the fill
     # renderer, so the test can diverge from the drawn pixels there. The boundary
-    # is half-open (top/right edges read as outside), as in rasterization.
+    # is half-open (the right and bottom edges read as outside), as in
+    # rasterization.
     def _point_in_polygon?(coords, px, py)
       n = coords.length / 2
       inside = false
@@ -432,10 +433,12 @@ module Ruby2D
       ex * ex + ey * ey <= half_sq
     end
 
-    # Check if the object contains the given point
+    # Check if the object contains the given point. Half-open like the
+    # rasterized box: a point on the right or bottom edge is outside, so two
+    # objects sharing an edge never both claim it.
     def contains?(x, y)
       x, y = _unrotate(x, y)
-      x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
+      x >= @x && x < (@x + @width) && y >= @y && y < (@y + @height)
     end
 
   end

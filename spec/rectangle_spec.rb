@@ -42,6 +42,28 @@ RSpec.describe Ruby2D::Rectangle do
     end
   end
 
+  describe '#contains?' do
+    it 'is half-open, so adjacent rectangles never both claim their shared edge' do
+      # Drawn side by side with no overlap, pixel column 60 is painted by `right`.
+      left  = Rectangle.new(x: 0,  y: 0, width: 60, height: 60, add: false)
+      right = Rectangle.new(x: 60, y: 0, width: 60, height: 60, add: false)
+      expect(left.contains?(59, 30)).to be true
+      expect(left.contains?(60, 30)).to be false
+      expect(right.contains?(60, 30)).to be true
+      expect(left.contains?(30, 60)).to be false # the bottom edge, likewise
+    end
+
+    it 'agrees with a Quad and a Polygon of the same geometry, edges included' do
+      rect = Rectangle.new(x: 0, y: 0, width: 60, height: 60, add: false)
+      quad = Quad.new(x1: 0, y1: 0, x2: 60, y2: 0, x3: 60, y3: 60, x4: 0, y4: 60, add: false)
+      poly = Polygon.new(points: [[0, 0], [60, 0], [60, 60], [0, 60]], add: false)
+      [[0, 0], [59, 59], [60, 30], [30, 60], [0, 60], [60, 0], [61, 30]].each do |x, y|
+        expect(rect.contains?(x, y)).to eq(quad.contains?(x, y))
+        expect(rect.contains?(x, y)).to eq(poly.contains?(x, y))
+      end
+    end
+  end
+
   describe '#contains? with rotation' do
     it 'tests against the rotated footprint, not the unrotated one' do
       # A 100×20 rect rotated 90° about its center (50, 10) renders as a tall,

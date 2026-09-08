@@ -194,4 +194,17 @@ RSpec.describe Ruby2D::Button do
         .not_to raise_error
     end
   end
+
+  describe '#contains? on a button not wrapping a visual' do
+    it 'is half-open like a Rectangle, so the right and bottom edges are outside' do
+      visual_less = Ruby2D::Button.new(x: 10, y: 10, width: 100, height: 40, add: false)
+      self_drawn  = Ruby2D::Button.new(x: 10, y: 10, width: 100, height: 40, color: 'navy', add: false)
+      [visual_less, self_drawn].each do |button|
+        expect(button.contains?(10, 10)).to be true
+        expect(button.contains?(109, 49)).to be true
+        expect(button.contains?(110, 30)).to be false
+        expect(button.contains?(50, 50)).to be false
+      end
+    end
+  end
 end

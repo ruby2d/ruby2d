@@ -416,6 +416,20 @@ RSpec.describe 'Per-object events' do
       expect(top_clicked).to be true
       expect(bottom_clicked).to be false
     end
+
+    it 'routes a click on the shared edge of adjacent rectangles to the one drawn there' do
+      # `left` is on top by z, but its half-open box ends before column 60,
+      # which `right` paints.
+      left  = make_rect(x: 0,  y: 0, width: 60, height: 60, z: 1)
+      right = make_rect(x: 60, y: 0, width: 60, height: 60, z: 0)
+      seen = []
+      left.on(:click)  { seen << :left }
+      right.on(:click) { seen << :right }
+
+      window.mouse_callback(:down, :left, nil, 60, 30, 0, 0)
+      window.mouse_callback(:up, :left, nil, 60, 30, 0, 0)
+      expect(seen).to eq([:right])
+    end
   end
 
   describe ':hover_out on window leave' do

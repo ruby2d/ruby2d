@@ -97,10 +97,12 @@ module Ruby2D
                      stroke_color || stroke_colour)
     end
 
-    # Check if the rectangle contains the given point
+    # Check if the rectangle contains the given point. Half-open like the
+    # rasterized fill, as `Quad` and `Polygon` are: a point on the right or
+    # bottom edge belongs to whatever is drawn there, not to this rectangle.
     def contains?(x, y)
       x, y = _unrotate(x, y)
-      x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
+      x >= @x && x < (@x + @width) && y >= @y && y < (@y + @height)
     end
 
     private

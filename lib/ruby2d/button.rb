@@ -145,11 +145,12 @@ module Ruby2D
     end
 
     # Hit-test the button. Wrapped visuals delegate so non-rectangular shapes
-    # (Circle, Polygon, …) test against their actual geometry.
+    # (Circle, Polygon, …) test against their actual geometry. The box test is
+    # half-open like `Rectangle`'s: the right and bottom edges are outside.
     def contains?(x, y)
       return @visual.contains?(x, y) if @visual && !@owns_visual
 
-      x >= @x && x <= (@x + @width) && y >= @y && y <= (@y + @height)
+      x >= @x && x < (@x + @width) && y >= @y && y < (@y + @height)
     end
 
     def x

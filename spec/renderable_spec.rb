@@ -76,7 +76,9 @@ RSpec.describe Ruby2D::Renderable do
   describe '#contains?' do
     shape = SomeShape.new(x: 1, y: 1, width: 2, height: 2)
 
-    # Grid looks like this, 2x2 square at point (1, 1):
+    # Grid looks like this, 2x2 square at point (1, 1). The box is half-open
+    # like the rasterized shape: its left and top edges (1) are inside, its
+    # right and bottom edges (3) outside.
     #
     #   0  1  2  3  4
     # 0 +--+--+--+--+
@@ -92,13 +94,17 @@ RSpec.describe Ruby2D::Renderable do
     it 'returns true if point is inside the shape' do
       expect(shape.contains?(1, 1)).to be true
       expect(shape.contains?(2, 1)).to be true
-      expect(shape.contains?(3, 1)).to be true
       expect(shape.contains?(1, 2)).to be true
       expect(shape.contains?(2, 2)).to be true
-      expect(shape.contains?(3, 2)).to be true
-      expect(shape.contains?(1, 3)).to be true
-      expect(shape.contains?(2, 3)).to be true
-      expect(shape.contains?(3, 3)).to be true
+      expect(shape.contains?(2.9, 2.9)).to be true
+    end
+
+    it 'returns false on the right and bottom edges, which a neighbor there would draw' do
+      expect(shape.contains?(3, 1)).to be false
+      expect(shape.contains?(3, 2)).to be false
+      expect(shape.contains?(3, 3)).to be false
+      expect(shape.contains?(2, 3)).to be false
+      expect(shape.contains?(1, 3)).to be false
     end
 
     it 'returns false if point is outside the shape' do
