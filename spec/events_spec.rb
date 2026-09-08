@@ -293,7 +293,7 @@ RSpec.describe Ruby2D::Window do
     let(:window) { Ruby2D::Window.new }
 
     it 'resets mouse scroll delta and direction each frame' do
-      window.mouse_callback(:scroll, nil, :normal, nil, nil, 3, -2)
+      window.mouse_callback(:scroll, nil, :normal, 0.0, 0.0, 3, -2)
       expect(window.mouse_scrolled?).to be true
       expect(window.mouse_scroll_delta_x).to eq(3)
       expect(window.mouse_scroll_delta_y).to eq(-2)

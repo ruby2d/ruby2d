@@ -81,8 +81,8 @@ end
 # Stamp a disc of material around the cursor, then wake the affected rows
 # (plus one row either side) so the sleeping sim picks the new cells up.
 def paint(grid, active, dirty, mx, my, mat)
-  cx = mx / CELL
-  cy = my / CELL
+  cx = (mx / CELL).floor
+  cy = (my / CELL).floor
   (-BRUSH_RADIUS..BRUSH_RADIUS).each do |dy|
     (-BRUSH_RADIUS..BRUSH_RADIUS).each do |dx|
       next if dx * dx + dy * dy > BRUSH_RADIUS * BRUSH_RADIUS

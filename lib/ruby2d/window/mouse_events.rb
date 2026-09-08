@@ -83,7 +83,7 @@ module Ruby2D
           handle_mouse_held type, button, x, y
         # When mouse scrolling, wheel or trackpad
         when :scroll
-          handle_mouse_scroll type, direction, delta_x, delta_y
+          handle_mouse_scroll type, direction, x, y, delta_x, delta_y
         # When mouse motion / movement
         when :move
           handle_mouse_move type, x, y, delta_x, delta_y
@@ -122,15 +122,19 @@ module Ruby2D
         dispatch_object_mouse_held(button, x, y)
       end
 
-      def handle_mouse_scroll(type, direction, delta_x, delta_y)
+      # `x`, `y` is where the cursor was when the wheel moved, which is where
+      # the event is hit-tested. The polled position (`@mouse_x`, `@mouse_y`)
+      # is where the cursor ended up by the time this frame's events were
+      # read, and can already be over a different object.
+      def handle_mouse_scroll(type, direction, x, y, delta_x, delta_y)
         @mouse_scroll_event     = true
         @mouse_scroll_direction = direction
         @mouse_scroll_delta_x   = delta_x
         @mouse_scroll_delta_y   = delta_y
 
-        fire_event_handlers(:mouse_scroll) { MouseEvent.new(type, nil, direction, nil, nil, delta_x, delta_y) }
+        fire_event_handlers(:mouse_scroll) { MouseEvent.new(type, nil, direction, x, y, delta_x, delta_y) }
 
-        dispatch_object_mouse_scroll(@mouse_x, @mouse_y, direction, delta_x, delta_y)
+        dispatch_object_mouse_scroll(x, y, direction, delta_x, delta_y)
       end
 
       def handle_mouse_move(type, x, y, delta_x, delta_y)

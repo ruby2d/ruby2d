@@ -369,10 +369,10 @@ RSpec.describe 'Per-object events' do
       scrolled = false
       rect.on(:mouse_scroll) { |e| scrolled = e }
 
-      # Scroll events carry no coordinates of their own, so dispatch hit-tests
-      # the window's tracked cursor position (kept current by the frame loop).
-      window.instance_variable_set(:@mouse_x, 50)
-      window.instance_variable_set(:@mouse_y, 50)
+      # A scroll event is hit-tested at its own position, not at the polled
+      # cursor position, which can have moved on by dispatch time.
+      window.instance_variable_set(:@mouse_x, 500)
+      window.instance_variable_set(:@mouse_y, 500)
       window.mouse_callback(:scroll, nil, :up, 50, 50, 0, -1)
       expect(scrolled).to be_a(Ruby2D::Window::MouseEvent)
       expect(scrolled.delta_y).to eq(-1)

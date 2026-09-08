@@ -136,8 +136,8 @@ end
 on :mouse_down do |event|
   next if event.y < GRID_TOP
 
-  cx = event.x / CELL
-  cy = (event.y - GRID_TOP) / CELL
+  cx = (event.x / CELL).floor
+  cy = ((event.y - GRID_TOP) / CELL).floor
   next if cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS
 
   cell = [cx, cy]
@@ -164,8 +164,8 @@ on :mouse_move do |event|
   next if mouse_mode == :none
   next if event.y < GRID_TOP
 
-  cx = event.x / CELL
-  cy = (event.y - GRID_TOP) / CELL
+  cx = (event.x / CELL).floor
+  cy = ((event.y - GRID_TOP) / CELL).floor
   next if cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS
 
   case mouse_mode

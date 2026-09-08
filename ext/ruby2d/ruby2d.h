@@ -465,8 +465,8 @@ typedef struct {
   int button;
   int direction;
   int axis;
-  int x;
-  int y;
+  float x;
+  float y;
   float delta_x;
   float delta_y;
   int value;
@@ -481,10 +481,12 @@ typedef struct {
   float a;
 } R2D_Color;
 
-// R2D_Mouse
+// R2D_Mouse — cursor position in logical render coordinates. Kept as floats:
+// under a scaled viewport a window pixel maps to a fraction of a logical
+// unit, and truncating would push hit-tests off fractional object edges.
 typedef struct {
-  int x;
-  int y;
+  float x;
+  float y;
 } R2D_Mouse;
 
 // R2D_Viewport

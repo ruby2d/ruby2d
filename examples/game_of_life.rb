@@ -59,8 +59,8 @@ mouse_y = -1
 paint = lambda do |mx, my, value|
   return if my < HEADER
 
-  c = mx / CELL
-  r = (my - HEADER) / CELL
+  c = (mx / CELL).floor
+  r = ((my - HEADER) / CELL).floor
   grid[r][c] = value if r.between?(0, ROWS - 1) && c.between?(0, COLS - 1)
 end
 

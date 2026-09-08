@@ -828,9 +828,10 @@ module Ruby2D
     end
 
     def init_event_registrations
-      # Mouse X and Y position in the window
-      @mouse_x = 0
-      @mouse_y = 0
+      # Mouse X and Y position in the window, in logical coordinates. Floats,
+      # like the positions events carry; `poll_events` syncs them every frame.
+      @mouse_x = 0.0
+      @mouse_y = 0.0
 
       # Unique ID for the input event being registered
       @event_key = 0

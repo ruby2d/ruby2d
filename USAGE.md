@@ -1888,7 +1888,7 @@ key_pressed?('space')  # Ruby2D::Error: key names are symbols, use `:space`
 | `:mouse_enter` | When the cursor enters the window | `MouseEvent` |
 | `:mouse_leave` | When the cursor leaves the window | `MouseEvent` |
 
-The `MouseEvent` struct has fields: `type`, `button`, `direction`, `x`, `y`, `delta_x`, `delta_y`, plus `button?(name)` for matching, `position` returning `[x, y]`, and `delta` returning `[delta_x, delta_y]`. `:mouse_enter` / `:mouse_leave` carry only `type`; query `mouse_position` if you need the current location.
+The `MouseEvent` struct has fields: `type`, `button`, `direction`, `x`, `y`, `delta_x`, `delta_y`, plus `button?(name)` for matching, `position` returning `[x, y]`, and `delta` returning `[delta_x, delta_y]`. Positions are floats in the window's logical coordinates, and can be fractional under a scaled viewport or on a high-DPI display, so `floor` them before dividing into grid cells. A `:mouse_scroll` event's position is where the cursor was when the wheel moved. `:mouse_enter` / `:mouse_leave` carry only `type`; query `mouse_position` if you need the current location.
 
 Button names are the symbols `:left`, `:middle`, `:right`, `:x1`, `:x2`. As with [key names](#key-names), anything else raises rather than silently never matching.
 
@@ -1929,7 +1929,7 @@ def update
     puts mouse_move_delta_y
   end
 
-  # Mouse position is always available:
+  # Mouse position is always available, as floats like event positions:
   puts mouse_x
   puts mouse_y
   mx, my = mouse_position  # both as a pair when you need them together

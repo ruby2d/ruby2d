@@ -495,14 +495,19 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
           .category = R2D_EVT_MOUSE,
           .type = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? R2D_MOUSE_DOWN : R2D_MOUSE_UP,
           .button = e.button.button,
-          .x = (int)e.button.x, .y = (int)e.button.y
+          .x = e.button.x, .y = e.button.y
         });
         break;
 
+      // A wheel event carries the cursor position at the moment the wheel
+      // moved (converted above with the rest of the event), which is where
+      // Ruby hit-tests it. The cursor may be somewhere else by the time this
+      // poll ends, so the polled position is the wrong one to use.
       case SDL_EVENT_MOUSE_WHEEL:
         event_buf_push((R2D_QueuedEvent){
           .category = R2D_EVT_MOUSE, .type = R2D_MOUSE_SCROLL,
           .direction = e.wheel.direction,
+          .x = e.wheel.mouse_x, .y = e.wheel.mouse_y,
           .delta_x = e.wheel.x, .delta_y = -e.wheel.y
         });
         break;
@@ -510,7 +515,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
       case SDL_EVENT_MOUSE_MOTION:
         event_buf_push((R2D_QueuedEvent){
           .category = R2D_EVT_MOUSE, .type = R2D_MOUSE_MOVE,
-          .x = (int)e.motion.x, .y = (int)e.motion.y,
+          .x = e.motion.x, .y = e.motion.y,
           .delta_x = e.motion.xrel, .delta_y = e.motion.yrel
         });
         break;
@@ -621,8 +626,8 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   Uint32 mouse_buttons = SDL_GetMouseState(&ms_x, &ms_y);
   float logical_x, logical_y;
   SDL_RenderCoordinatesFromWindow(r2d_window->sdl_renderer, ms_x, ms_y, &logical_x, &logical_y);
-  r2d_window->mouse.x = (int)logical_x;
-  r2d_window->mouse.y = (int)logical_y;
+  r2d_window->mouse.x = logical_x;
+  r2d_window->mouse.y = logical_y;
 
   // Detect mouse buttons held down
   static const int mouse_held_buttons[] = {
@@ -633,7 +638,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     if (mouse_buttons & SDL_BUTTON_MASK(btn)) {
       event_buf_push((R2D_QueuedEvent){
         .category = R2D_EVT_MOUSE, .type = R2D_MOUSE_HELD,
-        .button = btn, .x = (int)logical_x, .y = (int)logical_y
+        .button = btn, .x = logical_x, .y = logical_y
       });
     }
   }
@@ -664,8 +669,8 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   // Sync C state to Ruby ivars. Frame count and fps are deferred to begin_frame
   // so they track frames actually presented, not ticks — in :on_demand mode most
   // ticks present nothing.
-  r_ivar_set(obj, id_mouse_x, INT2NUM(r2d_window->mouse.x));
-  r_ivar_set(obj, id_mouse_y, INT2NUM(r2d_window->mouse.y));
+  r_ivar_set(obj, id_mouse_x, DBL2NUM(r2d_window->mouse.x));
+  r_ivar_set(obj, id_mouse_y, DBL2NUM(r2d_window->mouse.y));
   // width/height are the logical (user-intended) size per USAGE.md — sync
   // orig_width/orig_height, not window->width/height, which carry the physical
   // render size under pixel_scale. viewport_width/height expose the physical size.
@@ -687,6 +692,8 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
  * [category, type, id, button, direction, axis, x, y, delta_x, delta_y, value, str]
  * `id` is an Integer for every category except R2D_EVT_KEY, where it is the
  * key's name Symbol — the scancode is translated here and never reaches Ruby.
+ * `x`, `y` are Floats in logical render coordinates, as are the deltas of
+ * a mouse move; a scroll's deltas are the amount scrolled, unscaled.
  * Returns nil when no events are queued (the common case, every frame).
  */
 R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
@@ -714,8 +721,8 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     r_ary_push(ary, INT2NUM(ev->button));
     r_ary_push(ary, INT2NUM(ev->direction));
     r_ary_push(ary, INT2NUM(ev->axis));
-    r_ary_push(ary, INT2NUM(ev->x));
-    r_ary_push(ary, INT2NUM(ev->y));
+    r_ary_push(ary, DBL2NUM(ev->x));
+    r_ary_push(ary, DBL2NUM(ev->y));
     r_ary_push(ary, DBL2NUM(ev->delta_x));
     r_ary_push(ary, DBL2NUM(ev->delta_y));
     r_ary_push(ary, INT2NUM(ev->value));
