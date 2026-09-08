@@ -302,9 +302,15 @@ module Ruby2D
       if event.is_a?(Symbol) && filters.empty?
         register_event_handler(event, wrap_for_event(event, proc))
       elsif event.nil? && !filters.empty?
-        descriptors = filters.map do |type, matcher|
-          register_event_handler(type, build_filter_wrapper(type, matcher, proc))
+        # Validate every filter and build its wrapper before registering any,
+        # so a bad one later in the list raises without leaving the earlier
+        # handlers installed.
+        wrappers = filters.map do |type, matcher|
+          raise Error, "`#{type}` is not a valid event type" unless @events.key? type
+
+          [type, build_filter_wrapper(type, matcher, proc)]
         end
+        descriptors = wrappers.map { |type, wrapper| register_event_handler(type, wrapper) }
         descriptors.size == 1 ? descriptors.first : descriptors
       else
         raise Error, '`on` requires either an event symbol or event filters'

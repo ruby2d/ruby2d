@@ -28,24 +28,23 @@ module Ruby2D
     #   obj.on(mouse_down: :left, click: :left) { ... }  # multi-event
     def on(event = nil, **filters, &proc)
       raise Error, '`on` requires a block' unless proc
-      if event.is_a?(Symbol) && filters.empty?
-        raise Error, "`#{event}` is not a valid object event" unless OBJECT_EVENTS.include?(event)
-        register_object_event_handler(event, proc)
-      elsif event.nil? && !filters.empty?
-        descriptors = filters.map do |type, matcher|
-          predicate = OBJECT_EVENT_FILTER_PREDICATES[type] or
-            raise Error, "`#{type}` does not support filtering with `on event: value`"
-          values = Array(matcher)
-          # Every filterable object event matches on a mouse button, so a bad
-          # name fails here rather than the first time the user clicks.
-          values.each { |v| Mouse.validate!(v) }
-          wrapped = ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
-          register_object_event_handler(type, wrapped)
+
+      handlers =
+        if event.is_a?(Symbol) && filters.empty?
+          raise Error, "`#{event}` is not a valid object event" unless OBJECT_EVENTS.include?(event)
+
+          [[event, proc]]
+        elsif event.nil? && !filters.empty?
+          # Build every wrapper before installing any handler, so a bad filter
+          # later in the list raises without leaving the earlier ones installed.
+          filters.map { |type, matcher| [type, build_filter_wrapper(type, matcher, proc)] }
+        else
+          raise Error, '`on` requires either an event symbol or event filters'
         end
-        descriptors.size == 1 ? descriptors.first : descriptors
-      else
-        raise Error, '`on` requires either an event symbol or event filters'
-      end
+
+      descriptors = handlers.map { |type, handler| install_object_event_handler(type, handler) }
+      register_with_window
+      descriptors.size == 1 ? descriptors.first : descriptors
     end
 
     # Remove a per-object event handler (or several, given an array).
@@ -55,6 +54,14 @@ module Ruby2D
       unless descriptor.is_a?(Window::ObjectEventDescriptor)
         raise Error,
               "Cannot remove event handler: expected a descriptor returned by `on`, got #{descriptor.inspect}"
+      end
+
+      # Handler IDs are per object, so a descriptor from another object would
+      # silently name an unrelated handler here.
+      unless descriptor.object.equal?(self)
+        raise Error,
+              'Cannot remove event handler: the descriptor belongs to another object ' \
+              "(#{descriptor.object.class}); call `off` on that object, or `Window.off`"
       end
 
       return unless @_object_events
@@ -88,19 +95,44 @@ module Ruby2D
 
       # Snapshot the values: a handler may register another handler for the same
       # event type mid-dispatch, which would otherwise mutate the hash we're
-      # iterating ("can't add a new key into hash during iteration").
-      handlers.values.each { |proc| proc.call(event) }
+      # iterating ("can't add a new key into hash during iteration"). With more
+      # than one handler each gets its own copy of the event, so one mutating a
+      # field can't change what the next handler (or its filter) sees — the
+      # same isolation window-level handlers have. The single-handler case
+      # passes the event through untouched to avoid the allocation.
+      procs = handlers.values
+      return procs.first.call(event) if procs.size == 1
+
+      procs.each { |proc| proc.call(event.dup) }
     end
 
     private
 
-    def register_object_event_handler(event, proc)
+    # Wrap a user proc with a button matcher. Validates the event type and
+    # every button name up front, so a bad name fails here rather than the
+    # first time the user clicks.
+    def build_filter_wrapper(type, matcher, proc)
+      predicate = OBJECT_EVENT_FILTER_PREDICATES[type] or
+        raise Error, "`#{type}` does not support filtering with `on event: value`"
+      values = Array(matcher)
+      values.each { |v| Mouse.validate!(v) }
+      ->(e) { proc.call(e) if values.any? { |v| e.send(predicate, v) } }
+    end
+
+    def install_object_event_handler(event, proc)
       @_object_events ||= {}
       @_object_events[event] ||= {}
       id = (@_object_event_key = (@_object_event_key || 0) + 1)
       @_object_events[event][id] = proc
-      Window.register_interactive(self)
       Window::ObjectEventDescriptor.new(self, event, id)
+    end
+
+    # Join the window's interactive registry once handlers exist. Renderables
+    # always register; whether one is hit-tested is decided by scene-graph
+    # membership at dispatch time. Button overrides this to register only
+    # while added, since registry membership is what makes it hit-testable.
+    def register_with_window
+      Window.register_interactive(self)
     end
   end
 end

@@ -50,6 +50,10 @@ module Ruby2D
               '`hover_label_color`/`pressed_label_color` require a `label:` to tint'
       end
 
+      # Scene membership, which `on` honors: handlers attached while the button
+      # is removed (or built with `add: false`) wait for `add` to register.
+      @added = add
+
       if visual
         @visual = visual
         @owns_visual = false
@@ -97,19 +101,12 @@ module Ruby2D
       hook_visual_alignment if @owns_visual
 
       on(:click) { |e| on_click.call(e) } if on_click
-
-      # Honor `add: false` for interactivity, not just rendering. Registering the
-      # click/tint handlers above auto-added this Button to the interactive
-      # registry; without this an `add: false` Button would keep swallowing
-      # clicks while its un-added visual draws nothing. Only touches the registry
-      # when handlers exist, so a handler-less Button doesn't force a window into
-      # being. `add`/`remove` manage registration thereafter.
-      Window.unregister_interactive(self) if interactive? && !add
     end
 
     # Remove the button: drop visual + label from the render list and
     # unregister Button from the interactive registry.
     def remove
+      @added = false
       @visual.remove if @visual
       @label.remove if @label
       Window.unregister_interactive(self)
@@ -118,6 +115,7 @@ module Ruby2D
     # Re-add the button after `remove`. Restores rendering and re-registers
     # in the interactive registry if any handlers are attached.
     def add
+      @added = true
       @visual.add if @visual
       @label.add if @label
       Window.register_interactive(self) if interactive?
@@ -260,6 +258,13 @@ module Ruby2D
     end
 
     private
+
+    # Button isn't a scene-graph member (its visual is), so registry membership
+    # is what makes it hit-testable. Only join while added; `add` registers any
+    # handlers attached in the meantime.
+    def register_with_window
+      Window.register_interactive(self) if @added
+    end
 
     # Wire the hover/pressed tint state machine. `:auto` lightens for hover
     # and darkens for pressed; any other value is treated as an explicit color.

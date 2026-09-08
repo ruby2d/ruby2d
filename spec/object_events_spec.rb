@@ -76,6 +76,40 @@ RSpec.describe 'Per-object events' do
       rect._fire_event(:click, Ruby2D::Window::MouseEvent.new(:click, :left, nil, 50, 50, nil, nil))
       expect(values).to eq([:a, :b])
     end
+
+    it 'gives each handler its own event, so one mutating it cannot change what the next sees' do
+      rect = make_rect(x: 0, y: 0, width: 40, height: 40)
+      seen = []
+      rect.on(:mouse_down) { |e| e.button = :right }
+      rect.on(mouse_down: :left) { seen << :left }
+      rect.on(mouse_down: :right) { seen << :right }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      expect(seen).to eq([:left])
+    end
+
+    it 'rejects a descriptor that belongs to another object' do
+      first = make_rect(x: 0, y: 0, width: 40, height: 40)
+      second = make_rect(x: 50, y: 0, width: 40, height: 40)
+      first.on(:click) { }
+      desc = second.on(:click) { }
+
+      expect { first.off(desc) }.to raise_error(Ruby2D::Error, /belongs to another object/)
+      expect(first.interactive?).to be true
+      expect(second.interactive?).to be true
+    end
+
+    it 'installs nothing when a later filter in a multi-event registration is invalid' do
+      rect = make_rect(x: 0, y: 0, width: 30, height: 30)
+      calls = 0
+      expect { rect.on(click: :left, drag: :not_a_button) { calls += 1 } }
+        .to raise_error(Ruby2D::Error)
+      expect(rect.interactive?).to be false
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:up, :left, nil, 10, 10, 0, 0)
+      expect(calls).to eq(0)
+    end
   end
 
   describe ':click dispatching' do
@@ -718,10 +752,25 @@ RSpec.describe Ruby2D::Button do
       btn.remove
 
       clicked = false
-      btn.on(:click) { clicked = true } # this re-registers
+      btn.on(:click) { clicked = true } # dormant until #add
       btn.remove
       click_at(50, 20)
       expect(clicked).to be false
+    end
+
+    it 'does not re-register a removed button when a handler is attached' do
+      btn = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40) { }
+      btn.remove
+
+      hovered = false
+      btn.on(:hover) { hovered = true }
+      window.mouse_callback(:move, nil, nil, 50, 20, 1, 1)
+      expect(hovered).to be false
+      expect(window.topmost_interactive_at(50, 20)).to be_nil
+
+      btn.add
+      window.mouse_callback(:move, nil, nil, 51, 20, 1, 0)
+      expect(hovered).to be true
     end
   end
 
@@ -736,6 +785,18 @@ RSpec.describe Ruby2D::Button do
     it 'becomes clickable once #add is called' do
       clicked = false
       btn = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, add: false) { clicked = true }
+      btn.add
+      click_at(50, 20)
+      expect(clicked).to be true
+    end
+
+    it 'stays inert when handlers are attached before #add' do
+      clicked = false
+      btn = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, add: false)
+      btn.on(:click) { clicked = true }
+      click_at(50, 20)
+      expect(clicked).to be false
+
       btn.add
       click_at(50, 20)
       expect(clicked).to be true

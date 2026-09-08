@@ -365,6 +365,14 @@ RSpec.describe Ruby2D::Window do
       expect(descs).to be_an(Array).and have_attributes(size: 2)
     end
 
+    it 'installs nothing when a later filter in a multi-event registration is invalid' do
+      calls = 0
+      expect { window.on(key_down: :space, mouse_down: :not_a_button) { calls += 1 } }
+        .to raise_error(Ruby2D::Error)
+      window.key_callback(:down, :space)
+      expect(calls).to eq(0)
+    end
+
     it 'raises for events that have no matcher field' do
       expect { window.on(mouse_scroll: :up) { } }.to raise_error(Ruby2D::Error)
     end
