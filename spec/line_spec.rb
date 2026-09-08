@@ -126,6 +126,55 @@ RSpec.describe Ruby2D::Line do
       expect(thick.contains?(105, 0)).to be false  # 5px past the end
       expect(thick.contains?( -5, 0)).to be false  # 5px before the start
     end
+
+    # A dashed line draws only its dashes, starting at (x1, y1) and repeating
+    # every dash + gap, so a point in a gap is on the segment but not on the
+    # stroke.
+    context "when dashed" do
+      it "contains the dashes and not the gaps" do
+        dashed = Line.new(x1: 0, y1: 10, x2: 60, y2: 10, stroke_width: 4, dash: 10, gap: 10, add: false)
+        expect(dashed.contains?( 5, 10)).to be true   # first dash
+        expect(dashed.contains?(15, 10)).to be false  # first gap
+        expect(dashed.contains?(25, 10)).to be true   # second dash
+        expect(dashed.contains?(15, 11)).to be false  # the gap spans the stroke width too
+        expect(dashed.contains?(25, 11)).to be true
+      end
+
+      it "cuts the last dash at the endpoint, which a whole number of steps leaves in a gap" do
+        # Length 25: dashes 0-10 and 20-25.
+        cut = Line.new(x1: 0, y1: 0, x2: 25, y2: 0, stroke_width: 2, dash: 10, gap: 10, add: false)
+        expect(cut.contains?(24, 0)).to be true
+        expect(cut.contains?(25, 0)).to be true
+        # Length 40: dashes 0-10 and 20-30, then a gap to the end.
+        even = Line.new(x1: 0, y1: 0, x2: 40, y2: 0, stroke_width: 2, dash: 10, gap: 10, add: false)
+        expect(even.contains?(35, 0)).to be false
+        expect(even.contains?(40, 0)).to be false
+      end
+
+      it "treats a negative gap as none, like the renderer" do
+        # A gap that would cancel the dash: without the normalization the
+        # step is zero and nothing is on a dash.
+        solid = Line.new(x1: 0, y1: 0, x2: 60, y2: 0, stroke_width: 2, dash: 10, gap: -10, add: false)
+        expect(solid.contains?(15, 0)).to be true
+      end
+
+      it "follows the rotated segment" do
+        # Rotated 90° about its center (30, 10), the line runs from (30, -20)
+        # to (30, 40) with the pattern starting at (30, -20): dash to -10, gap
+        # to 0, dash to 10.
+        rotated = Line.new(x1: 0, y1: 10, x2: 60, y2: 10, stroke_width: 4, dash: 10, gap: 10, rotate: 90, add: false)
+        expect(rotated.contains?(30, -5)).to be false
+        expect(rotated.contains?(30,  5)).to be true
+      end
+
+      it "scales the pattern up past 10,000 steps, as the renderer does" do
+        # 50,000 steps of 2 would stall a frame, so the renderer draws 10,000
+        # steps of 10 (dash 5, gap 5) instead, and the hit region follows.
+        long = Line.new(x1: 0, y1: 0, x2: 100_000, y2: 0, stroke_width: 2, dash: 1, gap: 1, add: false)
+        expect(long.contains?(3, 0)).to be true   # dash 0-5
+        expect(long.contains?(7, 0)).to be false  # gap 5-10; a dash under the unscaled pattern
+      end
+    end
   end
 
 end

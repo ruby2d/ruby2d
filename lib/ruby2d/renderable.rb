@@ -413,9 +413,9 @@ module Ruby2D
     # `half_sq` is the squared half-stroke-width tolerance. The point must
     # project onto the segment (0 <= t <= 1) *and* fall within the half-width
     # perpendicular, so the hit region matches the drawn (butt-capped) rectangle
-    # and does not overhang the ends. Shared stroke hit-test for `Line` and
-    # `Polyline`; compares squared distances to skip the square root on this
-    # per-event, per-segment path.
+    # and does not overhang the ends. The stroke hit-test behind
+    # `Line#contains?`; compares squared distances to skip the square root on
+    # this per-event path.
     def _point_on_segment?(px, py, x1, y1, x2, y2, half_sq)
       dx = x2 - x1
       dy = y2 - y1

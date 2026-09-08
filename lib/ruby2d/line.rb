@@ -69,13 +69,16 @@ module Ruby2D
 
     # Check if the line contains the given point — within half the stroke width
     # of the drawn segment and between its endpoints, so the hit region matches
-    # the rendered (butt-capped) rectangle rather than overhanging its ends.
-    # Shares the segment test with `Polyline`.
+    # the rendered (butt-capped) rectangle rather than overhanging its ends. A
+    # dashed line draws only its dashes, so a point in a gap is not contained.
     def contains?(x, y)
       return false if @stroke_width.negative?
       x, y = _unrotate(x, y) if @rotate != 0
       half = @stroke_width / 2.0
-      _point_on_segment?(x, y, @x1, @y1, @x2, @y2, half * half)
+      return false unless _point_on_segment?(x, y, @x1, @y1, @x2, @y2, half * half)
+      return true unless @dash && @dash > 0
+
+      _on_dash?(x, y)
     end
 
     # Get the rotation center x coordinate
@@ -208,6 +211,29 @@ module Ruby2D
       dx = x1 - x2
       dy = y1 - y2
       Math.sqrt(dx * dx + dy * dy)
+    end
+
+    # Whether a point already known to be on the stroke falls on a dash rather
+    # than in a gap. Mirrors `R2D_DrawDashedLine`: dashes start at `(x1, y1)`
+    # every `dash + gap` units (a negative gap counts as none), the last one
+    # is cut at `(x2, y2)`, and past 10,000 steps dash and gap are scaled up
+    # together to bound the draw work, which shifts the pattern.
+    def _on_dash?(x, y)
+      dx = @x2 - @x1
+      dy = @y2 - @y1
+      len = points_distance(@x1, @y1, @x2, @y2)
+      dash = @dash.to_f
+      step = dash + (@gap > 0 ? @gap : 0)
+      if len / step > 10_000
+        factor = (len / step) / 10_000
+        dash *= factor
+        step *= factor
+      end
+      along = ((x - @x1) * dx + (y - @y1) * dy) / len
+      phase = along % step
+      # The dash holding this point must start before the endpoint: when the
+      # length is a whole number of steps, the endpoint itself is in a gap.
+      phase <= dash && along - phase < len
     end
 
     # Build/rebuild flat color cache for the native extension. Line is a quad
