@@ -91,7 +91,7 @@ Game.new.show
 
 `require 'ruby2d/core'` loads the classes under the `Ruby2D` namespace without the top-level mixin that `require 'ruby2d'` adds, so reference shapes as `Ruby2D::Square`, or `include Ruby2D` in your class, as above, to drop the prefix. Override `update` (and/or `render`); each is called every frame independently, so overriding just one is fine.
 
-The class pattern provides polling-based input methods (`key_pressed?`, `key_held?`, `key_released?`, `mouse_pressed?`, `mouse_held?`, `mouse_released?`, plus per-`Gamepad` polling; see [Gamepads](#gamepads)) for use inside `update`, in place of the DSL's `on` event handlers.
+The class pattern provides polling-based input methods (`key_pressed?`, `key_held?`, `key_released?`, `mouse_pressed?`, `mouse_held?`, `mouse_released?`, plus per-`Gamepad` polling; see [Gamepads](#gamepads)) for use inside `update`, in place of the DSL's `on` event handlers. The `*_held?` queries are also current inside event handlers: held state lasts from press to release, so a `:key_down` handler can check `key_held?(:left_shift)` for a modifier, and a `:mouse_move` handler can check `mouse_held?(:left)` for a drag in progress.
 
 ## Window
 

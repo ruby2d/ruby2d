@@ -81,4 +81,91 @@ RSpec.describe 'window input polling and coordinates' do
       expect([window.mouse_scroll_delta_x, window.mouse_scroll_delta_y]).to eq([0.0, -2.0])
     end
   end
+
+  # The extension queues a frame's transitions first and its held scan last,
+  # so a handler for a transition runs before the scan; held state has to be
+  # correct on its own by then.
+  describe 'held state inside handlers' do
+    it 'shows a key held since an earlier frame inside :key_down and :mouse_down handlers' do
+      seen = []
+      window.on(key_down: :s) { seen << [:key_down, window.key_held?(:left_shift), window.key_held?(:s)] }
+      window.on(:mouse_down) { seen << [:mouse_down, window.key_held?(:left_shift)] }
+
+      window.key_callback(:down, :left_shift)
+      window.key_callback(:held, :left_shift)
+      window.update_callback
+
+      window.key_callback(:down, :s)
+      window.mouse_callback(:down, :left, nil, 20.0, 20.0, nil, nil)
+      expect(seen).to eq([[:key_down, true, true], [:mouse_down, true]])
+    end
+
+    it 'shows the button of a drag in progress inside a :mouse_move handler' do
+      seen = []
+      window.on(:mouse_move) { seen << window.mouse_held?(:left) }
+
+      window.mouse_callback(:down, :left, nil, 20.0, 20.0, nil, nil)
+      window.mouse_callback(:held, :left, nil, 20.0, 20.0, nil, nil)
+      window.update_callback
+
+      window.mouse_callback(:move, nil, nil, 30.0, 20.0, 10.0, 0.0)
+      expect(seen).to eq([true])
+    end
+
+    it 'shows a gamepad button held since an earlier frame inside a button handler' do
+      window.gamepad_callback(123, :connect, nil, nil, 'Pad')
+      pad = window.gamepads.first
+      seen = []
+      window.on(gamepad_button_down: :south) { |device| seen << [device.held?(:left_shoulder), device.held?(:south)] }
+
+      window.gamepad_callback(123, :button_down, :left_shoulder, nil)
+      window.gamepad_callback(123, :button_held, :left_shoulder, nil)
+      window.update_callback
+
+      window.gamepad_callback(123, :button_down, :south, nil)
+      expect(seen).to eq([[true, true]])
+      expect(pad.held?(:left_shoulder)).to be true
+    end
+
+    it 'is current inside the :key and :mouse catch-alls for the event being delivered' do
+      seen = []
+      window.on(:key)   { |e| seen << [e.type, window.key_held?(:space)] }
+      window.on(:mouse) { |e| seen << [e.type, window.mouse_held?(:left)] }
+
+      window.key_callback(:down, :space)
+      window.key_callback(:up, :space)
+      window.mouse_callback(:down, :left, nil, 20.0, 20.0, nil, nil)
+      window.mouse_callback(:up, :left, nil, 20.0, 20.0, nil, nil)
+      expect(seen).to eq([[:down, true], [:up, false], [:down, true], [:up, false]])
+    end
+
+    it 'drops held state on release, including inside the :key_up and :mouse_up handlers' do
+      seen = []
+      window.on(:key_up)   { seen << window.key_held?(:space) }
+      window.on(:mouse_up) { seen << window.mouse_held?(:left) }
+
+      window.key_callback(:down, :space)
+      window.mouse_callback(:down, :left, nil, 20.0, 20.0, nil, nil)
+      window.update_callback
+      expect(window.key_held?(:space)).to be true
+      expect(window.mouse_held?(:left)).to be true
+
+      window.key_callback(:up, :space)
+      window.mouse_callback(:up, :left, nil, 20.0, 20.0, nil, nil)
+      expect(seen).to eq([false, false])
+      expect(window.key_held?(:space)).to be false
+      expect(window.mouse_held?(:left)).to be false
+    end
+
+    it 'accepts the held scan as a source too, and still drops the key on release' do
+      # A key down before the window existed reaches Ruby only through the
+      # scan; a release still clears it.
+      window.key_callback(:held, :left_ctrl)
+      expect(window.key_held?(:left_ctrl)).to be true
+      window.update_callback
+      expect(window.key_held?(:left_ctrl)).to be true
+      window.key_callback(:up, :left_ctrl)
+      expect(window.key_held?(:left_ctrl)).to be false
+    end
+  end
 end

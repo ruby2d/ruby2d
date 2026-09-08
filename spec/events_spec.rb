@@ -233,7 +233,7 @@ RSpec.describe Ruby2D::Window do
       window.gamepads.find { |p| p.id == id }
     end
 
-    it 'pressed? is frame-scoped; held? persists; clear_event_stores resets both' do
+    it 'pressed? is frame-scoped; held? lasts until the release' do
       pad = connect(window)
       window.gamepad_callback(pad.id, :button_down, :south, nil, nil)
       expect(pad.pressed?(:south)).to be true
@@ -241,7 +241,7 @@ RSpec.describe Ruby2D::Window do
 
       window.send(:clear_event_stores)
       expect(pad.pressed?(:south)).to be false
-      expect(pad.held?(:south)).to be false  # cleared and refilled by C next frame
+      expect(pad.held?(:south)).to be true
     end
 
     it 'released? fires once on transition' do

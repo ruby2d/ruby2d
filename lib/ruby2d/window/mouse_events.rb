@@ -68,6 +68,8 @@ module Ruby2D
 
       # Mouse callback method, called by the native and web extentions
       def mouse_callback(type, button, direction, x, y, delta_x, delta_y)
+        update_mouse_held(type, button)
+
         # All mouse events
         fire_event_handlers(:mouse) { MouseEvent.new(type, button, direction, x, y, delta_x, delta_y) }
 
@@ -98,6 +100,21 @@ module Ruby2D
 
       private
 
+      # Held state lasts from press to release and changes before any handler
+      # runs, the `:mouse` catch-all included, so `mouse_held?` is current
+      # inside them: a `:mouse_move` handler mid-drag sees the button that went
+      # down in an earlier frame. The extension's per-frame `:held` events
+      # mostly confirm what is already here; they also add a button that was
+      # already down when the window opened.
+      def update_mouse_held(type, button)
+        case type
+        when :down, :held
+          @mouse_buttons_held << button unless @mouse_buttons_held.include? button
+        when :up
+          @mouse_buttons_held.delete(button)
+        end
+      end
+
       def handle_mouse_down(type, button, x, y)
         @mouse_buttons_down << button unless @mouse_buttons_down.include? button
 
@@ -115,8 +132,6 @@ module Ruby2D
       end
 
       def handle_mouse_held(type, button, x, y)
-        @mouse_buttons_held << button unless @mouse_buttons_held.include? button
-
         fire_event_handlers(:mouse_held) { MouseEvent.new(type, button, nil, x, y, nil, nil) }
 
         dispatch_object_mouse_held(button, x, y)
@@ -165,6 +180,8 @@ module Ruby2D
       end
 
       def init_mouse_event_stores
+        # Down and up live one frame; held lasts from press to release (see
+        # `update_mouse_held`).
         @mouse_buttons_down = []
         @mouse_buttons_up   = []
         @mouse_buttons_held = []

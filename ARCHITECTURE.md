@@ -84,7 +84,7 @@ On CRuby, `Window#show` runs `tick until @close`. On mruby (native and WASM), a 
 Two input patterns are supported simultaneously:
 
 - **Callback pattern** (DSL-style): register blocks with `on(:key_down) { |e| ... }`. Events are dispatched from Ruby's `dispatch_events` after the C poll returns.
-- **Polling pattern** (class-style): query `key_pressed?(:space)` or `mouse_pressed?(:left)` inside `update`. Event stores are populated during dispatch and cleared each frame.
+- **Polling pattern** (class-style): query `key_pressed?(:space)` or `mouse_pressed?(:left)` inside `update`. Event stores are populated during dispatch; the pressed/released transitions are cleared each frame, while held state lasts from press to release so it is current inside callbacks as well.
 
 ### Input name vocabularies
 

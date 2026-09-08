@@ -66,15 +66,16 @@ end
 RSpec.describe 'mouse input names' do
   let(:window) { Ruby2D::Window.new }
 
+  # Press without releasing: held state lasts until the button goes up.
   before do
     window.mouse_callback(:down, :left, nil, 0, 0, nil, nil)
     window.mouse_callback(:held, :left, nil, 0, 0, nil, nil)
-    window.mouse_callback(:up,   :left, nil, 0, 0, nil, nil)
   end
 
   it 'matches a symbol for pressed, held, and released' do
     expect(window.mouse_pressed?(:left)).to be true
     expect(window.mouse_held?(:left)).to be true
+    window.mouse_callback(:up, :left, nil, 0, 0, nil, nil)
     expect(window.mouse_released?(:left)).to be true
   end
 

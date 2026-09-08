@@ -63,10 +63,10 @@ end
 RSpec.describe 'keyboard input' do
   let(:window) { Ruby2D::Window.new }
 
+  # Press without releasing: held state lasts until the key goes up.
   def press(win, key)
     win.key_callback(:down, key)
     win.key_callback(:held, key)
-    win.key_callback(:up, key)
   end
 
   describe 'polling' do
@@ -74,6 +74,7 @@ RSpec.describe 'keyboard input' do
       press(window, :space)
       expect(window.key_pressed?(:space)).to be true
       expect(window.key_held?(:space)).to be true
+      window.key_callback(:up, :space)
       expect(window.key_released?(:space)).to be true
     end
 

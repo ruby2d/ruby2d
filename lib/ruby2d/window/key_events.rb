@@ -22,6 +22,8 @@ module Ruby2D
       # Key callback method. `key` is a key name symbol, supplied by the
       # extension with the event or passed directly by a caller.
       def key_callback(type, key)
+        update_key_held(type, key)
+
         # All key events
         fire_event_handlers(:key) { KeyEvent.new(type, key) }
 
@@ -40,6 +42,21 @@ module Ruby2D
 
       private
 
+      # Held state lasts from press to release and changes before any handler
+      # runs, the `:key` catch-all included, so `key_held?` inside a `:key_down`
+      # handler already includes this key and everything pressed earlier (a
+      # modifier held since a previous frame, say). The extension's per-frame
+      # `:held` events mostly confirm what is already here; they also add a key
+      # that was already down when the window opened.
+      def update_key_held(type, key)
+        case type
+        when :down, :held
+          @keys_held << key unless @keys_held.include? key
+        when :up
+          @keys_held.delete(key)
+        end
+      end
+
       def handle_key_down(type, key)
         close if @close_on_esc && key == :escape
 
@@ -49,8 +66,6 @@ module Ruby2D
       end
 
       def handle_key_held(type, key)
-        @keys_held << key unless @keys_held.include? key
-
         fire_event_handlers(:key_held) { KeyEvent.new(type, key) }
       end
 
@@ -61,7 +76,8 @@ module Ruby2D
       end
 
       def init_key_event_stores
-        # Event stores for class pattern
+        # Event stores for class pattern. Down and up live one frame; held
+        # lasts from press to release (see `update_key_held`).
         @keys_down = []
         @keys_held = []
         @keys_up   = []

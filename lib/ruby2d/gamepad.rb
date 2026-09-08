@@ -102,9 +102,10 @@ module Ruby2D
         h[sym] = Ext.window_gamepad_has_axis(window, id, enum)
       end
 
-      # Frame-scoped event sets. Pressed/released/axes_moved are cleared by
-      # `_clear_frame_state`; held is also cleared and refilled each frame
-      # from the C-side held loop.
+      # Pressed/released/axes_moved are frame-scoped, cleared by
+      # `_clear_frame_state`. Held lasts from press to release, so it is
+      # current inside a button handler; the C-side held loop only confirms it
+      # each frame.
       @buttons_down  = []
       @buttons_up    = []
       @buttons_held  = []
@@ -314,7 +315,6 @@ module Ruby2D
     def _clear_frame_state
       @buttons_down.clear
       @buttons_up.clear
-      @buttons_held.clear
       @axes_moved.clear
     end
 

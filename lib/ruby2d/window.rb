@@ -770,13 +770,16 @@ module Ruby2D
       value.nil? || (value.is_a?(Numeric) && value > 0)
     end
 
+    # Clears the transition and delta state that lives one frame. Held state
+    # (`@keys_held`, `@mouse_buttons_held`, each pad's held buttons) is not
+    # frame-scoped: it lasts from press to release, so it is already correct
+    # inside the next frame's callbacks, before the extension's held scan
+    # confirms it.
     def clear_event_stores
       @keys_down.clear
-      @keys_held.clear
       @keys_up.clear
       @mouse_buttons_down.clear
       @mouse_buttons_up.clear
-      @mouse_buttons_held.clear
       @mouse_scroll_event     = false
       @mouse_scroll_direction = nil
       @mouse_scroll_delta_x   = 0
