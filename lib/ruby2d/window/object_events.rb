@@ -65,23 +65,28 @@ module Ruby2D
       end
 
       # Whether an object may receive an object event right now: still in the
-      # registry and, for a Renderable, still in the scene graph. Dispatch
-      # re-checks this after every user callback, since a callback may remove
-      # the object the next event was about to go to.
+      # registry and, if something is drawn for it, that still in the scene
+      # graph. Dispatch re-checks this after every user callback, since a
+      # callback may remove the object the next event was about to go to.
       def event_target?(object)
-        return false unless @interactive_keys.key?(object)
-
-        !object.is_a?(Renderable) || @object_set.key?(object)
+        @interactive_keys.key?(object) && drawn?(object)
       end
 
-      # Find the topmost interactive object at the given coordinates. A
-      # Renderable is only hit-tested while it's in the scene graph: a shape
-      # built with `add: false` (or one that's been removed) has handlers but
-      # is not drawn, so it must not silently swallow clicks or shadow visible
-      # objects beneath it. Hidden objects (`visible = false`) stay in the
-      # scene graph and keep receiving events, as documented. Button and other
-      # self-managing interactives aren't scene-graph members by design (their
-      # visual is) and register/unregister themselves, so they're exempt.
+      # Whether what is drawn for an object is in the scene graph: the object
+      # itself for a Renderable, the visual for a Button. A shape built with
+      # `add: false` (or one that's been removed) has handlers but is not
+      # drawn, so it must not silently swallow clicks or shadow visible objects
+      # beneath it, and neither must a Button whose visual is gone. Hidden
+      # objects (`visible = false`) stay in the scene graph and keep receiving
+      # events, as documented. A visual-less Button draws nothing and is
+      # hit-tested whenever it is registered.
+      def drawn?(object)
+        drawn = object._scene_visual || object
+        !drawn.is_a?(Renderable) || @object_set.key?(drawn)
+      end
+
+      # Find the topmost interactive object at the given coordinates that is
+      # drawn (see `drawn?`).
       def topmost_interactive_at(x, y)
         # This runs on every mouse-move event, so the common cases must not
         # allocate: a sort like the fallback's below costs ~12µs per event on
@@ -111,9 +116,7 @@ module Ruby2D
           i = size - 1
           while i >= 0
             obj = objs[i]
-            unless obj.is_a?(Renderable) && !@object_set.key?(obj)
-              return obj if obj.contains?(x, y)
-            end
+            return obj if drawn?(obj) && obj.contains?(x, y)
             i -= 1
           end
           return nil
@@ -124,16 +127,21 @@ module Ruby2D
         # take the fast path again, then hit-test top-down as above.
         objs = @interactive_objects = objs.sort_by { |obj| [obj.z, @interactive_keys[obj]] }
         objs.reverse_each do |obj|
-          next if obj.is_a?(Renderable) && !@object_set.key?(obj)
-          return obj if obj.contains?(x, y)
+          return obj if drawn?(obj) && obj.contains?(x, y)
         end
         nil
       end
 
-      # Dispatch mouse down to the topmost interactive object
+      # Dispatch mouse down to the topmost interactive object. A press is
+      # proof of where the cursor is, whether or not a move event has said so:
+      # the object may have appeared under a resting cursor, or the hovered
+      # one moved out from under it. Hover is brought up to date first, so a
+      # `:hover` precedes the `:mouse_down` on an object the cursor had not
+      # moved over, and the previously hovered object gets its `:hover_out`.
       def dispatch_object_mouse_down(button, x, y)
         obj = topmost_interactive_at(x, y)
-        return unless obj
+        update_hover(obj, x, y)
+        return unless obj && event_target?(obj)
 
         @pressed_objects[button] = { object: obj, x: x, y: y }
         obj._fire_event(:mouse_down, MouseEvent.new(:down, button, nil, x, y, nil, nil))
@@ -163,23 +171,7 @@ module Ruby2D
 
       # Dispatch mouse move: update hover state, handle drag
       def dispatch_object_mouse_move(x, y, delta_x, delta_y)
-        obj = topmost_interactive_at(x, y)
-
-        # Hover transition. Commit the new hovered object before running either
-        # callback: a handler that removes its object clears `@hovered_object`
-        # through `cleanup_interaction_state`, and assigning afterwards would
-        # resurrect the reference removal just cleared.
-        if obj != @hovered_object
-          previous = @hovered_object
-          @hovered_object = obj
-          if previous
-            previous._fire_event(:hover_out, MouseEvent.new(:hover_out, nil, nil, x, y, nil, nil))
-          end
-          if obj && @hovered_object.equal?(obj)
-            obj._fire_event(:hover, MouseEvent.new(:hover, nil, nil, x, y, nil, nil))
-          end
-        end
-
+        update_hover(topmost_interactive_at(x, y), x, y)
         dispatch_object_drags(x, y, delta_x, delta_y)
       end
 
@@ -216,6 +208,25 @@ module Ruby2D
       end
 
       private
+
+      # Make `obj` (the topmost interactive object under the cursor, or nil)
+      # the hovered object, firing `:hover_out` and `:hover` on a change.
+      # Commit the new hovered object before running either callback: a
+      # handler that removes its object clears `@hovered_object` through
+      # `cleanup_interaction_state`, and assigning afterwards would resurrect
+      # the reference removal just cleared.
+      def update_hover(obj, x, y)
+        return if obj == @hovered_object
+
+        previous = @hovered_object
+        @hovered_object = obj
+        if previous
+          previous._fire_event(:hover_out, MouseEvent.new(:hover_out, nil, nil, x, y, nil, nil))
+        end
+        return unless obj && @hovered_object.equal?(obj)
+
+        obj._fire_event(:hover, MouseEvent.new(:hover, nil, nil, x, y, nil, nil))
+      end
 
       # Fire `:drag` on each captured object. Iterates a snapshot because a
       # callback may remove objects (deleting their captures) or clear the

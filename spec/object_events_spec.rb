@@ -272,6 +272,46 @@ RSpec.describe 'Per-object events' do
       window.mouse_callback(:move, nil, nil, 200, 200, 10, 10)
       expect(hover_out_count).to eq(1)
     end
+
+    it 'brings hover up to date on a press, so :hover precedes :mouse_down on an object the cursor never moved over' do
+      events = []
+      under = make_rect(x: 0, y: 0, width: 100, height: 100)
+      under.on(:hover)     { events << :under_hover }
+      under.on(:hover_out) { events << :under_hover_out }
+      window.mouse_callback(:move, nil, nil, 50, 50, 1, 1)
+
+      # A shape appears on top of the hovered one, under the resting cursor
+      over = make_rect(x: 0, y: 0, width: 100, height: 100)
+      over.on(:hover)      { events << :over_hover }
+      over.on(:mouse_down) { events << :over_down }
+      window.mouse_callback(:down, :left, nil, 50, 50, 0, 0)
+      expect(events).to eq(%i[under_hover under_hover_out over_hover over_down])
+
+      # Moving within it afterwards fires no second :hover
+      window.mouse_callback(:move, nil, nil, 51, 50, 1, 0)
+      expect(events.count(:over_hover)).to eq(1)
+    end
+
+    it 'ends a stale hover on a press over nothing' do
+      events = []
+      rect = make_rect(x: 0, y: 0, width: 100, height: 100)
+      rect.on(:hover_out) { events << :hover_out }
+      window.mouse_callback(:move, nil, nil, 50, 50, 1, 1)
+
+      rect.x = 500 # moved out from under the resting cursor
+      window.mouse_callback(:down, :left, nil, 50, 50, 0, 0)
+      expect(events).to eq([:hover_out])
+    end
+
+    it 'drops the press when the :hover it triggered removes the object' do
+      events = []
+      rect = make_rect(x: 0, y: 0, width: 100, height: 100)
+      rect.on(:hover) { events << :hover; rect.remove }
+      rect.on(:mouse_down) { events << :down }
+      window.mouse_callback(:down, :left, nil, 50, 50, 0, 0)
+      expect(events).to eq([:hover])
+      expect(window.instance_variable_get(:@pressed_objects)).to be_empty
+    end
   end
 
   describe '#on with filters' do
@@ -662,6 +702,21 @@ RSpec.describe Ruby2D::Button do
   end
 
   describe 'wrapped-visual form' do
+    it 'is not hit-tested while its visual is out of the scene' do
+      rect = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40)
+      clicked = false
+      Ruby2D::Button.new(rect) { clicked = true }
+
+      rect.remove
+      click_at(50, 20)
+      expect(clicked).to be false
+      expect(window.topmost_interactive_at(50, 20)).to be_nil
+
+      rect.add
+      click_at(50, 20)
+      expect(clicked).to be true
+    end
+
     it 'delegates contains? to the wrapped visual' do
       circle = Ruby2D::Circle.new(x: 50, y: 50, radius: 30)
       btn = Ruby2D::Button.new(circle)

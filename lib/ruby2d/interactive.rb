@@ -107,11 +107,18 @@ module Ruby2D
     end
 
     # The scene-graph member drawn for this object when it isn't one itself,
-    # so hit-testing among equal z can follow draw order. Renderables are
-    # their own; Button answers with its visual.
+    # so hit-testing among equal z can follow draw order, and skips the object
+    # while what is drawn for it is out of the scene. Renderables are their
+    # own; Button answers with its visual.
     def _scene_visual
       nil
     end
+
+    # What is drawn for this object left the scene without the object being
+    # told: the window was cleared, or a Button's visual was removed directly.
+    # A Renderable is hit-tested by scene membership, so there is nothing to
+    # do; Button overrides to end any interaction in progress.
+    def _removed_from_scene; end
 
     private
 
@@ -136,8 +143,9 @@ module Ruby2D
 
     # Join the window's interactive registry once handlers exist. Renderables
     # always register; whether one is hit-tested is decided by scene-graph
-    # membership at dispatch time. Button overrides this to register only
-    # while added, since registry membership is what makes it hit-testable.
+    # membership at dispatch time. Button overrides this: a visual-less one
+    # registers only while added, since registry membership is all that makes
+    # it hit-testable.
     def register_with_window
       Window.register_interactive(self)
     end

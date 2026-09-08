@@ -26,7 +26,8 @@ module Ruby2D
                 :highdpi, :pixel_scale,
                 :viewport_width, :viewport_height, :viewport_mode,
                 :render_mode, :scale_mode,
-                :mouse_x, :mouse_y, :diagnostics, :show_fps, :close_on_esc
+                :mouse_x, :mouse_y, :diagnostics, :show_fps, :close_on_esc,
+                :scene_generation
 
     # Accepted `fps_cap` values, shared by the strict constructor check and the
     # lenient runtime setter so the two messages can't drift apart.
@@ -82,6 +83,7 @@ module Ruby2D
       @objects = []
       @object_set = {}
       @scene_order = 0
+      @scene_generation = 0
 
       init_window_defaults
       init_event_stores
@@ -202,6 +204,13 @@ module Ruby2D
 
       @object_set.delete(object)
       unregister_interactive(object)
+      # A Button drawn by this object is not hit-tested without it, so the
+      # release or exit that would end its interaction can no longer reach
+      # it: end the interaction now, as `clear` does.
+      if (owner = @interactive_by_visual[object])
+        cleanup_interaction_state(owner)
+        owner._removed_from_scene
+      end
       true
     end
 
@@ -217,17 +226,24 @@ module Ruby2D
         @objects.delete(object)
         insert_object(object)
       elsif (owner = @interactive_by_visual[object])
-        # Not drawn, but the Button standing in for it is still hit-tested
+        # Not drawn, so not hit-tested, but the Button standing in for it is
+        # sorted by this z; keep the registry in order for when it returns
         reregister_interactive(owner)
       end
       reregister_interactive(object) if @interactive_keys.key?(object)
       in_scene
     end
 
-    # Clear all objects from the window
+    # Clear all objects from the window. Interactive objects are told first,
+    # since the registry they were in goes with the scene: a Button ends any
+    # press or hover in progress. `scene_generation` counts the clears, for a
+    # visual-less Button, which has no scene object and may not be registered
+    # yet, to tell that it was cleared.
     def clear
       @objects.clear
       @object_set.clear
+      @scene_generation += 1
+      @interactive_objects.each(&:_removed_from_scene)
       init_object_event_stores
     end
 

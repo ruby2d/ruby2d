@@ -186,6 +186,11 @@ module Ruby2D
         DSL.window.clear
       end
 
+      # How many times the scene has been cleared
+      def scene_generation
+        DSL.window.scene_generation
+      end
+
       # Set the update callback
       def update(&proc)
         DSL.window.update(&proc)
