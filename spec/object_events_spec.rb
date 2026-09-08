@@ -88,6 +88,18 @@ RSpec.describe 'Per-object events' do
       expect(seen).to eq([:left])
     end
 
+    it 'gives the press origin its own :mouse_up event when released over another object' do
+      origin = make_rect(x: 0, y: 0, width: 40, height: 40)
+      target = make_rect(x: 100, y: 0, width: 40, height: 40)
+      seen = []
+      target.on(:mouse_up) { |e| e.button = :right }
+      origin.on(mouse_up: :left) { |e| seen << e.x }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:up, :left, nil, 110, 10, 0, 0)
+      expect(seen).to eq([110])
+    end
+
     it 'rejects a descriptor that belongs to another object' do
       first = make_rect(x: 0, y: 0, width: 40, height: 40)
       second = make_rect(x: 50, y: 0, width: 40, height: 40)

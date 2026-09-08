@@ -106,6 +106,13 @@ module Ruby2D
       procs.each { |proc| proc.call(event.dup) }
     end
 
+    # The scene-graph member drawn for this object when it isn't one itself,
+    # so hit-testing among equal z can follow draw order. Renderables are
+    # their own; Button answers with its visual.
+    def _scene_visual
+      nil
+    end
+
     private
 
     # Wrap a user proc with a button matcher. Validates the event type and

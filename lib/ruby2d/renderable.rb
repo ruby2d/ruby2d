@@ -295,7 +295,7 @@ module Ruby2D
     # scene: hover, press capture, and drag state survive, so a shape can raise
     # itself in its own `:mouse_down` handler and keep the drag that follows.
     # An object built with `add: false` or already removed just gets the new
-    # value; `Window#reorder` ignores objects outside the scene graph.
+    # value, though `Window#reorder` still re-sorts the interactive registry.
     def z=(z)
       @z = z
       Window.reorder(self)

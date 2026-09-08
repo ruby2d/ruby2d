@@ -56,4 +56,102 @@ RSpec.describe 'Interactive hit-test z-order' do
     first.add
     expect(topmost).to eq(first)
   end
+
+  it 'ranks a Button where its visual is drawn, below a shape added later' do
+    button = Ruby2D::Button.new(x: 0, y: 0, width: 50, height: 50, color: 'red')
+    cover = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button.on(:click) {}
+    cover.on(:click) {}
+    expect(topmost).to eq(cover)
+  end
+
+  it 'ranks a Button wrapping a visual where that visual is drawn, above a shape added earlier' do
+    under = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button = Ruby2D::Button.new(Ruby2D::Square.new(x: 0, y: 0, size: 50))
+    under.on(:click) {}
+    button.on(:click) {}
+    expect(topmost).to eq(button)
+  end
+
+  it 'follows a wrapped visual when that visual is restacked' do
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button = Ruby2D::Button.new(visual)
+    button.on(:click) {}
+    cover = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    cover.on(:click) {}
+    expect(topmost).to eq(cover)
+
+    visual.z = 0 # re-asserting z moves the visual to the top of its bucket
+    expect(topmost).to eq(button)
+
+    cover.z = 0
+    expect(topmost).to eq(cover)
+  end
+
+  it 'ranks a Button just above its own visual when both have handlers' do
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button = Ruby2D::Button.new(visual)
+    visual.on(:click) {}
+    button.on(:click) {}
+    expect(topmost).to eq(button)
+
+    # The same with handlers attached the other way round, and after the
+    # registry has been re-sorted by the fallback path
+    Ruby2D::DSL.window.clear
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button = Ruby2D::Button.new(visual)
+    button.on(:click) {}
+    visual.on(:click) {}
+    detached = Ruby2D::Square.new(x: 0, y: 0, size: 50, add: false)
+    detached.on(:click) {}
+    detached.z = -1
+    expect(topmost).to eq(button)
+  end
+
+  it 'keys a Button by its visual once that visual is added' do
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50, add: false)
+    button = Ruby2D::Button.new(visual)
+    button.on(:click) {}
+    cover = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    cover.on(:click) {}
+    visual.add
+    expect(topmost).to eq(button)
+  end
+
+  it 'keeps equal-z draw order when a registered object outside the scene changes z' do
+    detached = Ruby2D::Square.new(x: 0, y: 0, size: 50, add: false)
+    detached.on(:mouse_down) {}
+    back = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    back.on(:mouse_down) {}
+    detached.z = 5
+    front = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    front.on(:mouse_down) {}
+    expect(topmost).to eq(front)
+  end
+
+  it 'answers the same before and after a fallback re-sort when a Button visual is detached' do
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50, z: 1)
+    button = Ruby2D::Button.new(visual)
+    button.on(:click) {}
+    scene = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    scene.on(:click) {}
+    visual.remove
+    visual.z = 0
+    first = topmost
+
+    other = Ruby2D::Square.new(x: 0, y: 0, size: 50, add: false)
+    other.on(:click) {}
+    other.instance_variable_set(:@z, -3) # a z change the window wasn't told about
+    expect(topmost).to eq(first)
+    expect(topmost).to eq(first)
+  end
+
+  it 'recovers draw order when an object changes z behind the window back' do
+    _back, front = overlapping_pair(z_low: 0, z_high: 0)
+    other = Ruby2D::Square.new(x: 0, y: 0, size: 50, z: 1)
+    other.on(:mouse_down) {}
+    other.instance_variable_set(:@z, -1)
+    expect(topmost).to eq(front)
+    expect(topmost).to eq(front) # and again on the re-sorted fast path
+  end
 end

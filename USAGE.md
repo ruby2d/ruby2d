@@ -2268,7 +2268,7 @@ Any renderable object can register its own event handlers for mouse interactions
 | `:drag` | Mouse moved while pressed on the object |
 | `:mouse_scroll` | Scroll wheel while hovering over the object |
 
-Events are dispatched to the topmost (highest z-order) interactive object at the mouse position; among equal z, the object drawn on top (the most recently added) wins.
+Events are dispatched to the topmost (highest z-order) interactive object at the mouse position; among equal z, the object drawn on top (the most recently added) wins, and a Button ranks by its visual.
 
 **Example:**
 

@@ -8,19 +8,29 @@ module Ruby2D
       def init_object_event_stores
         @interactive_objects = []
         @interactive_keys = {}
+        @interactive_by_visual = {}
         @hovered_object = nil
         @pressed_objects = {}
       end
 
       # Register an object as interactive (has event handlers). The registry is
       # kept sorted by z, and among equal z by an order key: the scene insertion
-      # order for objects in the scene graph, so hit-testing agrees with draw
-      # order however handlers were attached, and registration order otherwise.
-      # `@interactive_keys` doubles as the registry's membership set.
+      # order of the object, or of the visual drawn for it (a Button's), so
+      # hit-testing agrees with draw order however handlers were attached; an
+      # object with nothing in the scene gets the next order key instead.
+      # `@interactive_keys` doubles as the registry's membership set, and
+      # `@interactive_by_visual` lets `insert_object` re-key a Button when its
+      # visual moves in the scene.
       def register_interactive(object)
         return if @interactive_keys.key?(object)
 
-        key = @object_set[object] || next_scene_order
+        visual = object._scene_visual
+        @interactive_by_visual[visual] = object if visual
+        # Keys are unique per object except for a Button and the visual it
+        # stands in for, when that visual has handlers of its own. Doubling
+        # leaves room for that one tie: the Button ranks just above its visual.
+        key = (@object_set[object] || @object_set[visual] || next_scene_order) * 2
+        key += 1 if visual
         @interactive_keys[object] = key
         z = object.z
         index = @interactive_objects.index do |obj|
@@ -32,7 +42,11 @@ module Ruby2D
       # Unregister an object (no more event handlers, or removed from the
       # scene), ending any interaction it was part of.
       def unregister_interactive(object)
-        @interactive_objects.delete(object) if @interactive_keys.delete(object)
+        if @interactive_keys.delete(object)
+          @interactive_objects.delete(object)
+          visual = object._scene_visual
+          @interactive_by_visual.delete(visual) if @interactive_by_visual[visual].equal?(object)
+        end
         cleanup_interaction_state(object)
       end
 
@@ -70,18 +84,19 @@ module Ruby2D
       # visual is) and register/unregister themselves, so they're exempt.
       def topmost_interactive_at(x, y)
         # This runs on every mouse-move event, so the common cases must not
-        # allocate: the enumerator + pair-array sort below costs ~12µs per
-        # event on wasm mruby even with zero interactive objects.
+        # allocate: a sort like the fallback's below costs ~12µs per event on
+        # wasm mruby even with zero interactive objects.
         objs = @interactive_objects
         size = objs.size
         return nil if size.zero?
 
-        # @interactive_objects is kept sorted by z at registration, but an
-        # object's z (or its wrapped visual's z) can change at runtime. Verify
-        # the order in one allocation-free pass; while it holds (nearly every
+        # @interactive_objects is kept sorted by z and order key: registration
+        # inserts in order and `Window#reorder` re-sorts on every `z` change.
+        # Verify the z order in one allocation-free pass anyway, in case a z
+        # changed behind the window's back; while it holds (nearly every
         # frame), hit-test top-down by iterating backwards in place — among
         # equal-z objects the highest index (latest order key, i.e. drawn on
-        # top) is checked first, matching the stable sort in the fallback.
+        # top) is checked first. Otherwise fall back to re-sorting below.
         in_order = true
         i = 1
         while i < size
@@ -104,10 +119,11 @@ module Ruby2D
           return nil
         end
 
-        # A runtime z change broke the registration order: re-establish it with
-        # a sort stable on the array's current index, preserving the registry's
-        # order among equal-z objects (latest order key stays topmost).
-        objs.each_with_index.sort_by { |obj, idx| [obj.z, idx] }.reverse_each do |obj, _idx|
+        # A runtime z change broke the registration order: re-sort by z and
+        # order key, keeping the sorted array as the registry so later events
+        # take the fast path again, then hit-test top-down as above.
+        objs = @interactive_objects = objs.sort_by { |obj| [obj.z, @interactive_keys[obj]] }
+        objs.reverse_each do |obj|
           next if obj.is_a?(Renderable) && !@object_set.key?(obj)
           return obj if obj.contains?(x, y)
         end

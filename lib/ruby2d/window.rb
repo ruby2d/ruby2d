@@ -208,14 +208,20 @@ module Ruby2D
     # Move an object to its place in the z-order after its `z` changes. Like
     # `remove` + `add` it lands at the top of its new z-bucket, but the object
     # never leaves the scene, so a hover, press capture, or drag in progress
-    # carries on. Returns false if the object isn't in the scene.
+    # carries on. Returns false if the object isn't in the scene; the
+    # interactive registry is still re-sorted, since `topmost_interactive_at`
+    # relies on it staying ordered by z whether or not an entry is drawn.
     def reorder(object)
-      return false unless @object_set.key?(object)
-
-      @objects.delete(object)
-      insert_object(object)
+      in_scene = @object_set.key?(object)
+      if in_scene
+        @objects.delete(object)
+        insert_object(object)
+      elsif (owner = @interactive_by_visual[object])
+        # Not drawn, but the Button standing in for it is still hit-tested
+        reregister_interactive(owner)
+      end
       reregister_interactive(object) if @interactive_keys.key?(object)
-      true
+      in_scene
     end
 
     # Clear all objects from the window
@@ -688,6 +694,10 @@ module Ruby2D
       index = @objects.bsearch_index { |obj| obj.z > object.z }
       @objects.insert(index || @objects.size, object)
       @object_set[object] = next_scene_order
+
+      # A Button ranks by its visual, so it follows the visual's new position
+      owner = @interactive_by_visual[object]
+      reregister_interactive(owner) if owner
     end
 
     def next_scene_order

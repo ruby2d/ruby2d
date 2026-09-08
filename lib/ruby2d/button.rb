@@ -138,6 +138,12 @@ module Ruby2D
       @visual ? @visual.visible? : true
     end
 
+    # The visual drawn for this button, which decides where it ranks among
+    # equal-z objects for hit-testing. Nil for a visual-less button.
+    def _scene_visual
+      @visual
+    end
+
     # Hit-test the button. Wrapped visuals delegate so non-rectangular shapes
     # (Circle, Polygon, …) test against their actual geometry.
     def contains?(x, y)
