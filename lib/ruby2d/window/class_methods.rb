@@ -166,6 +166,11 @@ module Ruby2D
         DSL.window.remove(object)
       end
 
+      # Re-sort an object after its z changes
+      def reorder(object)
+        DSL.window.reorder(object)
+      end
+
       # Register an interactive object
       def register_interactive(object)
         DSL.window.register_interactive(object)

@@ -290,14 +290,15 @@ module Ruby2D
             'like Text, Image, or Rectangle for that'
     end
 
-    # Set the z position (depth) of the object. Re-inserts at the new depth only
-    # if the object was actually in the scene graph — `Window#remove` returns
-    # false for an object built with `add: false` or already removed, so changing
-    # its `z` updates the value without silently adding it to the window.
+    # Set the z position (depth) of the object. Like `remove` + `add`, the
+    # object lands at the top of its new z-bucket, but it never leaves the
+    # scene: hover, press capture, and drag state survive, so a shape can raise
+    # itself in its own `:mouse_down` handler and keep the drag that follows.
+    # An object built with `add: false` or already removed just gets the new
+    # value; `Window#reorder` ignores objects outside the scene graph.
     def z=(z)
-      was_added = remove
       @z = z
-      add if was_added
+      Window.reorder(self)
     end
 
     # Add the object to the window's scene graph. This governs iteration and

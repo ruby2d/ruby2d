@@ -7,26 +7,40 @@ module Ruby2D
       # Initialize stores for object-level interaction state
       def init_object_event_stores
         @interactive_objects = []
+        @interactive_keys = {}
         @hovered_object = nil
         @pressed_objects = {}
       end
 
-      # Register an object as interactive (has event handlers)
+      # Register an object as interactive (has event handlers). The registry is
+      # kept sorted by z, and among equal z by an order key: the scene insertion
+      # order for objects in the scene graph, so hit-testing agrees with draw
+      # order however handlers were attached, and registration order otherwise.
+      # `@interactive_keys` doubles as the registry's membership set.
       def register_interactive(object)
-        return if @interactive_objects.include?(object)
+        return if @interactive_keys.key?(object)
 
-        index = @interactive_objects.index { |obj| obj.z > object.z }
-        if index
-          @interactive_objects.insert(index, object)
-        else
-          @interactive_objects.push(object)
+        key = @object_set[object] || next_scene_order
+        @interactive_keys[object] = key
+        z = object.z
+        index = @interactive_objects.index do |obj|
+          obj.z > z || (obj.z == z && @interactive_keys[obj] > key)
         end
+        @interactive_objects.insert(index || @interactive_objects.size, object)
       end
 
-      # Unregister an object (no more event handlers)
+      # Unregister an object (no more event handlers, or removed from the
+      # scene), ending any interaction it was part of.
       def unregister_interactive(object)
-        @interactive_objects.delete(object)
+        @interactive_objects.delete(object) if @interactive_keys.delete(object)
         cleanup_interaction_state(object)
+      end
+
+      # Re-sort a registered object after its z or scene position changed.
+      # Unlike unregister + register, hover and press state survive.
+      def reregister_interactive(object)
+        @interactive_objects.delete(object) if @interactive_keys.delete(object)
+        register_interactive(object)
       end
 
       # Clear pressed/hover refs when an object is removed
@@ -56,8 +70,8 @@ module Ruby2D
         # object's z (or its wrapped visual's z) can change at runtime. Verify
         # the order in one allocation-free pass; while it holds (nearly every
         # frame), hit-test top-down by iterating backwards in place — among
-        # equal-z objects the highest index (most recently registered) is
-        # checked first, matching the stable sort in the fallback.
+        # equal-z objects the highest index (latest order key, i.e. drawn on
+        # top) is checked first, matching the stable sort in the fallback.
         in_order = true
         i = 1
         while i < size
@@ -81,8 +95,8 @@ module Ruby2D
         end
 
         # A runtime z change broke the registration order: re-establish it with
-        # a sort stable on the array's current index, preserving registration
-        # order among equal-z objects (most recently registered stays topmost).
+        # a sort stable on the array's current index, preserving the registry's
+        # order among equal-z objects (latest order key stays topmost).
         objs.each_with_index.sort_by { |obj, idx| [obj.z, idx] }.reverse_each do |obj, _idx|
           next if obj.is_a?(Renderable) && !@object_set.key?(obj)
           return obj if obj.contains?(x, y)

@@ -581,7 +581,7 @@ All shapes are automatically added to the window when created. Every shape inclu
 shape.x        # x position
 shape.y        # y position
 shape.z        # depth (drawing order); higher z is drawn on top
-shape.z = 10   # changing z re-inserts the object in the correct order
+shape.z = 10   # re-inserts at the new depth; a hover or drag in progress carries on
 shape.width    # width  (bounding-box extent; e.g. a Circle's diameter)
 shape.height   # height (bounding-box extent)
 shape.color    # the color or color set
@@ -2268,7 +2268,7 @@ Any renderable object can register its own event handlers for mouse interactions
 | `:drag` | Mouse moved while pressed on the object |
 | `:mouse_scroll` | Scroll wheel while hovering over the object |
 
-Events are dispatched to the topmost (highest z-order) interactive object at the mouse position.
+Events are dispatched to the topmost (highest z-order) interactive object at the mouse position; among equal z, the object drawn on top (the most recently added) wins.
 
 **Example:**
 

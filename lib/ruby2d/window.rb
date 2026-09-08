@@ -76,9 +76,12 @@ module Ruby2D
       # land on, so it consults this rather than doing nothing at all.
       @running = false
 
-      # Renderable objects currently in the window, like a linear scene graph
+      # Renderable objects currently in the window, like a linear scene graph.
+      # `@object_set` maps each to its insertion order, the tie-breaker among
+      # equal z for drawing and hit-testing alike.
       @objects = []
       @object_set = {}
+      @scene_order = 0
 
       init_window_defaults
       init_event_stores
@@ -199,6 +202,19 @@ module Ruby2D
 
       @object_set.delete(object)
       unregister_interactive(object)
+      true
+    end
+
+    # Move an object to its place in the z-order after its `z` changes. Like
+    # `remove` + `add` it lands at the top of its new z-bucket, but the object
+    # never leaves the scene, so a hover, press capture, or drag in progress
+    # carries on. Returns false if the object isn't in the scene.
+    def reorder(object)
+      return false unless @object_set.key?(object)
+
+      @objects.delete(object)
+      insert_object(object)
+      reregister_interactive(object) if @interactive_keys.key?(object)
       true
     end
 
@@ -653,17 +669,23 @@ module Ruby2D
     def add_object(object)
       return false if @object_set.key?(object)
 
+      insert_object(object)
+      # (Re-)register at the scene position just recorded if the object has
+      # handlers, so hit-testing among equal z follows draw order.
+      reregister_interactive(object) if object.respond_to?(:interactive?) && object.interactive?
+      true
+    end
+
+    # Insert an object at the end of its z-bucket and record its insertion
+    # order, the tie-breaker among equal z for drawing and hit-testing alike.
+    def insert_object(object)
       index = @objects.bsearch_index { |obj| obj.z > object.z }
       @objects.insert(index || @objects.size, object)
-      @object_set[object] = true
+      @object_set[object] = next_scene_order
+    end
 
-      # Re-register for correct z-order if the object is interactive
-      if object.respond_to?(:interactive?) && object.interactive?
-        @interactive_objects.delete(object)
-        register_interactive(object)
-      end
-
-      true
+    def next_scene_order
+      @scene_order += 1
     end
 
     def set_any_window_properties(opts)
