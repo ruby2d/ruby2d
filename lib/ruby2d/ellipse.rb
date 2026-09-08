@@ -109,9 +109,14 @@ module Ruby2D
     end
     alias_method :stroke_colour=, :stroke_color=
 
-    # Check if the ellipse contains the given point
+    # Check if the ellipse contains the given point. Below `FACETED_SECTORS`
+    # the drawn rim is a visibly smaller polygon, so the test follows that.
     def contains?(x, y)
       x, y = _unrotate(x, y)
+      if @sectors < FACETED_SECTORS
+        return _point_in_faceted_ellipse?(@x, @y, @xradius, @yradius, @sectors, x, y)
+      end
+
       dx = x - @x
       dy = y - @y
       rx = @xradius.to_f

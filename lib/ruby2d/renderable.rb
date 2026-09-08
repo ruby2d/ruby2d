@@ -6,6 +6,13 @@ module Ruby2D
     # Per-object event handling (`on` / `off` / `interactive?` / `_fire_event`).
     include Interactive
 
+    # A `Circle` or `Ellipse` with fewer sectors than this is visibly faceted,
+    # so `contains?` tests the polygon the renderer draws instead of the ideal
+    # curve. From the default of 30 up, the rim tracks the curve closely at
+    # any usual radius, and the analytic test is much cheaper. See
+    # `_point_in_faceted_ellipse?`.
+    FACETED_SECTORS = 30
+
     # Resolve an input color to a single Color. If given a per-vertex array or
     # Color::Set, returns the first color. nil returns nil. Used to derive a
     # single stroke color from a fill that may be per-vertex.
@@ -406,6 +413,23 @@ module Ruby2D
         j = i
       end
       inside
+    end
+
+    # Hit-test against the rim `R2D_DrawEllipse` builds for a `Circle` or
+    # `Ellipse` with `sectors` below `FACETED_SECTORS`: one vertex per sector
+    # at equal angles from the +x axis, at least three of them as the renderer
+    # clamps. Builds the rim on each call; the count is small by definition.
+    def _point_in_faceted_ellipse?(cx, cy, rx, ry, sectors, px, py)
+      n = sectors.to_i
+      n = 3 if n < 3
+      step = 2 * Math::PI / n
+      coords = Array.new(n * 2)
+      n.times do |i|
+        angle = i * step
+        coords[i * 2]     = cx + rx * Math.cos(angle)
+        coords[i * 2 + 1] = cy + ry * Math.sin(angle)
+      end
+      _point_in_polygon?(coords, px, py)
     end
 
     # Hit-test a point against the stroked band of segment (x1, y1)-(x2, y2):

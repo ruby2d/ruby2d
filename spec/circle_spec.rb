@@ -90,4 +90,25 @@ RSpec.describe Ruby2D::Circle do
     end
   end
 
+  describe "#contains? with few sectors" do
+    it "follows the drawn polygon below 30 sectors, and the circle from 30 up" do
+      # Four sectors draw a diamond with its points on the axes: (53, 53) is
+      # inside the circle of radius 30 but outside the diamond.
+      diamond = Circle.new(x: 35, y: 35, radius: 30, sectors: 4, add: false)
+      expect(diamond.contains?(53, 53)).to be false
+      expect(diamond.contains?(35, 10)).to be true  # on an axis, inside the point
+
+      round = Circle.new(x: 35, y: 35, radius: 30, sectors: 30, add: false)
+      expect(round.contains?(53, 53)).to be true
+    end
+
+    it "uses at least three sectors, as the renderer does" do
+      # A one-sector circle draws as the three-sector triangle, whose left side
+      # runs along x = 20 (the radius times cos 120° from the center).
+      tri = Circle.new(x: 35, y: 35, radius: 30, sectors: 1, add: false)
+      expect(tri.contains?(30, 35)).to be true
+      expect(tri.contains?(10, 35)).to be false # inside the circle, left of the triangle
+    end
+  end
+
 end

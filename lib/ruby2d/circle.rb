@@ -112,10 +112,15 @@ module Ruby2D
     # to squared radius to skip the square root on this per-event hit path. A
     # negative radius (reachable via the unguarded runtime setter) contains
     # nothing, matching the old `sqrt(...) <= @radius` behavior the squared form
-    # would otherwise lose.
+    # would otherwise lose. Below `FACETED_SECTORS` the drawn rim is a visibly
+    # smaller polygon, so the test follows that instead.
     def contains?(x, y)
       return false if @radius.negative?
       x, y = _unrotate(x, y) if @rotate != 0
+      if @sectors < FACETED_SECTORS
+        return _point_in_faceted_ellipse?(@x, @y, @radius, @radius, @sectors, x, y)
+      end
+
       dx = x - @x
       dy = y - @y
       dx * dx + dy * dy <= @radius * @radius

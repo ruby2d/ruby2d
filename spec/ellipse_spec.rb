@@ -153,6 +153,28 @@ RSpec.describe Ruby2D::Ellipse do
       expect(ellipse.contains?(150, 125)).to be false
     end
 
+    it "follows the drawn polygon below 30 sectors, and the ellipse from 30 up" do
+      # Four sectors draw a diamond with points 30 left and right and 20 above
+      # and below the center: (193, 47) is inside the ellipse, outside the diamond.
+      diamond = Ellipse.new(x: 175, y: 35, xradius: 30, yradius: 20, sectors: 4, add: false)
+      expect(diamond.contains?(193, 47)).to be false
+      expect(diamond.contains?(185, 35)).to be true
+
+      round = Ellipse.new(x: 175, y: 35, xradius: 30, yradius: 20, sectors: 30, add: false)
+      expect(round.contains?(193, 47)).to be true
+    end
+
+    it "rotates the drawn polygon with the shape" do
+      # Rotated 90° about its center, the diamond's far points move from the x
+      # axis to the y axis: 25 from the center is now inside along y (point at
+      # 30) and outside along x (point at 20).
+      tilted = Ellipse.new(x: 175, y: 35, xradius: 30, yradius: 20, sectors: 4, rotate: 90, add: false)
+      expect(tilted.contains?(175, 60)).to be true
+      expect(tilted.contains?(200, 35)).to be false
+      # 15 left and 10 down: inside the rotated ellipse, outside its diamond.
+      expect(tilted.contains?(160, 45)).to be false
+    end
+
     context "with a degenerate (zero) radius" do
       it "is inside only at the center when both radii are 0 (matching Circle)" do
         point = Ellipse.new(x: 100, y: 100, xradius: 0, yradius: 0)
