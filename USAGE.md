@@ -2261,7 +2261,7 @@ Any renderable object can register its own event handlers for mouse interactions
 |---|---|
 | `:click` | Mouse down and up on the same object |
 | `:hover` | Mouse enters the object |
-| `:hover_out` | Mouse leaves the object |
+| `:hover_out` | Mouse leaves the object, or the window |
 | `:mouse_down` | Mouse button pressed on the object |
 | `:mouse_held` | Every frame while a button is held (fires on the object originally pressed) |
 | `:mouse_up` | Mouse button released. Fires on the originally-pressed object, plus on the topmost object under the cursor at release if different |

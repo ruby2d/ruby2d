@@ -151,6 +151,8 @@ module Ruby2D
       def handle_mouse_leave(type)
         @mouse_inside = false
         fire_event_handlers(:mouse_leave) { MouseEvent.new(type, nil, nil, nil, nil, nil, nil) }
+
+        dispatch_object_mouse_leave(@mouse_x, @mouse_y)
       end
 
       def init_mouse_event_stores

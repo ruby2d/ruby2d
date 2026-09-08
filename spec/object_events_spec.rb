@@ -372,6 +372,143 @@ RSpec.describe 'Per-object events' do
     end
   end
 
+  describe ':hover_out on window leave' do
+    it 'fires :hover_out on the hovered object when the cursor leaves the window' do
+      rect = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      rect.on(:hover) { events << :hover }
+      rect.on(:hover_out) { events << :hover_out }
+
+      window.mouse_callback(:move, nil, nil, 10, 10, 0, 0)
+      window.mouse_callback(:leave, nil, nil, nil, nil, nil, nil)
+      expect(events).to eq(%i[hover hover_out])
+
+      # Re-entering over the object starts a fresh hover
+      window.mouse_callback(:move, nil, nil, 11, 11, 1, 1)
+      expect(events).to eq(%i[hover hover_out hover])
+    end
+
+    it 'keeps a press capture across a window leave' do
+      rect = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      rect.on(:drag) { events << :drag }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:leave, nil, nil, nil, nil, nil, nil)
+      window.mouse_callback(:move, nil, nil, -5, -5, -15, -15)
+      expect(events).to eq([:drag])
+    end
+  end
+
+  describe 'callbacks that change the scene mid-dispatch' do
+    it 'keeps mouse capture when an object changes z in its :mouse_down handler' do
+      shape = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      shape.on(:mouse_down) { shape.z = 10 }
+      shape.on(:drag) { events << :drag }
+      shape.on(:click) { events << :click }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:move, nil, nil, 11, 11, 1, 1)
+      window.mouse_callback(:up, :left, nil, 11, 11, 0, 0)
+      expect(events).to eq(%i[drag click])
+      expect(shape.z).to eq(10)
+    end
+
+    it 'keeps hover state when the hovered object changes z' do
+      shape = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      shape.on(:hover) { events << :hover; shape.z = 10 }
+      shape.on(:hover_out) { events << :hover_out }
+
+      window.mouse_callback(:move, nil, nil, 10, 10, 0, 0)
+      window.mouse_callback(:move, nil, nil, 11, 11, 1, 1)
+      expect(events).to eq([:hover])
+    end
+
+    it 'does not resurrect a hovered object that removes itself in its :hover handler' do
+      rect = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      rect.on(:hover) { events << :hover; rect.remove }
+      rect.on(:hover_out) { events << :hover_out }
+
+      window.mouse_callback(:move, nil, nil, 10, 10, 0, 0)
+      expect(window.instance_variable_get(:@hovered_object)).to be_nil
+
+      # Moving away must not send :hover_out to the removed object
+      window.mouse_callback(:move, nil, nil, 100, 100, 90, 90)
+      expect(events).to eq([:hover])
+
+      # Once re-added, the first move over it is a fresh :hover
+      rect.add
+      window.mouse_callback(:move, nil, nil, 10, 10, -90, -90)
+      expect(events).to eq(%i[hover hover])
+    end
+
+    it 'does not fire :click when the :mouse_up handler removes the object' do
+      rect = make_rect(x: 0, y: 0, width: 50, height: 50)
+      events = []
+      rect.on(:mouse_up) { events << :up; rect.remove }
+      rect.on(:click) { events << :click }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:up, :left, nil, 10, 10, 0, 0)
+      expect(events).to eq([:up])
+    end
+
+    it 'does not send :mouse_up to a press origin the release target cleared away' do
+      origin = make_rect(x: 0, y: 0, width: 50, height: 50)
+      target = make_rect(x: 100, y: 0, width: 50, height: 50)
+      events = []
+      origin.on(:mouse_up) { events << :origin_up }
+      target.on(:mouse_up) { events << :target_up; window.clear }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:up, :left, nil, 110, 10, 0, 0)
+      expect(events).to eq([:target_up])
+    end
+
+    it 'stops dispatching :drag to captures cleared by an earlier drag handler' do
+      first = make_rect(x: 0, y: 0, width: 50, height: 50)
+      second = make_rect(x: 100, y: 0, width: 50, height: 50)
+      events = []
+      first.on(:drag) { events << :first; window.clear }
+      second.on(:drag) { events << :second }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:down, :right, nil, 110, 10, 0, 0)
+      window.mouse_callback(:move, nil, nil, 200, 10, 90, 0)
+      expect(events).to eq([:first])
+    end
+
+    it 'stops dispatching :drag to objects an earlier drag handler removed one by one' do
+      first = make_rect(x: 0, y: 0, width: 50, height: 50)
+      second = make_rect(x: 100, y: 0, width: 50, height: 50)
+      events = []
+      first.on(:drag) { events << :first; first.remove; second.remove }
+      second.on(:drag) { events << :second }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:down, :right, nil, 110, 10, 0, 0)
+      window.mouse_callback(:move, nil, nil, 200, 10, 90, 0)
+      expect(events).to eq([:first])
+      expect(window.instance_variable_get(:@pressed_objects)).to be_empty
+    end
+
+    it 'still dispatches :drag to every capture when nothing was removed' do
+      first = make_rect(x: 0, y: 0, width: 50, height: 50)
+      second = make_rect(x: 100, y: 0, width: 50, height: 50)
+      events = []
+      first.on(:drag) { events << :first }
+      second.on(:drag) { events << :second }
+
+      window.mouse_callback(:down, :left, nil, 10, 10, 0, 0)
+      window.mouse_callback(:down, :right, nil, 110, 10, 0, 0)
+      window.mouse_callback(:move, nil, nil, 200, 10, 90, 0)
+      expect(events).to eq(%i[first second])
+    end
+  end
+
   describe 'object removal cleanup' do
     it 'clears interaction state when an object is removed' do
       rect = make_rect(x: 0, y: 0, width: 100, height: 100)
@@ -517,6 +654,20 @@ RSpec.describe Ruby2D::Button do
       expect(rect.color.r).to be_within(0.001).of(0.0)
       expect(rect.color.g).to be_within(0.001).of(0.0)
       expect(rect.color.b).to be_within(0.001).of(1.0)
+    end
+
+    it 'drops the hover tint when the cursor leaves the window' do
+      rect = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40, color: 'red')
+      original = [rect.color.r, rect.color.g, rect.color.b]
+      Ruby2D::Button.new(rect, hover_color: '#0000ff')
+
+      window.mouse_callback(:move, nil, nil, 50, 20, 1, 1)
+      expect([rect.color.r, rect.color.g, rect.color.b]).not_to eq(original)
+
+      window.mouse_callback(:leave, nil, nil, nil, nil, nil, nil)
+      expect(rect.color.r).to be_within(0.001).of(original[0])
+      expect(rect.color.g).to be_within(0.001).of(original[1])
+      expect(rect.color.b).to be_within(0.001).of(original[2])
     end
   end
 

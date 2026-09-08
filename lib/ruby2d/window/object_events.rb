@@ -50,6 +50,16 @@ module Ruby2D
         @pressed_objects.delete_if { |_btn, info| info[:object] == object }
       end
 
+      # Whether an object may receive an object event right now: still in the
+      # registry and, for a Renderable, still in the scene graph. Dispatch
+      # re-checks this after every user callback, since a callback may remove
+      # the object the next event was about to go to.
+      def event_target?(object)
+        return false unless @interactive_keys.key?(object)
+
+        !object.is_a?(Renderable) || @object_set.key?(object)
+      end
+
       # Find the topmost interactive object at the given coordinates. A
       # Renderable is only hit-tested while it's in the scene graph: a shape
       # built with `add: false` (or one that's been removed) has handlers but
@@ -117,18 +127,20 @@ module Ruby2D
       # originally-pressed object regardless of release location, and also on
       # the topmost interactive object under the cursor at release. When the
       # press and release are on the same object, only one `:mouse_up` fires
-      # (and `:click` follows).
+      # (and `:click` follows). Each recipient is re-checked before its event,
+      # since an earlier handler may have removed it or cleared the window.
       def dispatch_object_mouse_up(button, x, y)
         obj = topmost_interactive_at(x, y)
         press = @pressed_objects.delete(button)
-        event = MouseEvent.new(:up, button, nil, x, y, nil, nil)
+        origin = press && press[:object]
 
-        obj._fire_event(:mouse_up, event) if obj
-        if press && press[:object] != obj
-          press[:object]._fire_event(:mouse_up, event)
+        obj._fire_event(:mouse_up, MouseEvent.new(:up, button, nil, x, y, nil, nil)) if obj
+
+        if origin && origin != obj && event_target?(origin)
+          origin._fire_event(:mouse_up, MouseEvent.new(:up, button, nil, x, y, nil, nil))
         end
 
-        if press && obj == press[:object]
+        if origin && origin == obj && event_target?(obj)
           obj._fire_event(:click, MouseEvent.new(:click, button, nil, x, y, nil, nil))
         end
       end
@@ -137,24 +149,33 @@ module Ruby2D
       def dispatch_object_mouse_move(x, y, delta_x, delta_y)
         obj = topmost_interactive_at(x, y)
 
-        # Update hover state
+        # Hover transition. Commit the new hovered object before running either
+        # callback: a handler that removes its object clears `@hovered_object`
+        # through `cleanup_interaction_state`, and assigning afterwards would
+        # resurrect the reference removal just cleared.
         if obj != @hovered_object
-          if @hovered_object
-            @hovered_object._fire_event(:hover_out, MouseEvent.new(:hover_out, nil, nil, x, y, nil, nil))
+          previous = @hovered_object
+          @hovered_object = obj
+          if previous
+            previous._fire_event(:hover_out, MouseEvent.new(:hover_out, nil, nil, x, y, nil, nil))
           end
-          if obj
+          if obj && @hovered_object.equal?(obj)
             obj._fire_event(:hover, MouseEvent.new(:hover, nil, nil, x, y, nil, nil))
           end
-          @hovered_object = obj
         end
 
-        # Handle drag for each pressed button
-        @pressed_objects.each do |button, info|
-          drag_obj = info[:object]
-          next unless drag_obj.interactive?(:drag)
+        dispatch_object_drags(x, y, delta_x, delta_y)
+      end
 
-          drag_obj._fire_event(:drag, MouseEvent.new(:drag, button, nil, x, y, delta_x, delta_y))
-        end
+      # The cursor left the window: end the hover on whatever object had it,
+      # since no in-window motion event will. Press captures are kept, so a
+      # drag that leaves the window keeps reporting positions.
+      def dispatch_object_mouse_leave(x, y)
+        previous = @hovered_object
+        return unless previous
+
+        @hovered_object = nil
+        previous._fire_event(:hover_out, MouseEvent.new(:hover_out, nil, nil, x, y, nil, nil))
       end
 
       # Dispatch mouse held to the object originally pressed with this button.
@@ -176,6 +197,26 @@ module Ruby2D
         return unless obj
 
         obj._fire_event(:mouse_scroll, MouseEvent.new(:scroll, nil, direction, x, y, delta_x, delta_y))
+      end
+
+      private
+
+      # Fire `:drag` on each captured object. Iterates a snapshot because a
+      # callback may remove objects (deleting their captures) or clear the
+      # window (replacing the store), and deleting from a Hash mid-iteration
+      # behaves differently on CRuby and mruby. Each capture is re-validated
+      # against the live store before its event goes out.
+      def dispatch_object_drags(x, y, delta_x, delta_y)
+        return if @pressed_objects.empty?
+
+        @pressed_objects.to_a.each do |button, info|
+          next unless @pressed_objects[button].equal?(info)
+
+          drag_obj = info[:object]
+          next unless drag_obj.interactive?(:drag)
+
+          drag_obj._fire_event(:drag, MouseEvent.new(:drag, button, nil, x, y, delta_x, delta_y))
+        end
       end
     end
   end
