@@ -49,4 +49,36 @@ RSpec.describe 'window input polling and coordinates' do
       expect(positions).to eq([[25.0, 25.0], [25.0, 25.0]])
     end
   end
+
+  describe 'polled deltas' do
+    it 'sums every move of the frame, while each handler call keeps its own delta' do
+      deltas = []
+      window.on(:mouse_move) { |e| deltas << e.delta }
+
+      window.mouse_callback(:move, nil, nil, 13.0, 25.0, 3.0, 0.0)
+      window.mouse_callback(:move, nil, nil, 20.0, 25.0, 7.0, 0.0)
+      expect(deltas).to eq([[3.0, 0.0], [7.0, 0.0]])
+      expect([window.mouse_move_delta_x, window.mouse_move_delta_y]).to eq([10.0, 0.0])
+    end
+
+    it 'sums every scroll of the frame, while each handler call keeps its own delta' do
+      deltas = []
+      window.on(:mouse_scroll) { |e| deltas << e.delta }
+
+      window.mouse_callback(:scroll, nil, :normal, 25.0, 25.0, 0.0, -1.0)
+      window.mouse_callback(:scroll, nil, :normal, 25.0, 25.0, 0.0, -2.0)
+      expect(deltas).to eq([[0.0, -1.0], [0.0, -2.0]])
+      expect([window.mouse_scroll_delta_x, window.mouse_scroll_delta_y]).to eq([0.0, -3.0])
+    end
+
+    it 'starts each frame from zero' do
+      window.mouse_callback(:move, nil, nil, 13.0, 25.0, 3.0, 4.0)
+      window.mouse_callback(:scroll, nil, :normal, 25.0, 25.0, 1.0, -1.0)
+      window.send(:clear_event_stores)
+      window.mouse_callback(:move, nil, nil, 20.0, 25.0, 7.0, 0.0)
+      window.mouse_callback(:scroll, nil, :normal, 25.0, 25.0, 0.0, -2.0)
+      expect([window.mouse_move_delta_x, window.mouse_move_delta_y]).to eq([7.0, 0.0])
+      expect([window.mouse_scroll_delta_x, window.mouse_scroll_delta_y]).to eq([0.0, -2.0])
+    end
+  end
 end

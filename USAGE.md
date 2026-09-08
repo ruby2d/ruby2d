@@ -1920,12 +1920,12 @@ def update
 
   if mouse_scrolled?
     puts mouse_scroll_direction
-    puts mouse_scroll_delta_x
-    puts mouse_scroll_delta_y
+    puts mouse_scroll_delta_x  # the frame's total; each event's own delta
+    puts mouse_scroll_delta_y  # is on its `:mouse_scroll` event
   end
 
   if mouse_moved?
-    puts mouse_move_delta_x
+    puts mouse_move_delta_x    # likewise, the frame's total motion
     puts mouse_move_delta_y
   end
 

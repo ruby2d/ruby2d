@@ -122,6 +122,11 @@ module Ruby2D
         dispatch_object_mouse_held(button, x, y)
       end
 
+      # Handlers get each event's own delta; the polled deltas add up every
+      # event of the frame, since a wheel or mouse can deliver several between
+      # two updates and code polling once per update would otherwise see only
+      # the last one. `clear_event_stores` zeroes them after the update.
+      #
       # `x`, `y` is where the cursor was when the wheel moved, which is where
       # the event is hit-tested. The polled position (`@mouse_x`, `@mouse_y`)
       # is where the cursor ended up by the time this frame's events were
@@ -129,8 +134,8 @@ module Ruby2D
       def handle_mouse_scroll(type, direction, x, y, delta_x, delta_y)
         @mouse_scroll_event     = true
         @mouse_scroll_direction = direction
-        @mouse_scroll_delta_x   = delta_x
-        @mouse_scroll_delta_y   = delta_y
+        @mouse_scroll_delta_x  += delta_x
+        @mouse_scroll_delta_y  += delta_y
 
         fire_event_handlers(:mouse_scroll) { MouseEvent.new(type, nil, direction, x, y, delta_x, delta_y) }
 
@@ -138,9 +143,9 @@ module Ruby2D
       end
 
       def handle_mouse_move(type, x, y, delta_x, delta_y)
-        @mouse_move_event   = true
-        @mouse_move_delta_x = delta_x
-        @mouse_move_delta_y = delta_y
+        @mouse_move_event    = true
+        @mouse_move_delta_x += delta_x
+        @mouse_move_delta_y += delta_y
 
         fire_event_handlers(:mouse_move) { MouseEvent.new(type, nil, nil, x, y, delta_x, delta_y) }
 
