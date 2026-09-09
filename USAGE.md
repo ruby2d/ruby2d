@@ -1266,21 +1266,21 @@ sprite = Sprite.new('characters.png',
 | `scale_mode` | `nil` | Texture sampling; `nil` follows the window (see [Scale Mode](#scale-mode)) |
 | `padding` | `0` | Inset from anchored edges (also `padding_top`/`padding_right`/`padding_bottom`/`padding_left`) |
 | `frame` | `nil` | When `source` is a `SpriteSheet`, the named frame to display statically |
-| `clip_x` | `0` | X offset into the sprite sheet |
-| `clip_y` | `0` | Y offset into the sprite sheet |
-| `clip_width` | Image width | Width of each frame |
+| `clip_x` | `0` | X offset of frame 0 in the sprite sheet; `Range` frames count from here |
+| `clip_y` | `0` | Y offset of the frames in the sprite sheet |
+| `clip_width` | Image width | Width of each frame; assigning `clip_width=` or `clip_height=` later redefines the frame as an untrimmed region of that size |
 | `clip_height` | Image height | Height of each frame |
 | `loop` | `false` | Whether the default animation loops |
 | `time` | `300` | Duration of each frame in milliseconds |
 | `speed` | `1.0` | Animation rate multiplier (also `sprite.speed=`) |
 | `animations` | `{}` | Hash of named animations |
-| `default` | `0` | Default frame index |
+| `default` | `0` | Frame of the default animation shown at construction and after `stop` (a strip frame index for a `Range`, a position for an `Array`); must be a frame of that animation |
 
 ### Defining Animations
 
 Animations are defined as a hash where keys are names and values are either:
 
-- **Range**: Frame indices across a horizontal strip. `walk: 0..3` plays frames 0, 1, 2, 3 using `clip_width` to determine each frame's position.
+- **Range**: Frame indices across a horizontal strip that starts at `clip_x`, `clip_y`. `walk: 0..3` plays frames 0, 1, 2, 3, each `clip_width` further along.
 - **Array**: Explicit frame regions, with optional per-frame timing. Each entry is one of:
   - A hash with `x`, `y`, `width`, `height`, and optional `time`.
   - A frame name (string) — only when the sprite was constructed from a `SpriteSheet`.
@@ -1297,7 +1297,7 @@ animations: {
 }
 ```
 
-For a horizontal-strip image, a `:default` animation is automatically created spanning all frames. Atlas-backed sprites (built from a `SpriteSheet`) skip this auto-default; define your own `:default` if you need one.
+For a horizontal-strip image, a `:default` animation is automatically created spanning all frames from `clip_x` to the right edge, unless you define one. Atlas-backed sprites (built from a `SpriteSheet`) skip this auto-default; define your own `:default` if you need one. The `:default` animation, whether you defined it or it was created for a strip, is the one `play` plays with no arguments, the one `stop` returns to, and the one a sprite constructed without `frame:` starts on, at its `default:` frame; an atlas sprite with no `:default` uses the first animation defined. An animation with no frames raises at construction.
 
 ### Playing Animations
 
@@ -1314,7 +1314,7 @@ sprite.play(animation: :attack) do
   sprite.play(animation: :idle, loop: true)
 end
 
-sprite.stop         # stop and revert to the default animation's frame
+sprite.stop         # stop and revert to the default animation's `default:` frame
 sprite.stop(:walk)  # stop only if :walk is currently playing
 ```
 
@@ -1351,11 +1351,11 @@ sprite.speed = 0    # frozen (still 'playing', just not advancing)
 Animations advance on real elapsed time — the same frame delta described under [`dt`](#frame-rate-independence-with-dt) — not on a fixed step per frame. So playback runs at the same wall-clock rate on any display refresh rate, a high `speed` genuinely skips frames (it isn't capped at the refresh rate), and a momentary stall is caught up on the next frame rather than dropped. Each frame is shown for its own `time:`, so per-frame durations stay accurate even while skipping.
 
 ```ruby
-sprite.frame             # => current static frame name, or nil
+sprite.frame             # => name of the atlas frame on display, or nil
 sprite.frame = 'walk_a'  # swap to that named frame on an atlas-backed sprite
 ```
 
-Assigning to `frame=` works on sprites built from a `SpriteSheet`. It updates the clip rect to the named frame, stops any playing animation, and (when no explicit `width`/`height` was given at construction) resizes the sprite to match the new frame.
+Assigning to `frame=` works on sprites built from a `SpriteSheet`. It updates the clip rect to the named frame, stops any playing animation, and (when no explicit `width`/`height` was given at construction) resizes the sprite to match the new frame. `frame` reads back whichever named frame the sprite is showing, whether it came from `frame:`, `frame=`, an animation, or `stop`; it is `nil` for a strip frame or an explicit `{ x:, y:, width:, height: }` rect. Assigning `width = nil` or `height = nil` drops a display-size override and resumes tracking each frame's size.
 
 ### Rendering Sprites in Render Blocks
 

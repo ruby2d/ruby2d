@@ -4,8 +4,7 @@ module Ruby2D
   # An animated sprite from a single image, a horizontal strip sprite sheet, or
   # a SpriteSheet (texture atlas).
   class Sprite < Image
-    attr_reader :flip, :sheet, :speed, :frame
-    attr_accessor :clip_x, :clip_y, :clip_width, :clip_height
+    attr_reader :flip, :sheet, :speed, :frame, :clip_x, :clip_y, :clip_width, :clip_height
 
     # Sentinel default for `update`'s `dt`. Lets the no-arg scene-graph call defer
     # resolving `Window.delta_time` until after the `@playing` guard, so a paused
@@ -45,19 +44,20 @@ module Ruby2D
               scale_mode: scale_mode)
       end
 
-      # Stash the resolved sheet rect (if any) so trim metadata can be
-      # applied after @clip_width/@clip_height get their final values.
+      # The sheet rect (if any) that sizes the clip and, unless an animation
+      # takes over below, is the pose the sprite starts on.
       sheet_rect = nil
+      static_name = nil
 
       if frame
         raise Error, '`frame:` requires a SpriteSheet source' unless @sheet
 
-        sheet_rect  = lookup_sheet_frame(frame.to_s)
+        static_name = frame.to_s
+        sheet_rect  = lookup_sheet_frame(static_name)
         clip_x      = sheet_rect[:x]
         clip_y      = sheet_rect[:y]
         clip_width  = sheet_rect[:width]
         clip_height = sheet_rect[:height]
-        @frame      = frame.to_s
       end
 
       @img_width  = @orig_width
@@ -74,9 +74,11 @@ module Ruby2D
       # When a sheet is in use and no explicit clip / frame was given, fall back
       # to the first frame in the sheet so the sprite shows something useful.
       if @sheet && !frame && clip_width.nil? && clip_height.nil?
-        first = first_sheet_rect
+        first_name = @sheet.frame_names.first
+        first = first_name && lookup_sheet_frame(first_name)
         if first
           sheet_rect  = first
+          static_name = first_name
           clip_x      = first[:x]
           clip_y      = first[:y]
           clip_width  = first[:width]
@@ -91,27 +93,27 @@ module Ruby2D
       @clip_width  = @img_width  if @clip_width  <= 0
       @clip_height = @img_height if @clip_height <= 0
 
-      # Trim metadata. For atlas frames it can come from the sheet rect;
-      # for path-based sprites and untrimmed atlas frames it falls back
-      # to the no-trim defaults (source = clip, trim = 0). With those
-      # defaults, the C draw path's trim math collapses to today's
-      # untrimmed behavior.
-      @source_width  = (sheet_rect && sheet_rect[:source_width])  || @clip_width
-      @source_height = (sheet_rect && sheet_rect[:source_height]) || @clip_height
-      @trim_x = (sheet_rect && sheet_rect[:trim_x]) || 0
-      @trim_y = (sheet_rect && sheet_rect[:trim_y]) || 0
-
       # Track user-provided display dimensions so animations can update
       # @width/@height to match the source (footprint) dimensions when no
       # explicit size was given.
       @user_width  = width
       @user_height = height
-      @width  = width  || @source_width
-      @height = height || @source_height
 
       @clipped = true
 
       setup_animation
+
+      # The starting pose: an explicit `frame:` wins; otherwise the default
+      # animation's `default:` frame, so a sprite shows the frame `stop` would
+      # return it to; otherwise the sheet's first frame or the plain clip.
+      if !frame && @defaults[:animation]
+        @playing_animation = @defaults[:animation]
+        set_frame
+      elsif sheet_rect
+        apply_frame(sheet_rect, static_name)
+      else
+        apply_rect(@clip_x, @clip_y, @clip_width, @clip_height)
+      end
 
       @visible = visible
       self.add if add
@@ -135,18 +137,50 @@ module Ruby2D
     # Set the displayed width. Like the `width:` constructor option, this persists
     # across animation frames (stored as the user override). A sprite without an
     # explicit size tracks each frame's source dimensions; set to nil to resume
-    # that source-tracking. Overrides Image's plain `attr_accessor`, which wrote
-    # `@width` directly and was silently reset by the next animation tick.
+    # that source-tracking, from the current frame on. Overrides Image's plain
+    # `attr_accessor`, which wrote `@width` directly and was silently reset by
+    # the next animation tick.
     def width=(w)
       @user_width = w
-      @width = w
+      @width = w || @source_width
     end
 
     # Set the displayed height. See `width=` — persists across frames; nil resumes
     # source-tracking.
     def height=(h)
       @user_height = h
-      @height = h
+      @height = h || @source_height
+    end
+
+    # Set the clip origin. The pose is no longer a named atlas frame.
+    def clip_x=(x)
+      @clip_x = x
+      @frame = nil
+    end
+
+    def clip_y=(y)
+      @clip_y = y
+      @frame = nil
+    end
+
+    # Set the clip width. The frame becomes an untrimmed region of that width:
+    # its source footprint follows, so the frame still fills the display width
+    # (which tracks it unless `width` was given), instead of drawing scaled
+    # against the previous frame's footprint. Same for `clip_height=`.
+    def clip_width=(w)
+      @clip_width = w
+      @source_width = w
+      @trim_x = 0
+      @width = @user_width || w
+      @frame = nil
+    end
+
+    def clip_height=(h)
+      @clip_height = h
+      @source_height = h
+      @trim_y = 0
+      @height = @user_height || h
+      @frame = nil
     end
 
     # Whether the current animation loops
@@ -178,11 +212,9 @@ module Ruby2D
         @loop = loop ? true : false unless loop.nil?
         @done_proc = done_proc if done_proc
       else
-        frames = @animations[anim_name]
-        # Validate up front, before mutating any state, so a typo'd or empty
-        # animation fails clearly here instead of crashing later in `update`.
-        raise Error, "Animation `#{anim_name}` is not defined for this sprite" if frames.nil?
-        raise Error, "Animation `#{anim_name}` has no frames" if frames.is_a?(Array) && frames.empty?
+        # Validate before mutating any state, so a typo'd animation fails
+        # clearly here instead of crashing later in `update`.
+        raise Error, "Animation `#{anim_name}` is not defined for this sprite" if @animations[anim_name].nil?
 
         @playing = true
         @paused = false
@@ -250,23 +282,14 @@ module Ruby2D
     def frame=(name)
       raise Error, '`frame=` requires a SpriteSheet source' unless @sheet
 
-      rect = lookup_sheet_frame(name.to_s)
+      name = name.to_s
+      rect = lookup_sheet_frame(name)
 
       @playing = false
       @paused = false
       @done_proc = nil
 
-      @clip_x      = rect[:x]
-      @clip_y      = rect[:y]
-      @clip_width  = rect[:width]
-      @clip_height = rect[:height]
-      @source_width  = rect[:source_width]  || @clip_width
-      @source_height = rect[:source_height] || @clip_height
-      @trim_x = rect[:trim_x] || 0
-      @trim_y = rect[:trim_y] || 0
-      @width  = @user_width  || @source_width
-      @height = @user_height || @source_height
-      @frame  = name.to_s
+      apply_frame(rect, name)
     end
 
     # Stop the current animation and set to the default frame
@@ -420,30 +443,37 @@ module Ruby2D
     # animation and draw the current frame, minus `render`'s keyword handling
     # — a zero-arg call into the 11-keyword `render` still pays ~5µs of
     # keyword setup on wasm mruby, half a millisecond per frame at 100 sprites.
+    # The animation advances first: a new frame can change the sprite's size,
+    # which alignment positions against.
     def _render_scene
-      _resolve_alignment
       update
+      _resolve_alignment
       Ext.image_draw(self)
     end
     public :_render_scene
 
-    # Reset frame to defaults
-    def reset_clipping_rect
-      @clip_x      = @defaults[:clip_x]
-      @clip_y      = @defaults[:clip_y]
-      @clip_width  = @defaults[:clip_width]
-      @clip_height = @defaults[:clip_height]
-    end
-
-    # Set the position of the clipping retangle based on the current frame
+    # Apply the current frame of the playing animation: the clip rect, the
+    # frame's footprint and trim, the display size, and its duration.
     def set_frame
       frames = @animations[@playing_animation]
       case frames
       when Range
-        reset_clipping_rect
-        @clip_x = @current_frame * @clip_width
+        # Frames of a strip sit side by side from the clip origin given at
+        # construction, each `clip_width` wide.
+        step = @defaults[:clip_width]
+        apply_rect(@defaults[:clip_x] + @current_frame * step, @defaults[:clip_y],
+                   step, @defaults[:clip_height])
+        # Range frames carry no per-frame `time:`, so reset to the default
+        # rather than inheriting a leftover value from a prior Array animation.
+        @frame_time = @defaults[:frame_time]
       when Array
-        set_explicit_frame frames[@current_frame]
+        rect = frames[@current_frame]
+        # Defensive: leave the pose in place rather than crash on an index
+        # past the end.
+        return if rect.nil?
+
+        apply_frame(rect)
+        @frame_time = rect[:time] || @defaults[:frame_time]
       end
     end
 
@@ -453,9 +483,9 @@ module Ruby2D
       case frames
       # When animation is a range, play through frames horizontally
       when Range
-        @first_frame   = frames.first || @defaults[:frame]
-        @current_frame = frames.first || @defaults[:frame]
-        @last_frame    = frames.last
+        @first_frame   = frames.begin
+        @current_frame = frames.begin
+        @last_frame    = frames.end
         # Range frames carry no per-frame `time:`, so reset to the default
         # rather than inheriting a leftover value from a prior Array animation.
         @frame_time    = @defaults[:frame_time]
@@ -467,24 +497,34 @@ module Ruby2D
       end
     end
 
-    # Set the current frame based on the region/portion of image
-    def set_explicit_frame(frame)
-      # Defensive: an out-of-range frame index (e.g. a `default:` past the end
-      # of the default animation, restored by `stop`) yields nil here. Leave the
-      # current frame in place rather than crashing.
-      return if frame.nil?
+    # Apply a frame rect — `{ x:, y:, width:, height: }` plus optional
+    # `source_width`, `source_height`, `trim_x`, `trim_y`, and `name` — as the
+    # sprite's current pose.
+    def apply_frame(rect, name = rect[:name])
+      apply_rect(rect[:x] || @defaults[:clip_x], rect[:y] || @defaults[:clip_y],
+                 rect[:width] || @defaults[:clip_width], rect[:height] || @defaults[:clip_height],
+                 rect[:source_width], rect[:source_height], rect[:trim_x], rect[:trim_y], name)
+    end
 
-      @clip_x      = frame[:x]      .nil? ? @defaults[:clip_x]      : frame[:x]
-      @clip_y      = frame[:y]      .nil? ? @defaults[:clip_y]      : frame[:y]
-      @clip_width  = frame[:width]  .nil? ? @defaults[:clip_width]  : frame[:width]
-      @clip_height = frame[:height] .nil? ? @defaults[:clip_height] : frame[:height]
-      @frame_time  = frame[:time]   .nil? ? @defaults[:frame_time]  : frame[:time]
-      @source_width  = frame[:source_width]  || @clip_width
-      @source_height = frame[:source_height] || @clip_height
-      @trim_x = frame[:trim_x] || 0
-      @trim_y = frame[:trim_y] || 0
+    # The one place a pose is written: the clip rect, the footprint the clip
+    # is drawn into (the clip itself when untrimmed), where the clip sits in
+    # it, the display size — the user's override or the footprint — and the
+    # atlas frame name, nil for a strip frame or an explicit rect. Everything
+    # that selects a frame (construction, animation steps, `stop`, `frame=`,
+    # `resize!`) goes through here so no field can go stale.
+    def apply_rect(x, y, width, height, source_width = nil, source_height = nil,
+                   trim_x = nil, trim_y = nil, name = nil)
+      @clip_x      = x
+      @clip_y      = y
+      @clip_width  = width
+      @clip_height = height
+      @source_width  = source_width  || width
+      @source_height = source_height || height
+      @trim_x = trim_x || 0
+      @trim_y = trim_y || 0
       @width  = @user_width  || @source_width
       @height = @user_height || @source_height
+      @frame  = name
     end
 
     # initialize animation, called by constructor
@@ -495,12 +535,22 @@ module Ruby2D
       @last_frame = 0
       @done_proc = nil
 
-      # Auto-generate :default only for path-based sprites where the source is
-      # a horizontal strip. Atlas sources have arbitrary 2D layouts, so we
-      # leave :default to the user.
-      @animations[:default] = 0..(@img_width / @clip_width) - 1 unless @sheet
+      # Generate `:default` for path-based sprites where the source is a
+      # horizontal strip from the clip origin, unless the user defined one.
+      # Atlas sources have arbitrary 2D layouts, so we leave `:default` to the
+      # user.
+      unless @sheet || @animations.key?(:default)
+        count = ((@img_width - @clip_x) / @clip_width).to_i
+        count = 1 if count < 1
+        @animations[:default] = 0..(count - 1)
+      end
 
-      default_anim = @animations.empty? ? nil : @animations.first[0]
+      # The animation `stop` returns to and construction starts on: `:default`
+      # when defined, else the first one defined, else none.
+      default_anim = if @animations.key?(:default) then :default
+                     elsif @animations.empty? then nil
+                     else @animations.first[0]
+                     end
 
       @defaults = {
         animation: default_anim,
@@ -512,36 +562,67 @@ module Ruby2D
         clip_height: @clip_height,
         loop: @loop
       }
+
+      frames = @animations[default_anim]
+      return if frames.nil? || frame_index?(frames, @current_frame)
+
+      raise Error, "`default:` frame #{@current_frame.inspect} is not in animation `#{default_anim}` (#{describe_frames(frames)})"
+    end
+
+    # Whether `index` selects a frame of `frames`: a strip index for a Range,
+    # a position for an Array.
+    def frame_index?(frames, index)
+      return false unless index.is_a?(Integer)
+
+      if frames.is_a?(Range)
+        index >= frames.begin && index <= frames.end
+      else
+        index >= 0 && index < frames.length
+      end
+    end
+
+    def describe_frames(frames)
+      frames.is_a?(Range) ? "frames #{frames}" : "#{frames.length} frames"
     end
 
     # Resolve frame-name strings against the SpriteSheet so the rest of the
     # class only has to deal with `{x:,y:,width:,height:[,time:]}` rects and
-    # numeric Ranges — the same shapes the legacy path-based API uses.
+    # numeric Ranges — the same shapes the legacy path-based API uses. An
+    # animation with no frames is rejected here rather than when it is played.
     def normalize_animations(anims)
       result = {}
       anims.each do |name, frames|
-        result[name] = case frames
-                       when Range  then frames
-                       when Array  then frames.map { |f| normalize_frame(f) }
-                       when String then [normalize_frame(frames)]
-                       else frames
-                       end
+        frames = case frames
+                 when Range  then frames
+                 when Array  then frames.map { |f| normalize_frame(f) }
+                 when String then [normalize_frame(frames)]
+                 else frames
+                 end
+        empty = frames.is_a?(Range) ? frames.begin > frames.end : frames.is_a?(Array) && frames.empty?
+        raise Error, "Animation `#{name}` has no frames" if empty
+
+        result[name] = frames
       end
       result
     end
 
     def normalize_frame(spec)
       if spec.is_a?(String)
-        lookup_sheet_frame(spec).dup
+        rect = lookup_sheet_frame(spec).dup
+        rect[:name] = spec
+        rect
       elsif spec.is_a?(Hash)
         name = spec[:name] || spec['name']
         if name
           rect = lookup_sheet_frame(name).dup
+          rect[:name] = name.to_s
           time = spec[:time] || spec['time']
           rect[:time] = time if time
           rect
         else
-          spec
+          # The sprite owns its rects: `resize!` scales them in place, and a
+          # caller may build several sprites from one literal.
+          spec.dup
         end
       else
         raise Error, "Invalid animation frame spec: #{spec.inspect}"
@@ -561,11 +642,6 @@ module Ruby2D
       end
 
       rect
-    end
-
-    def first_sheet_rect
-      first_name = @sheet.frame_names.first
-      first_name && lookup_sheet_frame(first_name)
     end
   end
 end

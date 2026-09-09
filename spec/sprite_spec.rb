@@ -217,10 +217,9 @@ RSpec.describe Ruby2D::Sprite do
         .to raise_error(Ruby2D::Error, /not defined/)
     end
 
-    it 'raises a clear error when playing an empty animation' do
-      sprite = Sprite.new(sheet, animations: { empty: [] }, add: false)
-      expect { sprite.play(animation: :empty) }
-        .to raise_error(Ruby2D::Error, /no frames/)
+    it 'raises a clear error when an animation has no frames' do
+      expect { Sprite.new(sheet, animations: { empty: [] }, add: false) }
+        .to raise_error(Ruby2D::Error, /`empty` has no frames/)
     end
   end
 
@@ -416,9 +415,48 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite.frame).to eq('block_blue')
     end
 
-    it 'returns nil when no frame: was passed' do
+    it 'reports the default animation frame when no frame: was passed' do
       sprite = Sprite.new(sheet, animations: { x: ['block_blue'] }, add: false)
+      expect(sprite.frame).to eq('block_blue')
+    end
+
+    it 'returns nil on a strip sprite' do
+      expect(Sprite.new("#{Ruby2D.test_spritesheets}/coin.png", add: false).frame).to be_nil
+    end
+
+    it 'follows the frame an animation shows and the one stop returns to' do
+      sprite = Sprite.new(sheet, frame: 'block_blue',
+                          animations: { walk: %w[block_coin block_green] }, add: false)
+      sprite.play(animation: :walk)
+      expect(sprite.frame).to eq('block_coin')
+      tick(sprite)
+      expect(sprite.frame).to eq('block_green')
+      sprite.stop
+      expect(sprite.frame).to eq('block_coin')
+    end
+
+    it 'is nil after a clip setter moves the pose off the named frame' do
+      sprite = Sprite.new(sheet, frame: 'block_coin', add: false)
+      sprite.clip_width = 64
       expect(sprite.frame).to be_nil
+      sprite.frame = 'block_coin'
+      sprite.clip_x = 0
+      expect(sprite.frame).to be_nil
+    end
+
+    it 'is nil while an explicit rect is shown' do
+      sprite = Sprite.new(sheet, frame: 'block_blue',
+                          animations: { raw: [{ x: 0, y: 0, width: 8, height: 8 }] }, add: false)
+      sprite.play(animation: :raw)
+      expect(sprite.frame).to be_nil
+    end
+
+    it 'lets a conditional reassignment restore the static pose after playback' do
+      sprite = Sprite.new(sheet, frame: 'block_blue', animations: { walk: ['block_coin'] }, add: false)
+      sprite.play(animation: :walk)
+      sprite.frame = 'block_blue' unless sprite.frame == 'block_blue'
+      expect(sprite.clip_x).to eq(sheet['block_blue'][:x])
+      expect(sprite.playing?).to be false
     end
 
     it 'updates the clip rect on assignment' do
@@ -577,6 +615,144 @@ RSpec.describe Ruby2D::Sprite do
       sprite = Sprite.new(path, add: false)
       expect { sprite.clip_x = sprite.width + 100 }.not_to raise_error
       expect { sprite.clip_y = -50 }.not_to raise_error
+    end
+  end
+
+  describe 'default animation and frame' do
+    include_context 'sprite sheet'
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" } # 504x84: six 84px frames
+
+    it 'starts a strip on its default: frame, the one stop returns to' do
+      sprite = Sprite.new(strip, clip_width: 84, default: 2, add: false)
+      expect(sprite.clip_x).to eq(168)
+      sprite.play(loop: true)
+      tick(sprite)
+      sprite.stop
+      expect(sprite.clip_x).to eq(168)
+    end
+
+    it 'counts strip frames from the clip origin' do
+      sprite = Sprite.new(strip, clip_x: 84, clip_width: 84, add: false)
+      expect(sprite.clip_x).to eq(84)
+      expect(sprite.instance_variable_get(:@animations)[:default]).to eq(0..4)
+      sprite.play(loop: true)
+      tick(sprite)
+      expect(sprite.clip_x).to eq(168)
+      sprite.stop
+      expect(sprite.clip_x).to eq(84)
+    end
+
+    it 'keeps an explicitly defined :default animation on a strip' do
+      frames = [{ x: 84, y: 0, width: 84, height: 84, time: 100 },
+                { x: 168, y: 0, width: 84, height: 84, time: 100 }]
+      sprite = Sprite.new(strip, clip_width: 84, animations: { default: frames }, add: false)
+      expect(sprite.clip_x).to eq(84)
+      sprite.play
+      sprite.update(0.1)
+      expect(sprite.clip_x).to eq(168)
+    end
+
+    it 'stops to the :default animation whatever the declaration order' do
+      sprite = Sprite.new(sheet, frame: 'block_blue', time: 50,
+                          animations: { attack: %w[block_coin block_green], default: %w[block_blue] },
+                          add: false)
+      sprite.play(animation: :attack)
+      tick(sprite)
+      expect(sprite.clip_x).to eq(sheet['block_green'][:x])
+      sprite.stop(:attack)
+      expect(sprite.clip_x).to eq(sheet['block_blue'][:x])
+      expect(sprite.width).to eq(sheet['block_blue'][:width])
+    end
+
+    it 'stops to the first defined animation when none is named :default' do
+      sprite = Sprite.new(sheet, animations: { idle: ['block_blue'], attack: %w[block_coin] }, add: false)
+      sprite.play(animation: :attack)
+      sprite.stop
+      expect(sprite.clip_x).to eq(sheet['block_blue'][:x])
+    end
+
+    it 'starts an atlas sprite with animations on the default animation frame' do
+      sprite = Sprite.new(sheet, animations: { walk: %w[block_coin block_green] }, add: false)
+      expect(sprite.clip_x).to eq(sheet['block_coin'][:x])
+      expect(sprite.width).to eq(sheet['block_coin'][:width])
+    end
+
+    it 'shows an explicit frame: over the default animation' do
+      sprite = Sprite.new(sheet, frame: 'block_green', animations: { default: %w[block_coin] }, add: false)
+      expect(sprite.clip_x).to eq(sheet['block_green'][:x])
+      sprite.stop
+      expect(sprite.clip_x).to eq(sheet['block_coin'][:x])
+    end
+
+    it 'raises when default: is outside the default animation' do
+      expect { Sprite.new(strip, clip_width: 84, default: 6, add: false) }
+        .to raise_error(Ruby2D::Error, /`default:` frame 6 is not in animation `default`/)
+      expect { Sprite.new(sheet, animations: { idle: ['block_blue'] }, default: 1, add: false) }
+        .to raise_error(Ruby2D::Error, /`default:` frame 1 is not in animation `idle`/)
+    end
+  end
+
+  describe 'frame geometry' do
+    include_context 'sprite sheet'
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" }
+
+    it 'owns its frame rects rather than sharing the caller literal' do
+      rect = { x: 84, y: 0, width: 84, height: 84 }
+      sprite = Sprite.new(strip, clip_width: 84, animations: { one: [rect] }, add: false)
+      rect[:x] = 0
+      sprite.play(animation: :one)
+      expect(sprite.clip_x).to eq(84)
+    end
+
+    it 'resets the footprint when a Range animation follows an Array one' do
+      sprite = Sprite.new(strip, clip_width: 84, clip_height: 84, time: 100,
+                          animations: { large: [{ x: 0, y: 0, width: 168, height: 84 }], strip: 0..2 },
+                          add: false)
+      sprite.play(animation: :large)
+      expect(sprite.width).to eq(168)
+      sprite.play(animation: :strip)
+      expect([sprite.width, sprite.clip_width, sprite.instance_variable_get(:@source_width)]).to eq([84, 84, 84])
+    end
+
+    it 'clears the trim when a Range animation follows a trimmed frame' do
+      stub_frame(sheet, 'tr', { x: 0, y: 0, width: 80, height: 120,
+                                source_width: 256, source_height: 256, trim_x: 40, trim_y: 70 })
+      sprite = Sprite.new(sheet, frame: 'tr', animations: { strip: 0..1 }, add: false)
+      sprite.play(animation: :strip)
+      expect(sprite.instance_variable_get(:@trim_x)).to eq(0)
+      expect(sprite.instance_variable_get(:@source_width)).to eq(sprite.clip_width)
+    end
+
+    it 'resumes tracking the frame when width= or height= is set to nil' do
+      sprite = Sprite.new(strip, clip_width: 84, width: 168, height: 42, add: false)
+      sprite.width = nil
+      sprite.height = nil
+      expect([sprite.width, sprite.height]).to eq([84, 84])
+    end
+
+    it 'redefines an untrimmed frame through clip_width= and clip_height=' do
+      sprite = Sprite.new(strip, clip_width: 20, clip_height: 20, add: false)
+      sprite.clip_width = 10
+      sprite.clip_height = 10
+      expect(sprite.instance_variable_get(:@source_width)).to eq(10)
+      expect(sprite.instance_variable_get(:@source_height)).to eq(10)
+      expect([sprite.width, sprite.height]).to eq([10, 10])
+    end
+
+    it 'keeps an explicit display size across clip_width= and clip_height=' do
+      sprite = Sprite.new(strip, width: 40, height: 40, clip_width: 20, clip_height: 20, add: false)
+      sprite.clip_width = 10
+      sprite.clip_height = 10
+      expect([sprite.width, sprite.height]).to eq([40, 40])
+      expect(sprite.instance_variable_get(:@source_width)).to eq(10)
+    end
+
+    it 'advances the animation before resolving alignment in the scene hook' do
+      sprite = Sprite.new(strip, clip_width: 84, x: :center, add: false)
+      allow(Ruby2D::Ext).to receive(:image_draw)
+      expect(sprite).to receive(:update).ordered
+      expect(sprite).to receive(:_resolve_alignment).ordered
+      sprite._render_scene
     end
   end
 end
