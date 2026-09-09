@@ -1280,7 +1280,7 @@ sprite = Sprite.new('characters.png',
 
 Animations are defined as a hash where keys are names and values are either:
 
-- **Range**: Frame indices across a horizontal strip that starts at `clip_x`, `clip_y`. `walk: 0..3` plays frames 0, 1, 2, 3, each `clip_width` further along.
+- **Range**: Frame indices across a horizontal strip that starts at `clip_x`, `clip_y`. `walk: 0..3` plays frames 0, 1, 2, 3, each `clip_width` further along; an exclusive range (`0...3`) stops before its end.
 - **Array**: Explicit frame regions, with optional per-frame timing. Each entry is one of:
   - A hash with `x`, `y`, `width`, `height`, and optional `time`.
   - A frame name (string) — only when the sprite was constructed from a `SpriteSheet`.
@@ -1297,7 +1297,7 @@ animations: {
 }
 ```
 
-For a horizontal-strip image, a `:default` animation is automatically created spanning all frames from `clip_x` to the right edge, unless you define one. Atlas-backed sprites (built from a `SpriteSheet`) skip this auto-default; define your own `:default` if you need one. The `:default` animation, whether you defined it or it was created for a strip, is the one `play` plays with no arguments, the one `stop` returns to, and the one a sprite constructed without `frame:` starts on, at its `default:` frame; an atlas sprite with no `:default` uses the first animation defined. An animation with no frames raises at construction.
+For a horizontal-strip image, a `:default` animation is automatically created spanning all frames from `clip_x` to the right edge, unless you define one. Atlas-backed sprites (built from a `SpriteSheet`) skip this auto-default; define your own `:default` if you need one. The `:default` animation, whether you defined it or it was created for a strip, is the one `play` plays with no arguments, the one `stop` returns to, and the one a sprite constructed without `frame:` starts on, at its `default:` frame; an atlas sprite with no `:default` uses the first animation defined. An animation with no frames, an unbounded `Range`, or a value of another type raises at construction.
 
 ### Playing Animations
 
@@ -1320,13 +1320,13 @@ sprite.stop(:walk)  # stop only if :walk is currently playing
 
 A non-looping animation that finishes **holds on its last frame** until you call `stop` or `play` something else; the sprite doesn't snap back to the default frame on its own. The completion block (if provided) fires once at that moment.
 
-Re-calling `play` with the animation that's *already* playing doesn't restart it (no jump back to frame 0), so calling it every frame from your update loop is safe. An explicitly-passed `loop:` or completion block still takes effect, letting you adjust those mid-play. To change only the loop setting, `sprite.loop = false` does the same without touching the callback.
+Re-calling `play` with the animation that's *already* playing doesn't restart it (no jump back to frame 0), so calling it every frame from your update loop is safe. An explicitly-passed `loop:`, `flip:`, or completion block still takes effect, letting you adjust those mid-play: a character turning around keeps its stride. To change only the loop setting, `sprite.loop = false` does the same without touching the callback.
 
 | `play` Parameter | Default | Description |
 |---|---|---|
 | `animation` | `:default` | Animation name |
 | `loop` | From defaults | Whether to loop |
-| `flip` | `nil` | `:horizontal`, `:vertical`, or `:both` |
+| `flip` | `nil` | `:horizontal`, `:vertical`, `:both`, or `nil` for none; omitted on an already-playing animation, it keeps the current flip |
 | Block | `nil` | Called once when a non-looping animation finishes |
 
 ```ruby

@@ -396,14 +396,46 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite.instance_variable_get(:@frame_budget)).to be_within(0.01).of(100)
     end
 
-    it 'caps a runaway-fast loop at one cycle per update instead of spinning' do
+    it 'skips the whole cycles of a runaway-fast loop and keeps the remainder' do
       sprite.speed = 1_000_000.0
       sprite.play(animation: :stones, loop: true)
-      expect { sprite.update(0.1) }.not_to raise_error  # enormous budget
-      expect(sprite.instance_variable_get(:@current_frame)).to be_between(0, 2)
+      expect { sprite.update(0.1) }.not_to raise_error  # 100,000,000 ms of budget
+      # 111,111 cycles of 900 ms land back on frame 0 with 100 ms in hand
+      expect(sprite.instance_variable_get(:@current_frame)).to eq(0)
       expect(sprite.instance_variable_get(:@playing)).to be true
-      # The leftover budget was dropped, not left to grow without bound
-      expect(sprite.instance_variable_get(:@frame_budget)).to eq(0.0)
+      expect(sprite.instance_variable_get(:@frame_budget)).to be_within(0.01).of(100)
+    end
+
+    it 'catches up across more than one cycle without losing time' do
+      strip = "#{Ruby2D.test_spritesheets}/coin.png"
+      batched = Sprite.new(strip, clip_width: 84, time: 10, animations: { blink: 0..1 }, add: false)
+      batched.play(animation: :blink, loop: true)
+      batched.update(0.035)
+      split = Sprite.new(strip, clip_width: 84, time: 10, animations: { blink: 0..1 }, add: false)
+      split.play(animation: :blink, loop: true)
+      7.times { split.update(0.005) }
+      expect(batched.clip_x).to eq(84)
+      expect(batched.clip_x).to eq(split.clip_x)
+      expect(batched.instance_variable_get(:@frame_budget)).to be_within(0.01).of(5)
+      expect(split.instance_variable_get(:@frame_budget)).to be_within(0.01).of(5)
+    end
+
+    it 'catches up across cycles of an Array animation with per-frame times' do
+      sprite = Sprite.new(sheet, animations: { walk: [{ name: 'block_blue', time: 10 },
+                                                      { name: 'block_coin', time: 30 }] }, add: false)
+      sprite.play(animation: :walk, loop: true)
+      # 95 ms = two 40 ms cycles, then 10 ms onto the second frame, 5 ms left
+      sprite.update(0.095)
+      expect(sprite.instance_variable_get(:@current_frame)).to eq(1)
+      expect(sprite.instance_variable_get(:@frame_budget)).to be_within(0.01).of(5)
+    end
+
+    it 'still freezes on a frame with no positive time' do
+      sprite = Sprite.new(sheet, animations: { walk: [{ name: 'block_blue', time: 0 }, 'block_coin'] }, add: false)
+      sprite.play(animation: :walk, loop: true)
+      sprite.update(10.0)
+      expect(sprite.instance_variable_get(:@current_frame)).to eq(0)
+      expect(sprite.playing?).to be true
     end
   end
 
@@ -753,6 +785,85 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite).to receive(:update).ordered
       expect(sprite).to receive(:_resolve_alignment).ordered
       sprite._render_scene
+    end
+  end
+
+  describe 'exclusive ranges' do
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" }
+
+    it 'plays up to the frame before the end' do
+      sprite = Sprite.new(strip, clip_width: 84, time: 100, animations: { walk: 0...3 }, add: false)
+      sprite.play(animation: :walk)
+      positions = [sprite.clip_x]
+      3.times { sprite.update(0.1); positions << sprite.clip_x }
+      expect(positions).to eq([0, 84, 168, 168])
+      expect(sprite.playing?).to be false
+    end
+
+    it 'raises when the range is empty' do
+      expect { Sprite.new(strip, clip_width: 84, animations: { none: 0...0 }, add: false) }
+        .to raise_error(Ruby2D::Error, /`none` has no frames/)
+    end
+
+    it 'raises on an unbounded or non-integer range' do
+      [(2..), (..3), (0.0..2.0)].each do |range|
+        expect { Sprite.new(strip, clip_width: 84, animations: { walk: range }, add: false) }
+          .to raise_error(Ruby2D::Error, /`walk` must be a Range of strip frame indices with both ends/)
+      end
+    end
+
+    it 'raises on an animation value of another type' do
+      expect { Sprite.new(strip, clip_width: 84, animations: { walk: { x: 0, y: 0, width: 84, height: 84 } }, add: false) }
+        .to raise_error(Ruby2D::Error, /`walk` must be a Range of strip frames, an Array of frames, or a frame name/)
+      expect { Sprite.new(strip, clip_width: 84, animations: { walk: 5 }, add: false) }
+        .to raise_error(Ruby2D::Error, /`walk` must be/)
+    end
+  end
+
+  describe 'flip while playing' do
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" }
+    let(:sprite) { Sprite.new(strip, clip_width: 84, time: 100, animations: { walk: 0..3 }, add: false) }
+
+    it 'play with a new flip keeps the frame, the timing, and the completion block' do
+      completed = 0
+      sprite.play(animation: :walk) { completed += 1 }
+      sprite.update(0.1)
+      sprite.update(0.05)
+      sprite.play(animation: :walk, flip: :horizontal)
+      expect(sprite.flip).to eq(:horizontal)
+      expect(sprite.clip_x).to eq(84)
+      5.times { sprite.update(0.05) }
+      expect(sprite.clip_x).to eq(252)
+      expect(sprite.playing?).to be false
+      expect(completed).to eq(1)
+    end
+
+    it 'play with a new flip keeps looping when loop: is omitted' do
+      sprite.play(animation: :walk, loop: true)
+      sprite.play(animation: :walk, flip: :horizontal)
+      expect(sprite.looping?).to be true
+    end
+
+    it 'play with flip: nil clears the flip on the already-playing path' do
+      sprite.play(animation: :walk, loop: true, flip: :horizontal)
+      sprite.update(0.1)
+      sprite.play(animation: :walk, loop: true, flip: nil)
+      expect(sprite.flip).to be_nil
+      expect(sprite.clip_x).to eq(84)
+      expect(sprite.looping?).to be true
+    end
+
+    it 'play without flip: leaves the flip alone on the already-playing path' do
+      sprite.play(animation: :walk, flip: :horizontal)
+      sprite.play(animation: :walk)
+      expect(sprite.flip).to eq(:horizontal)
+    end
+
+    it 'play without flip: clears it when the animation restarts' do
+      sprite.play(animation: :walk, flip: :horizontal)
+      sprite.stop
+      sprite.play(animation: :walk)
+      expect(sprite.flip).to be_nil
     end
   end
 end

@@ -13,6 +13,11 @@ module Ruby2D
     UPDATE_DT_UNSET = Object.new.freeze
     private_constant :UPDATE_DT_UNSET
 
+    # Sentinel default for `play`'s `flip:`, so an omitted flip is distinct
+    # from an explicit `flip: nil`, which clears the flip.
+    FLIP_UNSET = Object.new.freeze
+    private_constant :FLIP_UNSET
+
     # Create a sprite. `source` can be either an image path or a SpriteSheet
     # instance. When given a SpriteSheet, animations may reference frames by
     # name (strings or `{ name:, time: }` hashes) and `frame:` selects a
@@ -200,17 +205,18 @@ module Ruby2D
 
     # Start playing an animation. Pass `loop:` to override the sprite's default
     # loop setting and a block to run when a non-looping animation finishes.
-    def play(animation: :default, loop: nil, flip: nil, &done_proc)
+    def play(animation: :default, loop: nil, flip: FLIP_UNSET, &done_proc)
       anim_name = animation || :default
 
-      if @playing && anim_name == @playing_animation && flip == @flip
-        # Same animation already running (same flip): don't restart it — that
-        # would jump back to frame 0 — but still honor an explicitly-passed
-        # `loop:` or completion block so callers can adjust them mid-play.
+      if @playing && anim_name == @playing_animation
+        # Same animation already running: don't restart it — that would jump
+        # back to frame 0 — but still honor an explicitly-passed `loop:`,
+        # `flip:`, or completion block so callers can adjust them mid-play.
         # Anything left unset is preserved, so a per-frame `play(:state)` call
-        # stays a safe no-op.
+        # stays a safe no-op and turning a character around keeps its stride.
         @loop = loop ? true : false unless loop.nil?
         @done_proc = done_proc if done_proc
+        self.flip = flip unless flip.equal?(FLIP_UNSET)
       else
         # Validate before mutating any state, so a typo'd animation fails
         # clearly here instead of crashing later in `update`.
@@ -221,7 +227,7 @@ module Ruby2D
         @playing_animation = anim_name
         @done_proc = done_proc
 
-        self.flip = flip
+        self.flip = flip.equal?(FLIP_UNSET) ? nil : flip
         reset_playing_animation
 
         loop = @defaults[:loop] if loop.nil?
@@ -334,16 +340,21 @@ module Ruby2D
       # playback doesn't slowly drift. The budget is in milliseconds.
       @frame_budget += dt * @speed * 1000.0
 
-      cycle    = @last_frame - @first_frame + 1   # frames in one full loop
-      steps    = 0
+      # A looping animation lands back on the current frame after every whole
+      # cycle, so a budget spanning several — a long stall, an absurd `speed`,
+      # frames far shorter than the tick — skips them in one step and walks
+      # only the remainder below, which keeps the loop bounded by one cycle
+      # without dropping time. `@cycle_time` is nil when a frame has no
+      # positive duration; playback freezes on that frame anyway.
+      @frame_budget %= @cycle_time if @loop && @cycle_time && @frame_budget >= @cycle_time
+
       finished = false
 
-      while @playing && steps < cycle
+      while @playing
         ft = @frame_time || @defaults[:frame_time]
         break if ft.nil? || ft <= 0 || @frame_budget < ft
 
         @frame_budget -= ft
-        steps += 1
         @current_frame += 1
 
         if @current_frame > @last_frame
@@ -361,10 +372,6 @@ module Ruby2D
         end
         set_frame   # refresh the clip rect and pick up the next frame's `time:`
       end
-
-      # Cap a runaway-fast loop (an absurd `speed`) at one cycle per update so it
-      # can't spin; drop the unspent budget rather than letting it grow unbounded.
-      @frame_budget = 0.0 if @playing && steps == cycle && @frame_budget >= (@frame_time || @defaults[:frame_time])
 
       # Fire the completion block last — after the bookkeeping above — so a
       # `play` chained inside it has the final say. Clear it first so the chained
@@ -486,14 +493,23 @@ module Ruby2D
         @first_frame   = frames.begin
         @current_frame = frames.begin
         @last_frame    = frames.end
-        # Range frames carry no per-frame `time:`, so reset to the default
-        # rather than inheriting a leftover value from a prior Array animation.
         @frame_time    = @defaults[:frame_time]
+        count = @last_frame - @first_frame + 1
+        @cycle_time = @frame_time && @frame_time > 0 ? count * @frame_time : nil
       # When array...
       when Array
         @first_frame   = 0
         @current_frame = 0
         @last_frame    = frames.length - 1
+        @cycle_time = 0.0
+        frames.each do |rect|
+          ft = rect[:time] || @defaults[:frame_time]
+          if ft.nil? || ft <= 0
+            @cycle_time = nil
+            break
+          end
+          @cycle_time += ft
+        end
       end
     end
 
@@ -533,6 +549,7 @@ module Ruby2D
       @playing = false
       @paused = false
       @last_frame = 0
+      @cycle_time = nil
       @done_proc = nil
 
       # Generate `:default` for path-based sprites where the source is a
@@ -588,22 +605,37 @@ module Ruby2D
     # Resolve frame-name strings against the SpriteSheet so the rest of the
     # class only has to deal with `{x:,y:,width:,height:[,time:]}` rects and
     # numeric Ranges — the same shapes the legacy path-based API uses. An
-    # animation with no frames is rejected here rather than when it is played.
+    # exclusive Range becomes the inclusive one it stands for, and anything
+    # else — an unbounded Range, an animation with no frames, a value of
+    # another type — is rejected here rather than when it is played.
     def normalize_animations(anims)
       result = {}
       anims.each do |name, frames|
         frames = case frames
-                 when Range  then frames
+                 when Range  then normalize_range(name, frames)
                  when Array  then frames.map { |f| normalize_frame(f) }
                  when String then [normalize_frame(frames)]
-                 else frames
+                 else
+                   raise Error, "Animation `#{name}` must be a Range of strip frames, an Array of frames, or a frame name, got #{frames.inspect}"
                  end
-        empty = frames.is_a?(Range) ? frames.begin > frames.end : frames.is_a?(Array) && frames.empty?
-        raise Error, "Animation `#{name}` has no frames" if empty
+        raise Error, "Animation `#{name}` has no frames" if frames.is_a?(Array) && frames.empty?
 
         result[name] = frames
       end
       result
+    end
+
+    def normalize_range(name, range)
+      first = range.begin
+      last  = range.end
+      unless first.is_a?(Integer) && last.is_a?(Integer)
+        raise Error, "Animation `#{name}` must be a Range of strip frame indices with both ends, got #{range.inspect}"
+      end
+
+      last -= 1 if range.exclude_end?
+      raise Error, "Animation `#{name}` has no frames" if first > last
+
+      first..last
     end
 
     def normalize_frame(spec)
