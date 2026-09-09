@@ -176,10 +176,12 @@ module Ruby2D
       @_stroke_cc = nil
     end
 
-    # Get opacity. Returns the per-vertex array when set, otherwise the
-    # uniform alpha from the first vertex color.
+    # Get opacity. Returns a copy of the per-vertex array when set (assign a
+    # new array through `opacity=` to change it; the renderer only sees values
+    # that went through the setter), otherwise the uniform alpha from the first
+    # vertex color.
     def opacity
-      @_per_vertex_opacity || @color&.opacity
+      @_per_vertex_opacity ? @_per_vertex_opacity.dup : @color&.opacity
     end
 
     # Render a polyline without creating an instance

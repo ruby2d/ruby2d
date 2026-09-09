@@ -571,7 +571,7 @@ Polyline.new(
 )
 ```
 
-When `opacity:` is a single value, all vertices share it. When it's an array, each entry overrides the alpha of the corresponding vertex. The array length must equal the vertex count.
+When `opacity:` is a single value, all vertices share it. When it's an array, each entry overrides the alpha of the corresponding vertex. The array length must equal the vertex count. Reading `opacity` back returns a copy of the array; assign a new array to change it.
 
 Opacity is clamped to the `0.0..1.0` range. A fade animation that momentarily overshoots (e.g. `opacity = 1.2` or `-0.1`) is pinned to fully opaque or fully transparent for that frame rather than raising, consistent with how runtime size setters degrade gracefully (see [Dimensions](#dimensions)).
 

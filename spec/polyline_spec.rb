@@ -176,4 +176,26 @@ RSpec.describe Ruby2D::Polyline do
       expect(line.instance_variable_get(:@coordinates)).to eq([0, 0, 100, 0])
     end
   end
+
+  describe '#opacity with a per-vertex array' do
+    it 'returns a copy, so the array read back cannot change the line' do
+      line = Polyline.new(points: [[0, 0], [100, 0]], opacity: [1, 1], add: false)
+      line.opacity.replace([0.0, 0.0])
+      expect(line.opacity).to eq([1.0, 1.0])
+    end
+
+    it 'draws the alphas assigned through the setter' do
+      line = Polyline.new(points: [[0, 0], [100, 0]], stroke_width: 4, opacity: [1, 1], add: false)
+      alphas = nil
+      allow(Ruby2D::Ext).to receive(:stroke_path) { |_, _, pvs, _| alphas = [pvs[3], pvs[7]] }
+      line.send(:render)
+      line.opacity.replace([0.0, 0.0])
+      line.send(:render)
+      expect(alphas).to eq([1.0, 1.0])
+      expect(line.opacity).to eq([1.0, 1.0])
+      line.opacity = [0.0, 0.5]
+      line.send(:render)
+      expect(alphas).to eq([0.0, 0.5])
+    end
+  end
 end
