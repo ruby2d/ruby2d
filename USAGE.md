@@ -1696,7 +1696,7 @@ btn.on(:mouse_up)   { btn.color = '#333' }
 
 ### Hover and Pressed States
 
-`hover_color:` tints the Button while the cursor is over it; `pressed_color:` tints it while the mouse is held down. When both are set and the user is hovering+pressed, **pressed wins**. Dragging out while held releases the press tint; dragging back in re-engages it.
+`hover_color:` tints the Button while the cursor is over it; `pressed_color:` tints it while the mouse is held down. When both are set and the user is hovering+pressed, **pressed wins**. Dragging out while held releases the press tint; dragging back in re-engages it. A press lasts from the first mouse button down to the last one up, and a press on a Button that appeared under a resting cursor tints it right away. `remove`, `clear`, and removing the wrapped shape directly cancel a press or hover in progress.
 
 ```ruby
 Button.new(x: 100, y: 100, width: 80, height: 26,
@@ -1722,7 +1722,7 @@ Tints work with a [gradient fill](#per-vertex-colors) too. `:auto` lightens or d
 Button.new(color: ['navy', 'blue', 'teal', 'aqua'], hover_color: :auto)
 ```
 
-`hover_label_color:` and `pressed_label_color:` require a `label:` to tint; supplying them without one raises an `ArgumentError`. When a tint is configured, change the resting color through `btn.color = …` (which updates the base color the tint derives from), not by mutating the visual directly; a direct change is overwritten on the next hover/press. Reading `btn.color` back returns that resting color, not the transient hover/press tint.
+`hover_label_color:` and `pressed_label_color:` require a `label:` to tint; supplying them without one raises an `ArgumentError`. `hover_color:` and `pressed_color:` need a visual with a `color`: an `Image` or `Canvas` has a `tint` instead, and a visual-less Button draws nothing, so either raises an `ArgumentError` (a label on an `Image` or `Canvas` Button can still be tinted). When a tint is configured, change the resting color through `btn.color = …` (which updates the base color the tint derives from), not by mutating the visual directly; a direct change is overwritten on the next hover/press. Reading `btn.color` back returns that resting color, not the transient hover/press tint.
 
 ### Custom Visual Button
 
@@ -1763,6 +1763,8 @@ btn.label  # => current label string or nil
 btn.color = '#555'  # set the fill color (the resting color when a tint is configured)
 btn.color           # => current fill color, or nil for a visual-less button
 btn.z = 5
+btn.visible = false  # same as btn.hide; btn.show or visible = true to draw again
+btn.padding_right = 8  # and the other edges; see Padding
 btn.contains?(x, y)
 btn.on(event)  # see Per-Object Events
 btn.off(descriptor)

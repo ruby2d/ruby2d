@@ -93,6 +93,13 @@ module Ruby2D
         mark_added(add)
       end
 
+      # Fill tints go through the visual's `color`. An `Image` or `Canvas` has
+      # a `tint` instead, and a visual-less button nothing at all.
+      if (hover_input || pressed_input) && !@visual.respond_to?(:color=)
+        what = @visual ? "a `#{@visual.class}` has no `color`" : 'a visual-less `Button` draws nothing'
+        raise ArgumentError, "`hover_color`/`pressed_color` need a visual with a `color` to tint: #{what}"
+      end
+
       if label
         @label = Text.new(label, size: label_size,
                           color: label_color || label_colour || 'white', add: false)
@@ -100,26 +107,40 @@ module Ruby2D
         center_label
       end
 
-      if @visual && (hover_input || pressed_input || hover_label_input || pressed_label_input)
-        install_state_tint(hover_input, pressed_input,
-                           hover_label_input, pressed_label_input)
-      end
+      @hovering = false
+      @pressed = []
+      install_fill_tint(hover_input, pressed_input) if hover_input || pressed_input
+      install_label_tint(hover_label_input, pressed_label_input) if hover_label_input || pressed_label_input
+      install_state_handlers if @base_color || @base_label_color
 
       on(:click) { |e| on_click.call(e) } if on_click
     end
 
     # Remove the button: drop the visual (and with it the label) from the
-    # scene and unregister from the interactive registry.
+    # scene and unregister from the interactive registry. A press or hover in
+    # progress is cancelled, since the release or exit that would end it can
+    # no longer reach the button.
     def remove
       @visual ? @visual.remove : mark_added(false)
       Window.unregister_interactive(self)
+      reset_state
     end
 
     # Re-add the button after `remove`. Restores rendering and re-registers in
-    # the interactive registry if any handlers are attached.
+    # the interactive registry if any handlers are attached. A button that
+    # was already added keeps its hover state: the cursor is still over it.
     def add
-      @visual ? @visual.add : mark_added(true)
+      newly = @visual ? @visual.add : !added?
+      mark_added(true) unless @visual
+      reset_state if newly
       Window.register_interactive(self) if interactive?
+    end
+
+    # The visual was removed directly, or the window cleared: the release or
+    # exit that would end an interaction in progress can no longer reach the
+    # button, so end it now.
+    def _removed_from_scene
+      reset_state
     end
 
     # Mark the button visible.
@@ -130,6 +151,10 @@ module Ruby2D
     # Mark the button hidden. Like any hidden object it keeps receiving events.
     def hide
       @visual ? @visual.hide : (@visible = false)
+    end
+
+    def visible=(flag)
+      flag ? show : hide
     end
 
     # Whether the button is currently visible.
@@ -226,14 +251,51 @@ module Ruby2D
       @visual.respond_to?(:y_align) ? @visual.y_align : nil
     end
 
-    # Alignment belongs to the visual, which resolves it when it draws; these
-    # forward to it, and are no-ops on a visual-less button.
+    # Alignment and padding belong to the visual, which resolves them when it
+    # draws; these forward to it, and are no-ops on a visual-less button.
     def x_align=(sym)
       @visual.x_align = sym if @visual.respond_to?(:x_align=)
     end
 
     def y_align=(sym)
       @visual.y_align = sym if @visual.respond_to?(:y_align=)
+    end
+
+    def padding_top
+      @visual.respond_to?(:padding_top) ? @visual.padding_top : nil
+    end
+
+    def padding_right
+      @visual.respond_to?(:padding_right) ? @visual.padding_right : nil
+    end
+
+    def padding_bottom
+      @visual.respond_to?(:padding_bottom) ? @visual.padding_bottom : nil
+    end
+
+    def padding_left
+      @visual.respond_to?(:padding_left) ? @visual.padding_left : nil
+    end
+
+    def padding_top=(value)
+      @visual.padding_top = value if @visual.respond_to?(:padding_top=)
+    end
+
+    def padding_right=(value)
+      @visual.padding_right = value if @visual.respond_to?(:padding_right=)
+    end
+
+    def padding_bottom=(value)
+      @visual.padding_bottom = value if @visual.respond_to?(:padding_bottom=)
+    end
+
+    def padding_left=(value)
+      @visual.padding_left = value if @visual.respond_to?(:padding_left=)
+    end
+
+    # Set all four padding edges to the same value.
+    def padding=(value)
+      @visual.padding = value if @visual.respond_to?(:padding=)
     end
 
     # Get the label string.
@@ -260,15 +322,18 @@ module Ruby2D
     end
 
     # Set the button's fill color. When a hover/pressed tint is configured this
-    # updates the resting (base) color and re-applies the current state so the
-    # change survives the next hover/press cycle; otherwise it sets the visual
-    # directly. Accepts a single color or a gradient (`Color::Set`). A no-op on
-    # a visual-less button.
+    # updates the resting (base) color, derives the `:auto` tints from it
+    # again, and re-applies the current state so the change survives the next
+    # hover/press cycle; otherwise it sets the visual directly. Accepts a
+    # single color or a gradient (`Color::Set`). A no-op on a button without a
+    # colorable visual.
     def color=(c)
       return unless @visual.respond_to?(:color=)
 
       if @base_color
         @base_color = Color.set(c)
+        @hover_color = resolve_state_color(@hover_input, :lighten)
+        @pressed_color = resolve_state_color(@pressed_input, :darken)
         apply_state
       else
         @visual.color = c
@@ -321,29 +386,41 @@ module Ruby2D
       end
     end
 
-    # Wire the hover/pressed tint state machine. `:auto` lightens for hover
-    # and darkens for pressed; any other value is treated as an explicit color.
-    # Pressed wins over hover when both apply (hovering+pressed). Drag-out
-    # while held reverts to base; drag back in re-engages the press tint.
-    def install_state_tint(hover_input, pressed_input,
-                           hover_label_input, pressed_label_input)
+    # Remember the fill tint inputs and resolve them against the base color.
+    # `:auto` is kept as such so `color=` can derive it from a new base; an
+    # explicit value is resolved once.
+    def install_fill_tint(hover_input, pressed_input)
       @base_color = map_color(@visual.color) { |c| Color.new(c) }
+      @hover_input = hover_input
+      @pressed_input = pressed_input
       @hover_color   = resolve_state_color(hover_input,   :lighten)
       @pressed_color = resolve_state_color(pressed_input, :darken)
+    end
 
-      if @label
-        @base_label_color    = Color.new(@label.color)
-        @hover_label_color   = hover_label_input   ? Color.new(hover_label_input)   : nil
-        @pressed_label_color = pressed_label_input ? Color.new(pressed_label_input) : nil
-      end
+    def install_label_tint(hover_label_input, pressed_label_input)
+      @base_label_color    = Color.new(@label.color)
+      @hover_label_color   = hover_label_input   ? Color.new(hover_label_input)   : nil
+      @pressed_label_color = pressed_label_input ? Color.new(pressed_label_input) : nil
+    end
 
-      @is_hovering = false
-      @is_pressed = false
+    # Wire the hover/pressed state machine that the tints follow. Pressed wins
+    # over hover when both apply (hovering+pressed). Drag-out while held
+    # reverts to base; drag back in re-engages the press tint. Each mouse
+    # button is tracked on its own, so with two held the tint stays until the
+    # last release. The window brings hover up to date before a press, so a
+    # button that appeared under a resting cursor tints on the first press.
+    def install_state_handlers
+      on(:hover)      { @hovering = true;  apply_state }
+      on(:hover_out)  { @hovering = false; apply_state }
+      on(:mouse_down) { |e| @pressed << e.button unless @pressed.include?(e.button); apply_state }
+      on(:mouse_up)   { |e| @pressed.delete(e.button); apply_state }
+    end
 
-      on(:hover)      { @is_hovering = true;  apply_state }
-      on(:hover_out)  { @is_hovering = false; apply_state }
-      on(:mouse_down) { @is_pressed = true;   apply_state }
-      on(:mouse_up)   { @is_pressed = false;  apply_state }
+    # Forget any hover or press in progress and show the resting colors.
+    def reset_state
+      @hovering = false
+      @pressed.clear
+      apply_state
     end
 
     # Resolve a state-color input into a concrete Color or Color::Set. `:auto`
@@ -357,23 +434,23 @@ module Ruby2D
       Color.set(input)
     end
 
-    # Recompute fill and label color from current (hover, pressed) state and
-    # apply to the visual + label. Pressed-without-hovering shows the rest
-    # color (drag-out), matching native UI conventions.
+    # Recompute fill and label color from the current (hovering, pressed)
+    # state and apply whichever tints are configured. Pressed-without-hovering
+    # shows the rest color (drag-out), matching native UI conventions.
     def apply_state
-      fill, label_col = current_state_colors
-      @visual.color = fill
-      @label.color = label_col if @label && label_col
+      @visual.color = state_color(@base_color, @hover_color, @pressed_color) if @base_color
+      return unless @base_label_color
+
+      @label.color = state_color(@base_label_color, @hover_label_color, @pressed_label_color)
     end
 
-    def current_state_colors
-      if @is_pressed && @is_hovering
-        [@pressed_color || @hover_color || @base_color,
-         @pressed_label_color || @hover_label_color || @base_label_color]
-      elsif @is_hovering
-        [@hover_color || @base_color, @hover_label_color || @base_label_color]
+    def state_color(base, hover, pressed)
+      if @hovering && !@pressed.empty?
+        pressed || hover || base
+      elsif @hovering
+        hover || base
       else
-        [@base_color, @base_label_color]
+        base
       end
     end
 

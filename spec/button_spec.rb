@@ -263,25 +263,213 @@ RSpec.describe Ruby2D::Button do
       expect(owned.contains?(50, 20)).to be false
     end
 
-    it 'forwards alignment to the visual, and ignores it without one' do
+    it 'forwards alignment and padding to the visual, and ignores them without one' do
       rect   = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40, add: false)
       button = Ruby2D::Button.new(rect, add: false)
       button.x = :right
+      button.padding_right = 12
       expect(rect.x_align).to eq(:right)
+      expect(rect.padding_right).to eq(12)
+      expect(button.padding_right).to eq(12)
 
       quad = Ruby2D::Quad.new(add: false)
       expect { Ruby2D::Button.new(quad, add: false).x = :center }.to raise_error(Ruby2D::Error, /Quad x must be a number/)
 
       hit_area = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, add: false)
       hit_area.x = :right
+      hit_area.padding = 12
       expect(hit_area.x).to eq(0)
+      expect(hit_area.padding_left).to be_nil
     end
   end
 
+  describe 'padding accessors' do
+    it "read and write the owned visual's padding" do
+      button = Ruby2D::Button.new(x: :right, y: 0, width: 100, height: 40, color: 'navy',
+                                  padding: 16, add: false)
+      visual = button.instance_variable_get(:@visual)
+      expect(button.padding_right).to eq(16)
 
+      button.padding_right = 32
+      button.padding_top = 4
+      expect(visual.padding_right).to eq(32)
+      expect(visual.padding_top).to eq(4)
 
+      button.padding = 8
+      expect([visual.padding_top, visual.padding_right, visual.padding_bottom, visual.padding_left]).to eq([8, 8, 8, 8])
+      expect([button.padding_top, button.padding_right, button.padding_bottom, button.padding_left]).to eq([8, 8, 8, 8])
+    end
+  end
 
+  describe 'visibility' do
+    it 'assigns visible= like show and hide, on the visual' do
+      owned   = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, label: 'Go', add: false)
+      wrapped = Ruby2D::Button.new(Ruby2D::Rectangle.new(width: 100, height: 40, add: false), add: false)
+      [owned, wrapped].each do |button|
+        visual = button.instance_variable_get(:@visual)
+        button.visible = false
+        expect(button.visible?).to be false
+        expect(visual.visible?).to be false
+        button.visible = true
+        expect(button.visible?).to be true
+        expect(visual.visible?).to be true
+      end
+    end
 
+    it 'keeps its own flag on a visual-less button' do
+      button = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, add: false)
+      button.visible = false
+      expect(button.visible?).to be false
+      button.show
+      expect(button.visible?).to be true
+    end
+  end
+
+  describe 'tints on a visual without a color' do
+    let(:image) { Ruby2D::Image.new(test_image('image.png'), add: false) }
+
+    it 'tints the label of a Button wrapping an Image or Canvas' do
+      canvas = Ruby2D::Canvas.new(width: 100, height: 40, add: false)
+      [image, canvas].each do |visual|
+        button = Ruby2D::Button.new(visual, label: 'Go', hover_label_color: 'yellow', add: false)
+        label  = button.instance_variable_get(:@label)
+        button._fire_event(:hover, nil)
+        expect(rgb(label)).to eq(rgb(Ruby2D::Text.new('', color: 'yellow', add: false)))
+        button._fire_event(:hover_out, nil)
+        expect(rgb(label)).to eq([1.0, 1.0, 1.0])
+      end
+    end
+
+    it 'rejects a fill tint on a visual with no color, and on a visual-less button' do
+      expect { Ruby2D::Button.new(image, hover_color: :auto, add: false) }
+        .to raise_error(ArgumentError, /`Ruby2D::Image` has no `color`/)
+      expect { Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, pressed_color: 'red', add: false) }
+        .to raise_error(ArgumentError, /visual-less `Button` draws nothing/)
+    end
+  end
+
+  describe ':auto tints after a color change' do
+    it 'derives the hover and pressed tints from the new base color' do
+      button = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 50, color: '#f00',
+                                  hover_color: :auto, pressed_color: :auto)
+      visual = button.instance_variable_get(:@visual)
+      button.color = '#00f'
+
+      move_to(25, 25)
+      expect(visual.color.to_a).to eq([0.15, 0.15, 1.0, 1.0])
+      press
+      expect(visual.color.to_a).to eq([0.0, 0.0, 0.85, 1.0])
+    end
+
+    it 'keeps an explicit tint as it was' do
+      button = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 50, color: '#f00',
+                                  hover_color: '#0f0')
+      visual = button.instance_variable_get(:@visual)
+      button.color = '#00f'
+
+      move_to(25, 25)
+      expect(rgb(visual)).to eq([0.0, 1.0, 0.0])
+    end
+
+    it 'derives the tints per vertex from a new gradient base' do
+      button = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 50, color: gradient,
+                                  hover_color: :auto, pressed_color: :auto)
+      visual = button.instance_variable_get(:@visual)
+      button.color = %w[navy blue teal aqua]
+      base = button.color
+
+      move_to(25, 25)
+      4.times { |i| expect(visual.color.vertex(i).r).to be_within(1e-6).of([base.vertex(i).r + 0.15, 1.0].min) }
+      press
+      4.times { |i| expect(visual.color.vertex(i).b).to be_within(1e-6).of([base.vertex(i).b - 0.15, 0.0].max) }
+      expect(visual.color.vertex(3).to_a).not_to eq(visual.color.vertex(0).to_a)
+    end
+  end
+
+  describe 'press state' do
+    let(:button) do
+      Ruby2D::Button.new(x: 0, y: 0, width: 50, height: 50, color: '#00f',
+                         hover_color: '#0f0', pressed_color: '#f00')
+    end
+    let(:visual) { button.instance_variable_get(:@visual) }
+
+    it 'tints on a press with no prior mouse move, as on a button that appeared under the cursor' do
+      move_to(25, 25)
+      button
+      press
+      expect(rgb(visual)).to eq([1.0, 0.0, 0.0])
+
+      # A drag out still drops the tint, and a drag back in restores it
+      move_to(200, 200)
+      expect(rgb(visual)).to eq([0.0, 0.0, 1.0])
+      move_to(25, 25)
+      expect(rgb(visual)).to eq([1.0, 0.0, 0.0])
+    end
+
+    it 'stays pressed until the last of several mouse buttons is released' do
+      button
+      move_to(25, 25)
+      press(:left)
+      press(:right)
+      release(:right)
+      expect(rgb(visual)).to eq([1.0, 0.0, 0.0])
+
+      release(:left)
+      expect(rgb(visual)).to eq([0.0, 1.0, 0.0])
+    end
+
+    it 'is cancelled by remove, so the re-added button hovers without a stale press' do
+      button
+      move_to(25, 25)
+      press
+      button.remove
+      expect(rgb(visual)).to eq([0.0, 0.0, 1.0])
+
+      release(:left, 100, 100)
+      button.add
+      move_to(26, 25)
+      expect(rgb(visual)).to eq([0.0, 1.0, 0.0])
+    end
+
+    it 'is cancelled by removing the wrapped visual directly, with the capture and hover it held' do
+      rect = Ruby2D::Rectangle.new(x: 0, y: 0, width: 50, height: 50, color: '#00f')
+      Ruby2D::Button.new(rect, hover_color: '#0f0', pressed_color: '#f00')
+      events = []
+      rect.on(:mouse_held) { events << :held }
+      move_to(25, 25)
+      press
+      rect.remove
+      expect(rgb(rect)).to eq([0.0, 0.0, 1.0])
+      window.mouse_callback(:held, :left, nil, 25, 25, nil, nil)
+      expect(events).to eq([])
+      expect(window.instance_variable_get(:@pressed_objects)).to be_empty
+      expect(window.instance_variable_get(:@hovered_object)).to be_nil
+
+      release(:left, 100, 100)
+      rect.add
+      move_to(26, 25)
+      expect(rgb(rect)).to eq([0.0, 1.0, 0.0])
+    end
+
+    it 'is cancelled by clearing the window' do
+      button
+      move_to(25, 25)
+      press
+      window.clear
+      expect(rgb(visual)).to eq([0.0, 0.0, 1.0])
+
+      button.add
+      move_to(26, 25)
+      expect(rgb(visual)).to eq([0.0, 1.0, 0.0])
+    end
+
+    it 'survives an add on a button that is already added' do
+      button
+      move_to(25, 25)
+      button.add
+      expect(rgb(visual)).to eq([0.0, 1.0, 0.0])
+    end
+  end
 
   describe 'after the window is cleared' do
     it 'is dormant, with or without a visual, until added again' do
