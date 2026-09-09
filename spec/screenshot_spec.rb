@@ -23,6 +23,6 @@ RSpec.describe 'Window#screenshot' do
     win = Ruby2D::Window.new
     Ruby2D::Window.shown = true # shown, but the frame loop is no longer running
     expect { win.screenshot('./ruby2d-spec.png') }
-      .to raise_error(Ruby2D::Error, /after the window closed/)
+      .to raise_error(Ruby2D::Error, /after the frame loop ended/)
   end
 end

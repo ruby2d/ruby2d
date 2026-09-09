@@ -84,6 +84,8 @@ module Ruby2D
       @object_set = {}
       @scene_order = 0
       @scene_generation = 0
+      # The list a frame is drawing from, while it is (see `render_objects`)
+      @drawing = nil
 
       init_window_defaults
       init_event_stores
@@ -200,8 +202,9 @@ module Ruby2D
     # Remove an object from the window
     def remove(object)
       raise Error, "Cannot remove `#{object.class}` from window!" if object.nil?
-      return false unless @objects.delete(object)
+      return false unless @object_set.key?(object)
 
+      editable_objects.delete(object)
       @object_set.delete(object)
       unregister_interactive(object)
       # A Button drawn by this object is not hit-tested without it, so the
@@ -223,7 +226,7 @@ module Ruby2D
     def reorder(object)
       in_scene = @object_set.key?(object)
       if in_scene
-        @objects.delete(object)
+        editable_objects.delete(object)
         insert_object(object)
       elsif (owner = @interactive_by_visual[object])
         # Not drawn, so not hit-tested, but the Button standing in for it is
@@ -240,7 +243,7 @@ module Ruby2D
     # visual-less Button, which has no scene object and may not be registered
     # yet, to tell that it was cleared.
     def clear
-      @objects.clear
+      editable_objects.clear
       @object_set.clear
       @scene_generation += 1
       @interactive_objects.each(&:_removed_from_scene)
@@ -455,20 +458,29 @@ module Ruby2D
     # public keyword `render`: on wasm mruby a zero-arg call into a
     # keyword-heavy method still pays ~5µs of keyword setup, so 100 sprites
     # would burn half a millisecond per frame on pure dispatch.
+    #
+    # The frame draws the list as it stood when the frame began. A callback
+    # that runs while an object draws (a Sprite's completion block, say, or the
+    # render block) may add, remove, or reorder objects; those edits go to a
+    # copy, through `editable_objects`, and show from the next frame. Editing
+    # the list in place would shift the objects after the edit under the
+    # iteration, so a sprite removing itself on completion skipped the object
+    # drawn next for that frame.
     def render_objects
+      objects = @drawing = @objects
       # Fast paths for the symbolic block positions: with the block pinned at
       # +∞ (`:foreground`, the default) or -∞ (`:background`) no object can
       # ever sort after (resp. before) it, so the per-object `z` read and
       # compare in the interleaving loop below could never fire — skip them.
       if @render_z == Float::INFINITY
-        @objects.each { |obj| obj._render_scene if obj.visible? }
+        objects.each { |obj| obj._render_scene if obj.visible? }
         render_callback
       elsif @render_z == -Float::INFINITY
         render_callback
-        @objects.each { |obj| obj._render_scene if obj.visible? }
+        objects.each { |obj| obj._render_scene if obj.visible? }
       else
         block_drawn = false
-        @objects.each do |obj|
+        objects.each do |obj|
           if !block_drawn && obj.z > @render_z
             render_callback
             block_drawn = true
@@ -477,6 +489,8 @@ module Ruby2D
         end
         render_callback unless block_drawn
       end
+    ensure
+      @drawing = nil
     end
 
     # Run the user's render block (and the overridden `render` method under the
@@ -515,24 +529,31 @@ module Ruby2D
       @close = false
       load_default_gamepad_mappings
 
-      if RUBY_ENGINE == 'ruby'
-        # CRuby: window_show creates the window and returns — Ruby owns the loop.
-        # Mark shown only after it succeeds; on failure it raises, so shown? stays
-        # false and no frame dereferences a NULL renderer.
-        Ext.window_show(self)
-        Window.shown = true
-        @running = true
-        tick until @close
-      else
-        # mruby/WASM: window_show creates the window AND runs the loop, blocking
-        # until close. Mark shown first so live updates (request_render, set title,
-        # etc.) work during the run; a creation failure raises before the loop.
-        Window.shown = true
-        @running = true
-        Ext.window_show(self)
+      begin
+        if RUBY_ENGINE == 'ruby'
+          # CRuby: window_show creates the window and returns — Ruby owns the loop.
+          # Mark shown only after it succeeds; on failure it raises, so shown? stays
+          # false and no frame dereferences a NULL renderer.
+          Ext.window_show(self)
+          Window.shown = true
+          @running = true
+          tick until @close
+        else
+          # mruby/WASM: window_show creates the window AND runs the loop, blocking
+          # until close. Mark shown first so live updates (request_render, set title,
+          # etc.) work during the run; a creation failure raises before the loop.
+          Window.shown = true
+          @running = true
+          Ext.window_show(self)
+        end
+      ensure
+        # The loop is over however it ended: an exception out of a callback
+        # leaves no frame to come either, so a later `screenshot` must raise
+        # rather than promise a file. Scoped below the guard above, so a
+        # second `show` from a callback of the running loop, rescued, leaves
+        # that loop's flag alone.
+        @running = false
       end
-
-      @running = false
     end
 
     # Take a screenshot, saving to `path` (or a timestamped file if omitted).
@@ -544,8 +565,9 @@ module Ruby2D
     # render, so a capture in `:on_demand` mode never grabs a parked frame, and
     # capturing and closing in the same tick still writes the file.
     #
-    # A closed window has no end-of-frame left to write on, so that raises rather
-    # than returning a path to a file that will never appear.
+    # A window whose frame loop has ended, closed or unwound by an exception,
+    # has no end-of-frame left to write on, so that raises rather than
+    # returning a path to a file that will never appear.
     #
     # A no-op on the web, returning nil: the only filesystem there is Emscripten's
     # in-memory one, so a capture would cost a framebuffer read and a PNG encode
@@ -554,7 +576,7 @@ module Ruby2D
       return if Ruby2D.web?
 
       if Window.shown? && !@running
-        raise Error, '`screenshot` called after the window closed; the file is ' \
+        raise Error, '`screenshot` called after the frame loop ended; the file is ' \
                      'written at the end of a frame, so nothing would be saved'
       end
 
@@ -707,8 +729,9 @@ module Ruby2D
     # Insert an object at the end of its z-bucket and record its insertion
     # order, the tie-breaker among equal z for drawing and hit-testing alike.
     def insert_object(object)
-      index = @objects.bsearch_index { |obj| obj.z > object.z }
-      @objects.insert(index || @objects.size, object)
+      objects = editable_objects
+      index = objects.bsearch_index { |obj| obj.z > object.z }
+      objects.insert(index || objects.size, object)
       @object_set[object] = next_scene_order
 
       # A Button ranks by its visual, so it follows the visual's new position
@@ -718,6 +741,14 @@ module Ruby2D
 
     def next_scene_order
       @scene_order += 1
+    end
+
+    # The scene list to edit: the live one, or a copy of it while a frame is
+    # drawing from it, so the draw in progress is unaffected (see
+    # `render_objects`). One copy serves every edit made during the frame.
+    def editable_objects
+      @objects = @objects.dup if @objects.equal?(@drawing)
+      @objects
     end
 
     def set_any_window_properties(opts)

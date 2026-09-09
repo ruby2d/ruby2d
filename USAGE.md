@@ -294,7 +294,7 @@ update do
 end
 ```
 
-Taking a screenshot after the window has closed raises, since no frame is left to write it.
+Taking a screenshot once the frame loop has ended, because the window closed or an exception unwound `show`, raises, since no frame is left to write it.
 
 On [the web](#building-for-the-web), `screenshot` does nothing and returns `nil`: the only filesystem there is Emscripten's in-memory one, so it could only write a file nobody can open.
 
@@ -2355,6 +2355,8 @@ clear  # remove all objects from the window
 - `.remove` / `.add` for lifecycle (spawn, despawn, destroy). Use `.remove` only when you genuinely want to stop participating in the scene graph.
 
 Toggling with `.remove` + `.add`, or by blanking a `Text`'s `content`, to achieve a hide/show effect is wasteful: `.remove` / `.add` re-inserts at the end of the object's z-bucket so z-equal siblings may reorder, and reassigning `content` rebuilds the texture on every toggle. Use `.hide` / `.show` instead.
+
+A frame draws the objects that were in the scene when it started drawing. Adding, removing, or restacking objects from a callback that runs while the frame draws, such as a `Sprite`'s completion block or the render block, takes effect from the next frame; edits made in `update` show in the same frame.
 
 The `z` property controls draw order. Higher values are drawn on top:
 
