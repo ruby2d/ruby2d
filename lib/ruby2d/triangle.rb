@@ -89,15 +89,16 @@ module Ruby2D
       self.opacity = opacity unless opacity.nil?
       @fill = fill
       @stroke_width = stroke_width
-      self.stroke_color = stroke_color || stroke_colour || (color || colour)
+      self.stroke_color = stroke_color || stroke_colour || _default_stroke_color
       self.stroke_color.opacity = opacity unless opacity.nil?
       @visible = visible
       self.add if add
     end
 
     # Set the stroke color. Accepts a single color or a `Color::Set` of 3
-    # (one per vertex) interpolated around the perimeter. If nil, defaults to
-    # the fill color (preserving a per-vertex set when the fill is per-vertex).
+    # (one per vertex) interpolated around the perimeter; nil is white. A
+    # triangle built without one gets a copy of its fill (see
+    # `Renderable#_default_stroke_color`).
     def stroke_color=(c)
       @stroke_color = Renderable.resolve_color_or_default(c, 3, label: self.class)
       # A single stroke Color (not a per-vertex Set) takes the compact
@@ -171,8 +172,9 @@ module Ruby2D
       # array from the already-resolved color (no second parse).
       # A per-vertex color flattens straight to floats, skipping the
       # `Color::Set` the general path builds — that allocates and parses one
-      # `Color` per vertex on every call. `resolved` stays nil in that case
-      # and the stroke below resolves for itself if it ends up needing one.
+      # `Color` per vertex on every call. `resolved` stays nil in that case;
+      # the default stroke below draws from this array, and only an explicit
+      # stroke color resolves on its own.
       # The `is_a?(Array)` guard is inline so the common single-color call
       # doesn't pay for a method call that would only decline.
       c = fill_input.is_a?(Array) ? Renderable.flatten_per_vertex(fill_input, 3, opacity) : nil
@@ -219,22 +221,34 @@ module Ruby2D
       # Resolve the stroke color only when actually stroking. A single stroke
       # color draws via the compact `stroke_triangle_uniform`; a per-vertex Set
       # keeps the splatting path. When no explicit stroke is given the stroke
-      # reuses the already-resolved fill color. (An explicit stroke color is
-      # still validated at stroke_width 0 below, matching the instance constructor.)
+      # draws with the fill's colors as resolved above, never re-parsing the
+      # input, so a `'random'` fill gets a matching outline. (An explicit
+      # stroke color is still validated at stroke_width 0 below, matching the
+      # instance constructor.)
       if stroke_width > 0
-        stroke_input = stroke_color || stroke_colour || fill_input
-        sresolved = if !stroke_input.equal?(fill_input)
-                      Color.for_render(stroke_input)
-                    else
-                      resolved || Color.for_render(fill_input.nil? ? 'white' : fill_input)
-                    end
-        if !sresolved.is_a?(Color::Set) && !opacity.is_a?(Array)
-          sa = opacity || sresolved.a
+        explicit_stroke = stroke_color || stroke_colour
+        if explicit_stroke
+          sresolved = Color.for_render(explicit_stroke)
+          if !sresolved.is_a?(Color::Set) && !opacity.is_a?(Array)
+            sa = opacity || sresolved.a
+            Ext.stroke_triangle_uniform(x1, y1, x2, y2, x3, y3, stroke_width,
+                                        sresolved.r, sresolved.g, sresolved.b, sa)
+          else
+            s1r, s1g, s1b, s1a, s2r, s2g, s2b, s2a, s3r, s3g, s3b, s3a =
+              Renderable.flatten_resolved_color(sresolved, 3, opacity, label: self)
+            Ext.stroke_triangle(
+              x1, y1, x2, y2, x3, y3, stroke_width,
+              s1r, s1g, s1b, s1a,
+              s2r, s2g, s2b, s2a,
+              s3r, s3g, s3b, s3a
+            )
+          end
+        elsif uniform
+          sa = opacity || resolved.a
           Ext.stroke_triangle_uniform(x1, y1, x2, y2, x3, y3, stroke_width,
-                                      sresolved.r, sresolved.g, sresolved.b, sa)
+                                      resolved.r, resolved.g, resolved.b, sa)
         else
-          s1r, s1g, s1b, s1a, s2r, s2g, s2b, s2a, s3r, s3g, s3b, s3a =
-            Renderable.flatten_resolved_color(sresolved, 3, opacity, label: self)
+          s1r, s1g, s1b, s1a, s2r, s2g, s2b, s2a, s3r, s3g, s3b, s3a = c
           Ext.stroke_triangle(
             x1, y1, x2, y2, x3, y3, stroke_width,
             s1r, s1g, s1b, s1a,

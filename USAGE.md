@@ -637,7 +637,7 @@ Rectangle.new(x: 10, y: 10, width: 100, height: 50,
 | `stroke_color` | Fill color | Outline color (single or per-vertex array matching the shape's vertex count) |
 
 Notes:
-- `stroke_color` defaults to the fill color. If the fill is per-vertex, the stroke gets the same per-vertex set so the outline traces the same gradient around the perimeter. Set it explicitly when you want a different outline color.
+- `stroke_color` defaults to a copy of the fill color, so fading one later leaves the other alone (see [Opacity](#opacity)). A per-vertex fill gives a per-vertex stroke with the same colors, so the outline traces the same gradient around the perimeter, and a `'random'` fill is rolled once, so the outline matches it. Set it explicitly when you want a different outline color.
 - `stroke_color:` accepts the same per-vertex vocabulary as `color:`; each vertex gets one color and pixels along each edge interpolate between the two endpoint colors. `Circle` and `Ellipse` strokes are single-color only.
 - `opacity:` applies to both fill and stroke when both are drawn.
 - Strokes rendered on persistent shapes use the same geometry as Canvas `stroke_*` methods, so a scene-graph outline and a Canvas outline of the same shape line up pixel-for-pixel (with minor anti-aliasing differences).

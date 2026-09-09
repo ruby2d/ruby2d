@@ -13,15 +13,6 @@ module Ruby2D
     # `_point_in_faceted_ellipse?`.
     FACETED_SECTORS = 30
 
-    # Resolve an input color to a single Color. If given a per-vertex array or
-    # Color::Set, returns the first color. nil returns nil. Used to derive a
-    # single stroke color from a fill that may be per-vertex.
-    def self.resolve_single_color(input)
-      return nil if input.nil?
-      c = Color.set(input)
-      c.is_a?(Color::Set) ? Color.new(c.first) : c
-    end
-
     # Resolve an input color allowing a Color::Set of exactly `vertex_count`
     # entries or a single color. nil returns white. Raises ArgumentError for
     # a Color::Set of the wrong length. Used by shapes that support per-vertex
@@ -385,6 +376,17 @@ module Ruby2D
     def opacity=(value)
       @color.opacity = value
       @stroke_color.opacity = value if instance_variable_defined?(:@stroke_color) && @stroke_color
+    end
+
+    # The stroke color a shape constructed without one gets: the resolved
+    # fill's colors, as independent state, so a later `color.opacity=` or
+    # `stroke_color.opacity=` fades one without the other. Copying the
+    # resolved fill rather than re-parsing the input also means `'random'` is
+    # rolled once, and the outline matches. `Color.set` copies a single
+    # `Color` but passes a `Color::Set` through as the same object, so a set
+    # is duplicated here.
+    def _default_stroke_color
+      @color.is_a?(Color::Set) ? @color.dup : @color
     end
 
     # Map a query point into this object's unrotated coordinate frame. Each

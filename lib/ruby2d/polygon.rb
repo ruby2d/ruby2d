@@ -28,7 +28,7 @@ module Ruby2D
       self.opacity = opacity unless opacity.nil?
       @fill = fill
       @stroke_width = stroke_width
-      self.stroke_color = stroke_color || stroke_colour || (color || colour)
+      self.stroke_color = stroke_color || stroke_colour || _default_stroke_color
       self.stroke_color.opacity = opacity unless opacity.nil?
       @visible = visible
       self.add if add
@@ -176,11 +176,14 @@ module Ruby2D
       end
 
       Ext.draw_polygon(coords, pvc) if fill
-      # Flatten the stroke colors only when actually stroking; an explicitly
-      # given stroke color is still validated at stroke_width 0 to match the
-      # instance constructor.
+      # Flatten the stroke colors only when actually stroking; without an
+      # explicit stroke color the outline is the fill as flattened above, not
+      # a second parse of the input (`'random'` would roll again). An
+      # explicitly given stroke color is still validated at stroke_width 0 to
+      # match the instance constructor.
       if stroke_width > 0
-        pvs = Renderable.flatten_color(stroke_color || stroke_colour || fill_input, n, opacity, label: self)
+        explicit_stroke = stroke_color || stroke_colour
+        pvs = explicit_stroke ? Renderable.flatten_color(explicit_stroke, n, opacity, label: self) : pvc
         Ext.stroke_path(coords, stroke_width, pvs, true)
       elsif stroke_color || stroke_colour
         Renderable.flatten_color(stroke_color || stroke_colour, n, opacity, label: self)

@@ -100,15 +100,16 @@ module Ruby2D
       self.opacity = opacity unless opacity.nil?
       @fill = fill
       @stroke_width = stroke_width
-      self.stroke_color = stroke_color || stroke_colour || (color || colour)
+      self.stroke_color = stroke_color || stroke_colour || _default_stroke_color
       self.stroke_color.opacity = opacity unless opacity.nil?
       @visible = visible
       self.add if add
     end
 
     # Set the stroke color. Accepts a single color or a `Color::Set` of 4
-    # (one per vertex) interpolated around the perimeter. If nil, defaults to
-    # the fill color (preserving a per-vertex set when the fill is per-vertex).
+    # (one per vertex) interpolated around the perimeter; nil is white. A
+    # quad built without one gets a copy of its fill (see
+    # `Renderable#_default_stroke_color`).
     def stroke_color=(c)
       @stroke_color = Renderable.resolve_color_or_default(c, 4, label: self.class)
       # A single stroke Color (not a per-vertex Set) takes the compact
@@ -200,8 +201,9 @@ module Ruby2D
       # a shared cached instance for string colors — read-only here.
       # A per-vertex color flattens straight to floats, skipping the
       # `Color::Set` the general path builds — that allocates and parses one
-      # `Color` per vertex on every call. `resolved` stays nil in that case
-      # and the stroke below resolves for itself if it ends up needing one.
+      # `Color` per vertex on every call. `resolved` stays nil in that case;
+      # the default stroke below draws from this array, and only an explicit
+      # stroke color resolves on its own.
       # The `is_a?(Array)` guard is inline so the common single-color call
       # doesn't pay for a method call that would only decline.
       c = fill_input.is_a?(Array) ? Renderable.flatten_per_vertex(fill_input, 4, opacity) : nil
@@ -251,24 +253,37 @@ module Ruby2D
 
       # Resolve the stroke color only when actually stroking. A single stroke
       # color draws via the compact `stroke_quad_uniform`; a per-vertex Set keeps
-      # the splatting path. When no explicit stroke is given the stroke reuses
-      # the already-resolved fill color. (An explicit stroke color is still
-      # validated at stroke_width 0 below, matching the instance constructor.)
+      # the splatting path. When no explicit stroke is given the stroke draws
+      # with the fill's colors as resolved above, never re-parsing the input,
+      # so a `'random'` fill gets a matching outline. (An explicit stroke color
+      # is still validated at stroke_width 0 below, matching the instance
+      # constructor.)
       if stroke_width > 0
-        stroke_input = explicit_stroke || fill_input
-        sresolved = if !stroke_input.equal?(fill_input)
-                      Color.for_render(stroke_input)
-                    else
-                      resolved || Color.for_render(fill_input.nil? ? 'white' : fill_input)
-                    end
-        if !sresolved.is_a?(Color::Set) && !opacity.is_a?(Array)
-          sa = opacity || sresolved.a
+        if explicit_stroke
+          sresolved = Color.for_render(explicit_stroke)
+          if !sresolved.is_a?(Color::Set) && !opacity.is_a?(Array)
+            sa = opacity || sresolved.a
+            Ext.stroke_quad_uniform(x1, y1, x2, y2, x3, y3, x4, y4, stroke_width,
+                                    sresolved.r, sresolved.g, sresolved.b, sa)
+          else
+            s1r, s1g, s1b, s1a, s2r, s2g, s2b, s2a,
+              s3r, s3g, s3b, s3a, s4r, s4g, s4b, s4a =
+              Renderable.flatten_resolved_color(sresolved, 4, opacity, label: self)
+            Ext.stroke_quad(
+              x1, y1, x2, y2, x3, y3, x4, y4, stroke_width,
+              s1r, s1g, s1b, s1a,
+              s2r, s2g, s2b, s2a,
+              s3r, s3g, s3b, s3a,
+              s4r, s4g, s4b, s4a
+            )
+          end
+        elsif uniform
+          sa = opacity || resolved.a
           Ext.stroke_quad_uniform(x1, y1, x2, y2, x3, y3, x4, y4, stroke_width,
-                                  sresolved.r, sresolved.g, sresolved.b, sa)
+                                  resolved.r, resolved.g, resolved.b, sa)
         else
           s1r, s1g, s1b, s1a, s2r, s2g, s2b, s2a,
-            s3r, s3g, s3b, s3a, s4r, s4g, s4b, s4a =
-            Renderable.flatten_resolved_color(sresolved, 4, opacity, label: self)
+            s3r, s3g, s3b, s3a, s4r, s4g, s4b, s4a = c
           Ext.stroke_quad(
             x1, y1, x2, y2, x3, y3, x4, y4, stroke_width,
             s1r, s1g, s1b, s1a,

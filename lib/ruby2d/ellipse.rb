@@ -50,7 +50,7 @@ module Ruby2D
       self.opacity = opacity unless opacity.nil?
       @fill = fill
       @stroke_width = stroke_width
-      self.stroke_color = stroke_color || stroke_colour || (color || colour)
+      self.stroke_color = stroke_color || stroke_colour || _default_stroke_color
       self.stroke_color.opacity = opacity unless opacity.nil?
       @visible = visible
       self.add if add
@@ -147,6 +147,10 @@ module Ruby2D
       end
 
       Window.render_ready_check
+      # A scalar opacity override is clamped like `Color#opacity=`, so a fade
+      # that overshoots pins to opaque or transparent for the fill and the
+      # stroke alike, instead of handing the renderer an out-of-range alpha.
+      opacity = opacity.clamp(0.0, 1.0) if opacity.is_a?(Numeric)
       c = Renderable.flatten_color(fill_input, 1, opacity)
 
       # `rotate` (degrees) tilts the ellipse and, given a pivot other than the
@@ -163,12 +167,19 @@ module Ruby2D
       end
 
       Ext.draw_ellipse(x, y, xradius, yradius, rad, sectors, c[0], c[1], c[2], c[3]) if fill
-      # Resolve the stroke color only when actually stroking.
+      # Resolve the stroke color only when actually stroking. Without an
+      # explicit stroke color the outline is the fill as flattened above, not a
+      # second parse of the input (`'random'` would roll again).
       if stroke_width > 0
-        sc = Renderable.resolve_single_color(stroke_input) || Color.new('white')
-        sc = Color.new(sc)
-        sc.opacity = opacity if opacity
-        Ext.stroke_ellipse(x, y, xradius, yradius, rad, sectors, stroke_width, sc.r, sc.g, sc.b, sc.a)
+        if explicit_stroke
+          # `Color.set` builds a fresh Color (the per-vertex check above ruled
+          # out a set), so the opacity override mutates nothing shared.
+          sc = Color.set(explicit_stroke)
+          sc.opacity = opacity if opacity
+          Ext.stroke_ellipse(x, y, xradius, yradius, rad, sectors, stroke_width, sc.r, sc.g, sc.b, sc.a)
+        else
+          Ext.stroke_ellipse(x, y, xradius, yradius, rad, sectors, stroke_width, c[0], c[1], c[2], c[3])
+        end
       end
     end
 
