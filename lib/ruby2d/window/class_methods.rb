@@ -44,6 +44,11 @@ module Ruby2D
         DSL.window.viewport_mode
       end
 
+      # Get the render mode
+      def render_mode
+        DSL.window.render_mode
+      end
+
       # Get the window-wide texture scaling mode
       def scale_mode
         DSL.window.scale_mode
@@ -67,6 +72,11 @@ module Ruby2D
       # Get the display height in physical pixels
       def display_pixel_height
         DSL.window.display_pixel_height
+      end
+
+      # Get the window icon path
+      def icon
+        DSL.window.icon
       end
 
       # Get whether the window is resizable
@@ -129,6 +139,11 @@ module Ruby2D
       # Get whether FPS display is enabled
       def show_fps
         DSL.window.show_fps
+      end
+
+      # Get whether Escape closes the window
+      def close_on_esc
+        DSL.window.close_on_esc
       end
 
       # Take a screenshot, saving to `path` (or a timestamped file if omitted)
@@ -196,9 +211,10 @@ module Ruby2D
         DSL.window.update(&proc)
       end
 
-      # Set the render callback
-      def render(&proc)
-        DSL.window.render(&proc)
+      # Set the render callback, at `z:` in the scene's z-order (see
+      # `Window#render`)
+      def render(z: :foreground, &proc)
+        DSL.window.render(z: z, &proc)
       end
 
       # Show the window

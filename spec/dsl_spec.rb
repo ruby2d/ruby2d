@@ -38,4 +38,27 @@ RSpec.describe Ruby2D::DSL do
     end
   end
 
+  # USAGE.md promises every readable window attribute as a method on the
+  # Window class too. Nothing at runtime tells a method `attr_reader` defined
+  # from one written out, so the list is read from the source.
+  describe "Window class getters" do
+    it "cover every attribute reader on the window instance" do
+      source = File.read(File.expand_path('../lib/ruby2d/window.rb', __dir__))
+      readers = source[/^ *attr_reader (.*?)\n\n/m, 1].scan(/:(\w+)/).flatten.map(&:to_sym)
+      expect(readers).to include(:title, :render_mode, :close_on_esc, :icon)
+      missing = readers.reject { |name| Ruby2D::Window.respond_to?(name) }
+      expect(missing).to be_empty
+    end
+
+    it "read the same values as the instance and `get`" do
+      set title: 'Getter check', render_mode: :on_demand, close_on_esc: true
+      %i[title render_mode close_on_esc icon].each do |name|
+        expect(Ruby2D::Window.public_send(name)).to eq(get(name))
+        expect(Ruby2D::Window.public_send(name)).to eq(Ruby2D::Window.current.public_send(name))
+      end
+      expect(Ruby2D::Window.render_mode).to eq(:on_demand)
+      expect(Ruby2D::Window.close_on_esc).to be true
+      expect(Ruby2D::Window.icon).to be_nil
+    end
+  end
 end

@@ -54,4 +54,29 @@ RSpec.describe 'Render block z-order' do
     expect { win.render(z: :sideways) {} }
       .to raise_error(Ruby2D::Error, /:foreground.*:background|:background.*:foreground/)
   end
+
+  it 'keeps the current block at its depth when a registration is rejected' do
+    win = Ruby2D::Window.new
+    log = []
+    win.add(drawable(0, log, 'obj0'))
+    win.render(z: :background) { log << 'original' }
+    expect { win.render(z: :foregound) { log << 'rejected' } }.to raise_error(Ruby2D::Error)
+
+    win.render_objects
+    expect(log).to eq(%w[original obj0])
+  end
+
+  it 'takes the same z: through the Window class and the DSL as on the instance' do
+    win = Ruby2D::Window.new
+    dsl = Object.new.extend(Ruby2D::DSL)
+    depth = -> { win.instance_variable_get(:@render_z) }
+
+    Ruby2D::Window.render(z: 10) {}
+    expect(depth.call).to eq(10)
+    dsl.render(z: :background) {}
+    expect(depth.call).to eq(-Float::INFINITY)
+    Ruby2D::Window.render {}
+    expect(depth.call).to eq(Float::INFINITY)
+    expect { Ruby2D::Window.render(z: :sideways) {} }.to raise_error(Ruby2D::Error)
+  end
 end

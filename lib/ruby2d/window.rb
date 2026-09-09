@@ -256,7 +256,10 @@ module Ruby2D
       @update_proc = proc
       # Cache whether the block takes a delta-time arg; the arity never changes
       # after assignment, so the per-frame loop reads this instead of recomputing.
-      @update_wants_dt = !proc.arity.zero?
+      # A block or proc takes any number of arguments, so only a lambda declared
+      # without parameters is called without `dt`: a proc with an optional
+      # parameter reports arity 0 too, but wants the value.
+      @update_wants_dt = !(proc.lambda? && proc.arity.zero?)
       true
     end
 
@@ -267,8 +270,12 @@ module Ruby2D
     # block, then the rest).
     def render(z: :foreground, &proc)
       raise Error, '`render` requires a block' unless proc
+
+      # Resolve `z` before touching either field, so a rejected registration
+      # leaves the current block in place at its depth
+      depth = render_z_for(z)
       @render_proc = proc
-      @render_z = render_z_for(z)
+      @render_z = depth
       true
     end
 
