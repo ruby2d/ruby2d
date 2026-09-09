@@ -11,7 +11,14 @@ module Ruby2D
       0.0, 1.0  # bottom left
     ].freeze
 
-    # Create a vertex set for a tile placement
+    # Create a vertex set for a tile placement. A flip mirrors the texture
+    # coordinates, not the quad: mirroring the quad by negating an extent
+    # reverses its winding, and SDL's software renderer drops half of a
+    # reversed quad's texture detail when it's also rotated a quarter turn.
+    # Every quad therefore keeps the same corner order, and the UVs carry the
+    # flip. Each corner still maps to the same texel as before; only the
+    # diagonal the quad is split along changes, so a flipped tile now rounds
+    # at a texel seam exactly like its unflipped self.
     def initialize(x, y, width, height, rotate, crop: nil, flip: nil)
       @x = x
       @y = y
@@ -19,7 +26,7 @@ module Ruby2D
       @height = height.to_f
       @rotate = rotate
       @crop = crop
-      apply_flip(flip)
+      @flip = flip
       @rx = @x + (@width / 2.0)
       @ry = @y + (@height / 2.0)
     end
@@ -31,7 +38,12 @@ module Ruby2D
 
     # Get the texture UV coordinates as a flat array
     def texture_coordinates
-      @texture_coordinates ||= @crop ? cropped_texture_coordinates : TEX_UNCROPPED_COORDS
+      @texture_coordinates ||=
+        if @crop || @flip
+          build_texture_coordinates
+        else
+          TEX_UNCROPPED_COORDS
+        end
     end
 
     private
@@ -68,14 +80,23 @@ module Ruby2D
        dx * sa + dy * ca + @ry]
     end
 
-    def cropped_texture_coordinates
-      img_w = @crop[:image_width].to_f
-      img_h = @crop[:image_height].to_f
+    # The crop's UV rectangle (the whole texture without one), mirrored per
+    # axis for the flip, in the same corner order as `coordinates`
+    def build_texture_coordinates
+      if @crop
+        img_w = @crop[:image_width].to_f
+        img_h = @crop[:image_height].to_f
 
-      left   = @crop[:x] / img_w
-      top    = @crop[:y] / img_h
-      right  = left + (@crop[:width] / img_w)
-      bottom = top + (@crop[:height] / img_h)
+        left   = @crop[:x] / img_w
+        top    = @crop[:y] / img_h
+        right  = left + (@crop[:width] / img_w)
+        bottom = top + (@crop[:height] / img_h)
+      else
+        left, top, right, bottom = 0.0, 0.0, 1.0, 1.0
+      end
+
+      left, right = right, left if @flip == :horizontal || @flip == :both
+      top, bottom = bottom, top if @flip == :vertical || @flip == :both
 
       [
         left,  top,    # top left
@@ -83,20 +104,6 @@ module Ruby2D
         right, bottom, # bottom right
         left,  bottom  # bottom left
       ]
-    end
-
-    def apply_flip(flip)
-      return unless flip
-
-      if flip == :horizontal || flip == :both
-        @x += @width
-        @width = -@width
-      end
-
-      if flip == :vertical || flip == :both
-        @y += @height
-        @height = -@height
-      end
     end
   end
 end
