@@ -11,16 +11,46 @@ module Ruby2D
       Parser.new(str).parse
     end
 
+    # Encode a Unicode code point as a UTF-8 string. On CRuby,
+    # `Integer#chr(Encoding::UTF_8)` produces a properly tagged UTF-8 string.
+    # mruby (without the encoding mrbgem) lacks `Encoding`, so we fall back to
+    # a hand-rolled UTF-8 byte sequence. `AtlasParser` uses it for numeric
+    # character references too.
+    def self.encode_utf8(code)
+      code.chr(Encoding::UTF_8)
+    rescue NameError, ArgumentError
+      encode_utf8_bytes(code)
+    end
+
+    def self.encode_utf8_bytes(code)
+      if code < 0x80
+        code.chr
+      elsif code < 0x800
+        (0xC0 | (code >> 6)).chr +
+          (0x80 | (code & 0x3F)).chr
+      elsif code < 0x10000
+        (0xE0 | (code >> 12)).chr +
+          (0x80 | ((code >> 6) & 0x3F)).chr +
+          (0x80 | (code & 0x3F)).chr
+      else
+        (0xF0 | (code >> 18)).chr +
+          (0x80 | ((code >> 12) & 0x3F)).chr +
+          (0x80 | ((code >> 6) & 0x3F)).chr +
+          (0x80 | (code & 0x3F)).chr
+      end
+    end
+
     class Parser
-      # Cap nesting depth so pathological input fails with a ParseError rather
-      # than overflowing the Ruby stack with a SystemStackError. Real texture
-      # atlases nest only a handful of levels deep.
+      # Cap nesting so pathological input fails with a ParseError instead of
+      # allocating a container per opening bracket without bound. Containers
+      # are parsed with an explicit stack rather than by recursion (see
+      # `parse_container`), so the cap bounds work, not the Ruby call stack;
+      # real texture atlases nest only a handful of levels deep.
       MAX_DEPTH = 500
 
       def initialize(str)
         @s = str
         @i = 0
-        @depth = 0
       end
 
       def parse
@@ -35,14 +65,17 @@ module Ruby2D
       private
 
       def parse_value
-        @depth += 1
-        raise ParseError, "nesting too deep (over #{MAX_DEPTH} levels)" if @depth > MAX_DEPTH
-
         skip_ws
         c = @s[@i]
+        if c == '{' || c == '['
+          parse_container
+        else
+          parse_scalar(c)
+        end
+      end
+
+      def parse_scalar(c)
         case c
-        when '{' then parse_object
-        when '[' then parse_array
         when '"' then parse_string
         when 't', 'f' then parse_bool
         when 'n' then parse_null
@@ -50,62 +83,82 @@ module Ruby2D
         else
           raise ParseError, "unexpected character #{c.inspect} at offset #{@i}"
         end
-      ensure
-        @depth -= 1
       end
 
-      def parse_object
-        @i += 1
-        obj = {}
-        skip_ws
-        if @s[@i] == '}'
-          @i += 1
-          return obj
-        end
-        loop do
+      # Parse the object or array at `@i`, and everything nested in it, with
+      # an explicit stack of open containers instead of recursion: mruby
+      # allows only a few hundred Ruby call frames, and a recursive parser
+      # spent several per level, so a hundred and fifty nested arrays
+      # overflowed it before any depth guard could fire. `keys` holds, for
+      # each open container, the key the next value is stored under (nil for
+      # an array).
+      def parse_container
+        containers = []
+        keys = []
+        value = nil
+        while true
+          # At the start of a value.
           skip_ws
-          raise ParseError, "expected string key at offset #{@i}" unless @s[@i] == '"'
+          c = @s[@i]
+          if c == '{' || c == '['
+            raise ParseError, "nesting too deep (over #{MAX_DEPTH} levels)" if containers.length >= MAX_DEPTH
 
-          key = parse_string
-          skip_ws
-          raise ParseError, "expected ':' at offset #{@i}" unless @s[@i] == ':'
-
-          @i += 1
-          obj[key] = parse_value
-          skip_ws
-          case @s[@i]
-          when ','
             @i += 1
-          when '}'
-            @i += 1
-            return obj
+            container = c == '{' ? {} : []
+            skip_ws
+            if @s[@i] == (c == '{' ? '}' : ']')
+              @i += 1
+              value = container
+            else
+              containers << container
+              keys << (c == '{' ? parse_key : nil)
+              next
+            end
           else
-            raise ParseError, "expected ',' or '}' at offset #{@i}"
+            value = parse_scalar(c)
+          end
+
+          # The value is complete: store it in the innermost open container,
+          # then read the separator. A closing bracket completes that
+          # container, which becomes the value to store one level up.
+          while true
+            return value if containers.empty?
+
+            container = containers.last
+            if container.is_a?(Hash)
+              container[keys.last] = value
+              closer = '}'
+            else
+              container << value
+              closer = ']'
+            end
+            skip_ws
+            c = @s[@i]
+            if c == ','
+              @i += 1
+              keys[-1] = parse_key if container.is_a?(Hash)
+              break
+            elsif c == closer
+              @i += 1
+              value = containers.pop
+              keys.pop
+            else
+              raise ParseError, "expected ',' or '#{closer}' at offset #{@i}"
+            end
           end
         end
       end
 
-      def parse_array
-        @i += 1
-        arr = []
+      def parse_key
         skip_ws
-        if @s[@i] == ']'
-          @i += 1
-          return arr
-        end
-        loop do
-          arr << parse_value
-          skip_ws
-          case @s[@i]
-          when ','
-            @i += 1
-          when ']'
-            @i += 1
-            return arr
-          else
-            raise ParseError, "expected ',' or ']' at offset #{@i}"
-          end
-        end
+        raise ParseError, "expected string key at offset #{@i}" unless @s[@i] == '"'
+
+        key = parse_string
+        skip_ws
+        raise ParseError, "expected ':' at offset #{@i}" unless @s[@i] == ':'
+
+        @i += 1
+        key
       end
 
       def parse_string
@@ -161,7 +214,7 @@ module Ruby2D
           # scalar value; without this guard it would escape as a RangeError.
           raise ParseError, "unexpected low surrogate at offset #{@i}"
         end
-        encode_codepoint(code)
+        JsonParser.encode_utf8(code)
       end
 
       def read_hex4
@@ -176,33 +229,6 @@ module Ruby2D
 
       def hex_only?(s)
         s.each_char.all? { |c| (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') }
-      end
-
-      # On CRuby, `Integer#chr(Encoding::UTF_8)` produces a properly tagged
-      # UTF-8 string. mruby (without the encoding mrbgem) lacks `Encoding`, so
-      # we fall back to a hand-rolled UTF-8 byte sequence.
-      def encode_codepoint(code)
-        code.chr(Encoding::UTF_8)
-      rescue NameError, ArgumentError
-        encode_codepoint_bytes(code)
-      end
-
-      def encode_codepoint_bytes(code)
-        if code < 0x80
-          code.chr
-        elsif code < 0x800
-          (0xC0 | (code >> 6)).chr +
-            (0x80 | (code & 0x3F)).chr
-        elsif code < 0x10000
-          (0xE0 | (code >> 12)).chr +
-            (0x80 | ((code >> 6) & 0x3F)).chr +
-            (0x80 | (code & 0x3F)).chr
-        else
-          (0xF0 | (code >> 18)).chr +
-            (0x80 | ((code >> 12) & 0x3F)).chr +
-            (0x80 | ((code >> 6) & 0x3F)).chr +
-            (0x80 | (code & 0x3F)).chr
-        end
       end
 
       def parse_number

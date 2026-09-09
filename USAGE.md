@@ -1428,10 +1428,12 @@ runner = Sprite.new(sheet, animations: {
 | `image_path` | Resolved path to the atlas's texture image |
 | `texture` | The shared backing `Image` |
 | `frame_names` | All frame names, in declaration order |
-| `frame(name)` / `[name]` | Look up a frame's `{x:, y:, width:, height:}`, or `nil` if absent |
+| `frame(name)` / `[name]` | Look up a frame's `{x:, y:, width:, height:}`, plus any trim or rotation keys the atlas carries, or `nil` if absent |
 | `frame?(name)` | Whether the sheet contains the named frame |
 
-TexturePacker can pack frames rotated 90° (the `"rotated": true` flag). Ruby 2D doesn't draw rotated atlas frames yet; building a `Sprite` against one raises `Ruby2D::Error`. For now, repack the atlas with rotation disabled.
+TexturePacker can pack frames rotated 90° (the JSON `"rotated": true` flag, or `rotated="true"` in Sparrow XML). Ruby 2D doesn't draw rotated atlas frames yet; building a `Sprite` against one raises `Ruby2D::Error` from either format. For now, repack the atlas with rotation disabled.
+
+An XML atlas is read as XML: markup inside a comment, CDATA section, or processing instruction is skipped rather than read as a frame, a `>` inside a quoted attribute value is part of the value, and the predefined entities and numeric character references in attribute values are decoded, so `imagePath="a&amp;b.png"` names the file `a&b.png`. An atlas with an unterminated attribute value, tag, or comment raises `Ruby2D::AtlasParser::ParseError` instead of loading a truncated frame.
 
 **Trimmed frames** are supported. When TexturePacker (or Aseprite, etc.) crops transparent edges from each frame, the atlas stores the original frame size (`sourceSize`/`frameWidth`,`frameHeight`) and the offset of the trimmed pixels within it (`spriteSourceSize.x`,`y` / `frameX`,`frameY`). Ruby 2D draws those frames at their original logical size: `sprite.width` and `sprite.height` reflect the un-trimmed footprint, and the packed pixels render at the correct offset. No setup is needed; if the atlas carries trim metadata, it just works.
 

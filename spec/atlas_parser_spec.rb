@@ -57,6 +57,120 @@ RSpec.describe Ruby2D::AtlasParser do
       untrimmed = result[:frames]['untrimmed']
       expect(untrimmed).not_to include(:source_width, :trim_x)
     end
+
+    it 'flags rotated frames and omits the key for unrotated ones, like the JSON path' do
+      xml = '<TextureAtlas imagePath="s.png">' \
+            '<SubTexture name="hero" x="0" y="0" width="4" height="8" rotated="true"/>' \
+            '<SubTexture name="flat" x="0" y="0" width="4" height="8" rotated="false"/>' \
+            '<SubTexture name="plain" x="0" y="0" width="4" height="8"/>' \
+            '</TextureAtlas>'
+      frames = described_class.parse_xml(xml)[:frames]
+      expect(frames['hero']).to eq(x: 0, y: 0, width: 4, height: 8, rotated: true)
+      expect(frames['flat']).not_to include(:rotated)
+      expect(frames['plain']).not_to include(:rotated)
+    end
+
+    it 'decodes the predefined entities and numeric character references in attribute values' do
+      xml = '<TextureAtlas imagePath="a&amp;b.png">' \
+            '<SubTexture name="a&amp;b" x="0" y="0" width="1" height="1"/>' \
+            '<SubTexture name="q&quot;s&apos;lt&lt;gt&gt;" x="0" y="0" width="1" height="1"/>' \
+            '<SubTexture name="num&#65;&#x42;&#x1F600;" x="0" y="0" width="1" height="1"/>' \
+            '</TextureAtlas>'
+      result = described_class.parse_xml(xml)
+      expect(result[:image_path]).to eq('a&b.png')
+      expect(result[:frames].keys).to eq(['a&b', %q(q"s'lt<gt>), "numAB\u{1F600}"])
+    end
+
+    it 'leaves a reference it cannot resolve as written' do
+      xml = '<TextureAtlas imagePath="s.png">' \
+            '<SubTexture name="keep&bogus;&#;&#xZZ;&#0;&#xD800;&" x="0" y="0" width="1" height="1"/>' \
+            '</TextureAtlas>'
+      expect(described_class.parse_xml(xml)[:frames].keys).to eq(['keep&bogus;&#;&#xZZ;&#0;&#xD800;&'])
+    end
+
+    it 'skips frames inside comments, CDATA sections, processing instructions, and the DOCTYPE' do
+      xml = <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE TextureAtlas [ <!ELEMENT SubTexture EMPTY> ]>
+        <!-- <TextureAtlas imagePath="wrong.png"> -->
+        <TextureAtlas imagePath="sheet.png">
+          <SubTexture name="idle" x="0" y="0" width="8" height="8" />
+          <!-- Old frame, retained as a comment:
+            <SubTexture name="idle" x="32" y="32" width="64" height="64" />
+            <SubTexture name="deleted" x="0" y="0" width="4" height="4" />
+          -->
+          <![CDATA[ <SubTexture name="cdata" x="1" y="1" width="1" height="1"/> ]]>
+          <?pi <SubTexture name="pi" x="1" y="1" width="1" height="1"/> ?>
+        </TextureAtlas>
+      XML
+      result = described_class.parse_xml(xml)
+      expect(result[:image_path]).to eq('sheet.png')
+      expect(result[:frames]).to eq('idle' => { x: 0, y: 0, width: 8, height: 8 })
+    end
+
+    it 'skips a DOCTYPE whose quoted literals or comments contain brackets, quotes, or >' do
+      xml = <<~XML
+        <!DOCTYPE TextureAtlas SYSTEM "a[b.dtd">
+        <TextureAtlas imagePath="s.png">
+          <SubTexture name="arr]x" x="1" y="2" width="3" height="4"/>
+        </TextureAtlas>
+      XML
+      expect(described_class.parse_xml(xml)).to eq(
+        image_path: 's.png', frames: { 'arr]x' => { x: 1, y: 2, width: 3, height: 4 } }
+      )
+
+      xml = <<~XML
+        <!DOCTYPE TextureAtlas [
+          <!ENTITY a "]">
+          <!ENTITY b "<A/><SubTexture name='ghost' x='9' y='9' width='9' height='9'/>">
+        ]>
+        <TextureAtlas imagePath="s.png"><SubTexture name="a" x="1" y="2" width="3" height="4"/></TextureAtlas>
+      XML
+      expect(described_class.parse_xml(xml)[:frames].keys).to eq(['a'])
+
+      xml = <<~XML
+        <!DOCTYPE TextureAtlas [
+          <!-- don't edit; see [1 -->
+          <!ELEMENT SubTexture EMPTY>
+        ]>
+        <TextureAtlas imagePath="s.png"><SubTexture name="a" x="1" y="2" width="3" height="4"/></TextureAtlas>
+      XML
+      expect(described_class.parse_xml(xml)[:frames].keys).to eq(['a'])
+    end
+
+    it 'decodes a reference beside a raw non-ASCII byte whatever the source string is tagged' do
+      value = "caf\xE9&#233;.png".b
+      xml = "<TextureAtlas imagePath=\"#{value}\"/>".b
+      expect(described_class.parse_xml(xml)[:image_path]).to eq("caf\xE9é.png".b.force_encoding('UTF-8'))
+    end
+
+    it 'keeps a quoted > or /> as part of the attribute value' do
+      xml = "<TextureAtlas note='a>\"b' imagePath=\"s.png\">" \
+            '<SubTexture name="power>idle" x="16" y="8" width="24" height="32"/>' \
+            "<SubTexture name='x/>y' x=\"1\" y=\"2\" width=\"3\" height=\"4\" />" \
+            '</TextureAtlas>'
+      result = described_class.parse_xml(xml)
+      expect(result[:image_path]).to eq('s.png')
+      expect(result[:frames]).to eq(
+        'power>idle' => { x: 16, y: 8, width: 24, height: 32 },
+        'x/>y' => { x: 1, y: 2, width: 3, height: 4 }
+      )
+    end
+
+    it 'raises ParseError on an unterminated attribute value, tag, or comment instead of a truncated frame' do
+      base = '<TextureAtlas imagePath="s.png">%s</TextureAtlas>'
+      [
+        '<SubTexture name="oops x="1"/>',
+        '<SubTexture name="oops',
+        '<SubTexture name="a" selected x="1"/>',
+        '<!-- <SubTexture name="a" x="1"/>'
+      ].each do |markup|
+        expect { described_class.parse_xml(format(base, markup)) }
+          .to raise_error(described_class::ParseError), markup
+      end
+      expect { described_class.parse_xml('<SubTexture name="a" x="1"') }
+        .to raise_error(described_class::ParseError, /Unterminated tag/)
+    end
   end
 
   describe '.parse_json (TexturePacker Hash form)' do

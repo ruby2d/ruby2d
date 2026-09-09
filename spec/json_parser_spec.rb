@@ -85,7 +85,35 @@ RSpec.describe Ruby2D::JsonParser do
     expect { parse('"\\uDC00"') }.to raise_error(described_class::ParseError)
   end
 
-  it 'raises ParseError (not SystemStackError) on deeply nested input' do
+  it 'parses nesting up to the cap without recursing per level' do
+    # mruby allows only a few hundred Ruby call frames in total; a parser that
+    # recursed per level overflowed it around 150 nested arrays, well before
+    # the cap. Containers are parsed with an explicit stack, so the cap is
+    # the only limit on either runtime.
+    depth = described_class::Parser::MAX_DEPTH
+    value = parse('[' * depth + '0' + ']' * depth)
+    (depth - 1).times { value = value.first }
+    expect(value).to eq([0])
+
+    value = parse('{"a":' * depth + '1' + '}' * depth)
+    (depth - 1).times { value = value['a'] }
+    expect(value).to eq('a' => 1)
+
+    expect(parse('[[], {}, [[]], {"k": {}}]')).to eq([[], {}, [[]], { 'k' => {} }])
+  end
+
+  it 'raises ParseError (not SystemStackError) on nesting past the cap' do
+    depth = described_class::Parser::MAX_DEPTH + 1
+    expect { parse('[' * depth + '0' + ']' * depth) }
+      .to raise_error(described_class::ParseError, /nesting too deep/)
     expect { parse('[' * 1000) }.to raise_error(described_class::ParseError)
+  end
+
+  it 'raises ParseError on bad array syntax' do
+    expect { parse('[1 2]') }.to raise_error(described_class::ParseError, /expected ',' or '\]'/)
+    expect { parse('[1,]') }.to raise_error(described_class::ParseError)
+    expect { parse('{"a": 1,}') }.to raise_error(described_class::ParseError)
+    expect { parse('[1') }.to raise_error(described_class::ParseError)
+    expect { parse('{"a": [1, {"b": 2}') }.to raise_error(described_class::ParseError, /expected ',' or '\]'/)
   end
 end
