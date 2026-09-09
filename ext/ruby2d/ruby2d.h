@@ -517,7 +517,7 @@ typedef struct {
   int flags;
   R2D_Color background;
   R2D_Mouse mouse;
-  int fps_cap;
+  double fps_cap;               // frames per second to pace to; 0 = uncapped
   const char *icon;
   uint64_t frames;
   double fps;
@@ -530,7 +530,9 @@ typedef struct {
   int display_pixel_height;
   bool diagnostics;
   bool show_fps;
-  char *screenshot_path;        // deferred screenshot request (consumed once per frame)
+  char **screenshot_paths;      // deferred screenshot requests, written at the end of the frame
+  int screenshot_count;
+  int screenshot_capacity;
   SDL_ScaleMode scale_mode;     // default when an object doesn't set its own
 } R2D_Window;
 
@@ -1101,9 +1103,9 @@ void R2D_ApplyViewportMode(R2D_Window *window);
 void R2D_SetIcon(R2D_Window *window, const char *icon);
 
 /*
- * Take a screenshot of the window
+ * Write every screenshot requested this frame
  */
-void R2D_Screenshot(R2D_Window *window, const char *path);
+void R2D_WriteScreenshots(R2D_Window *window);
 
 /*
  * Show the cursor over the window

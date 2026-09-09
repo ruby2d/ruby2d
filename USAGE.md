@@ -294,6 +294,8 @@ update do
 end
 ```
 
+The image is the drawn area as shown: letterbox bars are left out, and under `viewport: :overscan` it's the part inside the window. Every request made in a frame is written, so two callbacks capturing the same frame get two files.
+
 Taking a screenshot once the frame loop has ended, because the window closed or an exception unwound `show`, raises, since no frame is left to write it.
 
 On [the web](#building-for-the-web), `screenshot` does nothing and returns `nil`: the only filesystem there is Emscripten's in-memory one, so it could only write a file nobody can open.

@@ -363,7 +363,7 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   // Parse viewport mode symbol from Ruby
   window->viewport.mode = R2D_ParseViewportMode(r_ivar_get(obj, id_viewport_mode));
 
-  window->fps_cap         = (int)R2D_GetInitRefreshRate();
+  window->fps_cap         = R2D_GetInitRefreshRate();
   window->background.r    = 0.0;
   window->background.g    = 0.0;
   window->background.b    = 0.0;
@@ -391,7 +391,9 @@ R_VAL ruby2d_ext_window_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   window->display_pixel_height = R2D_GetInitDisplayPixelHeight();
   window->diagnostics = false;
   window->show_fps = false;
-  window->screenshot_path = NULL;
+  window->screenshot_paths    = NULL;
+  window->screenshot_count    = 0;
+  window->screenshot_capacity = 0;
 
   // SDL window and renderer are created later, in R2D_Show.
   r2d_window = window;
@@ -773,7 +775,7 @@ R_VAL ruby2d_ext_window_begin_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
   current_frame_rendered =
     r2d_window->render_mode == R2D_RENDER_CONTINUOUS ||
     was_pending != 0 ||
-    r2d_window->screenshot_path != NULL;
+    r2d_window->screenshot_count > 0;
 
   if (current_frame_rendered) {
     // Count and time only frames actually drawn. In :on_demand mode the tick
@@ -831,10 +833,8 @@ R_VAL ruby2d_ext_window_end_frame(RUBY2D_METHOD_ARGS_VARIADIC) {
       R2D_DrawFrameRate(r2d_window);
     }
 
-    if (r2d_window->screenshot_path) {
-      R2D_Screenshot(r2d_window, r2d_window->screenshot_path);
-      free(r2d_window->screenshot_path);
-      r2d_window->screenshot_path = NULL;
+    if (r2d_window->screenshot_count > 0) {
+      R2D_WriteScreenshots(r2d_window);
     }
 
     if (r2d_window->sdl_renderer) {
@@ -1041,14 +1041,16 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // Resolve the effective fps_cap. Float::INFINITY means "uncapped" → fps_cap 0,
   // so target_frame stays 0 (no frame delay). Read as a double so an Integer or
-  // Float::INFINITY both work. Without a user cap, fall back to the display
+  // Float::INFINITY both work, and kept as one: a cap below 1, or with a
+  // fraction, paces at that rate rather than truncating to an integer (0.5
+  // used to become 0, uncapped). Without a user cap, fall back to the display
   // refresh rate.
   R_VAL fps_cap_val = r_ivar_get(obj, id_fps_cap);
   if (r_test(fps_cap_val)) {
     double cap = NUM2DBL(fps_cap_val);
-    r2d_window->fps_cap = isinf(cap) ? 0 : (int)cap;
+    r2d_window->fps_cap = isinf(cap) ? 0 : cap;
   } else {
-    r2d_window->fps_cap = (int)r2d_window->display_refresh_rate;
+    r2d_window->fps_cap = r2d_window->display_refresh_rate;
   }
 
   // On the web, pacing is applied by the tick trampoline instead of vsync or
@@ -1123,7 +1125,7 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
   // as a fallback when vsync is not blocking (e.g., window occluded).
   perf_freq = SDL_GetPerformanceFrequency();
   target_frame = r2d_window->fps_cap > 0
-               ? 1.0 / (double)r2d_window->fps_cap
+               ? 1.0 / r2d_window->fps_cap
                : 0.0;
 
   // Center the window on the primary display and reveal it. It was created
@@ -1178,20 +1180,51 @@ void R2D_SetIcon(R2D_Window *window, const char *icon) {
 
 
 /*
- * Take a screenshot of the window
+ * Drop the screenshot requests queued for the frame, freeing their paths. The
+ * array is kept for the next frame's requests.
  */
-void R2D_Screenshot(R2D_Window *window, const char *path) {
-  SDL_Surface *surface = SDL_RenderReadPixels(window->sdl_renderer, NULL);
+static void R2D_ClearScreenshots(R2D_Window *window) {
+  for (int i = 0; i < window->screenshot_count; i++) {
+    free(window->screenshot_paths[i]);
+  }
+  window->screenshot_count = 0;
+}
+
+
+/*
+ * Write every screenshot requested this frame, from one read of the frame.
+ * SDL reads the current viewport, which under overscan presentation extends
+ * past the window and fails the read; clipping the read to the window's
+ * pixels keeps it inside and captures what is on screen: the drawn area,
+ * without letterbox bars. (SDL_GetRenderOutputSize is the window; the
+ * "current" size is the presentation area, which leaves out its offset.)
+ * Requests are consumed whether or not the write succeeds; a failure is
+ * logged, since nothing would retry it.
+ */
+void R2D_WriteScreenshots(R2D_Window *window) {
+  int w, h;
+  if (!SDL_GetRenderOutputSize(window->sdl_renderer, &w, &h)) {
+    R2D_Error("R2D_WriteScreenshots", "%s", SDL_GetError());
+    R2D_ClearScreenshots(window);
+    return;
+  }
+  SDL_Rect output = { 0, 0, w, h };
+
+  SDL_Surface *surface = SDL_RenderReadPixels(window->sdl_renderer, &output);
   if (!surface) {
-    R2D_Error("R2D_Screenshot", "%s", SDL_GetError());
+    R2D_Error("R2D_WriteScreenshots", "%s", SDL_GetError());
+    R2D_ClearScreenshots(window);
     return;
   }
 
-  if (!IMG_SavePNG(surface, path)) {
-    R2D_Error("R2D_Screenshot", "%s", SDL_GetError());
+  for (int i = 0; i < window->screenshot_count; i++) {
+    if (!IMG_SavePNG(surface, window->screenshot_paths[i])) {
+      R2D_Error("R2D_WriteScreenshots", "%s: %s", window->screenshot_paths[i], SDL_GetError());
+    }
   }
 
   SDL_DestroySurface(surface);
+  R2D_ClearScreenshots(window);
 }
 
 
@@ -1318,7 +1351,8 @@ int R2D_FreeWindow(R2D_Window *window) {
     SDL_DestroyWindow(window->sdl_window);
     window->sdl_window = NULL;
   }
-  free(window->screenshot_path);
+  R2D_ClearScreenshots(window);
+  free(window->screenshot_paths);
   if (r2d_window == window) r2d_window = NULL;
   free(window);
   return 0;
@@ -1520,15 +1554,16 @@ R_VAL ruby2d_ext_window_set_fps_cap(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   if (!r_test(fps_cap)) {
     // nil → no cap: restore vsync-driven pacing with the refresh-rate fallback.
-    r2d_window->fps_cap = (int)r2d_window->display_refresh_rate;
+    r2d_window->fps_cap = r2d_window->display_refresh_rate;
     #ifndef __EMSCRIPTEN__
     SDL_SetRenderVSync(r2d_window->sdl_renderer, 1);
     #endif
   } else {
-    // A finite cap paces via SDL_DelayPrecise; Float::INFINITY → uncapped.
-    // (The Ruby side has already rejected 0/negative/NaN.)
+    // A finite cap paces via SDL_DelayPrecise, at that rate, fractional or
+    // below 1 included; Float::INFINITY → uncapped. (The Ruby side has
+    // already rejected 0/negative/NaN.)
     double cap = NUM2DBL(fps_cap);
-    r2d_window->fps_cap = isinf(cap) ? 0 : (int)cap;
+    r2d_window->fps_cap = isinf(cap) ? 0 : cap;
     #ifndef __EMSCRIPTEN__
     SDL_SetRenderVSync(r2d_window->sdl_renderer, 0);
     #endif
@@ -1540,7 +1575,7 @@ R_VAL ruby2d_ext_window_set_fps_cap(RUBY2D_METHOD_ARGS_VARIADIC) {
   #ifdef __EMSCRIPTEN__
   wasm_set_pace_mode(fps_cap);
   #endif
-  target_frame = r2d_window->fps_cap > 0 ? 1.0 / (double)r2d_window->fps_cap : 0.0;
+  target_frame = r2d_window->fps_cap > 0 ? 1.0 / r2d_window->fps_cap : 0.0;
   return R_TRUE;
 }
 
@@ -1851,18 +1886,32 @@ R_VAL ruby2d_ext_window_gamepad_joystick_state(RUBY2D_METHOD_ARGS_VARIADIC) {
  *
  * Defers the screenshot to the end of the current frame, after rendering but
  * before SDL_RenderPresent, so the back buffer contains the fully drawn scene.
+ * Every request made during a frame is queued; the frame is read once and
+ * written to each path.
  */
 R_VAL ruby2d_ext_window_screenshot(RUBY2D_METHOD_ARGS_VARIADIC) {
   RUBY2D_EXTRACT_VARIADIC;
   if (argc != 2) r_raise("Ruby2D::Ext.window_screenshot expects 2 args, got %d", (int)argc);
   R_VAL path = argv[1];
-  if (r2d_window) {
-    free(r2d_window->screenshot_path);
-    r2d_window->screenshot_path = strdup(RSTRING_PTR(path));
-    return path;
-  } else {
+  if (!r2d_window) return R_FALSE;
+
+  if (r2d_window->screenshot_count == r2d_window->screenshot_capacity) {
+    int capacity = r2d_window->screenshot_capacity ? r2d_window->screenshot_capacity * 2 : 2;
+    char **paths = realloc(r2d_window->screenshot_paths, capacity * sizeof(char *));
+    if (!paths) {
+      R2D_Error("ruby2d_ext_window_screenshot", "Out of memory queueing a screenshot");
+      return R_FALSE;
+    }
+    r2d_window->screenshot_paths = paths;
+    r2d_window->screenshot_capacity = capacity;
+  }
+  char *copy = strdup(RSTRING_PTR(path));
+  if (!copy) {
+    R2D_Error("ruby2d_ext_window_screenshot", "Out of memory queueing a screenshot");
     return R_FALSE;
   }
+  r2d_window->screenshot_paths[r2d_window->screenshot_count++] = copy;
+  return path;
 }
 
 
