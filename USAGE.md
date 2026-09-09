@@ -517,6 +517,8 @@ Color.valid?('red')    # => true
 Color.hex?('#FF0000')  # => true
 ```
 
+Setting a channel in place (`c.r = 0.5`) follows the same rule as construction: an out-of-range value warns once and is clamped, so a stored channel is always within 0.0–1.0. `c.a=` is `c.opacity=`, which clamps without the warning (see [Opacity](#opacity)).
+
 > **Note**: `colour` is accepted as a synonym for `color` everywhere, including compound kwargs (`stroke_colour`, `hover_colour`, `label_colour`).
 
 > **Tip**: Color strings (names and hex) are parsed once and cached internally, so passing `color: 'red'` on a hot path is effectively as fast as passing a pre-built `Color`. You don't need to hoist `Color.new('red')` out of the loop to avoid parse overhead.
@@ -533,7 +535,7 @@ Triangle.new(
 
 The array length must match the shape's vertex count: 3 for `Triangle`, 4 for `Quad` / `Rectangle` / `Square`, N for `Polygon` / `Polyline` (matching `points`). `Circle` and `Ellipse` are single-color only. `Line` is the special case: its array is 2 colors `[start, end]` for a gradient along the length.
 
-Reading `color` back returns the same kind you set: a `Color` for a uniform fill, or a `Color::Set` for a per-vertex / gradient fill. Index a set's individual stops with `color.vertex(i)`, and `color.opacity` reports the first vertex's alpha (see [Opacity](#opacity)).
+Reading `color` back returns the same kind you set: a `Color` for a uniform fill, or a `Color::Set` for a per-vertex / gradient fill. Index a set's individual stops with `color.vertex(i)`, and `color.opacity` reports the first vertex's alpha (see [Opacity](#opacity)). A single `Color` is copied when assigned; a `Color::Set` is held as-is, so shapes given the same set share it and fade together when its opacity changes. Pass `palette.dup` for an independent copy.
 
 ### Opacity
 

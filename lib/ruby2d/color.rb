@@ -25,6 +25,16 @@ module Ruby2D
         @_rev += 1
       end
 
+      # `dup`/`clone` support: a copy gets its own member colors, adopted by
+      # the copy, and a fresh revision. A shallow copy would share the members,
+      # which report to the original set, so a change through the copy would
+      # never reach a shape caching against the copy's revision.
+      def initialize_copy(_source)
+        super
+        @_rev = 0
+        @colors = @colors.map { |c| Color.new(c)._adopt(self) }
+      end
+
       # Get a color by index
       def [](index)
         @colors[index]
@@ -83,23 +93,22 @@ module Ruby2D
     # Internal; not part of the public API.
     attr_reader :_rev
 
+    # The channel setters apply the same validation as construction: a value
+    # outside 0.0..1.0 warns once and clamps (see `channel`). The stored
+    # channels are always in range, so the renderer's float-to-byte casts
+    # never see a value they would wrap.
     def r=(value)
-      @r = value
+      @r = set_channel(value)
       _touch
     end
 
     def g=(value)
-      @g = value
+      @g = set_channel(value)
       _touch
     end
 
     def b=(value)
-      @b = value
-      _touch
-    end
-
-    def a=(value)
-      @a = value
+      @b = set_channel(value)
       _touch
     end
 
@@ -312,15 +321,19 @@ module Ruby2D
     # is only supported by shapes that handle it explicitly, such as Polyline.
     # The value is clamped to 0.0..1.0 so an animation that momentarily drives
     # opacity out of range degrades to fully transparent/opaque rather than
-    # wrapping the Uint8 alpha cast into a wrong, near-opaque byte.
+    # wrapping the Uint8 alpha cast into a wrong, near-opaque byte. NaN can't
+    # be clamped (`Float::NAN.clamp` raises), so it is fully transparent.
     def opacity=(opacity)
       unless opacity.is_a?(Numeric)
         raise ArgumentError, "opacity must be a number between 0.0 and 1.0, got #{opacity.inspect}"
       end
 
-      @a = opacity.clamp(0.0, 1.0)
+      value = opacity.to_f
+      value = 0.0 if value.nan?
+      @a = value.clamp(0.0, 1.0)
       _touch
     end
+    alias_method :a=, :opacity=
 
     # Return the color components as an array
     def to_a
@@ -364,6 +377,15 @@ module Ruby2D
       self
     end
 
+    # `dup`/`clone` support: a copy is a free-standing color, with no owner
+    # to report to and a fresh revision, even when the source is a member of
+    # a `Color::Set`.
+    def initialize_copy(_source)
+      super
+      @_rev = 0
+      @_owner = nil
+    end
+
     private
 
     def _touch
@@ -386,6 +408,17 @@ module Ruby2D
 
       Ruby2D.warn("color value #{value} is out of range; components must be 0.0..1.0")
       value < 0.0 ? 0.0 : 1.0
+    end
+
+    # `channel` for a public setter, which can be handed anything. The
+    # constructor's callers have validated their input by the time they call
+    # `channel`, so the check lives here and not on that path.
+    def set_channel(value)
+      unless value.is_a?(Numeric)
+        raise ArgumentError, "color channel must be a number between 0.0 and 1.0, got #{value.inspect}"
+      end
+
+      channel(value)
     end
   end
 

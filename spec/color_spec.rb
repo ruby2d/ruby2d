@@ -262,4 +262,110 @@ RSpec.describe Ruby2D::Color do
       expect { Ruby2D::Color.for_render([0.1, 0.2]) }.to raise_error(Ruby2D::Error, /not a valid color/)
     end
   end
+
+  # The setters are the documented way to recolor in place, so they apply the
+  # validation construction does: a stored channel is never out of range, and
+  # the renderer's float-to-byte casts never wrap.
+  describe "channel setters" do
+    it "warn and clamp an out-of-range channel like Color.new" do
+      c = Ruby2D::Color.new('#FF0000')
+      expect { c.r = 1.75 }.to output(/color value 1.75.*0\.0\.\.1\.0/).to_stderr
+      expect(c.r).to eq(1.0)
+      c.g = -0.25
+      expect(c.g).to eq(0.0)
+      c.b = 2
+      expect(c.b).to eq(1.0)
+      expect(c.to_a).to eq(Ruby2D::Color.new([1.75, -0.25, 2]).to_a)
+    end
+
+    it "store an in-range channel as a Float" do
+      c = Ruby2D::Color.new('red')
+      c.g = 1
+      expect(c.g).to eq(1.0)
+      expect(c.g).to be_a(Float)
+    end
+
+    it "clamp `a=` like `opacity=`, without a warning" do
+      c = Ruby2D::Color.new('red')
+      expect { c.a = -0.1 }.not_to output.to_stderr
+      expect(c.a).to eq(0.0)
+      c.a = 1.2
+      expect(c.opacity).to eq(1.0)
+      c.a = 1
+      expect(c.a).to be_a(Float)
+    end
+
+    it "treat NaN as out of range instead of raising" do
+      c = Ruby2D::Color.new('red')
+      expect { c.r = Float::NAN }.to output(/color value NaN/).to_stderr
+      expect(c.r).to eq(1.0)
+      expect { c.a = Float::NAN }.not_to output.to_stderr
+      expect(c.a).to eq(0.0)
+      c.opacity = Float::NAN
+      expect(c.opacity).to eq(0.0)
+    end
+
+    it "reject a non-numeric value instead of storing it" do
+      c = Ruby2D::Color.new('red')
+      expect { c.r = 'half' }.to raise_error(ArgumentError, /color channel must be a number/)
+      expect { c.a = [0.5] }.to raise_error(ArgumentError, /opacity must be a number/)
+      expect(c.to_a).to eq([1.0, 65 / 255.0, 54 / 255.0, 1.0])
+    end
+
+    it "still bump the revision" do
+      c = Ruby2D::Color.new('red')
+      c.r = 1.5
+      c.a = -1
+      expect(c._rev).to eq(2)
+    end
+  end
+
+  describe "#dup" do
+    it "detaches the copy from the Color::Set the source belongs to" do
+      s = Ruby2D::Color::Set.new(%w[red green blue])
+      copy = s[0].dup
+      copy.r = 0.2
+      copy.opacity = 0.5
+      expect(s._rev).to eq(0)
+      expect(s[0].to_a).to eq(Ruby2D::Color.new('red').to_a)
+      expect(copy._rev).to eq(2)
+    end
+
+    it "starts the copy's revision at zero" do
+      c = Ruby2D::Color.new('red')
+      c.r = 0.5
+      expect(c.dup._rev).to eq(0)
+      expect(c.clone.to_a).to eq(c.to_a)
+    end
+  end
+
+  describe "Color::Set#dup" do
+    it "copies the members, so a change through the copy reaches the copy's revision only" do
+      original = Ruby2D::Color::Set.new(%w[white white white white])
+      copy = original.dup
+      expect(copy.map(&:to_a)).to eq(original.map(&:to_a))
+      expect(copy[0]).not_to be(original[0])
+      copy.opacity = 0
+      expect(copy._rev).to eq(4)
+      expect(original._rev).to eq(0)
+      expect(original.opacity).to eq(1.0)
+      original[1].r = 0.5
+      expect(copy[1].r).to eq(1.0)
+      expect(copy._rev).to eq(4)
+    end
+
+    it "renders a shape holding the copy with the copy's current colors" do
+      original = Ruby2D::Color::Set.new(%w[white white white white])
+      rect = Rectangle.new(width: 40, height: 40, color: original.dup, stroke_color: 'white', add: false)
+      alphas = []
+      allow(Ruby2D::Ext).to receive(:draw_quad) do |*args|
+        alphas = [args[5], args[11], args[17], args[23]]
+      end
+      rect.send(:render)
+      expect(alphas).to eq([1.0, 1.0, 1.0, 1.0])
+      rect.opacity = 0
+      rect.send(:render)
+      expect(alphas).to eq([0.0, 0.0, 0.0, 0.0])
+    end
+  end
 end
