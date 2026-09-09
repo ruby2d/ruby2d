@@ -383,7 +383,9 @@ module Ruby2D
     # nothing. Driving every sprite off that one clock
     # (rather than each polling its own) keeps them in lockstep, lets the
     # engine clamp stalls once, and makes `update(dt)` directly testable. Pass
-    # an explicit `dt` (in seconds) to drive the animation by hand.
+    # an explicit `dt` (in seconds) to drive the animation by hand; every
+    # draw of the sprite, by the scene or by `render`, still advances it from
+    # the window clock, so the explicit time adds to that.
     def update(dt = UPDATE_DT_UNSET)
       return unless @playing
 
@@ -449,7 +451,11 @@ module Ruby2D
     # Render the sprite. With no arguments it draws the same frame the scene
     # graph does (delegating to `_render_scene`) — advancing the animation and
     # drawing the current frame. Called with overrides for one-shot rendering
-    # inside a render block (one-shot does not advance the animation).
+    # inside a render block, it advances the animation the same way, then
+    # draws as the scene would draw a sprite holding those values: an axis
+    # without a position override keeps its alignment, and a `clip_*`
+    # override works like the clip setter. The sprite is put back afterwards,
+    # even when the draw raises.
     def render(x: nil, y: nil, width: nil, height: nil, rotate: nil,
                clip_x: nil, clip_y: nil, clip_width: nil, clip_height: nil,
                tint: nil, opacity: nil)
@@ -460,6 +466,21 @@ module Ruby2D
       end
 
       Window.render_ready_check
+      _check_draw_position(:x, x)
+      _check_draw_position(:y, y)
+      color = _override_color(tint, opacity, @color)
+
+      # Advance the animation as a scene draw would, before the frame it
+      # lands on is saved for restoring. A completion block that hides the
+      # sprite keeps this frame off the screen, as it does for a scene draw;
+      # a sprite hidden before the call is still drawn.
+      was_visible = @visible
+      update
+      return if was_visible && !@visible
+
+      # The block may also have recolored the sprite: an opacity-only
+      # override fades the tint the sprite has now.
+      color = _override_color(nil, opacity, @color) if opacity && tint.nil?
 
       saved_x, saved_y = @x, @y
       saved_width, saved_height = @width, @height
@@ -470,30 +491,29 @@ module Ruby2D
       saved_trim_x, saved_trim_y = @trim_x, @trim_y
       saved_color = @color
 
-      @x = x if x
-      @y = y if y
-      @width = width if width
-      @height = height if height
-      @rotate = rotate if rotate
-      @clip_x = clip_x if clip_x
-      @clip_y = clip_y if clip_y
-      @clip_width = clip_width if clip_width
-      @clip_height = clip_height if clip_height
-
-      # Override draws use no trim — the caller is being explicit about
-      # source rect and display size, so collapse the trim math to the
-      # straightforward `draw clip into (x, y, width, height)` case.
-      @source_width  = @clip_width
-      @source_height = @clip_height
-      @trim_x = 0
-      @trim_y = 0
-
-      if tint || opacity
-        @color = tint ? Color.new(tint) : Color.new(saved_color)
-        @color.opacity = opacity if opacity
-      end
-
       begin
+        # Clip overrides work like the clip setters: an overridden clip width
+        # or height is an untrimmed region of that size on its axis, shown at
+        # the display size that tracks it unless `width`/`height` was given.
+        @clip_x = clip_x if clip_x
+        @clip_y = clip_y if clip_y
+        if clip_width
+          @clip_width = clip_width
+          @source_width = clip_width
+          @trim_x = 0
+          @width = @user_width || clip_width
+        end
+        if clip_height
+          @clip_height = clip_height
+          @source_height = clip_height
+          @trim_y = 0
+          @height = @user_height || clip_height
+        end
+        @width = width if width
+        @height = height if height
+        @rotate = rotate if rotate
+        @color = color if color
+        _place_for_draw(x, y)
         Ext.image_draw(self)
       ensure
         @x, @y = saved_x, saved_y

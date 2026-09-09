@@ -479,9 +479,11 @@ module Ruby2D
     end
 
     # Render the canvas. Called with overrides for one-shot rendering inside a
-    # render block; with no arguments it draws the same frame the scene graph
-    # does (delegating to `_render_scene`). `width:`/`height:` scale the
-    # displayed output — the underlying pixel buffer is fixed at construction.
+    # render block, it draws as the scene would draw a canvas holding those
+    # values and then puts the canvas back, even when the draw raises.
+    # `width:`/`height:` scale the displayed output — the underlying pixel
+    # buffer is fixed at construction. With no arguments it draws the same
+    # frame the scene graph does (delegating to `_render_scene`).
     def render(x: nil, y: nil, width: nil, height: nil, rotate: nil,
                tint: nil, opacity: nil)
       if x.nil? && y.nil? && width.nil? && height.nil? && rotate.nil? &&
@@ -490,24 +492,22 @@ module Ruby2D
       end
 
       Window.render_ready_check
+      x = _require_numeric_position(:x, x) if x
+      y = _require_numeric_position(:y, y) if y
+      tint = _override_color(tint, opacity, @tint)
 
       saved_x, saved_y = @x, @y
       saved_width, saved_height = @width, @height
       saved_rotate = @rotate
       saved_tint = @tint
 
-      @x = x if x
-      @y = y if y
-      @width = width if width
-      @height = height if height
-      @rotate = rotate if rotate
-
-      if tint || opacity
-        @tint = tint ? Color.new(tint) : Color.new(saved_tint)
-        @tint.opacity = opacity if opacity
-      end
-
       begin
+        @x = x if x
+        @y = y if y
+        @width = width if width
+        @height = height if height
+        @rotate = rotate if rotate
+        @tint = tint if tint
         Ext.canvas_draw(self, rx, ry)
       ensure
         @x, @y = saved_x, saved_y

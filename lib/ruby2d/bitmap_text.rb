@@ -85,36 +85,45 @@ module Ruby2D
     end
 
     # Render the text. Called with overrides for one-shot rendering inside a
-    # render block; with no arguments it draws the same frame the scene graph
-    # does (delegating to `_render_scene`).
+    # render block, it draws as the scene would draw a text holding those
+    # values — a `scale:` override rotates about the scaled text's center —
+    # and then puts the text back, even when the draw raises. With no
+    # arguments it draws the same frame the scene graph does (delegating to
+    # `_render_scene`).
     def render(x: nil, y: nil, scale: nil, rotate: nil, color: nil, colour: nil, opacity: nil)
       if x.nil? && y.nil? && scale.nil? && rotate.nil? && color.nil? && colour.nil? && opacity.nil?
         return _render_scene
       end
 
       Window.render_ready_check
+      x = _validate_coordinate(:x, x) if x
+      y = _validate_coordinate(:y, y) if y
+      scale = validate_scale(scale) if scale
+      color = _override_color(color || colour, opacity, @color)
 
       saved_x, saved_y = @x, @y
       saved_scale = @scale
+      saved_width, saved_height = @width, @height
       saved_rotate = @rotate
       saved_color = @color
 
-      @x = x if x
-      @y = y if y
-      @scale = validate_scale(scale) if scale
-      @rotate = rotate if rotate
-
-      c = color || colour
-      if c || opacity
-        @color = c ? Color.new(c) : Color.new(saved_color)
-        @color.opacity = opacity if opacity
-      end
-
       begin
+        @x = x if x
+        @y = y if y
+        if scale
+          # The glyph grid scales linearly (see `bitmap_text_create`), so the
+          # size the default rotation center is measured against does too.
+          @width  = @width  * scale / saved_scale
+          @height = @height * scale / saved_scale
+          @scale  = scale
+        end
+        @rotate = rotate if rotate
+        @color = color if color
         Ext.bitmap_text_draw(self, rx, ry)
       ensure
         @x, @y = saved_x, saved_y
         @scale = saved_scale
+        @width, @height = saved_width, saved_height
         @rotate = saved_rotate
         @color = saved_color
       end
@@ -140,15 +149,16 @@ module Ruby2D
       value
     end
 
-    # Ensure the scale is a positive number, raising a clear error instead of
-    # letting an invalid value reach the native renderer (where a non-numeric
-    # value surfaces as a cryptic `TypeError` and zero/negative silently builds
-    # a blank, zero-or-negative-sized texture). Coerce to the same integer the
-    # native renderer uses (truncation toward zero) so the `scale` reader equals
-    # the scale actually rendered — e.g. `scale: 2.9` renders and reports 2.
+    # Ensure the scale is a number of at least 1, raising a clear error
+    # instead of letting an invalid value reach the native renderer (where a
+    # non-numeric value surfaces as a cryptic `TypeError` and zero/negative
+    # silently builds a blank, zero-or-negative-sized texture). Coerce to the
+    # same integer the native renderer uses (truncation toward zero) so the
+    # `scale` reader equals the scale actually rendered — e.g. `scale: 2.9`
+    # renders and reports 2; a value below 1 would truncate to a scale of 0.
     def validate_scale(scale)
-      unless scale.is_a?(Numeric) && scale > 0
-        raise Error, "BitmapText scale must be a positive number, got #{scale.inspect}"
+      unless scale.is_a?(Numeric) && scale >= 1
+        raise Error, "BitmapText scale must be a number of at least 1, got #{scale.inspect}"
       end
 
       scale.to_i

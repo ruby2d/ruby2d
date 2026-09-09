@@ -688,6 +688,8 @@ end
 
 The texture/atlas is built once when `.new` runs, then reused on each `.render` call. This gives you the same "no persistent object" effect as shapes' class-level `.render`, without rebuilding expensive state per frame.
 
+An override applies to that draw only. The object is drawn as it would be if it held those values, then keeps its own: `obj.x` still reads what it read before. For the types that align (`Image`, `Text`, `Sprite`), an axis you don't position keeps its [alignment](#aligning-to-the-window), resolved against the size of that draw, and a symbol passed as `x:` or `y:` aligns that axis for one draw; `BitmapText` and `Canvas` take numbers only. An invalid override raises before anything is drawn and leaves the object as it was. Each type's section below lists the overrides it accepts.
+
 ### Construction-time `add:` and `visible:`
 
 Every renderable accepts `add:` and `visible:` at construction (both default to `true`). `add: false` builds the object without registering it in the window's scene graph, useful for entities you'll spawn later, or for the render-block override pattern (see [Images](#images), [Text](#text), etc., below) where you draw the object yourself each frame via `instance.render(...)`. `visible: false` keeps the object in the scene graph but skips drawing it.
@@ -728,7 +730,7 @@ Button.new(x: :center, y: :bottom, padding_bottom: 24, label: 'Start')
 
 `padding:` sets all four edges. Per-edge kwargs (`padding_top`, `padding_right`, `padding_bottom`, `padding_left`) override the uniform value for individual edges. Padding only takes effect on edge-anchored axes; it's a no-op for `:center` and for axes with a numeric position. Negative values are allowed (the object pushes past the edge). All four are also runtime accessors (`obj.padding_top = 8`).
 
-> **Timing.** Aligned positions are `0` until the first frame draws, because the window's viewport dimensions are only known once `show` starts. If you read `obj.x` before the first render, you'll see the placeholder.
+> **Timing.** Aligned positions are `0` until the first frame draws, because the window's viewport dimensions are only known once `show` starts. If you read `obj.x` before the first render, you'll see the placeholder. An object drawn only through [one-shot overrides](#one-shot-rendering) keeps it: its alignment is resolved for each draw and put back.
 
 ## Lines and Polygons
 
@@ -1093,6 +1095,8 @@ render do
 end
 ```
 
+Overrides: `x`, `y`, `width`, `height`, `rotate`, `tint`, `opacity`.
+
 ### SVG Images
 
 SVGs are rasterized once at load. If `width` and `height` are passed to `Image.new`, the SVG is rasterized at 2× that size so small upscales and rotations stay crisp; otherwise it rasterizes at the SVG's intrinsic size. Setting `width=`/`height=` later just scales the cached raster — for a fresh, sharp rasterization at a new size, use `resize!`:
@@ -1165,6 +1169,8 @@ render do
 end
 ```
 
+Overrides: `x`, `y`, `rotate`, `color`, `opacity`.
+
 ### Fonts
 
 The `Font` class provides utilities for discovering and loading system fonts.
@@ -1191,7 +1197,7 @@ bt = BitmapText.new('Hello!')
 | `x` | `0` | X position |
 | `y` | `0` | Y position |
 | `z` | `0` | Depth |
-| `scale` | `3` | Size multiplier (must be a positive number; a float truncates to an integer) |
+| `scale` | `3` | Size multiplier (a number of at least 1; a float truncates to an integer) |
 | `rotate` | `0` | Rotation in degrees |
 | `rx` | `nil` (center) | Rotation center x; defaults to the text's center |
 | `ry` | `nil` (center) | Rotation center y; defaults to the text's center |
@@ -1219,6 +1225,8 @@ render do
   label.render(x: 10, y: 10, scale: 2, color: 'white')
 end
 ```
+
+Overrides: `x`, `y`, `scale`, `rotate`, `color`, `opacity`.
 
 ## Sprites
 
@@ -1366,6 +1374,10 @@ render do
   sprite.render(x: 10, y: 10, clip_x: 64, clip_y: 0, clip_width: 32, clip_height: 32)
 end
 ```
+
+Overrides: `x`, `y`, `width`, `height`, `rotate`, `clip_x`, `clip_y`, `clip_width`, `clip_height`, `tint`, `opacity`.
+
+A playing animation advances on a one-shot draw just as it does when the scene draws the sprite, completion block included. The clip overrides work like the clip setters: `clip_width:` or `clip_height:` draws an untrimmed region of that size on its axis, at the size that tracks it unless `width`/`height` was given; the other overrides draw the current frame, trim and all.
 
 ### Sprite Sheets
 

@@ -146,15 +146,16 @@ RSpec.describe Ruby2D::BitmapText do
 
   describe 'scale validation' do
     it 'rejects a non-positive or non-numeric scale in the constructor' do
-      expect { BitmapText.new('hi', scale: 0) }.to raise_error(Ruby2D::Error, /positive number/)
-      expect { BitmapText.new('hi', scale: -2) }.to raise_error(Ruby2D::Error, /positive number/)
-      expect { BitmapText.new('hi', scale: 'big') }.to raise_error(Ruby2D::Error, /positive number/)
+      expect { BitmapText.new('hi', scale: 0) }.to raise_error(Ruby2D::Error, /at least 1/)
+      expect { BitmapText.new('hi', scale: 0.5) }.to raise_error(Ruby2D::Error, /at least 1/)
+      expect { BitmapText.new('hi', scale: -2) }.to raise_error(Ruby2D::Error, /at least 1/)
+      expect { BitmapText.new('hi', scale: 'big') }.to raise_error(Ruby2D::Error, /at least 1/)
     end
 
-    it 'rejects a non-positive scale assigned after construction' do
+    it 'rejects a scale below 1 assigned after construction' do
       bt = BitmapText.new('hi')
-      expect { bt.scale = 0 }.to raise_error(Ruby2D::Error, /positive number/)
-      expect { bt.scale = -1 }.to raise_error(Ruby2D::Error, /positive number/)
+      expect { bt.scale = 0 }.to raise_error(Ruby2D::Error, /at least 1/)
+      expect { bt.scale = -1 }.to raise_error(Ruby2D::Error, /at least 1/)
     end
 
     it 'truncates a float scale to the integer the renderer uses' do

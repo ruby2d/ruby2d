@@ -135,30 +135,29 @@ module Ruby2D
     end
 
     # Render the text. Called with overrides for one-shot rendering inside a
-    # render block; with no arguments it draws the same frame the scene graph
-    # does (delegating to `_render_scene`).
+    # render block, it draws as the scene would draw a text holding those
+    # values — an axis without a position override keeps its alignment — and
+    # then puts the text back, even when the draw raises. With no arguments it
+    # draws the same frame the scene graph does (delegating to
+    # `_render_scene`).
     def render(x: nil, y: nil, rotate: nil, color: nil, colour: nil, opacity: nil)
       if x.nil? && y.nil? && rotate.nil? && color.nil? && colour.nil? && opacity.nil?
         return _render_scene
       end
 
       Window.render_ready_check
+      _check_draw_position(:x, x)
+      _check_draw_position(:y, y)
+      color = _override_color(color || colour, opacity, @color)
 
       saved_x, saved_y = @x, @y
       saved_rotate = @rotate
       saved_color = @color
 
-      @x = x if x
-      @y = y if y
-      @rotate = rotate if rotate
-
-      c = color || colour
-      if c || opacity
-        @color = c ? Color.new(c) : Color.new(saved_color)
-        @color.opacity = opacity if opacity
-      end
-
       begin
+        @rotate = rotate if rotate
+        @color = color if color
+        _place_for_draw(x, y)
         Ext.text_draw(self, rx, ry)
       ensure
         @x, @y = saved_x, saved_y

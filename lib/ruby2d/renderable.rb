@@ -226,6 +226,55 @@ module Ruby2D
       end
     end
 
+    # Position a one-shot draw (see `Image#render`). `x` and `y` are the
+    # caller's overrides — a number or an alignment symbol, whatever `x=`
+    # takes — or nil to leave that axis as it is. Each axis then resolves as
+    # the scene would resolve it, an overridden axis by its override and the
+    # other by the object's own alignment, against the object's size for this
+    # draw. The caller restores `@x` and `@y` afterwards; the object's
+    # alignment intent is put back here.
+    def _place_for_draw(x, y)
+      saved_x_align = @x_align
+      saved_y_align = @y_align
+      if x
+        @x_align = x.is_a?(Symbol) ? x : nil
+        @x = x unless x.is_a?(Symbol)
+      end
+      if y
+        @y_align = y.is_a?(Symbol) ? y : nil
+        @y = y unless y.is_a?(Symbol)
+      end
+      _resolve_alignment
+    ensure
+      @x_align = saved_x_align
+      @y_align = saved_y_align
+    end
+
+    # Reject a one-shot position override that `_place_for_draw` could not
+    # resolve: anything but a number or an alignment symbol for that axis.
+    # Checked before a draw touches the object, so it raises with the object
+    # as it was.
+    def _check_draw_position(axis, value)
+      return if value.nil? || value.is_a?(Numeric)
+
+      names = axis == :x ? %i[left center right] : %i[top center bottom]
+      return if value.is_a?(Symbol) && names.include?(value)
+
+      raise ArgumentError, "Unknown #{axis} alignment: #{value.inspect}"
+    end
+
+    # The color of a one-shot draw: `color`, or `current` when only `opacity`
+    # was given, with `opacity` applied — or nil when neither was given. Built
+    # before the draw touches the object, so a bad value raises with the
+    # object as it was.
+    def _override_color(color, opacity, current)
+      return nil unless color || opacity
+
+      c = Color.new(color || current)
+      c.opacity = opacity if opacity
+      c
+    end
+
     # Offset from the bounding-box top-left (what `_resolve_alignment` computes)
     # to the shape's position anchor, split into x/y components to avoid boxing a
     # throwaway pair each aligned frame. Top-left-anchored shapes (Rectangle,

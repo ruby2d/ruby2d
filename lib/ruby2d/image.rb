@@ -145,8 +145,11 @@ module Ruby2D
     end
 
     # Render the image. Called with overrides for one-shot rendering inside a
-    # render block; with no arguments it draws the same frame the scene graph
-    # does (delegating to `_render_scene`).
+    # render block, it draws as the scene would draw an image holding those
+    # values — an axis without a position override keeps its alignment — and
+    # then puts the image back, even when the draw raises. With no arguments
+    # it draws the same frame the scene graph does (delegating to
+    # `_render_scene`).
     def render(x: nil, y: nil, width: nil, height: nil, rotate: nil,
                tint: nil, opacity: nil)
       if x.nil? && y.nil? && width.nil? && height.nil? && rotate.nil? &&
@@ -155,24 +158,21 @@ module Ruby2D
       end
 
       Window.render_ready_check
+      _check_draw_position(:x, x)
+      _check_draw_position(:y, y)
+      color = _override_color(tint, opacity, @color)
 
       saved_x, saved_y = @x, @y
       saved_width, saved_height = @width, @height
       saved_rotate = @rotate
       saved_color = @color
 
-      @x = x if x
-      @y = y if y
-      @width = width if width
-      @height = height if height
-      @rotate = rotate if rotate
-
-      if tint || opacity
-        @color = tint ? Color.new(tint) : Color.new(saved_color)
-        @color.opacity = opacity if opacity
-      end
-
       begin
+        @width = width if width
+        @height = height if height
+        @rotate = rotate if rotate
+        @color = color if color
+        _place_for_draw(x, y)
         Ext.image_draw(self)
       ensure
         @x, @y = saved_x, saved_y
