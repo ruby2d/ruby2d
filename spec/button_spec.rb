@@ -2,7 +2,24 @@ RSpec.describe Ruby2D::Button do
   # A fresh DSL window so the button's visual auto-adds and on() can register.
   before(:each) { Ruby2D::DSL.window = Ruby2D::Window.new }
 
+  let(:window) { Ruby2D::DSL.window }
   let(:gradient) { ['red', 'blue', 'green', 'yellow'] }
+
+  def rgb(object)
+    [object.color.r, object.color.g, object.color.b]
+  end
+
+  def press(button = :left, x = 25, y = 25)
+    window.mouse_callback(:down, button, nil, x, y, nil, nil)
+  end
+
+  def release(button = :left, x = 25, y = 25)
+    window.mouse_callback(:up, button, nil, x, y, nil, nil)
+  end
+
+  def move_to(x, y)
+    window.mouse_callback(:move, nil, nil, x, y, 0, 0)
+  end
 
   describe 'gradient fill with a hover/pressed tint' do
     it 'does not raise when combining a gradient fill with :auto tints' do
@@ -101,6 +118,197 @@ RSpec.describe Ruby2D::Button do
 
       expect(label.x).to be_within(1e-6).of((200 - 40) / 2.0) # 80
       expect(label.y).to be_within(1e-6).of((50 - 20) / 2.0)  # 15
+    end
+
+    # The centroid-anchored vertex shapes: `x`/`y` is the centroid, so the
+    # label is centered on the bounding box, not placed at the centroid.
+    it 'centers the label on the bounding box of a wrapped Quad, Triangle, Polygon, and Polyline' do
+      shapes = [
+        Ruby2D::Quad.new(points: [[20, 20], [120, 20], [120, 60], [20, 60]], add: false),
+        Ruby2D::Triangle.new(points: [[20, 60], [120, 60], [70, 20]], add: false),
+        Ruby2D::Polygon.new(points: [[20, 20], [120, 20], [120, 60], [70, 40], [20, 60]], add: false),
+        Ruby2D::Polyline.new(points: [[20, 20], [120, 20], [120, 60], [20, 60]], add: false)
+      ]
+      shapes.each do |shape|
+        button = Ruby2D::Button.new(shape, add: false)
+        label  = fake_label(40, 20)
+        button.instance_variable_set(:@label, label)
+
+        button.send(:center_label)
+
+        # The box is (20, 20)-(120, 60) for each, so the label centers on (70, 40)
+        expect(label.x).to be_within(1e-6).of(70 - 40 / 2.0), shape.class.name
+        expect(label.y).to be_within(1e-6).of(40 - 20 / 2.0), shape.class.name
+      end
+    end
+
+    it 'follows a wrapped visual that was resized or moved directly' do
+      rect   = Ruby2D::Rectangle.new(x: 0, y: 20, width: 100, height: 40, add: false)
+      button = Ruby2D::Button.new(rect, label: 'Go', add: false)
+      label  = button.instance_variable_get(:@label)
+
+      rect.width = 200
+      rect.x = 50
+      button.send(:center_label)
+
+      expect(label.x + label.width / 2.0).to be_within(1e-6).of(150)
+      expect(label.y + label.height / 2.0).to be_within(1e-6).of(40)
+    end
+  end
+
+  describe 'drawing the label' do
+    it 'draws the label with the visual, re-centered on its current box, instead of as a scene object' do
+      rect   = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40)
+      button = Ruby2D::Button.new(rect, label: 'Go')
+      label  = button.instance_variable_get(:@label)
+      objects = window.instance_variable_get(:@objects)
+      expect(objects).to include(rect)
+      expect(objects).not_to include(label)
+
+      calls = []
+      allow(Ruby2D::Ext).to receive(:draw_quad_uniform) { |*args| calls << :visual }
+      allow(Ruby2D::Ext).to receive(:text_draw) { |*args| calls << :label }
+      rect.width = 300
+      rect._render_scene
+
+      expect(calls).to eq([:visual, :label])
+      expect(label.x + label.width / 2.0).to be_within(1e-6).of(150)
+    end
+
+    it 'keeps the label at the depth of a wrapped visual restacked directly' do
+      rect   = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40)
+      button = Ruby2D::Button.new(rect, label: 'Go')
+      label  = button.instance_variable_get(:@label)
+
+      rect.z = 10
+
+      # The raised visual draws last, and the label with it, not from a
+      # scene position of its own that the visual would now cover
+      expect(button.z).to eq(10)
+      objects = window.instance_variable_get(:@objects)
+      expect(objects.last).to be(rect)
+      expect(objects).not_to include(label)
+      calls = []
+      allow(Ruby2D::Ext).to receive(:draw_quad_uniform) { calls << :visual }
+      allow(Ruby2D::Ext).to receive(:text_draw) { |text, *| calls << :label if text.equal?(label) }
+      rect._render_scene
+      expect(calls).to eq([:visual, :label])
+    end
+
+    it 'moves the visual with z= and re-sorts a visual-less button' do
+      button = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, color: 'navy')
+      visual = button.instance_variable_get(:@visual)
+      button.z = 3
+      expect(visual.z).to eq(3)
+      expect(button.z).to eq(3)
+
+      under = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40) { }
+      over  = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40) { }
+      expect(window.topmost_interactive_at(10, 10)).to be(over)
+      under.z = 5
+      expect(under.z).to eq(5)
+      expect(window.topmost_interactive_at(10, 10)).to be(under)
+    end
+  end
+
+  describe 'wrapping a visual' do
+    it 'rejects a Line, which has no position to move or to center a label on' do
+      line = Ruby2D::Line.new(x1: 0, y1: 0, x2: 100, y2: 0, add: false)
+      expect { Ruby2D::Button.new(line) }
+        .to raise_error(ArgumentError, /can't wrap a `Ruby2D::Line`/)
+    end
+
+    it 'takes the visual into and out of the scene with add:, add, and remove' do
+      rect = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40, add: false)
+      objects = window.instance_variable_get(:@objects)
+
+      button = Ruby2D::Button.new(rect)
+      expect(objects).to include(rect)
+
+      button.remove
+      expect(objects).not_to include(rect)
+
+      button.add
+      expect(objects).to include(rect)
+
+      added = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40)
+      Ruby2D::Button.new(added, add: false)
+      expect(objects).not_to include(added)
+    end
+
+    it 'reads position, size, depth, and visibility from the visual live' do
+      circle = Ruby2D::Circle.new(x: 50, y: 50, radius: 20, z: 2)
+      button = Ruby2D::Button.new(circle)
+
+      circle.x = 80
+      circle.radius = 30
+      circle.z = 7
+      circle.hide
+
+      expect([button.x, button.y]).to eq([80, 50])
+      expect([button.width, button.height]).to eq([60, 60])
+      expect(button.z).to eq(7)
+      expect(button.visible?).to be false
+      expect(button.contains?(105, 50)).to be true
+
+      # The owned visual too, which used to be copied at construction: its
+      # alignment resolves at draw time, and the button reads the result
+      owned  = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, color: 'navy', label: 'Go')
+      visual = owned.instance_variable_get(:@visual)
+      visual.x = 300
+      visual.width = 50
+      expect(owned.x).to eq(300)
+      expect(owned.width).to eq(50)
+      expect(owned.contains?(340, 20)).to be true
+      expect(owned.contains?(50, 20)).to be false
+    end
+
+    it 'forwards alignment to the visual, and ignores it without one' do
+      rect   = Ruby2D::Rectangle.new(x: 0, y: 0, width: 100, height: 40, add: false)
+      button = Ruby2D::Button.new(rect, add: false)
+      button.x = :right
+      expect(rect.x_align).to eq(:right)
+
+      quad = Ruby2D::Quad.new(add: false)
+      expect { Ruby2D::Button.new(quad, add: false).x = :center }.to raise_error(Ruby2D::Error, /Quad x must be a number/)
+
+      hit_area = Ruby2D::Button.new(x: 0, y: 0, width: 100, height: 40, add: false)
+      hit_area.x = :right
+      expect(hit_area.x).to eq(0)
+    end
+  end
+
+
+
+
+
+
+  describe 'after the window is cleared' do
+    it 'is dormant, with or without a visual, until added again' do
+      drawn = Ruby2D::Button.new(x: 0, y: 0, width: 50, height: 50, color: '#00f') { }
+      hit_area = Ruby2D::Button.new(x: 100, y: 0, width: 50, height: 50) { }
+      # Not registered when the window is cleared, having no handler yet
+      idle_area = Ruby2D::Button.new(x: 200, y: 0, width: 50, height: 50)
+      window.clear
+
+      clicks = []
+      drawn.on(:click) { clicks << :drawn }
+      hit_area.on(:click) { clicks << :hit_area }
+      idle_area.on(:click) { clicks << :idle_area }
+      [25, 125, 225].each do |x|
+        press(:left, x, 25)
+        release(:left, x, 25)
+      end
+      expect(clicks).to eq([])
+
+      drawn.add
+      hit_area.add
+      idle_area.add
+      [25, 125, 225].each do |x|
+        press(:left, x, 25)
+        release(:left, x, 25)
+      end
+      expect(clicks).to eq([:drawn, :hit_area, :idle_area])
     end
   end
 

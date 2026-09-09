@@ -60,6 +60,15 @@ module Ruby2D
       ys.max - ys.min
     end
 
+    # Bounding-box left and top (the least vertex x and y)
+    def _bounding_box_left
+      [@x1, @x2, @x3, @x4].min
+    end
+
+    def _bounding_box_top
+      [@y1, @y2, @y3, @y4].min
+    end
+
     # Create a quadrilateral. Specify vertices via `points:` or via
     # `x1:`/`y1:`/... `points:` takes precedence if both are given.
     def initialize(x1: 0, y1: 0, x2: 100, y2: 0, x3: 100, y3: 100, x4: 0, y4: 100,

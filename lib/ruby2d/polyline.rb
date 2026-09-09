@@ -55,6 +55,15 @@ module Ruby2D
       ys.max - ys.min
     end
 
+    # Bounding-box left and top (the least vertex x and y)
+    def _bounding_box_left
+      @coordinates.each_slice(2).map(&:first).min
+    end
+
+    def _bounding_box_top
+      @coordinates.each_slice(2).map(&:last).min
+    end
+
     # Test whether (x, y) lies on the polyline's stroke. Hit-tests against the
     # exact shape the renderer draws — the ribbon between the outer and inner
     # stroke outlines, with mitered joints and butt-capped open ends — so the

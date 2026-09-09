@@ -1726,7 +1726,7 @@ Button.new(color: ['navy', 'blue', 'teal', 'aqua'], hover_color: :auto)
 
 ### Custom Visual Button
 
-Wrap any shape as a button. The hit area follows the visual, and moving the button (`button.x = …` / `button.y = …`) moves the wrapped shape, the click region, and any label together.
+Wrap any shape with an `x`/`y` position as a button; a `Line`, positioned only by its endpoints, raises an `ArgumentError` (wrap a two-point `Polyline` instead). The shape becomes the button's: the hit area is the shape's own, the button's position, size, depth, and visibility are read from it, and `add:`, `add`, and `remove` on the button add and remove the shape. A `label:` is drawn on the shape, centered on its bounding box, and follows it, so the shape can be moved, resized, or restacked directly (`circle.radius = 40`, `circle.z = 5`) or through the button (`button.x = …`).
 
 ```ruby
 circle = Circle.new(x: 200, y: 200, radius: 30, color: 'blue')
@@ -1762,10 +1762,11 @@ btn.label = 'New Label'
 btn.label  # => current label string or nil
 btn.color = '#555'  # set the fill color (the resting color when a tint is configured)
 btn.color           # => current fill color, or nil for a visual-less button
+btn.z = 5
 btn.contains?(x, y)
 btn.on(event)  # see Per-Object Events
 btn.off(descriptor)
-btn.remove
+btn.remove  # take the visual out of the scene; no events until add
 btn.add
 ```
 

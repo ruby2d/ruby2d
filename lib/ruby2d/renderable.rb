@@ -248,6 +248,18 @@ module Ruby2D
       0
     end
 
+    # Left and top of the bounding box, which `x`/`y` alone don't give for
+    # the center-anchored `Circle` and `Ellipse` or the centroid-anchored
+    # vertex shapes, which override. Split into two, like the anchor offsets
+    # above, to avoid boxing a pair. `Button` centers its label on this box.
+    def _bounding_box_left
+      x - _alignment_anchor_dx
+    end
+
+    def _bounding_box_top
+      y - _alignment_anchor_dy
+    end
+
     # Resolve construction-time padding kwargs into per-edge values. The
     # uniform `padding:` seeds all four edges; per-edge kwargs override
     # individual slots. Called from each shape's `initialize` after

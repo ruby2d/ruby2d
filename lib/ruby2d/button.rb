@@ -5,17 +5,23 @@ module Ruby2D
   # interactive entity: it registers directly with `Window`'s interactive
   # registry and holds its own event handlers. The optional `@visual` is a
   # rendering concern, never an event-routing one.
+  #
+  # The visual is the button's geometry. Position, size, depth, visibility,
+  # and scene membership are read from it live, so a wrapped shape the caller
+  # moves, resizes, or restacks directly stays in step with the hit region and
+  # the label; the button only keeps its own box when it has no visual. The
+  # label is drawn by the visual, right after it and centered on its current
+  # bounding box, so it sits on the visual at the visual's depth however the
+  # visual changes.
   class Button
     include Interactive
-
-    attr_reader :label_text
 
     # Create a button. Three forms:
     #
     # Self-rendered:
     #   Button.new(x:, y:, width:, height:, label:, color:, hover_color:) { ... }
     #
-    # Wrap a custom visual (any shape responding to `x`, `y`, and `contains?`):
+    # Wrap a custom visual (any shape with an `x`/`y` position and `contains?`):
     #   Button.new(some_shape) { ... }
     #
     # Visual-less hit area (nothing rendered):
@@ -50,47 +56,47 @@ module Ruby2D
               '`hover_label_color`/`pressed_label_color` require a `label:` to tint'
       end
 
-      # Scene membership, which `on` honors: handlers attached while the button
-      # is removed (or built with `add: false`) wait for `add` to register.
-      @added = add
-
       if visual
+        # A `Line` has endpoints but no position, so the button could neither
+        # move it nor center a label on it.
+        unless visual.respond_to?(:x=) && visual.respond_to?(:y=)
+          raise ArgumentError,
+                "`Button` can't wrap a `#{visual.class}`: it has no `x`/`y` position to move it by or to center a label on"
+        end
+
         @visual = visual
-        @owns_visual = false
-        @x = visual.x
-        @y = visual.y
-        @z = visual.respond_to?(:z) ? visual.z : 0
-        @width = visual.respond_to?(:width) ? visual.width : 0
-        @height = visual.respond_to?(:height) ? visual.height : 0
+        # Wrapping makes the visual the button's, so the button's `add:`
+        # decides whether it is in the scene.
+        (add ? @visual.add : @visual.remove) if @visual.respond_to?(:add)
+      elsif label || base_color_input || stroke_input
+        # Self-rendered: own a Rectangle for drawing.
+        @visual = Rectangle.new(x: x, y: y, width: width, height: height, z: z,
+                                color: base_color_input || '#333',
+                                stroke_color: stroke_input,
+                                stroke_width: stroke_width,
+                                add: add, visible: visible,
+                                padding: padding, padding_top: padding_top,
+                                padding_right: padding_right,
+                                padding_bottom: padding_bottom,
+                                padding_left: padding_left)
       else
+        # Visual-less: no rendering, no @visual. Just an interactive region,
+        # whose box and scene membership (which `on` honors: handlers attached
+        # while removed, or built with `add: false`, wait for `add`) live here.
+        @visual = nil
         @x = x.is_a?(Symbol) ? 0 : x
         @y = y.is_a?(Symbol) ? 0 : y
         @z = z
         @width = width
         @height = height
-        if label || base_color_input || stroke_input
-          # Self-rendered: own a Rectangle for drawing.
-          @visual = Rectangle.new(x: x, y: y, width: width, height: height, z: z,
-                                  color: base_color_input || '#333',
-                                  stroke_color: stroke_input,
-                                  stroke_width: stroke_width,
-                                  add: add, visible: visible,
-                                  padding: padding, padding_top: padding_top,
-                                  padding_right: padding_right,
-                                  padding_bottom: padding_bottom,
-                                  padding_left: padding_left)
-          @owns_visual = true
-        else
-          # Visual-less: no rendering, no @visual. Just an interactive region.
-          @visual = nil
-          @owns_visual = false
-        end
+        @visible = visible
+        mark_added(add)
       end
 
       if label
-        @label = Text.new(label, x: 0, y: 0, z: @z + 1,
-                          size: label_size, color: label_color || label_colour || 'white',
-                          add: add, visible: visible)
+        @label = Text.new(label, size: label_size,
+                          color: label_color || label_colour || 'white', add: false)
+        draw_label_with_visual
         center_label
       end
 
@@ -98,125 +104,136 @@ module Ruby2D
         install_state_tint(hover_input, pressed_input,
                            hover_label_input, pressed_label_input)
       end
-      hook_visual_alignment if @owns_visual
 
       on(:click) { |e| on_click.call(e) } if on_click
     end
 
-    # Remove the button: drop visual + label from the render list and
-    # unregister Button from the interactive registry.
+    # Remove the button: drop the visual (and with it the label) from the
+    # scene and unregister from the interactive registry.
     def remove
-      @added = false
-      @visual.remove if @visual
-      @label.remove if @label
+      @visual ? @visual.remove : mark_added(false)
       Window.unregister_interactive(self)
     end
 
-    # Re-add the button after `remove`. Restores rendering and re-registers
-    # in the interactive registry if any handlers are attached.
+    # Re-add the button after `remove`. Restores rendering and re-registers in
+    # the interactive registry if any handlers are attached.
     def add
-      @added = true
-      @visual.add if @visual
-      @label.add if @label
+      @visual ? @visual.add : mark_added(true)
       Window.register_interactive(self) if interactive?
     end
 
-    # Mark the button visible (cascades to visual and label).
+    # Mark the button visible.
     def show
-      @visual.show if @visual
-      @label.show if @label
+      @visual ? @visual.show : (@visible = true)
     end
 
-    # Mark the button hidden (cascades to visual and label).
+    # Mark the button hidden. Like any hidden object it keeps receiving events.
     def hide
-      @visual.hide if @visual
-      @label.hide if @label
+      @visual ? @visual.hide : (@visible = false)
     end
 
     # Whether the button is currently visible.
     def visible?
-      @visual ? @visual.visible? : true
+      @visual ? @visual.visible? : @visible
     end
 
     # The visual drawn for this button, which decides where it ranks among
-    # equal-z objects for hit-testing. Nil for a visual-less button.
+    # equal-z objects for hit-testing, and whether it is hit-tested at all: a
+    # button whose visual is out of the scene is not. Nil for a visual-less
+    # button, which is hit-tested whenever it is registered.
     def _scene_visual
       @visual
     end
 
-    # Hit-test the button. Wrapped visuals delegate so non-rectangular shapes
-    # (Circle, Polygon, …) test against their actual geometry. The box test is
-    # half-open like `Rectangle`'s: the right and bottom edges are outside.
+    # Hit-test the button. With a visual the test is the visual's, so
+    # non-rectangular shapes (Circle, Polygon, …) test against their actual
+    # geometry. The visual-less box test is half-open like `Rectangle`'s: the
+    # right and bottom edges are outside.
     def contains?(x, y)
-      return @visual.contains?(x, y) if @visual && !@owns_visual
+      return @visual.contains?(x, y) if @visual
 
       x >= @x && x < (@x + @width) && y >= @y && y < (@y + @height)
     end
 
     def x
-      @owns_visual ? @x : (@visual ? @visual.x : @x)
+      @visual ? @visual.x : @x
     end
 
-    # Set the x position. Pass a symbol (`:left`, `:center`, `:right`) to
-    # set alignment intent on the underlying visual (owned visuals only).
+    # Set the x position. With a visual the value goes to it, so a symbol
+    # (`:left`, `:center`, `:right`) sets alignment intent on a visual that
+    # supports it and raises on one that doesn't, as it would on the shape
+    # itself. A visual-less button has nothing to align and ignores a symbol.
     def x=(x)
-      return self.x_align = x if x.is_a?(Symbol)
-
-      @x = x
-      # Move the visual too — owned or wrapped — so the visual, the (delegated)
-      # hit region, the getter, and the label all move together.
-      @visual.x = x if @visual.respond_to?(:x=)
-      center_label if @label
+      if @visual
+        @visual.x = x
+        center_label if @label
+      elsif !x.is_a?(Symbol)
+        @x = x
+      end
     end
 
     def y
-      @owns_visual ? @y : (@visual ? @visual.y : @y)
+      @visual ? @visual.y : @y
     end
 
-    # Set the y position. Pass a symbol (`:top`, `:center`, `:bottom`) to
-    # set alignment intent on the underlying visual (owned visuals only).
+    # Set the y position. See `x=`.
     def y=(y)
-      return self.y_align = y if y.is_a?(Symbol)
-
-      @y = y
-      # Move the visual too — owned or wrapped — so the visual, the (delegated)
-      # hit region, the getter, and the label all move together.
-      @visual.y = y if @visual.respond_to?(:y=)
-      center_label if @label
+      if @visual
+        @visual.y = y
+        center_label if @label
+      elsif !y.is_a?(Symbol)
+        @y = y
+      end
     end
 
     def z
-      @owns_visual ? @z : (@visual && @visual.respond_to?(:z) ? @visual.z : @z)
+      return @z unless @visual
+
+      @visual.respond_to?(:z) ? @visual.z : 0
+    end
+
+    # Set the depth. With a visual the visual moves in the scene, and the
+    # label with it; a visual-less button only re-sorts among the interactive
+    # objects it is hit-tested with.
+    def z=(z)
+      if @visual
+        @visual.z = z if @visual.respond_to?(:z=)
+      else
+        @z = z
+        Window.reorder(self)
+      end
     end
 
     def width
-      @owns_visual ? @width : (@visual && @visual.respond_to?(:width) ? @visual.width : @width)
+      return @width unless @visual
+
+      @visual.respond_to?(:width) ? @visual.width : 0
     end
 
     def height
-      @owns_visual ? @height : (@visual && @visual.respond_to?(:height) ? @visual.height : @height)
+      return @height unless @visual
+
+      @visual.respond_to?(:height) ? @visual.height : 0
     end
 
-    # Horizontal alignment intent of the underlying visual, or nil.
+    # Horizontal alignment intent of the visual, or nil.
     def x_align
       @visual.respond_to?(:x_align) ? @visual.x_align : nil
     end
 
-    # Vertical alignment intent of the underlying visual, or nil.
+    # Vertical alignment intent of the visual, or nil.
     def y_align
       @visual.respond_to?(:y_align) ? @visual.y_align : nil
     end
 
-    # Set alignment intent on the underlying visual (owned visuals only), so
-    # these mirror the getters above rather than writing a `@x_align` the
-    # getters would never read. A wrapped visual is positioned by its owner,
-    # so alignment there is the caller's to set on the visual itself.
+    # Alignment belongs to the visual, which resolves it when it draws; these
+    # forward to it, and are no-ops on a visual-less button.
     def x_align=(sym)
-      @visual.x_align = sym if @owns_visual
+      @visual.x_align = sym if @visual.respond_to?(:x_align=)
     end
 
     def y_align=(sym)
-      @visual.y_align = sym if @owns_visual
+      @visual.y_align = sym if @visual.respond_to?(:y_align=)
     end
 
     # Get the label string.
@@ -264,13 +281,44 @@ module Ruby2D
       self.color = c
     end
 
+    # Draw the label over the visual, centered on its bounding box as it is
+    # now, so the label follows a move, resize, or alignment made to the
+    # visual directly. Called by the visual's draw hook, right after it draws.
+    def _draw_label
+      center_label
+      @label._render_scene
+    end
+
     private
 
     # Button isn't a scene-graph member (its visual is), so registry membership
-    # is what makes it hit-testable. Only join while added; `add` registers any
+    # is what makes it hit-testable. With a visual, dispatch skips the button
+    # while the visual is out of the scene, so it can always join; a
+    # visual-less button joins only while added, and `add` registers any
     # handlers attached in the meantime.
     def register_with_window
-      Window.register_interactive(self) if @added
+      Window.register_interactive(self) if @visual || added?
+    end
+
+    # Scene membership of a visual-less button, which has no scene object:
+    # its own flag, and the window not having been cleared since it was set.
+    def mark_added(added)
+      @added = added
+      @scene_generation = Window.scene_generation
+    end
+
+    def added?
+      @added && @scene_generation == Window.scene_generation
+    end
+
+    # Make the visual draw the label after itself: the label is then always on
+    # the visual, at the visual's depth, hidden and removed along with it.
+    def draw_label_with_visual
+      button = self
+      @visual.define_singleton_method(:_render_scene) do
+        super()
+        button._draw_label
+      end
     end
 
     # Wire the hover/pressed tint state machine. `:auto` lightens for hover
@@ -329,51 +377,14 @@ module Ruby2D
       end
     end
 
-    # Center the label text within the button bounds. `@x`/`@y` is the visual's
-    # anchor, which is the bounding-box top-left for most shapes but the *center*
-    # for a wrapped Circle/Ellipse — so back out the anchor offset to find the
-    # true top-left before centering.
+    # Center the label on the visual's bounding box. The box, not the
+    # position: a `Circle` is anchored at its center and a `Quad` or `Polygon`
+    # at its centroid, so `x`/`y` alone would put the label off the shape.
     def center_label
-      return unless @label
-
-      ox, oy = visual_anchor_offset
-      left = @x - ox
-      top  = @y - oy
-      @label.x = left + (@width - @label.width) / 2.0
-      @label.y = top + (@height - @label.height) / 2.0
-    end
-
-    # Offset from the visual's bounding-box top-left to its `x`/`y` anchor.
-    # Zero for top-left-anchored shapes (Rectangle, owned visual, visual-less);
-    # the radius for a wrapped center-anchored Circle/Ellipse. Lets
-    # `center_label` find the bounding box regardless of the visual's anchor.
-    def visual_anchor_offset
-      if @visual && !@owns_visual && @visual.respond_to?(:_alignment_anchor_dx, true)
-        [@visual.send(:_alignment_anchor_dx), @visual.send(:_alignment_anchor_dy)]
-      else
-        [0, 0]
-      end
-    end
-
-    # Wrap the visual's alignment resolver so that, when symbolic alignment
-    # resolves to a numeric position at draw time, Button's stored `@x`/`@y`
-    # follow and the label re-centers.
-    def hook_visual_alignment
-      return unless @visual.respond_to?(:_resolve_alignment)
-
-      button = self
-      @visual.define_singleton_method(:_resolve_alignment) do
-        super()
-        button.send(:_sync_from_visual)
-      end
-    end
-
-    # Pull the visual's resolved position back into Button's own state and
-    # re-center the label. Called after each alignment resolution.
-    def _sync_from_visual
-      @x = @visual.x
-      @y = @visual.y
-      center_label if @label
+      left = @visual.respond_to?(:_bounding_box_left) ? @visual._bounding_box_left : @visual.x
+      top  = @visual.respond_to?(:_bounding_box_top)  ? @visual._bounding_box_top  : @visual.y
+      @label.x = left + (width - @label.width) / 2.0
+      @label.y = top + (height - @label.height) / 2.0
     end
 
     # Lightened version of a color for the `:auto` hover tint. Maps per-vertex

@@ -109,8 +109,8 @@ RSpec.describe 'Interactive hit-test z-order' do
   end
 
   it 'keys a Button by its visual once that visual is added' do
-    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50, add: false)
-    button = Ruby2D::Button.new(visual)
+    visual = Ruby2D::Square.new(x: 0, y: 0, size: 50)
+    button = Ruby2D::Button.new(visual, add: false)
     button.on(:click) {}
     cover = Ruby2D::Square.new(x: 0, y: 0, size: 50)
     cover.on(:click) {}

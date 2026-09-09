@@ -55,6 +55,15 @@ module Ruby2D
       ys.max - ys.min
     end
 
+    # Bounding-box left and top (the least vertex x and y)
+    def _bounding_box_left
+      @coordinates.each_slice(2).map(&:first).min
+    end
+
+    def _bounding_box_top
+      @coordinates.each_slice(2).map(&:last).min
+    end
+
     # Test whether (x, y) lies inside the polygon, using the even-odd ray-cast
     # rule (shared by every filled polygonal shape — see `_point_in_polygon?`).
     # Matches the rendered fill for non-self-intersecting polygons (convex and
