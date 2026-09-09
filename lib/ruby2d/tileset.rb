@@ -79,6 +79,7 @@ module Ruby2D
       @coords_batch = []
       @tex_coords_batch = []
       @batch_dirty = true
+      @bounds = nil
       @padding = padding
       @spacing = spacing
       @x = 0
@@ -160,7 +161,52 @@ module Ruby2D
     # is already zero-arg, so the hook is the same method under the scene name.
     alias_method :_render_scene, :render
 
+    # Hit-test against the placed tiles: true when (x, y) falls inside a tile's
+    # drawn quad, following each tile type's rotation and half-open like every
+    # other box. `@x`/`@y`/`@width`/`@height` describe the source texture, not
+    # the layer, so the inherited box test doesn't apply. The layer's bounding
+    # box is checked first so a mouse move far from the tiles doesn't scan
+    # every placement; it's inclusive, since which edges of a rotated tile are
+    # inside is the tile's call. The scan is an index loop over the cached
+    # vertices list: a `return` out of an `each_value` block allocates on the
+    # way out, and this runs on every mouse move.
+    def contains?(x, y)
+      return false if @tiles.empty?
+
+      left, top, right, bottom = _bounds
+      return false if x < left || x > right || y < top || y > bottom
+
+      placed = @placed
+      i = 0
+      n = placed.size
+      while i < n
+        return true if placed[i].contains?(x, y)
+        i += 1
+      end
+      false
+    end
+
     private
+
+    # The box enclosing every placed tile, rebuilt after a placement changes
+    # along with `@placed`, the placements' vertices in one array
+    def _bounds
+      @bounds ||= begin
+        left = top = Float::INFINITY
+        right = bottom = -Float::INFINITY
+        @placed = []
+        @tiles.each_value do |placement|
+          vertices = placement.fetch(:vertices)
+          @placed << vertices
+          l, t, r, b = vertices.bounds
+          left = l if l < left
+          top = t if t < top
+          right = r if r > right
+          bottom = b if b > bottom
+        end
+        [left, top, right, bottom]
+      end
+    end
 
     def place_one(name, x, y)
       tile_def = @tile_definitions.fetch(name) do
@@ -187,6 +233,7 @@ module Ruby2D
     # Invalidate the cached draw batch so the next `render` rebuilds it. Called
     # from every placement mutation (`place_one`, `delete`, `clear`).
     def mark_batch_dirty
+      @bounds = nil
       @batch_dirty = true
     end
 

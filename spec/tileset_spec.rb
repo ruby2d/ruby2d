@@ -127,6 +127,91 @@ RSpec.describe Ruby2D::Tileset do
     end
   end
 
+  # The inherited box test covers the source image at the origin, which has
+  # nothing to do with where tiles are drawn; a tileset is hit on its tiles.
+  describe '#contains?' do
+    let(:tileset) do
+      ts = Tileset.new(atlas_path, tile_width: 16, tile_height: 8, scale: 2, add: false)
+      ts.define(:a, 0, 0)
+      ts.define(:turned, 0, 0, rotate: 90)
+      ts.define(:tilted, 0, 0, rotate: 45)
+      ts
+    end
+
+    it 'is false with no placements, even inside the source image' do
+      expect(tileset.contains?(8, 8)).to be(false)
+    end
+
+    it 'hits a placed tile at its scaled size and misses the source image area' do
+      tileset[80, 40] = :a
+      expect(tileset.contains?(88, 48)).to be(true)
+      expect(tileset.contains?(111, 55)).to be(true)
+      expect(tileset.contains?(8, 8)).to be(false)
+      expect(tileset.contains?(112, 48)).to be(false)
+    end
+
+    it 'is half-open: left and top edges inside, right and bottom outside' do
+      tileset[80, 40] = :a
+      expect(tileset.contains?(80, 40)).to be(true)
+      expect(tileset.contains?(112, 40)).to be(false)
+      expect(tileset.contains?(80, 56)).to be(false)
+      expect(tileset.contains?(111.9, 55.9)).to be(true)
+    end
+
+    it 'follows the rotation of the tile type' do
+      # 32×16 placed at (80, 40) turns about (96, 48) into the 16×32 box
+      # from (88, 32) to (104, 64)
+      tileset[80, 40] = :turned
+      expect(tileset.contains?(90, 60)).to be(true)
+      expect(tileset.contains?(100, 34)).to be(true)
+      expect(tileset.contains?(84, 44)).to be(false)
+      expect(tileset.contains?(90, 70)).to be(false)
+    end
+
+    it 'keeps the inside edge of a turned tile on the layer edge' do
+      # The tile's top-left corner lands at (104, 32) after the turn, on the
+      # layer's top and right edges, and is still inside; the other corners
+      # are outside as they were.
+      tileset[80, 40] = :turned
+      expect(tileset.contains?(104, 32)).to be(true)
+      expect(tileset.contains?(88, 32)).to be(false)
+      expect(tileset.contains?(88, 64)).to be(false)
+    end
+
+    # Runs on every mouse move; a per-call allocation would show as 100 here
+    # (the counter itself adds one or two).
+    it 'allocates nothing per call hitting a rotated tile' do
+      tileset[80, 40] = :turned
+      tileset.contains?(90, 60)
+      before = GC.stat(:total_allocated_objects)
+      100.times { tileset.contains?(90, 60) }
+      expect(GC.stat(:total_allocated_objects) - before).to be < 10
+    end
+
+    it 'excludes the bounding-box corners of a tilted tile' do
+      tileset[80, 40] = :tilted
+      expect(tileset.contains?(96, 48)).to be(true)
+      expect(tileset.contains?(80, 32)).to be(false)
+    end
+
+    it 'checks every placement' do
+      tileset.place(:a, [[0, 0], [200, 100]])
+      expect(tileset.contains?(8, 4)).to be(true)
+      expect(tileset.contains?(208, 104)).to be(true)
+      expect(tileset.contains?(100, 50)).to be(false)
+    end
+
+    it 'tracks deletion and clearing' do
+      tileset[80, 40] = :a
+      tileset[0, 0] = :a
+      tileset.delete(80, 40)
+      expect(tileset.contains?(88, 48)).to be(false)
+      expect(tileset.contains?(8, 4)).to be(true)
+      tileset.clear
+      expect(tileset.contains?(8, 4)).to be(false)
+    end
+  end
+
   describe 'texture coordinates' do
     it 'pins width/height to the source texture dimensions' do
       ts = Tileset.new(atlas_path, add: false)

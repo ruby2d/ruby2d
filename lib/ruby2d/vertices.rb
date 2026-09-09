@@ -46,6 +46,37 @@ module Ruby2D
         end
     end
 
+    # The axis-aligned box enclosing the quad, as `[left, top, right, bottom]`
+    def bounds
+      @bounds ||= begin
+        c = coordinates
+        xs = [c[0], c[2], c[4], c[6]]
+        ys = [c[1], c[3], c[5], c[7]]
+        [xs.min, ys.min, xs.max, ys.max]
+      end
+    end
+
+    # Hit-test the drawn quad. The point is rotated back about the tile's
+    # center, then tested against the unrotated box, half-open like
+    # `Renderable#contains?` so a point on the right or bottom edge is outside.
+    # Runs on every mouse move for every placed tile, so the rotation is
+    # inlined rather than going through the array-returning `rotate_point`.
+    def contains?(px, py)
+      unless @rotate.zero?
+        @inverse ||= begin
+          angle = -@rotate * Math::PI / 180.0
+          [Math.sin(angle), Math.cos(angle)]
+        end
+        sa = @inverse[0]
+        ca = @inverse[1]
+        dx = px - @rx
+        dy = py - @ry
+        px = dx * ca - dy * sa + @rx
+        py = dx * sa + dy * ca + @ry
+      end
+      px >= @x && px < @x + @width && py >= @y && py < @y + @height
+    end
+
     private
 
     def unrotated_coordinates
