@@ -426,7 +426,7 @@ For a number, objects with `z` at or below it draw first, then the block, then t
 Ruby 2D supports two rendering modes that control when the window presents frames:
 
 - **`:continuous`** (default) — the window renders every tick up to `fps_cap`. Right for games and anything with continuous animation.
-- **`:on_demand`** — the window only presents a frame when `request_render` is called or when the OS signals a redraw (resize, expose, display change). Input, `update`, and frame pacing still run every tick, so the app remains responsive.
+- **`:on_demand`** — the window only presents a frame when `request_render` is called, when the OS signals a redraw (resize, expose, display change), or when a `set` changes the window size or viewport. Input, `update`, and frame pacing still run every tick, so the app remains responsive.
 
 On-demand mode lets the GPU reach its deepest sleep state when nothing is changing on screen, useful for charts, editors, dashboards, and other non-game GUIs where the contents only change in response to input.
 

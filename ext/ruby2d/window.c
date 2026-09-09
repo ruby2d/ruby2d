@@ -225,6 +225,18 @@ static void R2D_ApplyPixelScale(R2D_Window *window) {
 }
 
 
+/*
+ * Publish the render viewport dimensions to the Ruby window, where symbolic
+ * alignment reads them. Called after every change to them, at the event poll
+ * and from the live setters, so a layout in the same frame as a `set` sees
+ * the viewport the renderer is already using.
+ */
+static void R2D_SyncViewportSize(R_VAL obj) {
+  r_ivar_set(obj, id_viewport_width, INT2NUM(r2d_window->viewport.width));
+  r_ivar_set(obj, id_viewport_height, INT2NUM(r2d_window->viewport.height));
+}
+
+
 // =============================================================================
 // Render Mode
 // =============================================================================
@@ -676,8 +688,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
   // render size under pixel_scale. viewport_width/height expose the physical size.
   r_ivar_set(obj, id_width, INT2NUM(r2d_window->orig_width));
   r_ivar_set(obj, id_height, INT2NUM(r2d_window->orig_height));
-  r_ivar_set(obj, id_viewport_width, INT2NUM(r2d_window->viewport.width));
-  r_ivar_set(obj, id_viewport_height, INT2NUM(r2d_window->viewport.height));
+  R2D_SyncViewportSize(obj);
 
   if (r2d_window->close) r_ivar_set(obj, id_close, R_TRUE);
 
@@ -1383,6 +1394,11 @@ R_VAL ruby2d_ext_window_set_viewport_mode(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   R2D_ApplyViewportMode(r2d_window);
 
+  // The viewport has changed: let Ruby lay out against the new dimensions
+  // this frame, and draw it, whatever the render mode.
+  R2D_SyncViewportSize(obj);
+  SDL_SetAtomicInt(&r2d_window->render_pending, 1);
+
   return R_TRUE;
 }
 
@@ -1468,6 +1484,14 @@ R_VAL ruby2d_ext_window_set_size(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   R2D_ApplyPixelScale(r2d_window);
   R2D_ApplyViewportMode(r2d_window);
+
+  // In expand mode the viewport just changed with the window: let Ruby lay
+  // out against the new dimensions this frame, and draw the resized window
+  // whatever the render mode. (A viewport dimension carried by the same
+  // `set` is overwritten here; `Window#set` restores it before calling
+  // ruby2d_ext_window_set_viewport_mode, which adopts it.)
+  R2D_SyncViewportSize(obj);
+  SDL_SetAtomicInt(&r2d_window->render_pending, 1);
   return R_TRUE;
 }
 

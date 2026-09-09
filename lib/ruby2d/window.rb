@@ -142,7 +142,15 @@ module Ruby2D
       set_any_window_properties opts
       set_any_window_dimensions opts
 
-      Ext.window_set_size(self) if Window.shown? && (opts[:width] || opts[:height])
+      if Window.shown? && (opts[:width] || opts[:height])
+        Ext.window_set_size(self)
+        # The resize publishes the viewport it left the renderer with. A
+        # viewport dimension this call also carries goes back in place for the
+        # viewport setter below, which adopts a dimension that differs from
+        # the renderer's.
+        @viewport_width  = opts[:viewport_width]  if opts[:viewport_width]
+        @viewport_height = opts[:viewport_height] if opts[:viewport_height]
+      end
 
       if Window.shown? && (opts[:viewport] || opts[:viewport_width] || opts[:viewport_height] || !opts[:pixel_scale].nil?)
         Ext.window_set_viewport_mode(self)
@@ -775,21 +783,29 @@ module Ruby2D
     end
 
     def set_any_window_dimensions(opts)
-      # Before `show`, the viewport auto-follows width/height (its documented
-      # default of "same as width/height"). After `show`, a bare `set width:` is
-      # a live resize: leave the fixed logical viewport alone so it letterboxes
-      # into the new window size instead of being silently overwritten. Only
-      # `:expand` tracks the window on resize, and that is handled C-side.
+      # Before `show`, a viewport dimension the user hasn't set follows
+      # width/height (its documented default of "same as width/height"); one
+      # set explicitly, in this call or an earlier one, stays put. After
+      # `show`, a bare `set width:` is a live resize: leave the fixed logical
+      # viewport alone so it letterboxes into the new window size instead of
+      # being silently overwritten. Only `:expand` tracks the window on resize,
+      # and that is handled C-side.
       if opts[:width]
         @width = opts[:width]
-        @viewport_width = @width unless opts[:viewport_width] || Window.shown?
+        @viewport_width = @width unless @viewport_width_explicit || Window.shown?
       end
       if opts[:height]
         @height = opts[:height]
-        @viewport_height = @height unless opts[:viewport_height] || Window.shown?
+        @viewport_height = @height unless @viewport_height_explicit || Window.shown?
       end
-      @viewport_width  = opts[:viewport_width]  if opts[:viewport_width]
-      @viewport_height = opts[:viewport_height] if opts[:viewport_height]
+      if opts[:viewport_width]
+        @viewport_width = opts[:viewport_width]
+        @viewport_width_explicit = true
+      end
+      if opts[:viewport_height]
+        @viewport_height = opts[:viewport_height]
+        @viewport_height_explicit = true
+      end
       if opts[:viewport]
         unless VIEWPORT_MODES.include?(opts[:viewport])
           raise Error, "Invalid viewport mode #{opts[:viewport].inspect}; expected one of #{VIEWPORT_MODES.inspect}"
@@ -856,9 +872,12 @@ module Ruby2D
       @highdpi = true
       @pixel_scale = false
 
-      # Size of the window's viewport (the drawable area)
+      # Size of the window's viewport (the drawable area), and whether each
+      # dimension was set explicitly rather than following the window size
       @viewport_width = @width
       @viewport_height = @height
+      @viewport_width_explicit = false
+      @viewport_height_explicit = false
 
       # Viewport scaling mode for resizable windows
       @viewport_mode = :letterbox

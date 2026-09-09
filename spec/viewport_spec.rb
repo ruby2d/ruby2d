@@ -11,6 +11,47 @@ RSpec.describe 'Window viewport on resize' do
     expect(w.viewport_height).to eq(600)
   end
 
+  it 'keeps an explicit viewport when width/height are set later, before show' do
+    w = Ruby2D::Window.new
+    w.set(viewport_width: 100, viewport_height: 50)
+    w.set(width: 400, height: 200)
+    expect(w.viewport_width).to eq(100)
+    expect(w.viewport_height).to eq(50)
+    expect(w.width).to eq(400)
+    expect(w.height).to eq(200)
+  end
+
+  it 'lets a dimension not set explicitly keep following the window' do
+    w = Ruby2D::Window.new
+    w.set(viewport_width: 100)
+    w.set(width: 400, height: 200)
+    expect(w.viewport_width).to eq(100)
+    expect(w.viewport_height).to eq(200)
+  end
+
+  # A live resize publishes the renderer's viewport back to the window (in
+  # :expand it changed with the size). A viewport dimension the same `set`
+  # carries must survive that for the viewport setter, called next, which
+  # adopts a dimension that differs from the renderer's.
+  it 'hands a viewport dimension carried by a live resize to the viewport setter' do
+    w = Ruby2D::Window.new
+    allow(Ruby2D::Ext).to receive(:window_set_size) do |win|
+      win.instance_variable_set(:@viewport_width, win.width)
+      win.instance_variable_set(:@viewport_height, win.height)
+    end
+    seen = nil
+    allow(Ruby2D::Ext).to receive(:window_set_viewport_mode) do |win|
+      seen = [win.viewport_width, win.viewport_height]
+    end
+    Ruby2D::Window.shown = true
+    begin
+      w.set(width: 800, height: 600, viewport_width: 400, viewport_height: 300)
+      expect(seen).to eq([400, 300])
+    ensure
+      Ruby2D::Window.shown = false
+    end
+  end
+
   it 'keeps an explicit viewport fixed across a live set width: after show' do
     w = Ruby2D::Window.new
     w.set(viewport_width: 320, viewport_height: 240)
