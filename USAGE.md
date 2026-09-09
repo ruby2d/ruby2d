@@ -446,7 +446,7 @@ show
 Things to know:
 
 - **The first frame is always rendered.** You don't need to call `request_render` for the window to appear.
-- **Animations are opt-in.** A blinking caret, spinner, or fade-out needs to call `request_render` on whatever cadence you want; if nothing asks for frames, frames stop.
+- **Animations are opt-in.** A blinking caret, spinner, or fade-out needs to call `request_render` on whatever cadence you want; if nothing asks for frames, frames stop. A playing `Sprite` advances by the time since the last drawn frame, so requesting frames at any cadence shows it where its animation has reached, not slowed down.
 - **`request_render` is thread-safe** and idempotent within a tick. Calling it multiple times before the next frame has no extra cost.
 - **`Canvas` mutations auto-request a render.** Every `Canvas#fill_*`, `Canvas#stroke_*`, `Canvas#draw_*`, and `Canvas#clear` call marks the next frame dirty for you, so you don't need `request_render` after canvas drawing. Mutating shape attributes (`rect.x = 100`, etc.) does *not*; call `request_render` yourself for those.
 - **`show_fps` / `diagnostics` counters freeze in `:on_demand` mode** because the overlay is drawn as part of the frame. FPS is not meaningful when rendering is demand-driven.
@@ -1348,7 +1348,7 @@ sprite.speed = 0    # frozen (still 'playing', just not advancing)
 
 `speed` is a multiplier on top of `time:` — the per-frame duration is effectively `time / speed`. Negative values clamp to `0`; reverse playback is not supported.
 
-Animations advance on real elapsed time — the same frame delta described under [`dt`](#frame-rate-independence-with-dt) — not on a fixed step per frame. So playback runs at the same wall-clock rate on any display refresh rate, a high `speed` genuinely skips frames (it isn't capped at the refresh rate), and a momentary stall is caught up on the next frame rather than dropped. Each frame is shown for its own `time:`, so per-frame durations stay accurate even while skipping.
+Animations advance on real elapsed time — the same clock as [`dt`](#frame-rate-independence-with-dt), read each time the sprite is drawn — not on a fixed step per frame. So playback runs at the same wall-clock rate on any display refresh rate, a high `speed` genuinely skips frames (it isn't capped at the refresh rate), and a momentary stall, or a frame not requested in `:on_demand` mode, is caught up on the next drawn frame rather than dropped. Each frame is shown for its own `time:`, so per-frame durations stay accurate even while skipping. A hidden sprite keeps time, like one at opacity 0: it is not drawn, not even by a bare `sprite.render` (an override draw such as `render(x:)` still draws it, as for any renderable), and once shown it is drawn where its animation has reached; use `pause` to hold a pose. A sprite drawn twice in one frame advances once. The completion block runs before the sprite is drawn, so hiding the sprite there keeps its last frame off the screen.
 
 ```ruby
 sprite.frame             # => name of the atlas frame on display, or nil

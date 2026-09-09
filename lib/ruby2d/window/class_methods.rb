@@ -105,10 +105,14 @@ module Ruby2D
       end
 
       # Get the most recent frame's delta time, in seconds (clamped to 0.1s).
-      # The same value passed to an `update do |dt|` block; the time source
-      # every animation advances on.
+      # The same value passed to an `update do |dt|` block.
       def delta_time
         DSL.window.delta_time
+      end
+
+      # The window's clock, the sum of every tick's delta (see `Window#_clock`)
+      def _clock
+        DSL.window._clock
       end
 
       # Get the FPS cap

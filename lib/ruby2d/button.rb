@@ -377,12 +377,14 @@ module Ruby2D
     end
 
     # Make the visual draw the label after itself: the label is then always on
-    # the visual, at the visual's depth, hidden and removed along with it.
+    # the visual, at the visual's depth, hidden and removed along with it. The
+    # visual's own hook can hide it mid-draw (a `Sprite`'s completion block),
+    # so the label checks again after it.
     def draw_label_with_visual
       button = self
       @visual.define_singleton_method(:_render_scene) do
         super()
-        button._draw_label
+        button._draw_label if visible?
       end
     end
 

@@ -433,6 +433,17 @@ module Ruby2D
       end
     end
 
+    # The window's clock: the sum of every tick's `delta_time`, in seconds,
+    # since the window was created. It runs on ticks, not on drawn frames, and
+    # it counts a stall once, as the clamped delta does. A scene-drawn
+    # `Sprite` advances by how far it moved since the sprite's previous update,
+    # so a tick that skips drawing in `:on_demand` mode delays the picture, not
+    # the animation. Public for the scene-graph hooks, like the other
+    # underscore-prefixed internals.
+    def _clock
+      @clock
+    end
+
     # Update callback method, called by the native and web extentions
     def update_callback
       # Monotonic seconds since the previous update. Clamped to 0.1s so a paused
@@ -449,6 +460,7 @@ module Ruby2D
         @delta_time = 0.0
       end
       @last_update_time = now
+      @clock += @delta_time
 
       update if @overrides_update
 
@@ -948,6 +960,7 @@ module Ruby2D
       # Per-frame delta-time state, populated each `update_callback`.
       @last_update_time = nil
       @delta_time = 0.0
+      @clock = 0.0
 
       # Detect the "class pattern": a Window subclass overriding `update` and/or
       # `render`. Each is detected independently so overriding only one still

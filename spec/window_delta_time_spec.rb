@@ -68,4 +68,39 @@ RSpec.describe 'Window#delta_time' do
     expect { tick_at(5.0) }.not_to raise_error
     expect(counter.calls).to eq(1)
   end
+
+  # `Window#_clock` is the window's clock: the sum of every tick's clamped
+  # delta since the window was created. It runs on ticks, drawn or not, so a
+  # `Sprite` drawn by the scene can advance by however much it moved since the
+  # sprite's previous draw, and a tick that skips drawing in `:on_demand` mode
+  # delays the picture, not the animation.
+  describe '#_clock' do
+    def tick(seconds, render:)
+      allow(Ruby2D::Ext).to receive(:poll_events)
+      allow(Ruby2D::Ext).to receive(:drain_events).and_return(nil)
+      allow(Ruby2D::Ext).to receive(:begin_frame).and_return(render)
+      allow(Ruby2D::Ext).to receive(:end_frame)
+      allow(Ruby2D::Ext).to receive(:now).and_return(seconds)
+      window.tick
+    end
+
+    it 'is 0.0 before any tick' do
+      expect(window._clock).to eq(0.0)
+    end
+
+    it 'adds up the deltas of every tick, drawn or not' do
+      tick(5.0, render: true)
+      tick(5.025, render: false)
+      tick(5.050, render: true)
+      tick(5.075, render: false)
+      expect(window._clock).to be_within(1e-9).of(0.075)
+    end
+
+    it 'counts a stall once, as the clamped delta does' do
+      tick(5.0, render: true)
+      tick(9.0, render: false)
+      tick(9.016, render: false)
+      expect(window._clock).to be_within(1e-9).of(0.116)
+    end
+  end
 end

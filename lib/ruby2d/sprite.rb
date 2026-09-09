@@ -7,9 +7,10 @@ module Ruby2D
     attr_reader :flip, :sheet, :speed, :frame, :clip_x, :clip_y, :clip_width, :clip_height
 
     # Sentinel default for `update`'s `dt`. Lets the no-arg scene-graph call defer
-    # resolving `Window.delta_time` until after the `@playing` guard, so a paused
-    # or static sprite never pays for it. A frozen unique object, so an explicit
-    # `update(nil)` is still distinct from the default and behaves as before.
+    # resolving the window's render delta until after the `@playing` guard, so a
+    # paused or static sprite never pays for it. A frozen unique object, so an
+    # explicit `update(nil)` is still distinct from the default and behaves as
+    # before.
     UPDATE_DT_UNSET = Object.new.freeze
     private_constant :UPDATE_DT_UNSET
 
@@ -235,6 +236,7 @@ module Ruby2D
 
         set_frame
         @frame_budget = 0.0   # first frame gets its full duration
+        @clock = nil
       end
       self
     end
@@ -259,6 +261,7 @@ module Ruby2D
       @paused = false
       @playing = true
       @frame_budget = 0.0
+      @clock = nil
       self
     end
 
@@ -319,18 +322,28 @@ module Ruby2D
     end
 
     # Advance the animation by one frame of real time and update the clip rect.
-    # Called with no arguments from the scene-graph loop, where `dt` defaults to
-    # the engine's shared frame delta (`Window.delta_time`) — the same value an
-    # `update do |dt|` block receives. Driving every sprite off that one clock
-    # (rather than each polling its own) keeps them in lockstep, lets the engine
-    # clamp stalls once, and makes `update(dt)` directly testable. Pass an
-    # explicit `dt` (in seconds) to drive the animation by hand.
+    # Called with no arguments from the scene-graph loop, where `dt` is what
+    # the window's clock (`Window._clock`, the sum of the engine's shared
+    # per-tick deltas — the same clock an `update do |dt|` block sees) has
+    # advanced since this sprite's previous no-argument update, so a tick that
+    # skips drawing in `:on_demand` mode delays the drawing, not the animation,
+    # a hidden sprite keeps time and shows where its animation has reached,
+    # and a second draw in the same tick advances nothing. `play` and `resume`
+    # start the count afresh, so time that passed before them matters to
+    # nothing. Driving every sprite off that one clock
+    # (rather than each polling its own) keeps them in lockstep, lets the
+    # engine clamp stalls once, and makes `update(dt)` directly testable. Pass
+    # an explicit `dt` (in seconds) to drive the animation by hand.
     def update(dt = UPDATE_DT_UNSET)
       return unless @playing
 
-      # Resolve the shared frame delta only now that we know the sprite is
-      # playing — the no-arg scene-graph call hits this every frame per sprite.
-      dt = Window.delta_time if dt.equal?(UPDATE_DT_UNSET)
+      # Read the clock only now that we know the sprite is playing — the
+      # no-arg scene-graph call hits this every frame per sprite.
+      if dt.equal?(UPDATE_DT_UNSET)
+        now = Window._clock
+        dt = @clock ? now - @clock : 0.0
+        @clock = now
+      end
 
       # Bank the elapsed time, scaled by `@speed` (0.0 freezes, 2.0 is double
       # speed), then spend it one whole frame at a time. Looping here — rather
@@ -451,9 +464,17 @@ module Ruby2D
     # — a zero-arg call into the 11-keyword `render` still pays ~5µs of
     # keyword setup on wasm mruby, half a millisecond per frame at 100 sprites.
     # The animation advances first: a new frame can change the sprite's size,
-    # which alignment positions against.
+    # which alignment positions against, and its completion block can hide
+    # the sprite, which the scene loop checked before calling here. A hidden
+    # sprite is not drawn, by the scene or by a bare `render`; its animation
+    # keeps time (see `update`), so it is drawn where it has reached once
+    # shown.
     def _render_scene
+      return unless @visible
+
       update
+      return unless @visible
+
       _resolve_alignment
       Ext.image_draw(self)
     end
@@ -551,6 +572,7 @@ module Ruby2D
       @last_frame = 0
       @cycle_time = nil
       @done_proc = nil
+      @clock = nil
 
       # Generate `:default` for path-based sprites where the source is a
       # horizontal strip from the clip origin, unless the user defined one.

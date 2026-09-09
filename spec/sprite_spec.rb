@@ -866,4 +866,112 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite.flip).to be_nil
     end
   end
+
+  describe 'drawn by the scene' do
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" }
+    let(:sprite) { Sprite.new(strip, clip_width: 84, time: 100, animations: { walk: 0..3 }, add: false) }
+
+    before { allow(Ruby2D::Ext).to receive(:image_draw) }
+
+    # Draw the sprite as the scene would, with the window's clock at `clock`
+    # seconds.
+    def draw(sprite, frame: nil, clock:)
+      allow(Ruby2D::Window).to receive(:_clock).and_return(clock)
+      sprite._render_scene
+    end
+
+    it 'gives the first frame after play its full duration' do
+      sprite.play(animation: :walk, loop: true)
+      draw(sprite, frame: 1, clock: 5.0)
+      expect(sprite.clip_x).to eq(0)
+      draw(sprite, frame: 2, clock: 5.05)
+      expect(sprite.clip_x).to eq(0)
+      draw(sprite, frame: 3, clock: 5.15)
+      expect(sprite.clip_x).to eq(84)
+    end
+
+    it 'advances by the clock since its previous draw, drawn frames only counted' do
+      sprite.play(animation: :walk, loop: true)
+      draw(sprite, frame: 1, clock: 5.0)
+      draw(sprite, frame: 2, clock: 5.2) # skipped ticks in between: their time counts
+      expect(sprite.clip_x).to eq(168)
+    end
+
+    it 'ignores the time that passed before play' do
+      allow(Ruby2D::Window).to receive(:_clock).and_return(9.0)
+      sprite.play(animation: :walk)
+      draw(sprite, frame: 1, clock: 9.0)
+      expect(sprite.clip_x).to eq(0)
+      expect(sprite.playing?).to be true
+    end
+
+    it 'keeps time while hidden and shows where its animation has reached' do
+      sprite.play(animation: :walk, loop: true)
+      draw(sprite, frame: 1, clock: 5.0)
+      sprite.hide
+      draw(sprite, frame: 2, clock: 5.15)
+      expect(sprite.clip_x).to eq(0)
+      sprite.show
+      draw(sprite, frame: 3, clock: 5.25)
+      expect(sprite.clip_x).to eq(168)
+    end
+
+    it 'keeps advancing while blinking' do
+      sprite.play(animation: :walk)
+      6.times do |i|
+        sprite.visible = i.even?
+        draw(sprite, clock: 5.0 + i * 0.1)
+      end
+      expect(sprite.clip_x).to eq(252)
+      expect(sprite.playing?).to be false
+    end
+
+    it 'skips the label of a Button it is the visual of when its completion block hides it' do
+      allow(Ruby2D::Ext).to receive(:text_draw)
+      Button.new(sprite, label: 'go')
+      sprite.play(animation: :walk) { sprite.hide }
+      draw(sprite, clock: 5.0)
+      expect(Ruby2D::Ext).not_to receive(:text_draw)
+      draw(sprite, clock: 5.5)
+    end
+
+    it 'advances once when drawn twice in one frame' do
+      sprite.play(animation: :walk, loop: true)
+      draw(sprite, frame: 1, clock: 5.0)
+      draw(sprite, frame: 2, clock: 5.15)
+      draw(sprite, frame: 2, clock: 5.15)
+      expect(sprite.clip_x).to eq(84)
+    end
+
+    it 'is not drawn while hidden' do
+      sprite.play(animation: :walk, loop: true)
+      draw(sprite, frame: 1, clock: 5.0)
+      sprite.hide
+      expect(Ruby2D::Ext).not_to receive(:image_draw)
+      draw(sprite, frame: 2, clock: 5.3)
+    end
+
+    it 'is not drawn when its completion block hides it' do
+      sprite.play(animation: :walk) { sprite.hide }
+      draw(sprite, frame: 1, clock: 5.0)
+      expect(Ruby2D::Ext).not_to receive(:image_draw)
+      draw(sprite, frame: 2, clock: 5.4)
+      expect(sprite.visible?).to be false
+      expect(sprite.playing?).to be false
+    end
+
+    it 'is drawn when its completion block leaves it visible' do
+      sprite.play(animation: :walk)
+      draw(sprite, frame: 1, clock: 5.0)
+      expect(Ruby2D::Ext).to receive(:image_draw).with(sprite)
+      draw(sprite, frame: 2, clock: 5.4)
+    end
+
+    it 'advances a hand-driven no-argument update by the clock since the last one' do
+      sprite.play(animation: :walk, loop: true)
+      allow(Ruby2D::Window).to receive(:_clock).and_return(5.0, 5.06, 5.06, 5.12)
+      4.times { sprite.update }
+      expect(sprite.clip_x).to eq(84)
+    end
+  end
 end
