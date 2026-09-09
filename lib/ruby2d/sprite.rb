@@ -125,11 +125,19 @@ module Ruby2D
       self.add if add
     end
 
+    # Re-rasterize a path-backed sprite's whole strip at a new pixel size. The
+    # frame regions scale with it (the clip, the strip origin every `Range`
+    # animation counts from, and each explicit frame rect), so the animation
+    # keeps selecting the same frames, and the display size stays the user's
+    # override or keeps tracking the frame. Called with no arguments,
+    # rasterizes so the current frame's pixels match its display size, which
+    # becomes the sprite's size from then on: the sprite-strip counterpart of
+    # `Image#resize!` committing `width`/`height`.
+    #
     # A SpriteSheet-backed sprite shares one backing texture with every other
-    # sprite cut from the same sheet. Re-rasterizing it (Image#resize!) would
-    # silently corrupt all of them and invalidate the sheet's frame coordinates,
-    # so refuse it. Path/strip-backed sprites own their texture and resize fine.
-    def resize!(width = @width, height = @height)
+    # sprite cut from the same sheet. Re-rasterizing it would silently corrupt
+    # all of them and invalidate the sheet's frame coordinates, so refuse it.
+    def resize!(width = nil, height = nil)
       if @sheet
         raise Error,
               'Cannot resize! a SpriteSheet-backed sprite: its texture is shared ' \
@@ -137,7 +145,49 @@ module Ruby2D
               'set width/height to change only this sprite\'s display size.'
       end
 
-      super
+      if (width.nil? || height.nil?) && (@source_width <= 0 || @source_height <= 0)
+        raise Error, 'Sprite#resize! needs a frame with a positive size to derive the strip size from'
+      end
+
+      if width.nil?
+        @user_width ||= @width
+        width = @img_width * (@width.to_f / @source_width)
+      end
+      if height.nil?
+        @user_height ||= @height
+        height = @img_height * (@height.to_f / @source_height)
+      end
+
+      # `Image#resize!` resets the clip to the whole raster, so keep the pose.
+      old_width, old_height = @img_width, @img_height
+      pose = [@clip_x, @clip_y, @clip_width, @clip_height,
+              @source_width, @source_height, @trim_x, @trim_y]
+      super(width, height)
+
+      # Scale by the raster the extension actually produced: an SVG rasterizes
+      # at twice the requested size.
+      @img_width  = @orig_width
+      @img_height = @orig_height
+      sx = @img_width.to_f  / old_width
+      sy = @img_height.to_f / old_height
+
+      @defaults[:clip_x]      = (@defaults[:clip_x]      * sx).round
+      @defaults[:clip_y]      = (@defaults[:clip_y]      * sy).round
+      @defaults[:clip_width]  = (@defaults[:clip_width]  * sx).round
+      @defaults[:clip_height] = (@defaults[:clip_height] * sy).round
+      @animations.each_value do |frames|
+        next unless frames.is_a?(Array)
+
+        frames.each { |rect| scale_rect(rect, sx, sy) }
+      end
+
+      # `Image#resize!` turned clipping off and set the display size to the
+      # whole strip; restore the current pose at the new scale.
+      @clipped = true
+      x, y, w, h, sw, sh, tx, ty = pose
+      apply_rect((x * sx).round, (y * sy).round, (w * sx).round, (h * sy).round,
+                 (sw * sx).round, (sh * sy).round, (tx * sx).round, (ty * sy).round, @frame)
+      self
     end
 
     # Set the displayed width. Like the `width:` constructor option, this persists
@@ -562,6 +612,18 @@ module Ruby2D
       @width  = @user_width  || @source_width
       @height = @user_height || @source_height
       @frame  = name
+    end
+
+    # Scale an explicit frame rect in place (see `resize!`).
+    def scale_rect(rect, sx, sy)
+      rect[:x] = (rect[:x] * sx).round if rect[:x]
+      rect[:y] = (rect[:y] * sy).round if rect[:y]
+      rect[:width]  = (rect[:width]  * sx).round if rect[:width]
+      rect[:height] = (rect[:height] * sy).round if rect[:height]
+      rect[:source_width]  = (rect[:source_width]  * sx).round if rect[:source_width]
+      rect[:source_height] = (rect[:source_height] * sy).round if rect[:source_height]
+      rect[:trim_x] = (rect[:trim_x] * sx).round if rect[:trim_x]
+      rect[:trim_y] = (rect[:trim_y] * sy).round if rect[:trim_y]
     end
 
     # initialize animation, called by constructor

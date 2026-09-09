@@ -974,4 +974,85 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite.clip_x).to eq(84)
     end
   end
+
+  describe '#resize! on a strip' do
+    include_context 'sprite sheet'
+    let(:strip) { "#{Ruby2D.test_spritesheets}/coin.png" } # 504x84: six 84px frames
+
+    it 'scales the frames with the raster and keeps clipping on' do
+      sprite = Sprite.new(strip, clip_width: 84, time: 100, add: false)
+      sprite.resize!(168, 28)
+      expect(sprite.instance_variable_get(:@orig_width)).to eq(168)
+      expect(sprite.instance_variable_get(:@clipped)).to be true
+      expect([sprite.clip_x, sprite.clip_width, sprite.clip_height]).to eq([0, 28, 28])
+      expect([sprite.width, sprite.height]).to eq([28, 28])
+      sprite.play
+      sprite.update(0.1)
+      expect(sprite.clip_x).to eq(28)
+      expect(sprite.instance_variable_get(:@defaults)[:clip_width]).to eq(28)
+    end
+
+    it 'scales explicit frame rects and the current pose' do
+      sprite = Sprite.new(strip, clip_width: 84, time: 100,
+                          animations: { two: [{ x: 84, y: 0, width: 84, height: 84 },
+                                              { x: 168, y: 0, width: 168, height: 84 }] }, add: false)
+      sprite.play(animation: :two)
+      sprite.update(0.1)
+      sprite.resize!(252, 42)
+      expect([sprite.clip_x, sprite.clip_width, sprite.width]).to eq([84, 84, 84])
+      two = sprite.instance_variable_get(:@animations)[:two]
+      expect(two[0]).to include(x: 42, width: 42, height: 42)
+      sprite.stop
+      expect([sprite.clip_x, sprite.clip_width]).to eq([0, 42])
+    end
+
+    it 'keeps an explicit display size' do
+      sprite = Sprite.new(strip, clip_width: 84, width: 40, height: 40, add: false)
+      sprite.resize!(252, 42)
+      expect([sprite.width, sprite.height]).to eq([40, 40])
+      expect(sprite.clip_width).to eq(42)
+    end
+
+    it 'with no arguments rasterizes the frame at its display size' do
+      sprite = Sprite.new(strip, clip_width: 84, width: 42, height: 42, add: false)
+      sprite.resize!
+      expect(sprite.instance_variable_get(:@orig_width)).to eq(252)
+      expect(sprite.instance_variable_get(:@orig_height)).to eq(42)
+      expect(sprite.clip_width).to eq(42)
+      expect(sprite.width).to eq(42)
+    end
+
+    it 'leaves a sprite built from the same animations literal alone' do
+      anims = { two: [{ x: 0, y: 0, width: 84, height: 84 }, { x: 84, y: 0, width: 84, height: 84 }] }
+      a = Sprite.new(strip, clip_width: 84, animations: anims, add: false)
+      b = Sprite.new(strip, clip_width: 84, animations: anims, add: false)
+      a.resize!(252, 42)
+      b.play(animation: :two)
+      b.update(0.3)
+      expect([b.clip_x, b.clip_width]).to eq([84, 84])
+      expect(anims[:two][1]).to eq(x: 84, y: 0, width: 84, height: 84)
+    end
+
+    it 'raises instead of deriving a size from a frame with no footprint' do
+      sprite = Sprite.new(strip, width: 60, height: 60, clip_width: 60, add: false)
+      sprite.clip_width = 0
+      expect { sprite.resize! }.to raise_error(Ruby2D::Error, /positive size/)
+      expect { sprite.resize!(Float::INFINITY, 10) }.to raise_error(Ruby2D::Error, /positive width and height/)
+    end
+
+    it 'with no arguments keeps the display size of an unsized SVG strip' do
+      sprite = Sprite.new("#{Ruby2D.test_images}/bee.svg", clip_width: 32, add: false)
+      w, h = sprite.width, sprite.height
+      sprite.resize!
+      expect(sprite.instance_variable_get(:@orig_height)).to eq(h * 2)
+      expect([sprite.width, sprite.height]).to eq([w, h])
+      sprite.resize!
+      expect([sprite.width, sprite.height]).to eq([w, h])
+    end
+
+    it 'refuses on the sheet texture too' do
+      expect { sheet.texture.resize!(64, 64) }
+        .to raise_error(Ruby2D::Error, /SpriteSheet texture/)
+    end
+  end
 end

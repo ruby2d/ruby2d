@@ -28,7 +28,7 @@ module Ruby2D
       raise Error, "SpriteSheet `#{@path}` does not specify an image path" unless atlas_image
 
       @image_path = resolve_image_path(@path, atlas_image)
-      @texture = Image.new(@image_path, add: false, scale_mode: scale_mode)
+      @texture = Image.new(@image_path, add: false, scale_mode: scale_mode, _shared: true)
     end
 
     # All frame names, in declaration order

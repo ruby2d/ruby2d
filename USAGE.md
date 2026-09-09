@@ -1107,7 +1107,7 @@ bee.resize!            # commit the current width/height to a fresh raster
 
 `resize!` also works on raster images (PNG/JPG/BMP), where it resamples the source, useful for trimming GPU memory when displaying a large source small. It re-decodes from disk, so call it on size changes, not every frame.
 
-> `resize!` is not supported on Sprites built from a `SpriteSheet`: every sprite cut from the sheet shares one backing texture, so re-rasterizing it would corrupt all of them. It raises `Ruby2D::Error`; set `width`/`height` to change only this sprite's display size, or use a standalone `Image` if you need a true resize.
+> On a `Sprite` built from an image file, `resize!` re-rasterizes the whole strip at the given pixel size and scales every frame region with it, so the animation keeps selecting the same frames; with no arguments it rasterizes so the current frame's pixels match the sprite's display size, which stays the sprite's size from then on, as if given as `width`/`height`. `resize!` is not supported on Sprites built from a `SpriteSheet`, nor on the sheet's `texture`: every sprite cut from the sheet shares that one backing texture, so re-rasterizing it would corrupt all of them. Both raise `Ruby2D::Error`; set `width`/`height` to change only one sprite's display size, or use a standalone `Image` if you need a true resize.
 
 ## Text
 

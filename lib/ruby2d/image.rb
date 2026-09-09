@@ -56,9 +56,10 @@ module Ruby2D
                    opacity: nil, add: true, visible: true,
                    padding: nil, padding_top: nil, padding_right: nil,
                    padding_bottom: nil, padding_left: nil,
-                   scale_mode: nil, _share_from: nil)
+                   scale_mode: nil, _share_from: nil, _shared: false)
       @width = width
       @height = height
+      @_shared = _shared
       self.scale_mode = scale_mode
 
       x, y = _extract_alignment(x, y)
@@ -113,8 +114,17 @@ module Ruby2D
     # — useful for trimming GPU memory when displaying a large source small.
     # Called with no arguments, re-rasterizes at the current `width`/`height`
     # — handy after assigning to `width=`/`height=` to commit a fresh raster.
+    # A `SpriteSheet`'s texture refuses: every sprite cut from the sheet draws
+    # from it by the sheet's frame coordinates, which a new raster would break.
     def resize!(width = @width, height = @height)
-      unless width.is_a?(Numeric) && height.is_a?(Numeric) && width.positive? && height.positive?
+      if @_shared
+        raise Error,
+              'Cannot resize! a SpriteSheet texture: it is shared by every sprite ' \
+              'cut from the sheet, and its frame coordinates assume the loaded ' \
+              'raster. Use a standalone Image for a resizable copy.'
+      end
+
+      unless [width, height].all? { |v| v.is_a?(Numeric) && v.positive? && (v.is_a?(Integer) || v.finite?) }
         raise Error, 'Image#resize! requires positive width and height'
       end
 
