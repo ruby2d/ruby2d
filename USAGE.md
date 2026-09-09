@@ -1449,6 +1449,7 @@ ts[0, 32] = :water
 | `z` | `0` | Depth |
 | `padding` | `0` | Padding around the tileset edges |
 | `spacing` | `0` | Spacing between tiles |
+| `opacity` | `nil` | Alpha override on the tint |
 | `scale` | `1` | Scale multiplier for tile rendering |
 | `add` | `true` | Add to the window's scene graph on construction |
 | `visible` | `true` | Initial visibility (drawn each frame while in the scene graph) |
@@ -1467,7 +1468,7 @@ ts.clear                                     # remove all placed tiles
 
 Placing a tile at a coordinate that's already occupied replaces the existing one. The `flip:` option for `define` accepts `:horizontal`, `:vertical`, or `:both`.
 
-Setting `tileset.tint` multiplies all placed tiles against the texture (white = untinted, the default).
+Setting `tileset.tint` multiplies all placed tiles against the texture (white = untinted, the default). `opacity:` and the `tileset.opacity` accessor read and set the tint's alpha, fading every placed tile (see [Opacity](#opacity)).
 
 ## Canvas
 

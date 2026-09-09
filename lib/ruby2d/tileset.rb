@@ -24,6 +24,16 @@ module Ruby2D
       @tint = Color.new(c)
     end
 
+    # Get and set the tint's opacity. Tileset overrides `Renderable#opacity`
+    # because its modulating color is `tint`, not `@color` (as `Canvas` does).
+    def opacity
+      tint.opacity
+    end
+
+    def opacity=(value)
+      tint.opacity = value
+    end
+
     # Sampling mode for the tileset's texture. Kept on the backing Image,
     # which is what `render` draws through.
     def scale_mode
@@ -36,7 +46,7 @@ module Ruby2D
 
     # Create a tileset from an image
     def initialize(path, tile_width: 32, tile_height: 32, z: 0,
-                   padding: 0, spacing: 0,
+                   padding: 0, spacing: 0, opacity: nil,
                    scale: 1, add: true, visible: true, scale_mode: nil)
       # `scale` and the tile dimensions feed the UV denominator
       # (`@scaled_*` sizes); a non-positive value collapses them to zero and
@@ -79,6 +89,7 @@ module Ruby2D
 
       calculate_scaled_sizes
 
+      self.opacity = opacity unless opacity.nil?
       @visible = visible
       self.add if add
     end

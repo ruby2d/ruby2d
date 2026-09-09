@@ -51,6 +51,23 @@ RSpec.describe Ruby2D::Tileset do
       expect { ts.define(:wall, 0, 0, rotate: 90) }.not_to raise_error
     end
 
+    it 'reads and sets opacity through the tint' do
+      ts = Tileset.new(atlas_path, add: false)
+      expect(ts.opacity).to eq(1.0)
+      ts.opacity = 0.5
+      expect(ts.opacity).to eq(0.5)
+      expect(ts.tint.opacity).to eq(0.5)
+      ts.tint = '#ff0000'
+      ts.opacity = 0.25
+      expect(ts.tint.to_a).to eq([1.0, 0.0, 0.0, 0.25])
+    end
+
+    it 'applies a construction-time opacity to the tint' do
+      ts = Tileset.new(atlas_path, opacity: 0.5, add: false)
+      expect(ts.opacity).to eq(0.5)
+      expect(ts.tint.to_a).to eq([1.0, 1.0, 1.0, 0.5])
+    end
+
     it 'gives each default-tinted tileset an independent tint' do
       a = Tileset.new(atlas_path)
       b = Tileset.new(atlas_path)
