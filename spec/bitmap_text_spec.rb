@@ -158,6 +158,20 @@ RSpec.describe Ruby2D::BitmapText do
       expect { bt.scale = -1 }.to raise_error(Ruby2D::Error, /at least 1/)
     end
 
+    it 'rejects an infinite scale with the same error' do
+      expect { BitmapText.new('hi', scale: Float::INFINITY) }.to raise_error(Ruby2D::Error, /at least 1/)
+    end
+
+    it 'restores the scale and content when the native call raises' do
+      bt = BitmapText.new('hi', scale: 3)
+      expect { bt.scale = 2**31 }.to raise_error(RangeError)
+      expect(bt.scale).to eq(3)
+
+      allow(Ruby2D::Ext).to receive(:bitmap_text_create).and_raise(Ruby2D::Error, 'boom')
+      expect { bt.content = 'changed' }.to raise_error(Ruby2D::Error, 'boom')
+      expect(bt.content).to eq('hi')
+    end
+
     it 'truncates a float scale to the integer the renderer uses' do
       expect(BitmapText.new('hi', scale: 2.9).scale).to eq(2)
       bt = BitmapText.new('hi', scale: 3)
@@ -208,14 +222,59 @@ RSpec.describe Ruby2D::BitmapText do
   end
 
   describe 'non-ASCII content' do
-    it 'sizes one cell per byte instead of silently dropping unsupported characters' do
-      # 'café' is 5 UTF-8 bytes (the é is two), each drawn as a glyph or a
-      # placeholder — so its width matches a 5-character ASCII string, not the
-      # 3 it would report if non-ASCII bytes were dropped from the count.
-      accented = BitmapText.new('café', scale: 3)
-      ascii5   = BitmapText.new('abcde', scale: 3)
-      expect(accented.width).to eq(ascii5.width)
-      expect(accented.width).to be > BitmapText.new('caf', scale: 3).width
+    it 'draws one placeholder cell per character, not per UTF-8 byte' do
+      one_placeholder = BitmapText.new('A?B', scale: 3).width
+      expect(BitmapText.new('AéB', scale: 3).width).to eq(one_placeholder)  # 2 bytes
+      expect(BitmapText.new('A界B', scale: 3).width).to eq(one_placeholder) # 3 bytes
+      expect(BitmapText.new('A🚀B', scale: 3).width).to eq(one_placeholder) # 4 bytes
+      expect(BitmapText.new('A??B', scale: 3).width).to be > one_placeholder
+    end
+
+    it 'does not drop unsupported characters from the count' do
+      expect(BitmapText.new('café', scale: 3).width).to eq(BitmapText.new('cafe', scale: 3).width)
+    end
+
+    it 'gives a malformed byte a cell of its own, so nothing vanishes' do
+      placeholder = BitmapText.new('A?B', scale: 3).width
+      expect(BitmapText.new("A\xFFB".b, scale: 3).width).to eq(placeholder)
+      # A lead byte without its continuation is one cell, then the letter
+      expect(BitmapText.new("A\xC3B".b, scale: 3).width).to eq(placeholder)
+      expect(BitmapText.new("A\xC3".b, scale: 3).width).to eq(BitmapText.new('A?', scale: 3).width)
+    end
+  end
+
+  describe 'embedded NUL content' do
+    it 'is rejected in the constructor and content=, as with Text' do
+      # The native side reads the string to its terminator, so a NUL silently
+      # cut off everything after it instead of drawing a placeholder.
+      expect { BitmapText.new("A\0B") }.to raise_error(Ruby2D::Error, /NUL/)
+      bt = BitmapText.new('AB')
+      expect { bt.content = "A\0BC" }.to raise_error(Ruby2D::Error, /NUL/)
+      expect(bt.content).to eq('AB')
+    end
+  end
+
+  describe 'content immutability' do
+    it 'owns a copy, so a caller mutating its string cannot desync the dimensions' do
+      content = +'A'
+      bt = BitmapText.new(content, scale: 1)
+      content << 'BCD'
+      expect(bt.content).to eq('A')
+
+      # Assigning the grown buffer back is a real change, measured afresh
+      bt.content = content
+      expect(bt.content).to eq('ABCD')
+      expect(bt.width).to eq(BitmapText.new('ABCD', scale: 1).width)
+    end
+
+    it 'rejects in-place mutation so native state cannot desync' do
+      expect { BitmapText.new('hi').content << 'x' }.to raise_error(FrozenError)
+    end
+
+    it 'never freezes the caller-supplied string' do
+      str = +'hello'
+      BitmapText.new(str)
+      expect(str).not_to be_frozen
     end
   end
 end

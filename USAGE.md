@@ -1150,7 +1150,7 @@ text.width   # => calculated width of the rendered text
 text.height  # => calculated height of the rendered text
 ```
 
-Embedded newlines (`"line one\nline two"`) are laid out as separate lines; `width` is the widest line and `height` covers the whole block, including blank lines at the end (`"line one\n"` is two lines high).
+Embedded newlines (`"line one\nline two"`) are laid out as separate lines; `width` is the widest line and `height` covers the whole block, including blank lines at the end (`"line one\n"` is two lines high). Content cannot contain a NUL byte; that raises.
 
 Font `style` combines one or more of `:bold`, `:italic`, `:underline`, and `:strikethrough` (pass an array for several). It can be set at construction or changed later, and `font`/`size`/`style` all re-render the text:
 
@@ -1187,7 +1187,7 @@ Fonts are cached internally. You do not instantiate `Font` objects directly; the
 
 ## Bitmap Text
 
-Renders text using a built-in bitmap font, with no TTF dependency. The font covers printable ASCII only (space through `~`); any other character — accented letters, non-Latin scripts, emoji, tabs, newlines — renders as a `?` placeholder. For full Unicode or multi-line text, use [`Text`](#text).
+Renders text using a built-in bitmap font, with no TTF dependency. The font covers printable ASCII only (space through `~`); any other character — accented letters, non-Latin scripts, emoji, tabs, newlines — renders as one `?` placeholder per Unicode code point (so a flag or a skin-toned emoji takes more than one). A NUL byte in the content raises, as it does for [`Text`](#text). For full Unicode or multi-line text, use `Text`.
 
 ```ruby
 bt = BitmapText.new('Hello!')

@@ -6,6 +6,10 @@ module Ruby2D
     include Renderable
     include TextureScaling
 
+    # Frozen NUL string for the content scan, as in `Text` — a bare literal
+    # would allocate on every `content=`.
+    NUL = "\0".freeze
+
     attr_reader :content, :scale, :x, :y
     attr_accessor :rotate
 
@@ -52,7 +56,7 @@ module Ruby2D
       @rotate = rotate
       @_user_rx = rx
       @_user_ry = ry
-      @content = content.to_s
+      @content = validate_content(content).dup.freeze
       @scale = validate_scale(scale)
 
       self.color = color || colour || 'white'
@@ -65,23 +69,40 @@ module Ruby2D
 
     # Set the text content. A no-op when the content is unchanged — rebuilding
     # the texture is the expensive part, and per-frame assignments of the same
-    # string (HUDs, score counters) are common.
+    # string (HUDs, score counters) are common. The stored string is a frozen
+    # copy, as in `Text`: the width and height are measured here, and a
+    # caller's string mutated in place (a reused buffer) would change what's
+    # drawn without updating them — and read as unchanged when assigned back.
     def content=(msg)
-      msg = msg.to_s
-      return if msg == @content
+      str = validate_content(msg)
+      return if str == @content
 
-      @content = msg
-      Ext.bitmap_text_create(self)
+      previous = @content
+      @content = str.dup.freeze
+      begin
+        Ext.bitmap_text_create(self)
+      rescue StandardError => e
+        @content = previous
+        raise e
+      end
     end
 
     # Set the scale. A no-op when unchanged, like `content=` — rebuilding the
-    # texture is the expensive part.
+    # texture is the expensive part. Both setters restore their attribute when
+    # the native call raises, as `Text`'s do, so the object keeps describing
+    # what it measured.
     def scale=(s)
       s = validate_scale(s)
       return if s == @scale
 
+      previous = @scale
       @scale = s
-      Ext.bitmap_text_create(self)
+      begin
+        Ext.bitmap_text_create(self)
+      rescue StandardError => e
+        @scale = previous
+        raise e
+      end
     end
 
     # Render the text. Called with overrides for one-shot rendering inside a
@@ -140,6 +161,17 @@ module Ruby2D
     end
     public :_render_scene
 
+    # Coerce content to a string and reject embedded NUL bytes, as `Text`
+    # does. The native side measures and draws the string to its terminator,
+    # so a NUL silently cut off everything after it; the placeholder the font
+    # draws for other unsupported characters never saw the suffix.
+    def validate_content(content)
+      str = content.to_s
+      raise Error, 'BitmapText content cannot contain NUL (\0) bytes' if str.include?(NUL)
+
+      str
+    end
+
     def _validate_coordinate(axis, value)
       unless value.is_a?(Numeric)
         raise Error,
@@ -157,7 +189,7 @@ module Ruby2D
     # `scale` reader equals the scale actually rendered — e.g. `scale: 2.9`
     # renders and reports 2; a value below 1 would truncate to a scale of 0.
     def validate_scale(scale)
-      unless scale.is_a?(Numeric) && scale >= 1
+      unless scale.is_a?(Numeric) && scale >= 1 && (scale.is_a?(Integer) || scale.finite?)
         raise Error, "BitmapText scale must be a number of at least 1, got #{scale.inspect}"
       end
 

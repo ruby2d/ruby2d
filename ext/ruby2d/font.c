@@ -216,6 +216,44 @@ static const uint8_t r2d_font_glyphs[R2D_FONT_NUM_GLYPHS][R2D_FONT_GLYPH_HEIGHT]
 
 
 /*
+ * Read one glyph cell from a UTF-8 string, advancing *p past it, and return
+ * the byte to draw for it: the character itself for printable ASCII, '?' for
+ * anything the font lacks. A well-formed multi-byte UTF-8 sequence is one
+ * cell, so an accented letter or an emoji draws one placeholder rather than
+ * one per byte; a control byte, a stray continuation byte, or a lead byte
+ * without its continuations is a cell of its own, so nothing disappears
+ * silently. Only the shape is checked: an overlong or surrogate encoding
+ * that is shaped like a sequence is one cell too. Content is NUL-free (the
+ * Ruby side rejects NUL), so callers read to the terminator.
+ */
+static unsigned char R2D_BitmapTextNextCell(const char **p) {
+  const unsigned char *s = (const unsigned char *)*p;
+  unsigned char lead = s[0];
+  int len = 1;
+  if      (lead >= 0xC2 && lead <= 0xDF) len = 2;
+  else if (lead >= 0xE0 && lead <= 0xEF) len = 3;
+  else if (lead >= 0xF0 && lead <= 0xF4) len = 4;
+  for (int i = 1; i < len; i++) {
+    if ((s[i] & 0xC0) != 0x80) { len = 1; break; }
+  }
+  *p += len;
+  if (len == 1 && lead >= R2D_FONT_FIRST_CHAR && lead <= R2D_FONT_LAST_CHAR) return lead;
+  return '?';
+}
+
+
+/*
+ * Number of glyph cells a string occupies — the width unit ext_create reports
+ * and R2D_UpdateBitmapText draws, so the two must count the same way.
+ */
+static int R2D_BitmapTextCellCount(const char *text) {
+  int cells = 0;
+  for (const char *p = text; *p; cells++) R2D_BitmapTextNextCell(&p);
+  return cells;
+}
+
+
+/*
  * Allocate a new bitmap text handle. All fields are zeroed so the first call
  * to R2D_UpdateBitmapText will create the texture.
  */
@@ -260,11 +298,12 @@ void R2D_UpdateBitmapText(R2D_BitmapText *bt, SDL_Renderer *renderer,
   free(bt->text);
   bt->text = NULL;
 
-  // Each byte renders one glyph cell — a real glyph for printable ASCII, or a
-  // placeholder for anything out of range (non-ASCII, control chars). Counting
-  // bytes (not just printable ones) keeps the width consistent with ext_create
-  // and makes unsupported characters visible instead of silently vanishing.
-  int len = (int)strlen(text);
+  // Each cell renders one glyph — a real glyph for printable ASCII, or a
+  // placeholder for anything else (one per character, see
+  // R2D_BitmapTextNextCell). Counting every cell, not just the printable ones,
+  // keeps the width consistent with ext_create and makes unsupported
+  // characters visible instead of silently vanishing.
+  int len = R2D_BitmapTextCellCount(text);
   if (len == 0) {
     // Nothing to render: cache the empty key and zero the content dims so the
     // draw paths skip the (still-allocated) texture with its stale pixels.
@@ -302,11 +341,11 @@ void R2D_UpdateBitmapText(R2D_BitmapText *bt, SDL_Renderer *renderer,
   int y_offset = bt->background ? (int)(R2D_FONT_PADDING_V * 0.5f * ds) : 0;
   uint32_t white = SDL_MapRGBA(SDL_GetPixelFormatDetails(surface->format), NULL, 255, 255, 255, 255);
 
-  for (const char *p = text; *p; p++) {
-    unsigned char ch = (unsigned char)*p;
-    // Substitute a visible placeholder for unsupported bytes (the font only
-    // covers printable ASCII), so dropped characters are noticeable.
-    if (ch < R2D_FONT_FIRST_CHAR || ch > R2D_FONT_LAST_CHAR) ch = '?';
+  for (const char *p = text; *p;) {
+    // The character itself, or a visible placeholder for anything the font
+    // lacks (it only covers printable ASCII), so dropped characters are
+    // noticeable.
+    unsigned char ch = R2D_BitmapTextNextCell(&p);
 
     int glyph_idx = ch - R2D_FONT_FIRST_CHAR;
     const uint8_t *glyph = r2d_font_glyphs[glyph_idx];
@@ -464,10 +503,10 @@ R_VAL ruby2d_ext_bitmap_text_create(RUBY2D_METHOD_ARGS_VARIADIC) {
     is_new = true;
   }
 
-  // One glyph cell per byte (out-of-range bytes draw a placeholder at draw
-  // time), matching R2D_UpdateBitmapText so the reported width agrees with
-  // what's rendered.
-  int len = (msg == NULL) ? 0 : (int)strlen(msg);
+  // One glyph cell per character (unsupported ones draw a placeholder at draw
+  // time), counted the way R2D_UpdateBitmapText draws so the reported width
+  // agrees with what's rendered.
+  int len = (msg == NULL) ? 0 : R2D_BitmapTextCellCount(msg);
 
   // Compute logical dimensions (no background padding for user-facing text).
   // Empty content reports a zero-width box at the glyph height — the draw path
