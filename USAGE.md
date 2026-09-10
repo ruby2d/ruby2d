@@ -1127,9 +1127,9 @@ text = Text.new('Hello, Ruby 2D!')
 | `x` | `0` | X position (or `:left`/`:center`/`:right`; see [Aligning to the window](#aligning-to-the-window)) |
 | `y` | `0` | Y position (or `:top`/`:center`/`:bottom`) |
 | `z` | `0` | Depth |
-| `size` | `20` | Font size in points |
+| `size` | `20` | Font size in points (a number of at least 1; a float truncates to an integer) |
 | `style` | `nil` | Font style: `:bold`, `:italic`, `:underline`, `:strikethrough`, or an array combining them |
-| `font` | `Font.default` | Path to a `.ttf` font file |
+| `font` | `Font.default` | Path to a font file (`.ttf`, `.otf`, or `.ttc`); `font` reads back the absolute path |
 | `rotate` | `0` | Rotation in degrees |
 | `rx`, `ry` | Center | Rotation center |
 | `color` | `'white'` | Text color |

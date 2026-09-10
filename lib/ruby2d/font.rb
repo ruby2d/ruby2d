@@ -43,11 +43,13 @@ module Ruby2D
           all_paths.find { |path| name_of(path).include?(font_name) }
       end
 
-      # Get full path to the default font
+      # Get full path to the default font. Absolute on both runtimes, like the
+      # `font` a `Text` reads back (see `Text#normalize_font_path`).
       def default
         if RUBY_ENGINE == 'mruby'
-          # Native and WASM builds bundle fonts at ruby2d/fonts/ relative to the binary
-          'ruby2d/fonts/outfit/outfit.ttf'
+          # Native and WASM builds bundle fonts at ruby2d/fonts/ relative to the
+          # working directory, which the native binary sets to its own location
+          File.expand_path('ruby2d/fonts/outfit/outfit.ttf')
         else
           File.expand_path('../../assets/resources/fonts/outfit/outfit.ttf', __dir__)
         end

@@ -1,4 +1,9 @@
+require 'fileutils'
+require 'tmpdir'
+
 RSpec.describe Ruby2D::Text do
+  ROBOTO_MONO = File.expand_path('../assets/resources/fonts/roboto_mono/roboto_mono.ttf', __dir__)
+
   describe '#new' do
     context 'using pathname' do
       it 'succeeds' do
@@ -66,15 +71,29 @@ RSpec.describe Ruby2D::Text do
   end
 
   describe 'size validation' do
-    it 'raises on a non-positive or non-numeric size at construction' do
-      expect { Text.new('hi', size: 0) }.to raise_error(Ruby2D::Error, /positive number/)
+    it 'raises on a size below 1 or a non-numeric size at construction' do
+      expect { Text.new('hi', size: 0) }.to raise_error(Ruby2D::Error, /at least 1/)
       expect { Text.new('hi', size: -5) }.to raise_error(Ruby2D::Error)
       expect { Text.new('hi', size: 'big') }.to raise_error(Ruby2D::Error)
+      expect { Text.new('hi', size: Float::INFINITY) }.to raise_error(Ruby2D::Error, /at least 1/)
     end
 
     it 'raises when size= is set to an invalid value' do
       txt = Text.new('hi')
       expect { txt.size = 0 }.to raise_error(Ruby2D::Error)
+    end
+
+    it 'rejects a positive fraction that would truncate to size 0' do
+      # 0.5 is positive, but the renderer uses the truncated integer, and a
+      # size-0 font fails inside SDL_ttf with a cryptic error — after `size=`
+      # had already committed the 0.
+      expect { Text.new('hi', size: 0.5) }.to raise_error(Ruby2D::Error, /at least 1/)
+
+      txt = Text.new('hi', size: 20)
+      dimensions = [txt.width, txt.height]
+      expect { txt.size = 0.5 }.to raise_error(Ruby2D::Error, /at least 1/)
+      expect(txt.size).to eq(20)
+      expect([txt.width, txt.height]).to eq(dimensions)
     end
   end
 
@@ -158,6 +177,107 @@ RSpec.describe Ruby2D::Text do
     it 'raises for a missing font file' do
       txt = Text.new('hello')
       expect { txt.font = 'nope.ttf' }.to raise_error(Ruby2D::Error)
+    end
+
+    it 'raises for an empty or nil font instead of expanding it to the working directory' do
+      expect { Text.new('hello', font: '') }.to raise_error(Ruby2D::Error, /not found/)
+      expect { Text.new('hello', font: nil) }.to raise_error(Ruby2D::Error, /not found/)
+    end
+
+    it 'keeps the previous font when the new file fails to load, so a retry is not a no-op' do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'selected.ttf')
+        File.write(path, 'not a font')
+        txt = Text.new('iiiiiiii', size: 24)
+        original_font = txt.font
+        original_width = txt.width
+
+        expect { txt.font = path }.to raise_error(Ruby2D::Error, /Failed to render/)
+        expect(txt.font).to eq(original_font)
+        expect(txt.width).to eq(original_width)
+
+        # Repair the file: assigning the same path again is a real change now
+        FileUtils.cp(ROBOTO_MONO, path)
+        txt.font = path
+        expect(txt.font).to eq(path)
+        expect(txt.width).to eq(Text.new('iiiiiiii', font: path, size: 24).width)
+        expect(txt.width).not_to eq(original_width)
+      end
+    end
+  end
+
+  # The native side keeps the last good rendering when a rebuild fails, so
+  # the Ruby attributes must keep describing it — otherwise the next
+  # assignment of the value that failed is skipped as unchanged.
+  describe 'setters when the native rebuild fails' do
+    def failing_rebuild
+      txt = Text.new('hello', size: 20, style: :bold)
+      allow(Ruby2D::Ext).to receive(:text_create).and_raise(Ruby2D::Error, 'boom')
+      txt
+    end
+
+    it 'restores the content' do
+      txt = failing_rebuild
+      expect { txt.content = 'world' }.to raise_error(Ruby2D::Error, 'boom')
+      expect(txt.content).to eq('hello')
+    end
+
+    it 'restores the size' do
+      txt = failing_rebuild
+      expect { txt.size = 30 }.to raise_error(Ruby2D::Error, 'boom')
+      expect(txt.size).to eq(20)
+    end
+
+    it 'restores the style and its flags' do
+      txt = failing_rebuild
+      expect { txt.style = :italic }.to raise_error(Ruby2D::Error, 'boom')
+      expect(txt.style).to eq(:bold)
+      expect(txt.instance_variable_get(:@style_flags)).to eq(Text::STYLE_FLAGS[:bold])
+    end
+
+    it 'restores the font' do
+      txt = failing_rebuild
+      expect { txt.font = ROBOTO_MONO }.to raise_error(Ruby2D::Error, 'boom')
+      expect(txt.font).to eq(Font.default)
+    end
+
+    it 'restores the size when the native side rejects it with another error class' do
+      txt = Text.new('hello', size: 20)
+      expect { txt.size = 2**31 }.to raise_error(RangeError)
+      expect(txt.size).to eq(20)
+    end
+  end
+
+  describe 'relative font paths' do
+    it 'resolves the font to an absolute path when loaded' do
+      Dir.chdir(File.dirname(Font.default)) do
+        txt = Text.new('x', font: 'outfit.ttf')
+        expect(txt.font).to eq(File.join(Dir.pwd, 'outfit.ttf'))
+      end
+    end
+
+    it 'keeps naming the loaded file after the working directory changes' do
+      # Two different fonts, both called `font.ttf`, in sibling directories
+      Dir.mktmpdir do |dir|
+        a = File.join(dir, 'a')
+        b = File.join(dir, 'b')
+        FileUtils.mkdir_p([a, b])
+        FileUtils.cp(Font.default, File.join(a, 'font.ttf'))
+        FileUtils.cp(ROBOTO_MONO, File.join(b, 'font.ttf'))
+
+        first = Dir.chdir(a) { Text.new('iiiiWWWW', font: 'font.ttf', size: 40) }
+        Dir.chdir(b) do
+          # The relative name is this directory's file, not a cache hit on a's
+          relative = Text.new('iiiiWWWW', font: 'font.ttf', size: 40)
+          absolute = Text.new('iiiiWWWW', font: File.join(b, 'font.ttf'), size: 40)
+          expect(relative.width).to eq(absolute.width)
+          expect(relative.width).not_to eq(first.width)
+
+          # A re-render reopens the file the text was loaded from
+          first.size = 41
+          expect(first.width).to eq(Text.new('iiiiWWWW', font: File.join(a, 'font.ttf'), size: 41).width)
+        end
+      end
     end
   end
 

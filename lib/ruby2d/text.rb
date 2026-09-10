@@ -92,12 +92,25 @@ module Ruby2D
     # invalid input raises regardless; the frozen copy is only allocated when
     # the content actually changes, so a same-string per-frame assignment costs
     # a coerce and a compare, not a string copy.
+    #
+    # Each setter below restores its attribute when the native rebuild raises
+    # (a font file gone or corrupt, a size the font refuses, a value outside
+    # the native int): the native side keeps drawing the last good rendering,
+    # so the Ruby side must keep describing it, or the next assignment of the
+    # same value is skipped as a no-op and the object reports a font or size
+    # it never rendered.
     def content=(msg)
       str = validate_content(msg)
       return if str == @content
 
+      previous = @content
       @content = str.dup.freeze
-      Ext.text_create(self)
+      begin
+        Ext.text_create(self)
+      rescue StandardError => e
+        @content = previous
+        raise e
+      end
     end
 
     # Set the font size. A no-op when unchanged, like `content=` — rebuilding
@@ -107,8 +120,14 @@ module Ruby2D
       size = validate_size(size)
       return if size == @size
 
+      previous = @size
       @size = size
-      Ext.text_create(self)
+      begin
+        Ext.text_create(self)
+      rescue StandardError => e
+        @size = previous
+        raise e
+      end
     end
 
     # Set the font style. Accepts `:normal`, `:bold`, `:italic`, `:underline`,
@@ -117,21 +136,35 @@ module Ruby2D
     # flags are unchanged (`:bold` and `[:bold]` are the same style).
     def style=(style)
       flags = compute_style_flags(style)
+      previous_style = @style
       @style = style
       return if flags == @style_flags
 
+      previous_flags = @style_flags
       @style_flags = flags
-      Ext.text_create(self)
+      begin
+        Ext.text_create(self)
+      rescue StandardError => e
+        @style = previous_style
+        @style_flags = previous_flags
+        raise e
+      end
     end
 
-    # Set the font, given a path to a `.ttf` file. Re-renders the text; a
-    # no-op when the resolved path is unchanged.
+    # Set the font, given a path to a font file (`.ttf`, `.otf`, or `.ttc`).
+    # Re-renders the text; a no-op when the resolved path is unchanged.
     def font=(font)
       font = normalize_font_path(font)
       return if font == @font
 
+      previous = @font
       @font = font
-      Ext.text_create(self)
+      begin
+        Ext.text_create(self)
+      rescue StandardError => e
+        @font = previous
+        raise e
+      end
     end
 
     # Render the text. Called with overrides for one-shot rendering inside a
@@ -178,25 +211,35 @@ module Ruby2D
     end
     public :_render_scene
 
-    # Coerce a font argument to a usable path: stringify, expand a leading `~`
-    # on CRuby, and raise a clear error if the file is missing.
+    # Coerce a font argument to a usable path: stringify, make it absolute
+    # (which also expands a leading `~`), and raise a clear error if the file
+    # is missing. Absolute so the path keeps naming the same file after the
+    # working directory changes: the native font cache is keyed by this
+    # string, and a later re-render (`size=`, a HiDPI rescale) reopens it —
+    # a relative `font.ttf` loaded in one directory was served, or reopened,
+    # from another directory's `font.ttf`.
     def normalize_font_path(font)
       font = font.to_s
-      font = File.expand_path(font) if RUBY_ENGINE == 'ruby' && font.start_with?('~')
+      # An empty path would expand to the working directory and pass the check
+      raise Error, "Font file `#{font}` not found" if font.empty?
+
+      font = File.expand_path(font)
       raise Error, "Font file `#{font}` not found" unless File.exist?(font)
 
       font
     end
 
-    # Ensure the font size is a positive number, raising a clear error instead
-    # of letting an invalid value reach the native font loader (where it would
-    # surface as a cryptic `TypeError`/`TTF_OpenFont failed`). Coerce to the same
-    # integer the native renderer uses (truncation toward zero) so the `size`
-    # reader equals the size actually rendered — e.g. `size: 10.9` renders and
-    # reports 10, not 10.9.
+    # Ensure the font size is a number of at least 1, raising a clear error
+    # instead of letting an invalid value reach the native font loader (where
+    # it would surface as a cryptic `TypeError` or "Couldn't set font size").
+    # Coerce to the same integer the native renderer uses (truncation toward
+    # zero) so the `size` reader equals the size actually rendered — e.g.
+    # `size: 10.9` renders and reports 10, not 10.9. The bound is checked
+    # before truncating: a fraction below 1 is positive but truncates to the
+    # size 0 the loader refuses.
     def validate_size(size)
-      unless size.is_a?(Numeric) && size > 0
-        raise Error, "Text size must be a positive number, got #{size.inspect}"
+      unless size.is_a?(Numeric) && size >= 1 && (size.is_a?(Integer) || size.finite?)
+        raise Error, "Text size must be a number of at least 1, got #{size.inspect}"
       end
 
       size.to_i
