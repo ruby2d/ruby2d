@@ -1596,6 +1596,98 @@ R_VAL ruby2d_ext_canvas_stroke_polyline(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 /*
+ * Stamp a source surface onto the canvas: scale `src_rect` of `src` (the whole
+ * surface when NULL) to `dst`, flip it, modulate it by an RGBA color, and
+ * composite it over the canvas pixels. `dst` is in surface pixel space and may
+ * run past the edges; only the overlap is drawn.
+ *
+ * SDL's blended blit can't do this. It writes `srcRGB*srcA + dstRGB*(1-srcA)`
+ * and accumulates alpha separately, which is "over" for a premultiplied
+ * destination. The canvas stores straight alpha (see canvas_blend_over), so
+ * over a transparent pixel that leaves a color darkened by its own alpha, and
+ * the window darkens it again when it blends the canvas texture. Instead the
+ * source is scaled into a scratch surface with a plain copy and composited
+ * pixel by pixel through canvas_blend_over.
+ */
+static void canvas_stamp_surface(R2D_Canvas *can, SDL_Surface *src,
+                                 const SDL_Rect *src_rect, SDL_Rect dst,
+                                 SDL_ScaleMode mode, SDL_FlipMode flip,
+                                 Uint8 mr, Uint8 mg, Uint8 mb, Uint8 ma) {
+  SDL_Surface *surface = can->surface;
+  if (dst.w <= 0 || dst.h <= 0 || ma == 0) return;
+
+  // The part of `dst` that lands on the canvas. The scratch surface is only
+  // this big, so an oversized stamp costs no more than the pixels it touches.
+  int x0 = dst.x < 0 ? 0 : dst.x;
+  int y0 = dst.y < 0 ? 0 : dst.y;
+  int x1 = dst.x + dst.w > surface->w ? surface->w : dst.x + dst.w;
+  int y1 = dst.y + dst.h > surface->h ? surface->h : dst.y + dst.h;
+  if (x0 >= x1 || y0 >= y1) return;
+  int vw = x1 - x0;
+  int vh = y1 - y0;
+
+  SDL_Surface *scaled = SDL_CreateSurface(vw, vh, SDL_PIXELFORMAT_RGBA32);
+  if (!scaled) {
+    R2D_Error("canvas_stamp_surface", "SDL_CreateSurface failed: %s", SDL_GetError());
+    return;
+  }
+
+  // Where the full-size stamp sits relative to the visible window; the scaled
+  // blit clips to the scratch surface and scales just the part that shows. A
+  // flip mirrors the whole stamp, so take the window from the mirrored side
+  // and flip the scratch afterwards.
+  SDL_Rect place = { dst.x - x0, dst.y - y0, dst.w, dst.h };
+  if (flip & SDL_FLIP_HORIZONTAL) place.x = x1 - dst.x - dst.w;
+  if (flip & SDL_FLIP_VERTICAL)   place.y = y1 - dst.y - dst.h;
+
+  // A plain copy; modulation and blending happen below. The source's blend
+  // mode is put back afterwards: text surfaces are shared through a cache and
+  // image textures are created from their surfaces.
+  SDL_BlendMode saved = SDL_BLENDMODE_BLEND;
+  SDL_GetSurfaceBlendMode(src, &saved);
+  SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
+  bool ok = SDL_BlitSurfaceScaled(src, src_rect, scaled, &place, mode);
+  SDL_SetSurfaceBlendMode(src, saved);
+  if (!ok) {
+    R2D_Error("canvas_stamp_surface", "SDL_BlitSurfaceScaled failed: %s", SDL_GetError());
+    SDL_DestroySurface(scaled);
+    return;
+  }
+  if (flip != SDL_FLIP_NONE && !SDL_FlipSurface(scaled, flip)) {
+    R2D_Error("canvas_stamp_surface", "SDL_FlipSurface failed: %s", SDL_GetError());
+    SDL_DestroySurface(scaled);
+    return;
+  }
+
+  bool modulate = mr != 255 || mg != 255 || mb != 255 || ma != 255;
+  SDL_LockSurface(surface);
+  for (int y = 0; y < vh; y++) {
+    const Uint8 *in = (const Uint8 *)scaled->pixels + y * scaled->pitch;
+    Uint8 *out = (Uint8 *)surface->pixels + (y0 + y) * surface->pitch + x0 * 4;
+    for (int x = 0; x < vw; x++, in += 4, out += 4) {
+      Uint8 r = in[0], g = in[1], b = in[2], a = in[3];
+      if (modulate) {
+        r = (Uint8)(r * mr / 255);
+        g = (Uint8)(g * mg / 255);
+        b = (Uint8)(b * mb / 255);
+        a = (Uint8)(a * ma / 255);
+      }
+      if (a == 0) continue;
+      if (a == 255) {
+        out[0] = r; out[1] = g; out[2] = b; out[3] = 255;
+      } else {
+        canvas_blend_over(out, r, g, b, a);
+      }
+    }
+  }
+  SDL_UnlockSurface(surface);
+  SDL_DestroySurface(scaled);
+
+  canvas_mark_dirty(can, (float)x0, (float)y0, (float)x1, (float)y1);
+}
+
+
+/*
  * Ruby2D::Canvas#ext_draw_image
  * Blit an Image's SDL_Surface onto this Canvas's SDL_Surface.
  * Arguments: img_obj (Ruby2D::Image), a = [x, y, width, height]
@@ -1631,18 +1723,13 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
   int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
   int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
 
-  // Nothing to draw for a degenerate (zero/negative) destination rect.
-  if (dw <= 0 || dh <= 0) return R_TRUE;
-
   SDL_Rect dst_rect = { dx, dy, dw, dh };
 
   // The source image's mode, not the canvas's: a :nearest sprite stamped
   // into a :linear canvas stays crisp.
-  SDL_SetSurfaceBlendMode(img->surface, SDL_BLENDMODE_BLEND);
-  SDL_BlitSurfaceScaled(img->surface, NULL, can->surface, &dst_rect,
-                        R2D_ResolveSurfaceScaleMode(img_obj));
-
-  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
+  canvas_stamp_surface(can, img->surface, NULL, dst_rect,
+                       R2D_ResolveSurfaceScaleMode(img_obj), SDL_FLIP_NONE,
+                       255, 255, 255, 255);
 
   return R_TRUE;
 }
@@ -1686,28 +1773,17 @@ R_VAL ruby2d_ext_canvas_draw_text(RUBY2D_METHOD_ARGS_VARIADIC) {
   int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
   int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
 
-  // Nothing to draw for a degenerate (zero/negative) destination rect.
-  if (dw <= 0 || dh <= 0) return R_TRUE;
-
   float rf = (float)NUM2DBL(r_ary_entry(a, 4));
   float gf = (float)NUM2DBL(r_ary_entry(a, 5));
   float bf = (float)NUM2DBL(r_ary_entry(a, 6));
   float af = (float)NUM2DBL(r_ary_entry(a, 7));
 
-  // Apply color/alpha modulation to tint the white text surface
-  SDL_SetSurfaceColorMod(txt->surface, (Uint8)(rf * 255), (Uint8)(gf * 255), (Uint8)(bf * 255));
-  SDL_SetSurfaceAlphaMod(txt->surface, (Uint8)(af * 255));
-  SDL_SetSurfaceBlendMode(txt->surface, SDL_BLENDMODE_BLEND);
-
+  // The color tints the white text surface as it lands on the canvas.
   SDL_Rect dst_rect = { dx, dy, dw, dh };
-  SDL_BlitSurfaceScaled(txt->surface, NULL, can->surface, &dst_rect,
-                        R2D_ResolveSurfaceScaleMode(txt_obj));
-
-  // Reset color/alpha mod to defaults so GPU rendering is unaffected
-  SDL_SetSurfaceColorMod(txt->surface, 255, 255, 255);
-  SDL_SetSurfaceAlphaMod(txt->surface, 255);
-
-  canvas_mark_dirty(can, (float)dx, (float)dy, (float)(dx + dw), (float)(dy + dh));
+  canvas_stamp_surface(can, txt->surface, NULL, dst_rect,
+                       R2D_ResolveSurfaceScaleMode(txt_obj), SDL_FLIP_NONE,
+                       (Uint8)(rf * 255), (Uint8)(gf * 255), (Uint8)(bf * 255),
+                       (Uint8)(af * 255));
 
   return R_TRUE;
 }
