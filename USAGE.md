@@ -1582,7 +1582,7 @@ label = Text.new('Canvas text', add: false)
 canvas.draw_text(label, x: 10, y: 80, color: 'yellow')
 ```
 
-`draw_image` copies the image's pixels as they are; its `tint` and `opacity` apply when the image itself is drawn, not to the stamp. `draw_text` takes the color to tint the glyphs with. A `Sprite` stamps its current frame, trim and flip included, and stamping reads the frame without advancing it: a sprite kept out of the scene animates when `render` draws it, or when you advance it yourself with `sprite.update(dt)`.
+`draw_image` stamps the image's pixels with its `tint` and `opacity` applied; `rotate` and `visible` don't carry into the stamp. `draw_text` takes the color to tint the glyphs with. A `Sprite` stamps its current frame, trim and flip included, and stamping reads the frame without advancing it: a sprite kept out of the scene animates when `render` draws it, or when you advance it yourself with `sprite.update(dt)`.
 
 ### Canvas Opacity Overrides
 

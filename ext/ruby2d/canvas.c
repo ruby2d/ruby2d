@@ -1779,11 +1779,16 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
                         (int)SDL_lroundf(dst.x + dst.w) - x0,
                         (int)SDL_lroundf(dst.y + dst.h) - y0 };
 
-  // The source image's mode, not the canvas's: a :nearest sprite stamped
-  // into a :linear canvas stays crisp.
+  // The image's tint and opacity land on the stamp as they would on the
+  // screen, and its own scale mode picks the sampling, not the canvas's: a
+  // :nearest sprite stamped into a :linear canvas stays crisp.
+  R_VAL tint = r_ivar_get(img_obj, id_color);
   canvas_stamp_surface(can, img->surface, &src_rect, dst_rect,
                        R2D_ResolveSurfaceScaleMode(img_obj), flip,
-                       255, 255, 255, 255);
+                       (Uint8)(NUM2DBL(r_ivar_get(tint, id_r)) * 255),
+                       (Uint8)(NUM2DBL(r_ivar_get(tint, id_g)) * 255),
+                       (Uint8)(NUM2DBL(r_ivar_get(tint, id_b)) * 255),
+                       (Uint8)(NUM2DBL(r_ivar_get(tint, id_a)) * 255));
 
   return R_TRUE;
 }
