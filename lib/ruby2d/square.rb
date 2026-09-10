@@ -24,12 +24,19 @@ module Ruby2D
             padding_bottom: padding_bottom, padding_left: padding_left)
     end
 
-    # Set the size of the square
+    # Set the size of the square, keeping width and height at it. The far
+    # corners are moved here rather than through `width=` and `height=`: those
+    # are private on a Square, and mruby refuses a private setter called
+    # through `self` where CRuby allows it, so the call died in compiled apps.
+    # Writing the vertices directly, as `Rectangle#x=` does, is deliberate over
+    # `send`: a size animation sets this every frame, and one call is cheaper
+    # than three.
     def size=(size)
-      self.width = self.height = @size = size
+      @size = @width = @height = size
+      @x2 = @x3 = @x1 + size
+      @y3 = @y4 = @y1 + size
     end
 
-    # Render a square without creating an instance
     # Render a square without creating an instance. Calls the positional
     # internal directly rather than `super` — see `Quad.draw_immediate`.
     def self.render(x: 0, y: 0, size: 100, rotate: 0,

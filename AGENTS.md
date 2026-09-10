@@ -18,7 +18,7 @@ Always use SDL3 libraries and APIs. SDL2 is not supported. Verify any constant, 
 
 Both the C extension and `lib/` compile against CRuby and mruby. In `.c` files, use the `r_*` macros from `ext/ruby2d/ruby2d.h`, never `rb_*` or `mrb_*` directly (`ARCHITECTURE.md` covers the layer; its few sanctioned exceptions are documented at the sites that need them).
 
-In `lib/`, CRuby-only idioms compile fine under `mrbc` and keep the specs green, then crash the native and web builds at runtime. `defined?` is the common one — use `instance_variable_defined?(:@x)` for ivar guards. When unsure whether something exists in mruby, confirm it with a throwaway script built by `ruby2d build --native`, ending the script's `update` block with `close` (closing any earlier leaves a window that has to be force-killed).
+In `lib/`, CRuby-only idioms compile fine under `mrbc` and keep the specs green, then crash the native and web builds at runtime. `defined?` is the common one — use `instance_variable_defined?(:@x)` for ivar guards. Calling a private setter through `self` (`self.width = w`, which CRuby allows) is another — mruby raises `NoMethodError`; write the ivars or use `send`. When unsure whether something exists in mruby, confirm it with a throwaway script built by `ruby2d build --native`, ending the script's `update` block with `close` (closing any earlier leaves a window that has to be force-killed).
 
 ## Documentation
 
