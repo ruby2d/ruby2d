@@ -167,6 +167,22 @@ module Ruby2D
       end
     end
 
+    # `dup`/`clone` support. A copy shares nothing mutable with its source:
+    # it gets its own color (`opacity=` writes the color in place), starts
+    # with no event handlers, and rebuilds its own native text — the struct
+    # behind `@ext_text` is one rasterized label, and a shallow copy aliased
+    # it, so clearing the copy's content blanked the original on screen while
+    # the original's `content` still read the old string. Like a new `Text`,
+    # the copy is not added to the window.
+    def initialize_copy(_source)
+      super
+      @color = @color.dup
+      @_object_events = nil
+      @_object_event_key = nil
+      @ext_text = nil
+      Ext.text_create(self)
+    end
+
     # Render the text. Called with overrides for one-shot rendering inside a
     # render block, it draws as the scene would draw a text holding those
     # values — an axis without a position override keeps its alignment — and

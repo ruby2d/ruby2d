@@ -150,6 +150,19 @@ module Ruby2D
       end
     end
 
+    # `dup`/`clone` support, as for `Text`: the copy gets its own color, no
+    # event handlers, and its own native text state instead of aliasing the
+    # source's texture and cache key through `@ext_bitmap_text`. Like a new
+    # `BitmapText`, the copy is not added to the window.
+    def initialize_copy(_source)
+      super
+      @color = @color.dup
+      @_object_events = nil
+      @_object_event_key = nil
+      @ext_bitmap_text = nil
+      Ext.bitmap_text_create(self)
+    end
+
     private
 
     # Scene-graph draw hook (see Renderable#_render_scene): `render` with no

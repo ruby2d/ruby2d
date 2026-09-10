@@ -281,6 +281,30 @@ RSpec.describe Ruby2D::Text do
     end
   end
 
+  describe 'dup and clone' do
+    [:dup, :clone].each do |method|
+      it "gives a #{method} its own native text, color, and handlers" do
+        original = Text.new('A')
+        copy = original.public_send(method)
+        expect(copy.instance_variable_get(:@ext_text))
+          .not_to equal(original.instance_variable_get(:@ext_text))
+
+        # Clearing the copy leaves the original's content and box alone
+        copy.content = ''
+        expect(copy.width).to eq(0)
+        expect(original.content).to eq('A')
+        expect(original.width).to be > 0
+
+        copy.opacity = 0.25
+        expect(original.opacity).to eq(1)
+
+        copy.on(:mouse_down) {}
+        expect(copy.interactive?).to be true
+        expect(original.interactive?).to be false
+      end
+    end
+  end
+
   describe '#content=' do
     it 'maps Time to string' do
       txt = Text.new('hello')
