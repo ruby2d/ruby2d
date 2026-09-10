@@ -221,7 +221,7 @@ Per class:
 
 - **`Tileset`** is the common case for `:nearest`. `scale:` multiplies tiles on the way to the screen, so a 16×16 tile at `scale: 3` is the GPU magnifying by 3.
 - **`SpriteSheet`** passes its mode to every `Sprite` built from it; a `Sprite` can still override its own. The sheet's texture is shared, but each sprite is sampled with its own mode.
-- **`Image#resize!`** and **`Canvas#draw_image`** resample on the CPU rather than the GPU. They follow the source image's mode, so a `:nearest` image stays crisp through either. `:pixel_art` has no CPU equivalent and behaves as `:nearest` on these two paths.
+- **`Image#resize!`**, **`Canvas#draw_image`**, and **`Canvas#draw_text`** resample on the CPU rather than the GPU. They follow the source object's mode, so a `:nearest` image stays crisp through any of them. `:pixel_art` has no CPU equivalent and behaves as `:nearest` on these paths.
 - **`BitmapText`** already renders its glyph grid at the target size, so its mode only matters when the window itself rescales the frame: a letterboxed `viewport:`, or `pixel_scale` on a HiDPI display.
 
 #### Pixel art

@@ -37,6 +37,15 @@ RSpec.describe 'scale_mode' do
       expect { Window.new.set(scale_mode: :crisp) }
         .to raise_error(Ruby2D::Error, /Invalid scale_mode :crisp/)
     end
+
+    # CPU resampling (`Image#resize!`, `Canvas#draw_image`, `draw_text`) reads
+    # the native default before `show`, so it must be synced on `set`, not only
+    # once the window is open.
+    it 'syncs the native default before the window is shown' do
+      window = Window.new
+      expect(Ruby2D::Ext).to receive(:window_set_scale_mode).with(window).and_call_original
+      window.set scale_mode: :nearest
+    end
   end
 
   # Every class backed by a GPU texture takes the same kwarg. nil means the

@@ -177,7 +177,10 @@ module Ruby2D
 
       unless opts[:scale_mode].nil?
         @scale_mode = TextureScaling.validate(opts[:scale_mode])
-        Ext.window_set_scale_mode(self) if Window.shown?
+        # Sync the native default right away, not only once shown: the CPU
+        # resampling in `Image#resize!`, `Canvas#draw_image`, and
+        # `Canvas#draw_text` reads it before the window opens too.
+        Ext.window_set_scale_mode(self)
       end
 
       @close_on_esc = opts[:close_on_esc] unless opts[:close_on_esc].nil?
