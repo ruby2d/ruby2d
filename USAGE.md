@@ -1618,6 +1618,8 @@ canvas.clear('red')  # clear to a specific color
 canvas.clear(nil, x: 10, y: 10, width: 50, height: 50)  # clear a region
 ```
 
+Without a region, `clear` resets the whole pixel buffer, which is sized at construction; assigning `width`/`height` afterward scales the display, not the buffer.
+
 Drawing methods take effect on their own; there is no commit step, and only the region you actually touched is re-uploaded to the GPU. In `:on_demand` render mode, canvas drawing calls (including `clear`) auto-request a render for you; see [Render Mode](#render-mode).
 
 ### One-Shot Rendering

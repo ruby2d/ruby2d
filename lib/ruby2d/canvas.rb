@@ -24,6 +24,11 @@ module Ruby2D
       @z = z
       @width = width
       @height = height
+      # The pixel buffer is sized once, below; assigning `width`/`height`
+      # later only scales the display. Drawing coordinates, and so `clear`'s
+      # default region, stay in the buffer's terms.
+      @buffer_width = width
+      @buffer_height = height
       @rotate = rotate
       @_user_rx = nil
       @_user_ry = nil
@@ -470,8 +475,10 @@ module Ruby2D
     # Clear the canvas, resetting all pixels to the fill color (or the given
     # color). The color may be passed positionally or via `color:`/`colour:`,
     # matching the rest of the draw API. Optionally clear only a rectangular
-    # region.
-    def clear(fill_color = nil, color: nil, colour: nil, x: 0, y: 0, width: @width, height: @height)
+    # region; the default is the whole pixel buffer, whatever size the canvas
+    # is currently displayed at.
+    def clear(fill_color = nil, color: nil, colour: nil, x: 0, y: 0,
+              width: @buffer_width, height: @buffer_height)
       return unless validate4(:clear, x, y, width, height)
       input = fill_color || color || colour
       c = input ? Color.new(input) : @fill

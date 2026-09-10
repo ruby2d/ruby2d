@@ -34,6 +34,22 @@ RSpec.describe Ruby2D::Canvas do
     end
   end
 
+  describe '#clear' do
+    it 'clears the whole pixel buffer after the display size shrinks' do
+      c = Canvas.new(width: 40, height: 20, add: false)
+      c.width = 20
+      expect(Ruby2D::Ext).to receive(:canvas_clear).with(c, [0, 0, 0, 0, 0, 0, 40, 20])
+      c.clear
+    end
+
+    it 'clears a region in buffer coordinates' do
+      c = Canvas.new(width: 40, height: 20, add: false)
+      c.width = 20
+      expect(Ruby2D::Ext).to receive(:canvas_clear).with(c, [1, 0, 0, 1, 30, 0, 10, 20])
+      c.clear('#f00', x: 30, y: 0, width: 10, height: 20)
+    end
+  end
+
   describe '#fill_triangle' do
     it 'draws a filled triangle with a named color' do
       expect {
