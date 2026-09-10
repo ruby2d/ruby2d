@@ -1177,9 +1177,11 @@ The `Font` class provides utilities for discovering and loading system fonts.
 
 ```ruby
 Font.all            # => ['arial', 'courier', ...] list of available font names
-Font.path('arial')  # => '/Library/Fonts/Arial.ttf' (case-insensitive)
+Font.path('arial')  # => '/System/Library/Fonts/Supplemental/Arial.ttf' (case-insensitive)
 Font.default        # => path to the default font
 ```
+
+Discovery scans the system font directories and the user's own (on macOS, `/System/Library/Fonts`, `/Library/Fonts`, and `~/Library/Fonts`), subdirectories included, for `.ttf`, `.otf`, and `.ttc` files. A name is the file name without its extension, downcased; a file whose name contains "bold", "italic", "oblique", "narrow", or "black" is left out unless it ends in "regular". `Font.path` returns the file whose name matches exactly, or else the first that contains the name.
 
 Fonts are cached internally. You do not instantiate `Font` objects directly; they are managed by `Text`.
 
