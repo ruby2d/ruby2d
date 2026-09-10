@@ -1723,12 +1723,24 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
   int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
   int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
 
-  SDL_Rect dst_rect = { dx, dy, dw, dh };
+  // Stamp the frame the image draws — a sprite's current clip, placed by its
+  // trim and flip — not the whole surface.
+  SDL_FlipMode flip = R2D_ImageFlipMode(img_obj);
+  SDL_FRect src;
+  SDL_FRect dst;
+  if (!R2D_ImageFrame(img_obj, flip, (float)dx, (float)dy, (float)dw, (float)dh, &src, &dst))
+    return R_TRUE;
+  SDL_Rect src_rect = { (int)src.x, (int)src.y, (int)src.w, (int)src.h };
+  int x0 = (int)SDL_lroundf(dst.x);
+  int y0 = (int)SDL_lroundf(dst.y);
+  SDL_Rect dst_rect = { x0, y0,
+                        (int)SDL_lroundf(dst.x + dst.w) - x0,
+                        (int)SDL_lroundf(dst.y + dst.h) - y0 };
 
   // The source image's mode, not the canvas's: a :nearest sprite stamped
   // into a :linear canvas stays crisp.
-  canvas_stamp_surface(can, img->surface, NULL, dst_rect,
-                       R2D_ResolveSurfaceScaleMode(img_obj), SDL_FLIP_NONE,
+  canvas_stamp_surface(can, img->surface, &src_rect, dst_rect,
+                       R2D_ResolveSurfaceScaleMode(img_obj), flip,
                        255, 255, 255, 255);
 
   return R_TRUE;

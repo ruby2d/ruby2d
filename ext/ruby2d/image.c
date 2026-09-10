@@ -127,6 +127,107 @@ R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 /*
+ * An image's `@flip` as an SDL flip mode (none when unset).
+ */
+SDL_FlipMode R2D_ImageFlipMode(R_VAL obj) {
+  SDL_FlipMode flip_mode = SDL_FLIP_NONE;
+  R_VAL flip_val = r_ivar_get(obj, id_flip);
+  if (r_test(flip_val)) {
+    R_ID flip_sym = r_sym_to_id(flip_val);
+    if (flip_sym == id_flip_horizontal)
+      flip_mode = SDL_FLIP_HORIZONTAL;
+    else if (flip_sym == id_flip_vertical)
+      flip_mode = SDL_FLIP_VERTICAL;
+    else if (flip_sym == id_flip_both)
+      flip_mode = (SDL_FlipMode)(SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL);
+  }
+  return flip_mode;
+}
+
+
+/*
+ * Where an image's selected pixels sit when it is drawn in a `w` x `h` box at
+ * (x, y): `src` is the clip rect inside the surface (the whole surface when
+ * unclipped) and `dst` is where that rect lands, which is the whole box unless
+ * the frame carries atlas trim. Shared by the GPU draw and the canvas stamp so
+ * both show the same frame. Returns false when a degenerate or out-of-bounds
+ * clip leaves nothing to draw.
+ */
+bool R2D_ImageFrame(R_VAL obj, SDL_FlipMode flip_mode,
+                    float x, float y, float w, float h,
+                    SDL_FRect *src, SDL_FRect *dst) {
+  int orig_width  = obj_int(obj, id_orig_width);
+  int orig_height = obj_int(obj, id_orig_height);
+
+  if (!obj_bool(obj, id_clipped)) {
+    src->x = 0;
+    src->y = 0;
+    src->w = (float)orig_width;
+    src->h = (float)orig_height;
+    dst->x = x;
+    dst->y = y;
+    dst->w = w;
+    dst->h = h;
+    return true;
+  }
+
+  // Source rect inside the texture, clamped to the area that actually
+  // remains after the clip offset. The public accessors (`clip_x=`,
+  // `clip_width=`, etc.) are unvalidated, so a zero-size, negative, or
+  // past-the-edge clip can reach here; an offset-aware clamp keeps the
+  // src rect inside the texture and the scale math finite.
+  int clip_w_int = obj_int(obj, id_clip_width);
+  int clip_h_int = obj_int(obj, id_clip_height);
+
+  int clip_x = (int)obj_float(obj, id_clip_x);
+  int clip_y = (int)obj_float(obj, id_clip_y);
+  if (clip_x < 0) clip_x = 0;
+  if (clip_x > orig_width)  clip_x = orig_width;
+  if (clip_y < 0) clip_y = 0;
+  if (clip_y > orig_height) clip_y = orig_height;
+
+  int avail_w = orig_width  - clip_x;
+  int avail_h = orig_height - clip_y;
+  int clipped_w = clip_w_int > avail_w ? avail_w : clip_w_int;
+  int clipped_h = clip_h_int > avail_h ? avail_h : clip_h_int;
+
+  // Degenerate or fully out-of-bounds clip: nothing to draw. Bail before
+  // the source_w/source_h division so it can't produce Inf/NaN geometry.
+  if (clipped_w <= 0 || clipped_h <= 0) return false;
+
+  src->x = (float)clip_x;
+  src->y = (float)clip_y;
+  src->w = (float)clipped_w;
+  src->h = (float)clipped_h;
+
+  // Trim metadata: `source_width`/`source_height` is the original logical
+  // frame size, `trim_x`/`trim_y` is where the packed pixels live within
+  // it. With the no-trim defaults (source = clip, trim = 0), the math
+  // collapses to drawing the clip rect at (x, y).
+  int source_w = obj_int(obj, id_source_width);
+  int source_h = obj_int(obj, id_source_height);
+  int trim_x   = obj_int(obj, id_trim_x);
+  int trim_y   = obj_int(obj, id_trim_y);
+  if (source_w <= 0) source_w = clipped_w;
+  if (source_h <= 0) source_h = clipped_h;
+
+  // Mirror the trim offset for flipped sprites so the pose flips around
+  // the original frame's center, not around the trimmed rect's center.
+  if (flip_mode & SDL_FLIP_HORIZONTAL) trim_x = source_w - trim_x - clipped_w;
+  if (flip_mode & SDL_FLIP_VERTICAL)   trim_y = source_h - trim_y - clipped_h;
+
+  float scale_x = w / (float)source_w;
+  float scale_y = h / (float)source_h;
+
+  dst->x = x + trim_x * scale_x;
+  dst->y = y + trim_y * scale_y;
+  dst->w = clipped_w * scale_x;
+  dst->h = clipped_h * scale_y;
+  return true;
+}
+
+
+/*
  * Ruby2D::Ext.image_draw(image)
  */
 R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
@@ -151,90 +252,18 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   R2D_ApplyScaleMode(img->texture, obj, &img->applied_scale_mode);
 
-  // Determine flip mode early — affects trim-offset mirroring below.
-  SDL_FlipMode flip_mode = SDL_FLIP_NONE;
-  R_VAL flip_val = r_ivar_get(obj, id_flip);
-  if (r_test(flip_val)) {
-    R_ID flip_sym = r_sym_to_id(flip_val);
-    if (flip_sym == id_flip_horizontal)
-      flip_mode = SDL_FLIP_HORIZONTAL;
-    else if (flip_sym == id_flip_vertical)
-      flip_mode = SDL_FLIP_VERTICAL;
-    else if (flip_sym == id_flip_both)
-      flip_mode = (SDL_FlipMode)(SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL);
-  }
+  // The flip is needed early — it mirrors the trim offset in R2D_ImageFrame.
+  SDL_FlipMode flip_mode = R2D_ImageFlipMode(obj);
 
   float img_x = obj_float(obj, id_x);
   float img_y = obj_float(obj, id_y);
   float img_w = obj_float(obj, id_width);
   float img_h = obj_float(obj, id_height);
 
+  SDL_FRect src_rect;
   SDL_FRect dst_rect;
-  SDL_FRect clip_rect;
-  SDL_FRect *src_rect = NULL;
-
-  if (obj_bool(obj, id_clipped)) {
-    // Source rect inside the texture, clamped to the area that actually
-    // remains after the clip offset. The public accessors (`clip_x=`,
-    // `clip_width=`, etc.) are unvalidated, so a zero-size, negative, or
-    // past-the-edge clip can reach here; an offset-aware clamp keeps the
-    // src rect inside the texture and the scale math finite.
-    int orig_width  = obj_int(obj, id_orig_width);
-    int orig_height = obj_int(obj, id_orig_height);
-    int clip_w_int  = obj_int(obj, id_clip_width);
-    int clip_h_int  = obj_int(obj, id_clip_height);
-
-    int clip_x = (int)obj_float(obj, id_clip_x);
-    int clip_y = (int)obj_float(obj, id_clip_y);
-    if (clip_x < 0) clip_x = 0;
-    if (clip_x > orig_width)  clip_x = orig_width;
-    if (clip_y < 0) clip_y = 0;
-    if (clip_y > orig_height) clip_y = orig_height;
-
-    int avail_w = orig_width  - clip_x;
-    int avail_h = orig_height - clip_y;
-    int clipped_w = clip_w_int > avail_w ? avail_w : clip_w_int;
-    int clipped_h = clip_h_int > avail_h ? avail_h : clip_h_int;
-
-    // Degenerate or fully out-of-bounds clip: nothing to draw. Bail before
-    // the source_w/source_h division so it can't produce Inf/NaN geometry.
-    if (clipped_w <= 0 || clipped_h <= 0) return R_TRUE;
-
-    clip_rect.x = clip_x;
-    clip_rect.y = clip_y;
-    clip_rect.w = clipped_w;
-    clip_rect.h = clipped_h;
-    src_rect = &clip_rect;
-
-    // Trim metadata: `source_width`/`source_height` is the original logical
-    // frame size, `trim_x`/`trim_y` is where the packed pixels live within
-    // it. With the no-trim defaults (source = clip, trim = 0), the math
-    // collapses to drawing the clip rect at (img_x, img_y).
-    int source_w = obj_int(obj, id_source_width);
-    int source_h = obj_int(obj, id_source_height);
-    int trim_x   = obj_int(obj, id_trim_x);
-    int trim_y   = obj_int(obj, id_trim_y);
-    if (source_w <= 0) source_w = clipped_w;
-    if (source_h <= 0) source_h = clipped_h;
-
-    // Mirror the trim offset for flipped sprites so the pose flips around
-    // the original frame's center, not around the trimmed rect's center.
-    if (flip_mode & SDL_FLIP_HORIZONTAL) trim_x = source_w - trim_x - clipped_w;
-    if (flip_mode & SDL_FLIP_VERTICAL)   trim_y = source_h - trim_y - clipped_h;
-
-    float scale_x = img_w / (float)source_w;
-    float scale_y = img_h / (float)source_h;
-
-    dst_rect.x = img_x + trim_x * scale_x;
-    dst_rect.y = img_y + trim_y * scale_y;
-    dst_rect.w = clipped_w * scale_x;
-    dst_rect.h = clipped_h * scale_y;
-  } else {
-    dst_rect.x = img_x;
-    dst_rect.y = img_y;
-    dst_rect.w = img_w;
-    dst_rect.h = img_h;
-  }
+  if (!R2D_ImageFrame(obj, flip_mode, img_x, img_y, img_w, img_h, &src_rect, &dst_rect))
+    return R_TRUE;
 
   // Read color directly from the Color object
   R_VAL color_obj = r_ivar_get(obj, id_color);
@@ -261,7 +290,7 @@ R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC) {
   R2D_CheckSDL(SDL_RenderTextureRotated(
     R2D_GetRenderer(),
     img->texture,
-    src_rect,
+    &src_rect,
     &dst_rect,
     obj_float(obj, id_rotate),
     &center,

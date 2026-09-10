@@ -995,6 +995,21 @@ void R2D_DrawDashedLine(
  */
 void R2D_Image_Init(void);
 
+/*
+ * An image's `@flip` as an SDL flip mode (none when unset).
+ */
+SDL_FlipMode R2D_ImageFlipMode(R_VAL obj);
+
+/*
+ * Where an image's selected pixels sit when drawn in a `w` x `h` box at (x, y):
+ * `src` is the clip rect inside the surface and `dst` where it lands in the box
+ * (the whole box unless the frame carries atlas trim). Returns false when the
+ * clip leaves nothing to draw.
+ */
+bool R2D_ImageFrame(R_VAL obj, SDL_FlipMode flip_mode,
+                    float x, float y, float w, float h,
+                    SDL_FRect *src, SDL_FRect *dst);
+
 R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC);

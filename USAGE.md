@@ -1580,6 +1580,8 @@ label = Text.new('Canvas text', add: false)
 canvas.draw_text(label, x: 10, y: 80, color: 'yellow')
 ```
 
+`draw_image` copies the image's pixels as they are; its `tint` and `opacity` apply when the image itself is drawn, not to the stamp. `draw_text` takes the color to tint the glyphs with. A `Sprite` stamps its current frame, trim and flip included, and stamping reads the frame without advancing it: a sprite kept out of the scene animates when `render` draws it, or when you advance it yourself with `sprite.update(dt)`.
+
 ### Canvas Opacity Overrides
 
 Every Canvas draw method that accepts `color:` also accepts `opacity:` as an optional alpha override. When provided, it replaces the color's alpha channel; when omitted, the color's own alpha is used unchanged. The caller's `Color` object is not mutated.
