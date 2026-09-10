@@ -248,6 +248,22 @@ RSpec.describe Ruby2D::Text do
     end
   end
 
+  describe 'font paths starting with a tilde' do
+    it 'still expands a home-relative path' do
+      expect { Text.new('A', font: '~/ruby2d-no-such-font.ttf') }
+        .to raise_error(Ruby2D::Error, /#{Regexp.escape(File.join(Dir.home, 'ruby2d-no-such-font.ttf'))}/)
+    end
+
+    it 'loads a file named that way rather than expanding a home directory' do
+      Dir.mktmpdir do |dir|
+        FileUtils.cp(ROBOTO_MONO, File.join(dir, '~mono.ttf'))
+        Dir.chdir(dir) do
+          expect(Text.new('A', font: '~mono.ttf').font).to eq(File.join(Dir.pwd, '~mono.ttf'))
+        end
+      end
+    end
+  end
+
   describe 'relative font paths' do
     it 'resolves the font to an absolute path when loaded' do
       Dir.chdir(File.dirname(Font.default)) do

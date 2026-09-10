@@ -26,4 +26,18 @@ module Ruby2D
 
     $stderr.puts "\e[1;34m[INFO]\e[0m #{message}"
   end
+
+  # An asset path made absolute, so it keeps naming the same file after the
+  # working directory changes. `File.expand_path` reads a leading `~` as a
+  # user's home directory and raises when there is no such user; a file or
+  # directory literally named that way is then a relative path like any other.
+  def self.absolute_path(path)
+    return File.expand_path(path) unless path.start_with?('~')
+
+    begin
+      File.expand_path(path)
+    rescue ArgumentError
+      File.expand_path("./#{path}")
+    end
+  end
 end

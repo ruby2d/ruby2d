@@ -18,7 +18,12 @@ module Ruby2D
     # file's directory. `scale_mode:` becomes the default for every Sprite
     # built from the sheet; a Sprite can still override it.
     def initialize(path, scale_mode: nil)
-      @path = path.to_s
+      # Absolute, like every asset path (see `Ruby2D.absolute_path`); an empty
+      # path would expand to the working directory and pass the check.
+      path = path.to_s
+      raise Error, "SpriteSheet file `#{path}` not found" if path.empty?
+
+      @path = Ruby2D.absolute_path(path)
       raise Error, "SpriteSheet file `#{@path}` not found" unless File.exist?(@path)
 
       atlas = AtlasParser.parse_file(@path)
@@ -59,10 +64,11 @@ module Ruby2D
       # can't shadow it. Only fall back to `image_name` as given (an absolute
       # path, or one relative to the working directory) when no atlas-relative
       # file exists.
+      # Absolute, as the texture `Image` reads its own path back.
       atlas_relative = File.join(File.dirname(atlas_path), image_name)
-      return atlas_relative if File.exist?(atlas_relative)
+      return Ruby2D.absolute_path(atlas_relative) if File.exist?(atlas_relative)
 
-      image_name
+      Ruby2D.absolute_path(image_name)
     end
   end
 

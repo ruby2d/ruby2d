@@ -1,7 +1,32 @@
+require 'fileutils'
+require 'tmpdir'
+
 RSpec.describe Ruby2D::SpriteSheet do
   let(:atlas_path) { "#{Ruby2D.test_spritesheets}/spritesheet.xml" }
 
   describe '#new' do
+    it 'loads an atlas from a directory whose name starts with a tilde' do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir(File.join(dir, '~sheets'))
+        %w[spritesheet.xml spritesheet.png].each do |f|
+          FileUtils.cp("#{Ruby2D.test_spritesheets}/#{f}", File.join(dir, '~sheets', f))
+        end
+        Dir.chdir(dir) do
+          sheet = described_class.new('~sheets/spritesheet.xml')
+          expect(sheet.path).to eq(File.join(Dir.pwd, '~sheets/spritesheet.xml'))
+          expect(sheet.image_path).to eq(File.join(Dir.pwd, '~sheets/spritesheet.png'))
+        end
+      end
+    end
+
+    it 'resolves a relative atlas path to an absolute image path' do
+      Dir.chdir(File.dirname(atlas_path)) do
+        sheet = described_class.new('spritesheet.xml')
+        expect(sheet.image_path).to eq(File.join(Dir.pwd, 'spritesheet.png'))
+        expect(sheet.image_path).to eq(sheet.texture.path)
+      end
+    end
+
     it 'loads a Sparrow XML atlas and resolves the image path relative to it' do
       sheet = described_class.new(atlas_path)
       expect(sheet.path).to eq(atlas_path)

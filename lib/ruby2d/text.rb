@@ -239,7 +239,7 @@ module Ruby2D
       # An empty path would expand to the working directory and pass the check
       raise Error, "Font file `#{font}` not found" if font.empty?
 
-      font = File.expand_path(font)
+      font = Ruby2D.absolute_path(font)
       raise Error, "Font file `#{font}` not found" unless File.exist?(font)
 
       font

@@ -90,7 +90,14 @@ module Ruby2D
         @clip_width  = @orig_width
         @clip_height = @orig_height
       else
-        @path = path.to_s
+        # Keep the absolute path: `resize!` re-reads the file later, and a
+        # relative path would resolve against whatever the working directory
+        # is by then. An empty path would expand to the working directory and
+        # pass the check.
+        path = path.to_s
+        raise Error, "Image file `#{path}` not found" if path.empty?
+
+        @path = Ruby2D.absolute_path(path)
         raise Error, "Image file `#{@path}` not found" unless File.exist?(@path)
 
         # Preserve user-provided values before image_create may overwrite them

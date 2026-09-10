@@ -1059,7 +1059,7 @@ img = Image.new('path/to/image.png')
 
 | Parameter | Default | Description |
 |---|---|---|
-| `path` | (required) | Path to the image file (positional argument) |
+| `path` | (required) | Path to the image file (positional argument); `path` reads back the absolute path |
 | `x` | `0` | X position (or `:left`/`:center`/`:right`; see [Aligning to the window](#aligning-to-the-window)) |
 | `y` | `0` | Y position (or `:top`/`:center`/`:bottom`) |
 | `z` | `0` | Depth |
