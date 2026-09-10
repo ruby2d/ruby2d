@@ -990,18 +990,18 @@ R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
       Uint8 cg = (Uint8)(gf * 255);
       Uint8 cb = (Uint8)(bf * 255);
 
-      // Half-open pixel coverage, matching canvas_fill_rectangle_on_surface
-      float fx = ox + gc * cell_w;
-      float fy = oy + gr * cell_h;
-      int rx = (int)ceilf(fx);
-      int ry = (int)ceilf(fy);
-      int rw = (int)ceilf(fx + cell_w) - rx;
-      int rh = (int)ceilf(fy + cell_h) - ry;
+      // Half-open pixel coverage, matching canvas_fill_rectangle_on_surface.
+      // Both edges of a cell come from the same indexed expression as its
+      // neighbors' edges, so adjoining cells share one boundary exactly; a
+      // separately computed `fx + cell_w` can land a rounding error past the
+      // next cell's start and paint that pixel twice.
+      int rx = (int)ceilf(ox + gc * cell_w);
+      int ry = (int)ceilf(oy + gr * cell_h);
+      int x_end = (int)ceilf(ox + (gc + 1) * cell_w);
+      int y_end = (int)ceilf(oy + (gr + 1) * cell_h);
 
       int x_start = rx < 0 ? 0 : rx;
       int y_start = ry < 0 ? 0 : ry;
-      int x_end = rx + rw;
-      int y_end = ry + rh;
       if (x_end > surface->w) x_end = surface->w;
       if (y_end > surface->h) y_end = surface->h;
 
