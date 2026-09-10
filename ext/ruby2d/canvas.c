@@ -1292,9 +1292,13 @@ R_VAL ruby2d_ext_canvas_draw_line(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   SDL_LockSurface(can->surface);
 
-  if (dash > 0.0f) {
-    if (dash < 0.5f) dash = 0.5f;
-    if (gap  < 0.5f) gap  = 0.5f;
+  // A dash with no gap is a solid line, as it is for the scene's `Line`. So
+  // is one whose gap is under half a logical pixel: the scanline coverage
+  // can't leave a hole that small, and clamping it up (as the dash is, to
+  // bound the loop) would draw a gap the caller never asked for. Logical
+  // pixels, so the same call dashes the same way at every display scale.
+  if (dash > 0.0f && gap >= 0.5f * scale) {
+    if (dash < 0.5f * scale) dash = 0.5f * scale;
 
     float dx  = x2 - x1;
     float dy  = y2 - y1;
@@ -1384,9 +1388,13 @@ R_VAL ruby2d_ext_canvas_draw_line_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   SDL_LockSurface(can->surface);
 
-  if (dash > 0.0f) {
-    if (dash < 0.5f) dash = 0.5f;
-    if (gap  < 0.5f) gap  = 0.5f;
+  // A dash with no gap is a solid line, as it is for the scene's `Line`. So
+  // is one whose gap is under half a logical pixel: the scanline coverage
+  // can't leave a hole that small, and clamping it up (as the dash is, to
+  // bound the loop) would draw a gap the caller never asked for. Logical
+  // pixels, so the same call dashes the same way at every display scale.
+  if (dash > 0.0f && gap >= 0.5f * scale) {
+    if (dash < 0.5f * scale) dash = 0.5f * scale;
 
     float dx  = x2 - x1;
     float dy  = y2 - y1;
