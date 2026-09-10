@@ -13,6 +13,28 @@ RSpec.describe Ruby2D::Image do
 
   include_examples 'image-like attributes', Image
 
+  describe 'dup and clone' do
+    [:dup, :clone].each do |method|
+      it "gives a #{method} its own pixels, tint, and handlers" do
+        original = Image.new(path, add: false)
+        copy = original.public_send(method)
+        expect(copy.instance_variable_get(:@ext_image))
+          .not_to equal(original.instance_variable_get(:@ext_image))
+
+        copy.resize!(4, 4)
+        expect(copy.width).to eq(4)
+        expect(original.width).to eq(Image.new(path, add: false).width)
+
+        copy.opacity = 0.25
+        expect(original.opacity).to eq(1)
+
+        copy.on(:mouse_down) {}
+        expect(copy.interactive?).to be true
+        expect(original.interactive?).to be false
+      end
+    end
+  end
+
   describe '#path' do
     let(:relative) { Pathname.new(path).relative_path_from(Pathname.pwd).to_s }
 

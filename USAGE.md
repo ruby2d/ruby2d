@@ -597,6 +597,8 @@ shape.remove   # remove from the window
 shape.contains?(x, y)  # hit-testing
 ```
 
+`dup` and `clone` copy a renderable outside the scene graph. A copied `Image`, `Sprite`, `Canvas`, `Text`, or `BitmapText` owns its color and its pixels, and starts with no event handlers: an image or canvas copy duplicates the pixel buffer, a text copy rebuilds its own. Sprites cut from one `SpriteSheet` share the sheet's texture instead. A copied shape shares its color object and handlers with the source.
+
 ### Dimensions
 
 Size parameters — `width`, `height`, `radius`, `xradius`, `yradius`, `size` — must be **zero or positive**. A negative value at construction raises `ArgumentError`, because a negative extent still renders but disagrees with `contains?` hit-testing. Zero is allowed (the shape collapses to a point).
@@ -1426,8 +1428,8 @@ runner = Sprite.new(sheet, animations: {
 
 | Method | Description |
 |---|---|
-| `path` | The atlas file path |
-| `image_path` | Resolved path to the atlas's texture image |
+| `path` | The atlas file path, read back absolute |
+| `image_path` | Resolved path to the atlas's texture image, read back absolute |
 | `texture` | The shared backing `Image` |
 | `frame_names` | All frame names, in declaration order |
 | `frame(name)` / `[name]` | Look up a frame's `{x:, y:, width:, height:}`, plus any trim or rotation keys the atlas carries, or `nil` if absent |
@@ -1564,7 +1566,7 @@ canvas.draw_polyline(points: [[x1, y1], [x2, y2], ...], stroke_width: 1, closed:
 canvas.draw_lines(segments: [[[x1a, y1a], [x2a, y2a]], [[x1b, y1b], [x2b, y2b]], ...], stroke_width: 1, color: 'white')
 ```
 
-`draw_line` accepts a 2-element `color:` array `[start, end]` for a gradient along the length, matching `Line` semantics. Dashed lines interpolate the endpoint colors per segment so the gradient carries smoothly across dashes. Set `closed: true` on `draw_polyline` to connect the last point back to the first.
+`draw_line` accepts a 2-element `color:` array `[start, end]` for a gradient along the length, matching `Line` semantics. Dashed lines interpolate the endpoint colors per segment so the gradient carries smoothly across dashes. A `gap` under half a pixel draws a solid line. Set `closed: true` on `draw_polyline` to connect the last point back to the first.
 
 `draw_polyline`, `stroke_triangle`, `stroke_quad`, `stroke_rectangle`, and `stroke_square` all accept a per-vertex `color:` array (length matching the vertex count) for a gradient around the path / perimeter. `stroke_circle` and `stroke_ellipse` are single-color only. `draw_polyline` also accepts a per-vertex `opacity:` array; see [Opacity](#opacity).
 

@@ -40,6 +40,7 @@ void R2D_Image_Init() {
   id_flip_both       = r_id("both");
 
   r_define_class_method(ruby2d_ext_module, "image_create",    ruby2d_ext_image_create,    r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "image_copy",      ruby2d_ext_image_copy,      r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "image_draw",      ruby2d_ext_image_draw,      r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "image_draw_quads", ruby2d_ext_image_draw_quads, r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "image_resize",    ruby2d_ext_image_resize,    r_args_variadic);
@@ -121,6 +122,37 @@ R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   obj_set_int(obj, id_trim_x, 0);
   obj_set_int(obj, id_trim_y, 0);
   obj_set_float(obj, id_rotate, 0.0);
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Ext.image_copy(copy, source)
+ * Give a copied image its own surface holding the source's pixels, so a later
+ * `resize!` on either leaves the other alone. The texture is created on the
+ * copy's first draw.
+ */
+R_VAL ruby2d_ext_image_copy(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.image_copy expects 2 args (copy, source), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Image *src;
+  obj_struct(argv[1], id_ext_image, R2D_Image, src);
+
+  SDL_Surface *surface = SDL_DuplicateSurface(src->surface);
+  if (!surface) {
+    r_raise("SDL_DuplicateSurface failed: %s", SDL_GetError());
+    return R_NIL;
+  }
+
+  R2D_Image *img = ALLOC(R2D_Image);
+  img->surface = surface;
+  img->texture = NULL;
+  img->applied_scale_mode = SDL_SCALEMODE_INVALID;
+
+  obj_set_struct(obj, id_ext_image, R2D_Image, img);
 
   return R_TRUE;
 }

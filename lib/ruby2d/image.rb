@@ -89,7 +89,9 @@ module Ruby2D
         @clip_y      = 0.0
         @clip_width  = @orig_width
         @clip_height = @orig_height
+        @_shares_texture = true
       else
+        @_shares_texture = false
         # Keep the absolute path: `resize!` re-reads the file later, and a
         # relative path would resolve against whatever the working directory
         # is by then. An empty path would expand to the working directory and
@@ -113,6 +115,22 @@ module Ruby2D
 
       @visible = visible
       self.add if add
+    end
+
+    # A copy owns its tint, handlers, and pixels, so `resize!` on one no
+    # longer replaces the other's. A sprite cut from a `SpriteSheet` keeps
+    # sharing the sheet's texture, as every sprite cut from it does; a copy
+    # of the sheet's own texture is a standalone image, so it may be resized.
+    def initialize_copy(source)
+      super
+      @color = @color.dup
+      @_object_events = nil
+      @_object_event_key = nil
+      return if @_shares_texture
+
+      @_shared = false
+      @ext_image = nil
+      Ext.image_copy(self, source)
     end
 
     # Re-rasterize the source at a new pixel size and update `width`/`height`.

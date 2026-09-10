@@ -52,6 +52,18 @@ module Ruby2D
       self.add if add
     end
 
+    # A copy owns its pixel buffer, tint, fill, and handlers, so drawing on
+    # one no longer draws on the other.
+    def initialize_copy(source)
+      super
+      @tint = @tint.dup
+      @fill = @fill.dup
+      @_object_events = nil
+      @_object_event_key = nil
+      @ext_canvas = nil
+      Ext.canvas_copy(self, source)
+    end
+
     # The canvas's tint color. The canvas's own pixel buffer is multiplied by
     # this — `tint: 'red'` makes the canvas redder, not solid red.
     def tint

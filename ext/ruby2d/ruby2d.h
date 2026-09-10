@@ -1011,6 +1011,7 @@ bool R2D_ImageFrame(R_VAL obj, SDL_FlipMode flip_mode,
                     SDL_FRect *src, SDL_FRect *dst);
 
 R_VAL ruby2d_ext_image_create(RUBY2D_METHOD_ARGS_VARIADIC);
+R_VAL ruby2d_ext_image_copy(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_draw(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_draw_quads(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_image_resize(RUBY2D_METHOD_ARGS_VARIADIC);
@@ -1050,6 +1051,7 @@ R_VAL ruby2d_ext_bitmap_text_draw(RUBY2D_METHOD_ARGS_VARIADIC);
 void R2D_Canvas_Init(void);
 
 R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC);
+R_VAL ruby2d_ext_canvas_copy(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_canvas_draw(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_canvas_clear(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_canvas_fill_triangle(RUBY2D_METHOD_ARGS_VARIADIC);

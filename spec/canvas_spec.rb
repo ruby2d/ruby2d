@@ -34,6 +34,26 @@ RSpec.describe Ruby2D::Canvas do
     end
   end
 
+  describe 'dup and clone' do
+    [:dup, :clone].each do |method|
+      it "gives a #{method} its own pixel buffer, tint, fill, and handlers" do
+        original = Canvas.new(width: 8, height: 8, add: false)
+        copy = original.public_send(method)
+        expect(copy.instance_variable_get(:@ext_canvas))
+          .not_to equal(original.instance_variable_get(:@ext_canvas))
+
+        copy.opacity = 0.25
+        expect(original.opacity).to eq(1)
+        copy.fill.opacity = 0.5
+        expect(original.fill.opacity).to eq(0)
+
+        copy.on(:mouse_down) {}
+        expect(copy.interactive?).to be true
+        expect(original.interactive?).to be false
+      end
+    end
+  end
+
   describe '#clear' do
     it 'clears the whole pixel buffer after the display size shrinks' do
       c = Canvas.new(width: 40, height: 20, add: false)

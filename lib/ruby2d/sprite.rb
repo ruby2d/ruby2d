@@ -125,6 +125,18 @@ module Ruby2D
       self.add if add
     end
 
+    # A copy also owns its frame tables: `resize!` rescales them in place, and
+    # they must follow the copy's own raster, not the source's.
+    def initialize_copy(source)
+      super
+      @defaults = @defaults.dup
+      copied = {}
+      @animations.each do |name, frames|
+        copied[name] = frames.is_a?(Array) ? frames.map(&:dup) : frames
+      end
+      @animations = copied
+    end
+
     # Re-rasterize a path-backed sprite's whole strip at a new pixel size. The
     # frame regions scale with it (the clip, the strip origin every `Range`
     # animation counts from, and each explicit frame rect), so the animation

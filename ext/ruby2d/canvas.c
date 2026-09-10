@@ -24,6 +24,7 @@ void R2D_Canvas_Init() {
   id_fill_a     = r_id("@fill_a");
 
   r_define_class_method(ruby2d_ext_module, "canvas_create",             ruby2d_ext_canvas_create,             r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "canvas_copy",               ruby2d_ext_canvas_copy,               r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "canvas_draw",               ruby2d_ext_canvas_draw,               r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "canvas_clear",              ruby2d_ext_canvas_clear,              r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "canvas_fill_triangle",      ruby2d_ext_canvas_fill_triangle,      r_args_variadic);
@@ -106,6 +107,39 @@ R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   can->surface = surface;
   can->texture = NULL;
   can->scale   = scale;
+  can->dirty   = false;
+  can->dirty_rect = (SDL_Rect){ 0, 0, 0, 0 };
+
+  obj_set_struct(obj, id_ext_canvas, R2D_Canvas, can);
+
+  return R_TRUE;
+}
+
+
+/*
+ * Ruby2D::Ext.canvas_copy(copy, source)
+ * Give a copied canvas its own surface holding the source's pixels. The
+ * texture is created on the copy's first draw, as for a new canvas.
+ */
+R_VAL ruby2d_ext_canvas_copy(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.canvas_copy expects 2 args (copy, source), got %d", (int)argc);
+  R_VAL obj = argv[0];
+
+  R2D_Canvas *src;
+  obj_struct(argv[1], id_ext_canvas, R2D_Canvas, src);
+
+  SDL_Surface *surface = SDL_DuplicateSurface(src->surface);
+  if (!surface) {
+    r_raise("SDL_DuplicateSurface failed: %s", SDL_GetError());
+    return R_NIL;
+  }
+  SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
+
+  R2D_Canvas *can = ALLOC(R2D_Canvas);
+  can->surface = surface;
+  can->texture = NULL;
+  can->scale   = src->scale;
   can->dirty   = false;
   can->dirty_rect = (SDL_Rect){ 0, 0, 0, 0 };
 

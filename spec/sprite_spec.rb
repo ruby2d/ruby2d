@@ -23,6 +23,21 @@ RSpec.describe Ruby2D::Sprite do
       expect(sprite.sheet).to be(sheet)
     end
 
+    it 'keeps a copy sharing the sheet texture' do
+      sprite = Sprite.new(sheet, frame: 'block_blue', add: false)
+      expect(sprite.dup.instance_variable_get(:@ext_image))
+        .to be(sheet.texture.instance_variable_get(:@ext_image))
+    end
+
+    it 'lets a copy of the sheet texture itself be resized' do
+      copy = sheet.texture.dup
+      expect(copy.instance_variable_get(:@ext_image))
+        .not_to be(sheet.texture.instance_variable_get(:@ext_image))
+      copy.resize!(8, 8)
+      expect(copy.width).to eq(8)
+      expect(sheet.texture.width).not_to eq(8)
+    end
+
     it 'refuses resize! because the sheet texture is shared' do
       sprite = Sprite.new(sheet, frame: 'block_blue', add: false)
       expect { sprite.resize!(64, 64) }
@@ -89,6 +104,23 @@ RSpec.describe Ruby2D::Sprite do
                           animations: { stones: %w[block_blue block_coin] },
                           add: false)
       expect(sprite.instance_variable_get(:@animations).key?(:default)).to be false
+    end
+  end
+
+  describe 'dup and clone' do
+    [:dup, :clone].each do |method|
+      it "gives a #{method} its own frame tables, so resize! on it leaves the source alone" do
+        walk = [{ x: 0, y: 0, width: 84, height: 84 }, { x: 84, y: 0, width: 84, height: 84 }]
+        sprite = Sprite.new(path, clip_width: 84, animations: { spin: 0..2, walk: walk }, add: false)
+        before = Marshal.load(Marshal.dump(sprite.instance_variable_get(:@animations)))
+        defaults = sprite.instance_variable_get(:@defaults).dup
+        copy = sprite.public_send(method)
+        copy.resize!(1008, 168)
+        expect(copy.instance_variable_get(:@defaults)[:clip_width]).to eq(168)
+        expect(copy.instance_variable_get(:@animations)[:walk][1][:x]).to eq(168)
+        expect(sprite.instance_variable_get(:@animations)).to eq(before)
+        expect(sprite.instance_variable_get(:@defaults)).to eq(defaults)
+      end
     end
   end
 
