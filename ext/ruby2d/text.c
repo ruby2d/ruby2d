@@ -164,8 +164,101 @@ static char *R2D_TextDup(const char *text, size_t len) {
 
 
 /*
+ * Split `len` bytes of content into the body SDL_ttf lays out (its length goes
+ * to *body_len) and the number of trailing newlines, which is returned. The
+ * wrapped renderer mislays trailing newlines: one widened the last line by a
+ * glyph advance instead of adding a line, and two added only one line. So
+ * the body is rasterized without them and each is added back as a blank line
+ * of padding (see R2D_TextSurfaceCacheGet), giving the layout USAGE.md
+ * documents: width is the widest line, height covers every line.
+ */
+static int R2D_TextTrailingNewlines(const char *msg, size_t len, size_t *body_len) {
+  size_t body = len;
+  int count = 0;
+  while (body > 0 && msg[body - 1] == '\n') {
+    body--;
+    count++;
+    // A CRLF terminator comes off whole: a '\r' left at the end of the body
+    // would lay out as an inkless advance, the width this fix removes. A bare
+    // '\r' anywhere else is left to SDL_ttf, which draws it that way.
+    if (body > 0 && msg[body - 1] == '\r') body--;
+  }
+  *body_len = body;
+  return count;
+}
+
+
+/*
+ * Height in pixels of a block of `lines` laid-out lines of a plain glyph in
+ * `font`, measured by SDL_ttf, for blank content. No metric reproduces it:
+ * the first line's box isn't `TTF_GetFontHeight` for every font (Hiragino
+ * lays out 30 where the metric says 20), and the second line adds more than
+ * `TTF_GetFontLineSkip` for some (a pixel on the SF fonts, a whole line on
+ * Apple Myungjo); from the third line on every font steps by the line skip.
+ * Returns -1 if the measurement fails (SDL_ttf reports the glyph as zero
+ * width at the smallest sizes of some fonts).
+ */
+static int R2D_TextLinesHeight(TTF_Font *font, int lines) {
+  char stack_probe[64];
+  size_t len = (size_t)lines * 2 - 1;  // "A\nA\n…A"
+  char *probe = len < sizeof(stack_probe) ? stack_probe : malloc(len + 1);
+  if (!probe) return -1;
+  for (size_t i = 0; i < len; i++) probe[i] = (i % 2 == 0) ? 'A' : '\n';
+  probe[len] = '\0';
+  int w = 0, h = -1;
+  if (!TTF_GetStringSizeWrapped(font, probe, len, 0, &w, &h)) h = -1;
+  if (probe != stack_probe) free(probe);
+  return h;
+}
+
+
+/*
+ * Height of `body_len` bytes of content laid out with `trailing` blank lines
+ * after it, as SDL_ttf would report it if blank lines could be measured
+ * directly: the body is measured with the blank lines and one more line
+ * holding a plain glyph, and that line's own contribution — a line skip,
+ * which is what every font adds from its third line on — is taken back. The
+ * blank lines are then the layout's own, including where a tall body line's
+ * overhang is absorbed into the line below rather than added to it. Exact
+ * whenever the probe glyph's ink sits inside the body's line box, which is
+ * every font but a few symbol fonts at small sizes (Webdings, whose 'A' is
+ * an ornament, overshoots by a pixel or two). Called only when a body is
+ * rasterized with trailing newlines, so an ordinary text pays nothing.
+ * Returns -1 if the measurement fails.
+ */
+static int R2D_TextBlockHeight(TTF_Font *font, const char *body, size_t body_len, int trailing) {
+  size_t len = body_len + (size_t)trailing + 2;  // body, newlines, "\nA"
+  char *probe = malloc(len + 1);
+  if (!probe) return -1;
+  memcpy(probe, body, body_len);
+  memset(probe + body_len, '\n', (size_t)trailing + 1);
+  probe[len - 1] = 'A';
+  probe[len] = '\0';
+  int w = 0, h = -1;
+  bool ok = TTF_GetStringSizeWrapped(font, probe, len, 0, &w, &h);
+  free(probe);
+  if (!ok) return -1;
+  return h - TTF_GetFontLineSkip(font);
+}
+
+
+/*
+ * Number of lines in `len` bytes of body content: one plus its newlines.
+ */
+static int R2D_TextLineCount(const char *msg, size_t len) {
+  int lines = 1;
+  for (size_t i = 0; i < len; i++) {
+    if (msg[i] == '\n') lines++;
+  }
+  return lines;
+}
+
+
+/*
  * Look up or rasterize a surface for (entry, msg) of msg_len bytes. The key is
- * length-aware so embedded NULs and prefix-equal strings stay distinct.
+ * length-aware so embedded NULs and prefix-equal strings stay distinct. The
+ * body must be non-empty once trailing newlines are set aside; the caller
+ * handles all-blank content itself (see R2D_TextRasterize).
  *
  * On success, returns a surface and sets *cached_out:
  *   - true  => surface is shared and ref-counted in the cache; caller must
@@ -219,8 +312,39 @@ static SDL_Surface *R2D_TextSurfaceCacheGet(
   // single garbled line). Wrap width 0 means "only break on explicit \n".
   // Pass the explicit byte length (not 0 = NUL-terminated) so content with an
   // embedded NUL renders in full rather than truncating at the first NUL.
-  SDL_Surface *surface = TTF_RenderText_Blended_Wrapped(entry->font, msg, msg_len, color, 0);
+  // Trailing newlines are left out of the rasterization and added back below.
+  size_t body_len;
+  int trailing = R2D_TextTrailingNewlines(msg, msg_len, &body_len);
+  SDL_Surface *surface = TTF_RenderText_Blended_Wrapped(entry->font, msg, body_len, color, 0);
   if (!surface) return NULL;
+
+  if (trailing > 0) {
+    // Append the blank lines as transparent rows, up to the height SDL_ttf
+    // lays this body out at with that many blank lines (measured, since no
+    // metric reproduces it — see R2D_TextBlockHeight). The body is copied
+    // verbatim (blend mode none), not composited over the padding.
+    int block_h = R2D_TextBlockHeight(entry->font, msg, body_len, trailing);
+    int pad;
+    if (block_h < 0) {
+      // Only an allocation failure gets here (the body just rendered, so its
+      // probe measures): a line skip per blank line is what the layout adds
+      // past its second line, so the estimate is exact but for that step.
+      pad = trailing * TTF_GetFontLineSkip(entry->font);
+    } else {
+      pad = block_h > surface->h ? block_h - surface->h : 0;
+    }
+    SDL_Surface *padded = SDL_CreateSurface(surface->w, surface->h + pad, surface->format);
+    if (!padded ||
+        !SDL_FillSurfaceRect(padded, NULL, 0) ||
+        !SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE) ||
+        !SDL_BlitSurface(surface, NULL, padded, NULL)) {
+      if (padded) SDL_DestroySurface(padded);
+      SDL_DestroySurface(surface);
+      return NULL;
+    }
+    SDL_DestroySurface(surface);
+    surface = padded;
+  }
 
 #ifdef __EMSCRIPTEN__
   // Normalize to RGBA32: the web build's persistent text texture is created
@@ -340,13 +464,38 @@ static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
   R2D_FontCacheEntry *new_entry = R2D_FontCacheGet(font, effective_size, style);
   if (!new_entry) return false;
 
-  // Empty content: report a zero-width box at the font's natural line height and
-  // skip rasterization entirely (no surface or texture). The draw paths key off
-  // txt->empty to treat this as "nothing to draw" rather than a failure. Width
-  // and height are derived from the new font, so it's safe to set them once the
-  // (only fallible) font open above has succeeded.
-  if (msg_len == 0) {
-    int new_height = (int)((float)TTF_GetFontHeight(new_entry->font) / scale);
+  // Rasterize unless the content is blank — empty, or nothing but newlines.
+  // A body SDL_ttf refuses (only zero-advance characters, or a font that
+  // measures zero width at this size) fails the same way with a trailing
+  // newline as without one; it used to render as a blank box behind the
+  // newline's phantom advance, and blanking real content silently is worse
+  // than the error the same content raises without the newline.
+  size_t body_len;
+  int trailing = R2D_TextTrailingNewlines(msg, msg_len, &body_len);
+  bool cached = false;
+  SDL_Surface *new_surface = NULL;
+  if (body_len > 0) {
+    new_surface = R2D_TextSurfaceCacheGet(new_entry, msg, msg_len, &cached);
+    if (!new_surface) {
+      R2D_FontCacheRelease(new_entry);
+      return false;
+    }
+  }
+
+  // Blank content: report a zero-width box as tall as a block of one line per
+  // newline plus one (measured the way a rendered block is, see
+  // R2D_TextLinesHeight), with no surface or texture. The draw paths key off
+  // txt->empty to treat this as "nothing to draw" rather than a failure.
+  // Width and height are derived from the new font, so it's safe to set them
+  // once the (only fallible) font open above has succeeded.
+  if (!new_surface) {
+    int lines = R2D_TextLineCount(msg, body_len) + trailing;
+    int lines_px = R2D_TextLinesHeight(new_entry->font, lines);
+    if (lines_px < 0) {
+      lines_px = TTF_GetFontHeight(new_entry->font) +
+                 (lines - 1) * TTF_GetFontLineSkip(new_entry->font);
+    }
+    int new_height = (int)((float)lines_px / scale);
 
     R2D_TextReleaseResources(txt);
 #ifndef __EMSCRIPTEN__
@@ -368,13 +517,6 @@ static bool R2D_TextRasterize(R_VAL obj, R2D_Text *txt) {
     obj_set_int(obj, id_width, 0);
     obj_set_int(obj, id_height, new_height);
     return true;
-  }
-
-  bool cached = false;
-  SDL_Surface *new_surface = R2D_TextSurfaceCacheGet(new_entry, msg, msg_len, &cached);
-  if (!new_surface) {
-    R2D_FontCacheRelease(new_entry);
-    return false;
   }
 
   char *new_cached_text = NULL;

@@ -430,6 +430,55 @@ RSpec.describe Ruby2D::Text do
       # renderer drew "a\nb" as one garbled line of roughly equal height.)
       expect(two.height).to be > (one.height * 1.5)
     end
+
+    # SDL_ttf's wrapped layout mislaid trailing newlines: one widened the last
+    # line by a glyph advance, two added only one line. Checked with both
+    # bundled fonts, whose metrics differ.
+    [nil, ROBOTO_MONO].each do |font_path|
+      context "with #{font_path ? 'Roboto Mono' : 'the default font'}" do
+        let(:font) { font_path || Font.default }
+
+        it 'lays out a trailing newline as a blank line, not as extra width' do
+          one = Text.new('A', font: font)
+          trailing = Text.new("A\n", font: font)
+          expect(trailing.width).to eq(one.width)
+          expect(trailing.height).to eq(Text.new("A\nB", font: font).height)
+        end
+
+        it 'stacks several trailing blank lines' do
+          two = Text.new("A\n\n", font: font)
+          expect(two.width).to eq(Text.new('A', font: font).width)
+          expect(two.height).to eq(Text.new("A\n\nB", font: font).height)
+        end
+
+        it 'takes a CRLF terminator off whole' do
+          crlf = Text.new("A\r\n", font: font)
+          expect(crlf.width).to eq(Text.new('A', font: font).width)
+          expect(crlf.height).to eq(Text.new("A\nB", font: font).height)
+        end
+
+        it 'adds the same blank line to a body taller than a plain line' do
+          # A stacked accent makes SDL_ttf's line taller than the one the
+          # padding is measured on, so the padding is a difference, not a target
+          tall = 'A' + "́" * 7
+          expect(Text.new("#{tall}\n", font: font).height).to eq(Text.new("#{tall}\nB", font: font).height)
+        end
+
+        it 'rejects a zero-width body the same way with or without a trailing newline' do
+          # A zero-width space can't be rasterized; it used to slip through
+          # behind the phantom advance, as a blank box that hid the content
+          expect { Text.new("​", font: font) }.to raise_error(Ruby2D::Error, /zero width/)
+          expect { Text.new("​\n", font: font) }.to raise_error(Ruby2D::Error, /zero width/)
+        end
+
+        it 'gives a newline-only string no width and a line per newline' do
+          blank = Text.new("\n", font: font)
+          expect(blank.width).to eq(0)
+          expect(blank.height).to eq(Text.new("A\nB", font: font).height)
+          expect(Text.new("\n\n", font: font).height).to eq(Text.new("A\nB\nC", font: font).height)
+        end
+      end
+    end
   end
 
   describe 'font cache exhaustion' do

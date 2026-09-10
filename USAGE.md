@@ -1150,7 +1150,7 @@ text.width   # => calculated width of the rendered text
 text.height  # => calculated height of the rendered text
 ```
 
-Embedded newlines (`"line one\nline two"`) are laid out as separate lines; `width` is the widest line and `height` covers the whole block.
+Embedded newlines (`"line one\nline two"`) are laid out as separate lines; `width` is the widest line and `height` covers the whole block, including blank lines at the end (`"line one\n"` is two lines high).
 
 Font `style` combines one or more of `:bold`, `:italic`, `:underline`, and `:strikethrough` (pass an array for several). It can be set at construction or changed later, and `font`/`size`/`style` all re-render the text:
 
