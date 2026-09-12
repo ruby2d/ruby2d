@@ -365,8 +365,11 @@ static float shapes_tri_cross(float ax, float ay, float bx, float by,
 
 /*
  * Point-in-triangle test using barycentric sign comparisons.
- * Returns 1 if (px, py) is strictly inside triangle (a, b, c) with the
- * given winding (assumed CCW); points exactly on an edge are excluded.
+ * Returns 1 if (px, py) lies inside or on the boundary of triangle (a, b, c)
+ * with the given winding (assumed CCW). The boundary counts: a vertex that
+ * sits exactly on a candidate ear's diagonal (a, c) would leave the polygon
+ * touching itself there once the ear is clipped, and the ear after that one
+ * could then fill a region outside the outline.
  */
 static int shapes_point_in_tri(float px, float py,
                                float ax, float ay,
@@ -375,8 +378,8 @@ static int shapes_point_in_tri(float px, float py,
   float d1 = shapes_tri_cross(ax, ay, bx, by, px, py);
   float d2 = shapes_tri_cross(bx, by, cx, cy, px, py);
   float d3 = shapes_tri_cross(cx, cy, ax, ay, px, py);
-  // For CCW triangles, all three should be > 0 for strict interior.
-  return (d1 > 0.0f && d2 > 0.0f && d3 > 0.0f);
+  // For CCW triangles, all three are >= 0 inside and on the edges.
+  return (d1 >= 0.0f && d2 >= 0.0f && d3 >= 0.0f);
 }
 
 
@@ -470,12 +473,18 @@ int *R2D_TriangulatePolygon(const float *verts, int n, int *out_tri_count) {
       float cross = shapes_tri_cross(ax, ay, bx, by, cx, cy);
       if (cross < 0.0f) continue;
 
-      // Ear test: no other polygon vertex lies inside (a, b, c).
+      // Ear test: no other polygon vertex lies inside or on (a, b, c). A
+      // vertex that coincides with one of the corners is a repeated point
+      // (an explicitly closed outline, say), not a blocker. A zero-area ear
+      // encloses nothing, so it needs no test: clipping it only drops the
+      // middle vertex of a collinear run.
       int contains = 0;
-      for (int k = 0; k < remaining; k++) {
+      for (int k = 0; cross > 0.0f && k < remaining; k++) {
         if (k == i_prev || k == i || k == i_next) continue;
         int v = poly[k];
         float px = verts[v * 2], py = verts[v * 2 + 1];
+        if ((px == ax && py == ay) || (px == bx && py == by) ||
+            (px == cx && py == cy)) continue;
         if (shapes_point_in_tri(px, py, ax, ay, bx, by, cx, cy)) {
           contains = 1;
           break;
