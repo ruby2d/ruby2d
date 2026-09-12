@@ -152,6 +152,83 @@ RSpec.describe Ruby2D::Polyline do
       tri = Polyline.new(points: [[0, 0], [100, 0], [50, 100]], stroke_width: 4)
       expect(tri.contains?(25, 50)).to be false
     end
+
+    # A repeated point has no direction of its own. It used to collapse the
+    # stroke to zero width there and taper the segments on either side; now it
+    # counts as the point it repeats, so the path keeps its full width.
+    it 'keeps its width across a repeated point' do
+      plain = Polyline.new(points: [[5, 10], [30, 10], [55, 10]], stroke_width: 10)
+      repeated = Polyline.new(points: [[5, 10], [30, 10], [30, 10], [55, 10]], stroke_width: 10)
+      [[29, 13], [31, 7], [30, 14]].each do |px, py|
+        expect(repeated.contains?(px, py)).to eq(plain.contains?(px, py)),
+          "expected (#{px}, #{py}) to hit the same with the repeated point"
+      end
+      expect(repeated.contains?(29, 13)).to be true
+      expect(repeated.contains?(30, 16)).to be false
+    end
+
+    it 'strokes a closed path of two distinct points as one segment' do
+      back = Polyline.new(points: [[10, 10], [90, 10], [90, 10], [10, 10]],
+                          stroke_width: 6, closed: true)
+      expect(back.contains?(50, 12)).to be true
+      expect(back.contains?(50, 14)).to be false
+    end
+
+    # An edge shorter than the reach of a sharp corner's miter can't share
+    # the corner's inner point with its neighbor: the ribbon between them
+    # folded over itself, painting a blob beside the path and pinching the
+    # second segment's band, which the old hit test followed. Such a corner
+    # keeps plain rectangle ends and draws the miter wedge on its own, so the
+    # stroke is the two full bands plus the wedge.
+    it 'keeps a sharp corner on a short segment within the stroke' do
+      hook = Polyline.new(points: [[40, 80], [50, 70], [20, 70]], stroke_width: 30)
+      expect(hook.contains?(34, 77)).to be true  # in the second segment's band, once pinched out
+      expect(hook.contains?(19, 80)).to be false # past the second segment's butt cap, once inside the fold
+      expect(hook.contains?(30, 86)).to be false # beside the path, where the blob was drawn
+      expect(hook.contains?(30, 90)).to be false # past the first segment's butt cap
+      expect(hook.contains?(50, 70)).to be true  # on the corner
+      expect(hook.contains?(45, 75)).to be true  # on the first segment
+      expect(hook.contains?(60, 62)).to be true  # in the miter wedge past the corner
+    end
+
+    # A ribbon join cuts each rectangle at the bisector and relies on the
+    # neighbor to paint what it cut. A butt-capped end segment shorter than
+    # that corner's reach can't, so the corner keeps plain ends instead of
+    # leaving a notch in the long segment's band.
+    it 'keeps the full band beside a short end segment' do
+      elbow = Polyline.new(points: [[60, 200], [60, 100], [74.55, 87.79]], stroke_width: 80)
+      expect(elbow.contains?(97, 110)).to be true
+      expect(elbow.contains?(98, 114)).to be true
+    end
+
+    # A corner within about a degree of a reversal has no usable bisector;
+    # it keeps plain ends rather than a miter computed from noise.
+    it 'stays within the stroke at a near reversal' do
+      pin = Polyline.new(points: [[97, 24], [86, 197], [94, 72]], stroke_width: 10)
+      expect(pin.contains?(96, 4)).to be false
+      expect(pin.contains?(90, 205)).to be false
+      expect(pin.contains?(90, 100)).to be true
+    end
+
+    it 'rebuilds the stroke layout when the path, width, or closure changes' do
+      path = Polyline.new(points: [[0, 0], [100, 0]], stroke_width: 4)
+      expect(path.contains?(50, 5)).to be false
+      path.stroke_width = 20
+      expect(path.contains?(50, 5)).to be true
+      path.y = 30
+      expect(path.contains?(50, 5)).to be false
+      expect(path.contains?(50, 35)).to be true
+      tri = Polyline.new(points: [[0, 0], [100, 0], [50, 100]], stroke_width: 4)
+      expect(tri.contains?(25, 50)).to be false
+      tri.closed = true
+      expect(tri.contains?(25, 50)).to be true
+    end
+
+    it 'is false with no stroke width, as nothing is drawn' do
+      path = Polyline.new(points: [[0, 0], [100, 0]], stroke_width: 4)
+      path.stroke_width = nil
+      expect(path.contains?(50, 0)).to be false
+    end
   end
 
   # A rotated polyline writes its rotated coordinates into a per-object buffer

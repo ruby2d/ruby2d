@@ -895,20 +895,71 @@ void R2D_DrawCircle(
 );
 
 /*
- * Compute the outer and inner outline points for a polyline or polygon stroke.
- * `verts` is a flat array of `n` (x, y) pairs. `closed` treats the polyline as
- * a closed polygon (corners computed for every vertex); otherwise endpoints get
- * butt caps. `stroke_width` is the total stroke thickness. `miter_limit` clamps
- * sharp corners (SVG default: 4.0). `outer` and `inner` must be preallocated
- * with `n * 2` floats each.
+ * One vertex of a stroked path as R2D_StrokeVertices lays it out: the corner
+ * points of the edges meeting there and, when those edges keep their plain
+ * ends, the wedge that fills the outer side of the corner. `s*` are the start
+ * corners of the outgoing edge and `e*` the end corners of the incoming edge,
+ * on the +normal (`p`) and -normal (`n`) sides of the path; at a ribbon join
+ * the two coincide. `w` holds the `wedge` points fanned from the vertex: none,
+ * 3 for c1, tip, c2 or 4 for c1, k1, k2, c2 when the tip is cut at the miter
+ * limit. `color` is the index of the input vertex whose color it carries.
+ * `t`, `reach`, `s_in`, and `ribbon` are the layout's working values.
  */
-void R2D_ComputeStrokeOutline(
-  const float *verts, int n, int closed,
+typedef struct {
+  float x, y;
+  float spx, spy, snx, sny;
+  float epx, epy, enx, eny;
+  float w[8];
+  int wedge;
+  int color;
+  float t;
+  float reach;
+  int s_in;
+  int ribbon;
+} R2D_StrokeVertex;
+
+// |n1 + n2| below which a corner counts as a reversal (a turn within a
+// twentieth of a degree of 180), keeping the bisector's direction out of the
+// noise
+#define R2D_STROKE_REVERSAL 0.001f
+
+/*
+ * Lay out the corner points of a polyline or polygon stroke into `sv`, which
+ * needs `n` entries. `verts` is a flat array of `n` (x, y) pairs. `*closed`
+ * treats the path as a closed polygon (a corner at every vertex), otherwise
+ * the ends get butt caps; it is cleared when the path collapses to a single
+ * edge. `stroke_width` is the total thickness and `miter_limit` the ratio of
+ * miter length to half width past which a corner is cut (SVG default: 4.0).
+ * Consecutive repeated points collapse into one. Returns the number of
+ * vertices laid out, 0 when there is nothing to draw.
+ */
+int R2D_StrokeVertices(
+  const float *verts, int n, int *closed,
   float stroke_width, float miter_limit,
-  float *outer, float *inner
+  R2D_StrokeVertex *sv
 );
 
-// SVG default miter-limit (miter switches to clamped past this ratio)
+// Most triangles one stroked edge can need: its quad split at both ends plus
+// a cut wedge
+#define R2D_STROKE_EDGE_TRIS 7
+
+// Edges per SDL_RenderGeometry batch in R2D_StrokePath: sized for the wasm
+// build's 64 KB stack (8 edges at the worst 7 triangles is 5 KB of vertices)
+#define R2D_STROKE_BATCH_EDGES 8
+
+/*
+ * Write the triangles of edge `k` (from vertex `k` to `k + 1`, wrapping on a
+ * closed path) of a laid-out stroke, plus the wedge at its end vertex, into
+ * `xy` (6 floats per triangle) and `cv` (3 per triangle: the input vertex
+ * index whose color each corner takes). Both need room for
+ * R2D_STROKE_EDGE_TRIS triangles. Returns the triangle count.
+ */
+int R2D_StrokeEdgeTriangles(
+  const R2D_StrokeVertex *sv, int m, int k,
+  float *xy, int *cv
+);
+
+// SVG default miter-limit (the miter tip is cut past this ratio)
 #define R2D_MITER_LIMIT 4.0f
 
 // Vertex-count threshold below which the stroke/geometry helpers serve their
@@ -918,9 +969,10 @@ void R2D_ComputeStrokeOutline(
 #define R2D_STROKE_STACK_N 64
 
 /*
- * Stroke a polyline or closed polygon via SDL_RenderGeometry. Miter-joined
- * corners clamped at `miter_limit` (SVG default 4.0). When `closed` is non-zero
- * the last vertex connects back to the first; otherwise endpoints get butt caps.
+ * Stroke a polyline or closed polygon via SDL_RenderGeometry. Corners are
+ * mitered, with the tip cut past `miter_limit` (SVG default 4.0). When `closed`
+ * is non-zero the last vertex connects back to the first; otherwise endpoints
+ * get butt caps. `colors` is `n * 4` floats, one rgba per vertex.
  */
 void R2D_StrokePath(
   const float *verts, int n, int closed,

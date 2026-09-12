@@ -643,6 +643,7 @@ Notes:
 - `stroke_color:` accepts the same per-vertex vocabulary as `color:`; each vertex gets one color and pixels along each edge interpolate between the two endpoint colors. `Circle` and `Ellipse` strokes are single-color only.
 - `opacity:` applies to both fill and stroke when both are drawn.
 - Strokes rendered on persistent shapes use the same geometry as Canvas `stroke_*` methods, so a scene-graph outline and a Canvas outline of the same shape line up pixel-for-pixel (with minor anti-aliasing differences).
+- Corners are mitered. A corner sharp enough that its point would reach past twice the stroke width is cut flat there, and a translucent stroke is painted twice, so darker, on the inside of a corner too sharp or on edges too short for its miter.
 - Strokes are **centered on the shape boundary**: half the stroke width falls inside the shape, half outside. On a Canvas, any portion that falls outside the surface bounds is clipped; on persistent shapes, it renders freely to the window. Inset Canvas-drawn shapes by `stroke_width / 2` if you want the full stroke visible.
 - `Line` and `Polyline` are always strokes; `fill:`, `stroke_color:`, and the fill-specific semantics do not apply to them.
 
@@ -885,7 +886,7 @@ star = Polygon.new(
 
 ### Polyline
 
-A stroke-only open or closed path of connected line segments. No fill.
+A stroke-only open or closed path of connected line segments. No fill. Consecutive repeated points count as one, so a path with a repeated sample keeps its full width.
 
 ```ruby
 Polyline.new(points: [[50, 50], [150, 100], [250, 80], [350, 150]])

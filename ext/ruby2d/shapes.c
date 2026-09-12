@@ -7,100 +7,262 @@
 
 
 /*
- * Compute outer and inner outline points for a polyline or polygon stroke.
- * See ruby2d.h for parameter documentation.
+ * Stroke geometry.
  *
- * Interior vertices (and all vertices in closed mode) use miter joins;
- * endpoints in open mode get butt caps using the perpendicular of the single
- * adjacent edge. Sharp miters are clamped to `miter_limit * half_width` so
- * very acute corners don't shoot off into space (SVG's miterlimit behavior,
- * though implemented here as a clamp rather than a bevel fallback).
+ * A stroke is the union of one rectangle per edge, `stroke_width` wide and
+ * centered on the edge, plus a miter wedge on the outer side of each corner.
+ * Painting that union piece by piece would cover the inner side of every
+ * corner twice, where the rectangles overlap, and a translucent stroke would
+ * show it. So where a corner allows it, the two rectangles share their corner
+ * points instead and meet along the miter line: the outer point is the miter
+ * tip, the inner point is where the two inner edges cross, and the wedge comes
+ * for free. That is the ribbon join, and it needs both rectangles to reach far
+ * enough past the corner to cover what the cut takes from the other. A corner
+ * sharper than the miter limit, or one whose edges are too short for that,
+ * keeps the plain rectangle ends and adds the wedge as its own piece, cut flat
+ * at the limit; a reversal keeps plain ends and needs no wedge. The two
+ * rectangles overlap on the inner side of such a corner, so a translucent
+ * stroke is painted twice there. Where a rectangle's plain end meets a wedge,
+ * the end is split at the vertex so the wedge shares whole edges with it and
+ * a rasterizer leaves no crack between them.
+ *
+ * `Polyline#contains?` (`lib/ruby2d/polyline.rb`) ports this layout to hit
+ * the same pixels — keep the two in sync.
  */
-void R2D_ComputeStrokeOutline(const float *verts, int n, int closed,
-                              float stroke_width, float miter_limit,
-                              float *outer, float *inner) {
 
-  if (n < 2) return;
+// Squared distance under which two consecutive points count as one
+#define R2D_STROKE_EPS_SQ 1e-8f
+
+/*
+ * Unit direction and length from vertex `a` to vertex `b`.
+ */
+static void shapes_edge_dir(const R2D_StrokeVertex *a, const R2D_StrokeVertex *b,
+                            float *dx, float *dy, float *len) {
+  float ex = b->x - a->x, ey = b->y - a->y;
+  *len = sqrtf(ex * ex + ey * ey);
+  *dx = ex / *len;
+  *dy = ey / *len;
+}
+
+
+/*
+ * Lay out the corner points of a stroked path. See ruby2d.h for parameter
+ * documentation.
+ */
+int R2D_StrokeVertices(const float *verts, int n, int *closed,
+                       float stroke_width, float miter_limit,
+                       R2D_StrokeVertex *sv) {
+
+  // Consecutive repeats of a point (and, on a closed path, a trailing repeat
+  // of the first) carry no direction, so they collapse into the point they
+  // repeat; the surviving vertex keeps the first copy's color.
+  int m = 0;
+  for (int i = 0; i < n; i++) {
+    float x = verts[i * 2], y = verts[i * 2 + 1];
+    if (m > 0) {
+      float ex = x - sv[m - 1].x, ey = y - sv[m - 1].y;
+      if (ex * ex + ey * ey < R2D_STROKE_EPS_SQ) continue;
+    }
+    sv[m].x = x;
+    sv[m].y = y;
+    sv[m].color = i;
+    m++;
+  }
+  if (*closed) {
+    while (m > 1) {
+      float ex = sv[m - 1].x - sv[0].x, ey = sv[m - 1].y - sv[0].y;
+      if (ex * ex + ey * ey >= R2D_STROKE_EPS_SQ) break;
+      m--;
+    }
+  }
+  if (m < 2 || stroke_width <= 0.0f) return 0;
+  // Two points close back over themselves: one edge, drawn once
+  if (m == 2) *closed = 0;
 
   float hw = stroke_width / 2.0f;
   float max_ml = miter_limit * hw;
 
-  for (int i = 0; i < n; i++) {
-    int is_endpoint = !closed && (i == 0 || i == n - 1);
+  // Pass 1: at each corner, how far the miter reaches back along both edges
+  // (`t`), how far the rectangle corners reach past the vertex (`reach`),
+  // which side the path bends toward (`s_in`), and whether the miter is
+  // within the limit and fits both edges. |n1 + n2| is twice the cosine of
+  // the half turn, read directly rather than from the normalized bisector,
+  // whose direction is noise when the two nearly cancel; below the threshold
+  // the corner counts as a reversal.
+  for (int k = 0; k < m; k++) {
+    R2D_StrokeVertex *v = &sv[k];
+    v->t = 0.0f;
+    v->reach = 0.0f;
+    v->s_in = 0;
+    v->ribbon = 0;
+    v->wedge = 0;
+    if (!*closed && (k == 0 || k == m - 1)) continue;
 
-    if (is_endpoint) {
-      // Butt cap: perpendicular of the single adjacent edge
-      int other = (i == 0) ? 1 : n - 2;
-      float dx = verts[i*2]   - verts[other*2];
-      float dy = verts[i*2+1] - verts[other*2+1];
-      if (i == 0) { dx = -dx; dy = -dy; }
-      float len = sqrtf(dx * dx + dy * dy);
-
-      if (len < 0.0001f) {
-        outer[i*2] = verts[i*2];     outer[i*2+1] = verts[i*2+1];
-        inner[i*2] = verts[i*2];     inner[i*2+1] = verts[i*2+1];
-      } else {
-        float nx = -dy / len, ny = dx / len;
-        outer[i*2]   = verts[i*2]   + nx * hw;
-        outer[i*2+1] = verts[i*2+1] + ny * hw;
-        inner[i*2]   = verts[i*2]   - nx * hw;
-        inner[i*2+1] = verts[i*2+1] - ny * hw;
-      }
-      continue;
-    }
-
-    // Interior (or any vertex in closed mode): compute miter
-    int prev = (i - 1 + n) % n;
-    int next = (i + 1) % n;
-
-    float d1x = verts[i*2]   - verts[prev*2];
-    float d1y = verts[i*2+1] - verts[prev*2+1];
-    float d2x = verts[next*2]   - verts[i*2];
-    float d2y = verts[next*2+1] - verts[i*2+1];
-
-    float len1 = sqrtf(d1x * d1x + d1y * d1y);
-    float len2 = sqrtf(d2x * d2x + d2y * d2y);
-
-    if (len1 < 0.0001f || len2 < 0.0001f) {
-      outer[i*2] = verts[i*2];     outer[i*2+1] = verts[i*2+1];
-      inner[i*2] = verts[i*2];     inner[i*2+1] = verts[i*2+1];
-      continue;
-    }
-
-    d1x /= len1; d1y /= len1;
-    d2x /= len2; d2y /= len2;
-
-    float n1x = -d1y, n1y = d1x;
-    float n2x = -d2y, n2y = d2x;
-
-    float mx = n1x + n2x;
-    float my = n1y + n2y;
+    float d1x, d1y, len1, d2x, d2y, len2;
+    shapes_edge_dir(&sv[(k + m - 1) % m], v, &d1x, &d1y, &len1);
+    shapes_edge_dir(v, &sv[(k + 1) % m], &d2x, &d2y, &len2);
+    float mx = -d1y - d2y, my = d1x + d2x;   // n1 + n2
     float mlen = sqrtf(mx * mx + my * my);
+    if (mlen < R2D_STROKE_REVERSAL) continue;  // reversal: plain ends, no wedge
+    float dot = 0.5f * mlen;                  // cos of the half turn
+    float ml = hw / dot;
+    float turn = d1x * d2y - d1y * d2x;
+    v->t = ml * sqrtf(fmaxf(0.0f, 1.0f - dot * dot));
+    v->reach = hw * fabsf(turn);
+    v->s_in = turn > 0.0f ? 1 : (turn < 0.0f ? -1 : 0);
+    v->ribbon = ml <= max_ml && v->t <= len1 && v->t <= len2;
+  }
 
-    if (mlen < 0.0001f) {
-      // 180° turn — degenerate; use the perpendicular of edge 1
-      outer[i*2]   = verts[i*2]   + n1x * hw;
-      outer[i*2+1] = verts[i*2+1] + n1y * hw;
-      inner[i*2]   = verts[i*2]   - n1x * hw;
-      inner[i*2+1] = verts[i*2+1] - n1y * hw;
+  // Pass 2: an edge whose two inner points, on the same side, reach past each
+  // other would fold its ribbon over itself; both corners fall back to plain
+  // ends there.
+  int edges = *closed ? m : m - 1;
+  for (int k = 0; k < edges; k++) {
+    R2D_StrokeVertex *a = &sv[k], *b = &sv[(k + 1) % m];
+    if (!a->ribbon || !b->ribbon || a->s_in == 0 || a->s_in != b->s_in) continue;
+    float dx, dy, len;
+    shapes_edge_dir(a, b, &dx, &dy, &len);
+    if (a->t + b->t > len) { a->ribbon = 0; b->ribbon = 0; }
+  }
+
+  // Pass 2, continued: the ribbon cut hands the inner corner of each
+  // rectangle's end to the neighboring edge, whose rectangle has to reach
+  // `reach` past the vertex to cover it. On a side whose far corner is a
+  // same-side ribbon, the miter there takes `t` off that length. A corner
+  // whose neighbors can't cover it falls back to plain ends. Every corner is
+  // judged against the flags as they stood before this pass, so a symmetric
+  // path gets a symmetric answer; a demotion only ever relaxes a neighbor.
+  for (int k = 0; k < m; k++) {
+    R2D_StrokeVertex *v = &sv[k];
+    if (!v->ribbon || v->s_in == 0) continue;
+    R2D_StrokeVertex *p = &sv[(k + m - 1) % m], *n = &sv[(k + 1) % m];
+    float dx, dy, len1, len2;
+    shapes_edge_dir(p, v, &dx, &dy, &len1);
+    shapes_edge_dir(v, n, &dx, &dy, &len2);
+    if (p->ribbon && p->s_in == v->s_in) len1 -= p->t;
+    if (n->ribbon && n->s_in == v->s_in) len2 -= n->t;
+    if (v->reach > len1 || v->reach > len2) v->ribbon = -1;   // demote below
+  }
+  for (int k = 0; k < m; k++) if (sv[k].ribbon < 0) sv[k].ribbon = 0;
+
+  // Pass 3: the corner points, and the wedge at each plain corner
+  for (int k = 0; k < m; k++) {
+    R2D_StrokeVertex *v = &sv[k];
+    int has_in = *closed || k > 0;
+    int has_out = *closed || k < m - 1;
+    float d1x = 0.0f, d1y = 0.0f, len1 = 0.0f, d2x = 0.0f, d2y = 0.0f, len2 = 0.0f;
+    if (has_in)  shapes_edge_dir(&sv[(k + m - 1) % m], v, &d1x, &d1y, &len1);
+    if (has_out) shapes_edge_dir(v, &sv[(k + 1) % m], &d2x, &d2y, &len2);
+    float n1x = -d1y, n1y = d1x, n2x = -d2y, n2y = d2x;
+
+    if (v->ribbon) {
+      float mx = n1x + n2x, my = n1y + n2y;
+      float mlen = sqrtf(mx * mx + my * my);
+      float ml = 2.0f * hw / mlen;              // hw over the half-turn cosine
+      mx /= mlen; my /= mlen;
+      v->spx = v->epx = v->x + mx * ml;
+      v->spy = v->epy = v->y + my * ml;
+      v->snx = v->enx = v->x - mx * ml;
+      v->sny = v->eny = v->y - my * ml;
       continue;
     }
 
-    mx /= mlen; my /= mlen;
+    // Plain ends: a butt cap at an open end, the rectangle corners elsewhere
+    v->spx = v->x + n2x * hw; v->spy = v->y + n2y * hw;
+    v->snx = v->x - n2x * hw; v->sny = v->y - n2y * hw;
+    v->epx = v->x + n1x * hw; v->epy = v->y + n1y * hw;
+    v->enx = v->x - n1x * hw; v->eny = v->y - n1y * hw;
+    if (v->s_in == 0) continue;
 
-    float dot = mx * n1x + my * n1y;
-    if (fabsf(dot) < 0.0001f) dot = 0.0001f;
+    // The wedge on the outer side, from the incoming edge's corner to the
+    // outgoing edge's corner around the miter tip, or around the cut where
+    // the tip passes the miter limit: the line across the bisector at
+    // `max_ml` from the vertex, meeting each edge's outer side.
+    float so = (float)-v->s_in;
+    float mx = n1x + n2x, my = n1y + n2y;
+    float mlen = sqrtf(mx * mx + my * my);
+    float dot = 0.5f * mlen;
     float ml = hw / dot;
-
-    // Clamp miter length for sharp corners
-    if (ml > max_ml) ml = max_ml;
-    else if (ml < -max_ml) ml = -max_ml;
-
-    outer[i*2]   = verts[i*2]   + mx * ml;
-    outer[i*2+1] = verts[i*2+1] + my * ml;
-    inner[i*2]   = verts[i*2]   - mx * ml;
-    inner[i*2+1] = verts[i*2+1] - my * ml;
+    float mox = so * mx / mlen, moy = so * my / mlen;    // toward the tip
+    float c1x = v->x + so * n1x * hw, c1y = v->y + so * n1y * hw;
+    float c2x = v->x + so * n2x * hw, c2y = v->y + so * n2y * hw;
+    v->w[0] = c1x; v->w[1] = c1y;
+    if (ml <= max_ml) {
+      v->w[2] = v->x + mox * ml; v->w[3] = v->y + moy * ml;
+      v->w[4] = c2x; v->w[5] = c2y;
+      v->wedge = 3;
+    } else {
+      float reach = max_ml - hw * dot;
+      float u = reach / (d1x * mox + d1y * moy);
+      float w = reach / (d2x * mox + d2y * moy);
+      v->w[2] = c1x + d1x * u; v->w[3] = c1y + d1y * u;
+      v->w[4] = c2x + d2x * w; v->w[5] = c2y + d2y * w;
+      v->w[6] = c2x; v->w[7] = c2y;
+      v->wedge = 4;
+    }
   }
+
+  return m;
+}
+
+
+/*
+ * The triangles of one edge of a laid-out stroke. See ruby2d.h for parameter
+ * documentation.
+ */
+int R2D_StrokeEdgeTriangles(const R2D_StrokeVertex *sv, int m, int k,
+                            float *xy, int *cv) {
+  const R2D_StrokeVertex *a = &sv[k], *b = &sv[(k + 1) % m];
+  int t = 0;
+
+  // The edge's quad: +n side start, -n side start, -n side end, +n side end.
+  // An end that meets a wedge is split at the vertex, so the wedge's first
+  // and last edges are whole edges of the quad's triangles too and a
+  // rasterizer leaves no crack between them. With both ends split the quad
+  // goes as two halves along the centerline; with one, as a fan from the
+  // corner opposite the split, which touches no split point.
+  float px[12];
+  int pc[6];
+  px[0] = a->spx; px[1] = a->spy; pc[0] = a->color;
+  px[2] = a->x;   px[3] = a->y;   pc[1] = a->color;
+  px[4] = a->snx; px[5] = a->sny; pc[2] = a->color;
+  px[6] = b->enx; px[7] = b->eny; pc[3] = b->color;
+  px[8] = b->x;   px[9] = b->y;   pc[4] = b->color;
+  px[10] = b->epx; px[11] = b->epy; pc[5] = b->color;
+  static const int both[4][3] = { { 0, 1, 4 }, { 0, 4, 5 }, { 1, 2, 3 }, { 1, 3, 4 } };
+  static const int start[3][3] = { { 3, 5, 0 }, { 3, 0, 1 }, { 3, 1, 2 } };
+  static const int end[3][3] = { { 0, 2, 3 }, { 0, 3, 4 }, { 0, 4, 5 } };
+  static const int none[2][3] = { { 0, 2, 3 }, { 0, 3, 5 } };
+  const int (*tri)[3];
+  int quad_tris;
+  if (a->wedge && b->wedge) { tri = both; quad_tris = 4; }
+  else if (a->wedge)        { tri = start; quad_tris = 3; }
+  else if (b->wedge)        { tri = end; quad_tris = 3; }
+  else                      { tri = none; quad_tris = 2; }
+  for (int i = 0; i < quad_tris; i++) {
+    float *p = xy + t * 6;
+    int *c = cv + t * 3;
+    for (int j = 0; j < 3; j++) {
+      p[j * 2] = px[tri[i][j] * 2];
+      p[j * 2 + 1] = px[tri[i][j] * 2 + 1];
+      c[j] = pc[tri[i][j]];
+    }
+    t++;
+  }
+
+  // The wedge at the edge's end vertex, fanned from the vertex. An open path's
+  // last vertex has none; on a closed path the last edge ends at vertex 0.
+  for (int i = 0; i + 1 < b->wedge; i++) {
+    float *p = xy + t * 6;
+    int *c = cv + t * 3;
+    p[0] = b->x; p[1] = b->y;
+    p[2] = b->w[i * 2]; p[3] = b->w[i * 2 + 1];
+    p[4] = b->w[i * 2 + 2]; p[5] = b->w[i * 2 + 3];
+    c[0] = c[1] = c[2] = b->color;
+    t++;
+  }
+
+  return t;
 }
 
 
@@ -114,92 +276,47 @@ void R2D_StrokePath(const float *verts, int n, int closed,
 
   if (n < 2 || stroke_width <= 0.0f) return;
 
-  // 2n vertices (outer[0], inner[0], outer[1], inner[1], ...); 6 indices per
-  // edge, with n edges when closed and n-1 when open.
-  int num_vertices = n * 2;
-  int edges = closed ? n : n - 1;
-  int num_indices = edges * 6;
-
-  // Most stroked shapes are small (triangles, quads, short polylines), so serve
-  // the four scratch buffers from the stack and fall back to the heap only for
-  // large vertex counts. Avoids four malloc/free pairs per call on the
-  // per-frame stroke path.
-  float outer_stack[R2D_STROKE_STACK_N * 2];
-  float inner_stack[R2D_STROKE_STACK_N * 2];
-  SDL_Vertex vertices_stack[R2D_STROKE_STACK_N * 2];
-  int indices_stack[R2D_STROKE_STACK_N * 6];
-
-  float *outer, *inner;
-  SDL_Vertex *vertices;
-  int *indices;
+  // Most stroked shapes are small (triangles, quads, short polylines), so lay
+  // the vertices out on the stack and fall back to the heap only for large
+  // vertex counts. Avoids a malloc/free pair per call on the per-frame path.
+  R2D_StrokeVertex sv_stack[R2D_STROKE_STACK_N];
   bool heap = n > R2D_STROKE_STACK_N;
+  R2D_StrokeVertex *sv = heap ? (R2D_StrokeVertex *)malloc(n * sizeof(R2D_StrokeVertex)) : sv_stack;
+  if (!sv) return;
 
-  if (heap) {
-    outer    = (float *)malloc(n * 2 * sizeof(float));
-    inner    = (float *)malloc(n * 2 * sizeof(float));
-    vertices = (SDL_Vertex *)malloc(num_vertices * sizeof(SDL_Vertex));
-    indices  = (int *)malloc(num_indices * sizeof(int));
-    if (!outer || !inner || !vertices || !indices) {
-      free(outer); free(inner); free(vertices); free(indices);
-      return;
+  int m = R2D_StrokeVertices(verts, n, &closed, stroke_width, miter_limit, sv);
+  if (m < 2) {
+    if (heap) free(sv);
+    return;
+  }
+
+  // Submit the triangles in batches of whole edges from a fixed buffer, so a
+  // long path costs no scratch proportional to its length; the renderer
+  // merges consecutive geometry calls into one draw.
+  SDL_Vertex batch[R2D_STROKE_BATCH_EDGES * R2D_STROKE_EDGE_TRIS * 3];
+  float xy[R2D_STROKE_EDGE_TRIS * 6];
+  int cv[R2D_STROKE_EDGE_TRIS * 3];
+  int count = 0;
+  int edges = closed ? m : m - 1;
+
+  for (int k = 0; k < edges; k++) {
+    int tris = R2D_StrokeEdgeTriangles(sv, m, k, xy, cv);
+    for (int i = 0; i < tris * 3; i++) {
+      const float *c = colors + cv[i] * 4;
+      batch[count++] = (SDL_Vertex){
+        .position  = { xy[i * 2], xy[i * 2 + 1] },
+        .color     = { c[0], c[1], c[2], c[3] },
+        .tex_coord = { 0.0f, 0.0f }
+      };
     }
-  } else {
-    outer    = outer_stack;
-    inner    = inner_stack;
-    vertices = vertices_stack;
-    indices  = indices_stack;
+    if (k == edges - 1 || count + R2D_STROKE_EDGE_TRIS * 3 > (int)(sizeof(batch) / sizeof(batch[0]))) {
+      R2D_CheckSDL(SDL_RenderGeometry(R2D_GetRenderer(), NULL, batch, count, NULL, 0),
+                   "SDL_RenderGeometry");
+      count = 0;
+    }
   }
 
-  R2D_ComputeStrokeOutline(verts, n, closed, stroke_width, miter_limit, outer, inner);
-
-  for (int i = 0; i < n; i++) {
-    float r = colors[i * 4];
-    float g = colors[i * 4 + 1];
-    float b = colors[i * 4 + 2];
-    float a = colors[i * 4 + 3];
-
-    vertices[i * 2].position.x = outer[i * 2];
-    vertices[i * 2].position.y = outer[i * 2 + 1];
-    vertices[i * 2].color.r = r;
-    vertices[i * 2].color.g = g;
-    vertices[i * 2].color.b = b;
-    vertices[i * 2].color.a = a;
-    vertices[i * 2].tex_coord.x = 0.0f;
-    vertices[i * 2].tex_coord.y = 0.0f;
-
-    vertices[i * 2 + 1].position.x = inner[i * 2];
-    vertices[i * 2 + 1].position.y = inner[i * 2 + 1];
-    vertices[i * 2 + 1].color.r = r;
-    vertices[i * 2 + 1].color.g = g;
-    vertices[i * 2 + 1].color.b = b;
-    vertices[i * 2 + 1].color.a = a;
-    vertices[i * 2 + 1].tex_coord.x = 0.0f;
-    vertices[i * 2 + 1].tex_coord.y = 0.0f;
-  }
-
-  for (int i = 0; i < edges; i++) {
-    int j = (i + 1) % n;
-    int oi = i * 2,      ii = i * 2 + 1;
-    int oj = j * 2,      ij = j * 2 + 1;
-
-    indices[i * 6]     = oi;
-    indices[i * 6 + 1] = ii;
-    indices[i * 6 + 2] = ij;
-    indices[i * 6 + 3] = oi;
-    indices[i * 6 + 4] = ij;
-    indices[i * 6 + 5] = oj;
-  }
-
-  R2D_CheckSDL(SDL_RenderGeometry(R2D_GetRenderer(), NULL,
-                                  vertices, num_vertices, indices, num_indices),
-               "SDL_RenderGeometry");
-
-  if (heap) {
-    free(indices);
-    free(vertices);
-    free(outer);
-    free(inner);
-  }
+  if (heap) free(sv);
 }
 
 

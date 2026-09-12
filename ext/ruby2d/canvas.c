@@ -562,12 +562,13 @@ static inline Uint8 lerp_u8(Uint8 a, Uint8 b, float t) {
  * When closed is true, the last vertex connects back to the first.
  * When closed is false, endpoints get butt caps.
  * verts is [x0, y0, x1, y1, ...], n is the vertex count.
- * colors is n*4 Uint8s (rgba per vertex); outer/inner at each vertex share its
- * color, so per-edge quads interpolate between adjacent vertex colors.
+ * colors is n*4 Uint8s (rgba per vertex); every corner point of a vertex
+ * carries that vertex's color, so each edge quad interpolates between its two
+ * vertices and a wedge is flat.
  * Coordinates are in surface pixel space. Color components are 0-255.
  *
- * Outline geometry is computed by the shared R2D_ComputeStrokeOutline so
- * Canvas strokes match the GPU-side R2D_StrokePath at corners.
+ * The geometry comes from the shared R2D_StrokeVertices layout, so Canvas
+ * strokes match the GPU-side R2D_StrokePath at corners.
  */
 static void canvas_stroke_polyline_on_surface(
     SDL_Surface *surface,
@@ -576,50 +577,34 @@ static void canvas_stroke_polyline_on_surface(
 
   if (n < 2) return;
 
-  // Most strokes are small (triangle, quad, default circle), so serve the
-  // outline buffers from the stack and fall back to the heap only past the
+  // Most strokes are small (triangle, quad, default circle), so lay the
+  // vertices out on the stack and fall back to the heap only past the
   // threshold — no malloc/free per call on the per-frame canvas paint path.
-  float outer_stack[R2D_STROKE_STACK_N * 2];
-  float inner_stack[R2D_STROKE_STACK_N * 2];
-  float *outer, *inner;
+  R2D_StrokeVertex sv_stack[R2D_STROKE_STACK_N];
   bool heap = n > R2D_STROKE_STACK_N;
+  R2D_StrokeVertex *sv = heap ? (R2D_StrokeVertex *)malloc(n * sizeof(R2D_StrokeVertex)) : sv_stack;
+  if (!sv) return;
 
-  if (heap) {
-    outer = (float *)malloc(n * 2 * sizeof(float));
-    inner = (float *)malloc(n * 2 * sizeof(float));
-    if (!outer || !inner) { free(outer); free(inner); return; }
-  } else {
-    outer = outer_stack;
-    inner = inner_stack;
+  int m = R2D_StrokeVertices(verts, n, &closed, width, R2D_MITER_LIMIT, sv);
+  int edges = closed ? m : m - 1;
+  float xy[R2D_STROKE_EDGE_TRIS * 6];
+  int cv[R2D_STROKE_EDGE_TRIS * 3];
+
+  for (int k = 0; m >= 2 && k < edges; k++) {
+    int tris = R2D_StrokeEdgeTriangles(sv, m, k, xy, cv);
+    for (int t = 0; t < tris; t++) {
+      const float *p = xy + t * 6;
+      const Uint8 *c1 = colors + cv[t * 3] * 4;
+      const Uint8 *c2 = colors + cv[t * 3 + 1] * 4;
+      const Uint8 *c3 = colors + cv[t * 3 + 2] * 4;
+      canvas_fill_triangle_lerp_on_surface(surface,
+        p[0], p[1], c1[0], c1[1], c1[2], c1[3],
+        p[2], p[3], c2[0], c2[1], c2[2], c2[3],
+        p[4], p[5], c3[0], c3[1], c3[2], c3[3]);
+    }
   }
 
-  R2D_ComputeStrokeOutline(verts, n, closed, width, R2D_MITER_LIMIT, outer, inner);
-
-  // Draw a quad for each edge segment
-  int edges = closed ? n : n - 1;
-  for (int i = 0; i < edges; i++) {
-    int j = (i + 1) % n;
-
-    Uint8 ri = colors[i * 4],     gi = colors[i * 4 + 1];
-    Uint8 bi = colors[i * 4 + 2], ai = colors[i * 4 + 3];
-    Uint8 rj = colors[j * 4],     gj = colors[j * 4 + 1];
-    Uint8 bj = colors[j * 4 + 2], aj = colors[j * 4 + 3];
-
-    canvas_fill_triangle_lerp_on_surface(surface,
-      outer[i*2], outer[i*2+1], ri, gi, bi, ai,
-      inner[i*2], inner[i*2+1], ri, gi, bi, ai,
-      inner[j*2], inner[j*2+1], rj, gj, bj, aj);
-
-    canvas_fill_triangle_lerp_on_surface(surface,
-      outer[i*2], outer[i*2+1], ri, gi, bi, ai,
-      inner[j*2], inner[j*2+1], rj, gj, bj, aj,
-      outer[j*2], outer[j*2+1], rj, gj, bj, aj);
-  }
-
-  if (heap) {
-    free(outer);
-    free(inner);
-  }
+  if (heap) free(sv);
 }
 
 
@@ -1588,8 +1573,9 @@ static R_VAL canvas_stroke_impl(R2D_Canvas *can, R_VAL a, int n, int vbase, int 
     SDL_LockSurface(can->surface);
     canvas_stroke_polyline_on_surface(can->surface, verts, n, closed, sw, colors);
     SDL_UnlockSurface(can->surface);
-    // Miter joins extend past the vertices by up to hw * R2D_MITER_LIMIT
-    canvas_mark_dirty_verts(can, verts, n, 0.5f * sw * R2D_MITER_LIMIT);
+    // A miter tip reaches hw * R2D_MITER_LIMIT past its vertex along the
+    // bisector, and the corners of a cut tip sit up to hw beside that
+    canvas_mark_dirty_verts(can, verts, n, 0.5f * sw * (R2D_MITER_LIMIT + 1.0f));
   }
 
   if (heap) {

@@ -6,11 +6,38 @@ module Ruby2D
   class Polyline
     include Renderable
 
-    attr_accessor :rotate, :stroke_width, :closed
+    attr_accessor :rotate
+    attr_reader :stroke_width, :closed
 
     # Miter-join limit, matching `R2D_MITER_LIMIT` in the C extension (the SVG
-    # default). A sharp corner's miter is clamped to `MITER_LIMIT * stroke_width / 2`.
+    # default). A corner whose miter tip would reach past
+    # `MITER_LIMIT * stroke_width / 2` is cut off there.
     MITER_LIMIT = 4.0
+
+    # Squared distance under which two consecutive points count as one, and
+    # the |n1 + n2| below which a corner counts as a reversal, matching
+    # `R2D_STROKE_EPS_SQ` and `R2D_STROKE_REVERSAL`.
+    STROKE_EPS_SQ = 1e-8
+    STROKE_REVERSAL = 0.001
+
+    # One vertex of the stroke as `stroke_vertices` lays it out: the corner
+    # points of the edges meeting there (`sp`/`sn` start the outgoing edge on
+    # the +normal and -normal sides, `ep`/`en` end the incoming edge) and the
+    # wedge points fanned from the vertex when the corner keeps plain ends.
+    class StrokeVertex
+      attr_accessor :x, :y, :sp, :sn, :ep, :en, :wedge, :t, :reach, :s_in, :ribbon
+
+      def initialize(x, y)
+        @x = x
+        @y = y
+        @wedge = []
+        @t = 0.0
+        @reach = 0.0
+        @s_in = 0
+        @ribbon = false
+      end
+    end
+    private_constant :StrokeVertex, :STROKE_EPS_SQ, :STROKE_REVERSAL
 
     # Create a polyline
     # points is an array of [x, y] pairs with N >= 2 vertices
@@ -65,26 +92,34 @@ module Ruby2D
     end
 
     # Test whether (x, y) lies on the polyline's stroke. Hit-tests against the
-    # exact shape the renderer draws — the ribbon between the outer and inner
-    # stroke outlines, with mitered joints and butt-capped open ends — so the
-    # clickable region matches the visible pixels, corners and all. A closed
-    # path joins at every vertex (no open ends).
+    # exact shape the renderer draws — a quad per edge, mitered at the corners
+    # and butt-capped at the open ends, plus the wedge at a corner too sharp
+    # or too short for its miter — so the clickable region matches the visible
+    # pixels, corners and all. A closed path joins at every vertex. The layout
+    # is cached until the path changes, and a point outside its bounds is
+    # rejected before any piece is tested: this runs on every mouse move.
     def contains?(x, y)
-      return false unless @stroke_width.positive?
+      return false unless @stroke_width && @stroke_width > 0
       x, y = _unrotate(x, y) if @rotate != 0
-      n = vertex_count
-      outer, inner = compute_stroke_outline
-      edges = @closed ? n : n - 1
-      edges.times do |i|
-        j = (i + 1) % n
-        # The renderer fills each edge as the quad outer[i] → inner[i] →
-        # inner[j] → outer[j]; the point is on the stroke iff it lies inside any
-        # of those quads. The miter outline makes the corners exact.
-        oi = outer[i]; ii = inner[i]
-        oj = outer[j]; ij = inner[j]
+      sv, closed, bounds = stroke_layout
+      m = sv.length
+      return false if m < 2
+      return false if x < bounds[0] || y < bounds[1] || x > bounds[2] || y > bounds[3]
+
+      edges = closed ? m : m - 1
+      edges.times do |k|
+        a = sv[k]
+        b = sv[(k + 1) % m]
+        # The edge's quad, then the wedge at its end vertex, as
+        # `R2D_StrokeEdgeTriangles` emits them; every piece is convex.
         return true if _point_in_polygon?(
-          [oi[0], oi[1], ii[0], ii[1], ij[0], ij[1], oj[0], oj[1]], x, y
+          [a.sp[0], a.sp[1], a.sn[0], a.sn[1], b.en[0], b.en[1], b.ep[0], b.ep[1]], x, y
         )
+        next if b.wedge.empty?
+
+        poly = [b.x, b.y]
+        b.wedge.each { |p| poly << p[0] << p[1] }
+        return true if _point_in_polygon?(poly, x, y)
       end
       false
     end
@@ -105,6 +140,18 @@ module Ruby2D
       sum / n
     end
 
+    # Stroke thickness and closure feed the cached stroke layout, so setting
+    # either drops it (the vertex translators below do the same).
+    def stroke_width=(value)
+      @stroke_width = value
+      @_stroke_layout = nil
+    end
+
+    def closed=(value)
+      @closed = value
+      @_stroke_layout = nil
+    end
+
     # Set the centroid x coordinate, translating all vertices
     def x=(new_x)
       _require_numeric_position(:x, new_x)
@@ -114,6 +161,7 @@ module Ruby2D
         @coordinates[i] += dx
         i += 2
       end
+      @_stroke_layout = nil
     end
 
     # Set the centroid y coordinate, translating all vertices
@@ -125,6 +173,7 @@ module Ruby2D
         @coordinates[i] += dy
         i += 2
       end
+      @_stroke_layout = nil
     end
 
     # Get the rotation center x coordinate
@@ -211,84 +260,185 @@ module Ruby2D
 
     private
 
-    # Build the stroke outline the renderer draws: the outer- and inner-edge
-    # point for each vertex, with miter joins clamped to `MITER_LIMIT` and butt
-    # caps at the open ends. A faithful port of `R2D_ComputeStrokeOutline`
-    # (`ext/ruby2d/shapes.c`) — keep the two in sync. Returns `[outer, inner]`,
-    # each an array of `[x, y]`. Used by `contains?` to hit-test the exact drawn
-    # shape, including the mitered corner spikes a round-join disk would miss.
-    def compute_stroke_outline
-      n = vertex_count
+    # Unit direction and length from vertex `a` to vertex `b`.
+    def edge_dir(a, b)
+      ex = b.x - a.x
+      ey = b.y - a.y
+      len = Math.sqrt(ex * ex + ey * ey)
+      [ex / len, ey / len, len]
+    end
+
+    # The stroke layout plus its bounding box `[min_x, min_y, max_x, max_y]`
+    # over every piece, built once and kept until the path, width, or closure
+    # changes.
+    def stroke_layout
+      return @_stroke_layout if @_stroke_layout
+
+      sv, closed = stroke_vertices
+      min_x = min_y = Float::INFINITY
+      max_x = max_y = -Float::INFINITY
+      sv.each do |v|
+        pts = [v.sp, v.sn, v.ep, v.en, [v.x, v.y]]
+        pts.concat(v.wedge)
+        pts.each do |px, py|
+          next if px.nil?
+
+          min_x = px if px < min_x
+          min_y = py if py < min_y
+          max_x = px if px > max_x
+          max_y = py if py > max_y
+        end
+      end
+      @_stroke_layout = [sv, closed, [min_x, min_y, max_x, max_y]]
+    end
+
+    # Lay out the stroke the renderer draws: a faithful port of
+    # `R2D_StrokeVertices` (`ext/ruby2d/shapes.c`), which explains the
+    # geometry — keep the two in sync. Consecutive repeated points collapse
+    # into one. Returns `[vertices, closed]`, `closed` cleared when the path
+    # collapses to a single edge. Used by `contains?` to hit-test the exact
+    # drawn shape, including the mitered corners a round-join disk would miss.
+    def stroke_vertices
       coords = @coordinates
+      closed = @closed
+      sv = []
+      vertex_count.times do |i|
+        px = coords[i * 2]
+        py = coords[i * 2 + 1]
+        unless sv.empty?
+          ex = px - sv[-1].x
+          ey = py - sv[-1].y
+          next if ex * ex + ey * ey < STROKE_EPS_SQ
+        end
+        sv << StrokeVertex.new(px, py)
+      end
+      if closed
+        while sv.length > 1
+          ex = sv[-1].x - sv[0].x
+          ey = sv[-1].y - sv[0].y
+          break if ex * ex + ey * ey >= STROKE_EPS_SQ
+
+          sv.pop
+        end
+      end
+      m = sv.length
+      return [sv, closed] if m < 2 || !(@stroke_width > 0)
+
+      closed = false if m == 2
       hw = @stroke_width / 2.0
       max_ml = MITER_LIMIT * hw
-      outer = Array.new(n)
-      inner = Array.new(n)
 
-      n.times do |i|
-        vx = coords[i * 2]
-        vy = coords[i * 2 + 1]
+      # Pass 1: at each corner, how far the miter reaches back along both
+      # edges, how far the rectangle corners reach past the vertex, which side
+      # the path bends toward, and whether the miter is within the limit and
+      # fits both edges. |n1 + n2| is twice the cosine of the half turn; below
+      # the threshold the corner counts as a reversal.
+      m.times do |k|
+        next if !closed && (k == 0 || k == m - 1)
 
-        # Open-path endpoints get a butt cap: perpendicular of the lone edge.
-        if !@closed && (i == 0 || i == n - 1)
-          other = i == 0 ? 1 : n - 2
-          dx = vx - coords[other * 2]
-          dy = vy - coords[other * 2 + 1]
-          if i == 0
-            dx = -dx
-            dy = -dy
-          end
-          len = Math.sqrt(dx * dx + dy * dy)
-          if len < 0.0001
-            outer[i] = [vx, vy]
-            inner[i] = [vx, vy]
-          else
-            nx = -dy / len
-            ny = dx / len
-            outer[i] = [vx + nx * hw, vy + ny * hw]
-            inner[i] = [vx - nx * hw, vy - ny * hw]
-          end
+        v = sv[k]
+        d1x, d1y, len1 = edge_dir(sv[(k + m - 1) % m], v)
+        d2x, d2y, len2 = edge_dir(v, sv[(k + 1) % m])
+        mx = -d1y - d2y
+        my = d1x + d2x
+        mlen = Math.sqrt(mx * mx + my * my)
+        next if mlen < STROKE_REVERSAL
+
+        dot = 0.5 * mlen
+        ml = hw / dot
+        turn = d1x * d2y - d1y * d2x
+        v.t = ml * Math.sqrt([0.0, 1.0 - dot * dot].max)
+        v.reach = hw * turn.abs
+        v.s_in = turn > 0 ? 1 : (turn < 0 ? -1 : 0)
+        v.ribbon = ml <= max_ml && v.t <= len1 && v.t <= len2
+      end
+
+      # Pass 2: an edge whose two inner points, on the same side, reach past
+      # each other keeps plain ends at both corners.
+      edges = closed ? m : m - 1
+      edges.times do |k|
+        a = sv[k]
+        b = sv[(k + 1) % m]
+        next unless a.ribbon && b.ribbon && a.s_in != 0 && a.s_in == b.s_in
+
+        len = edge_dir(a, b)[2]
+        if a.t + b.t > len
+          a.ribbon = false
+          b.ribbon = false
+        end
+      end
+
+      # Pass 2, continued: the ribbon cut hands the inner corner of each
+      # rectangle's end to the neighboring edge, whose rectangle has to reach
+      # `reach` past the vertex to cover it, less the miter of a same-side
+      # ribbon at its far corner. Every corner is judged against the flags as
+      # they stood before this pass.
+      demoted = []
+      m.times do |k|
+        v = sv[k]
+        next if !v.ribbon || v.s_in == 0
+
+        p = sv[(k + m - 1) % m]
+        n = sv[(k + 1) % m]
+        len1 = edge_dir(p, v)[2]
+        len2 = edge_dir(v, n)[2]
+        len1 -= p.t if p.ribbon && p.s_in == v.s_in
+        len2 -= n.t if n.ribbon && n.s_in == v.s_in
+        demoted << v if v.reach > len1 || v.reach > len2
+      end
+      demoted.each { |v| v.ribbon = false }
+
+      # Pass 3: the corner points, and the wedge at each plain corner
+      m.times do |k|
+        v = sv[k]
+        d1x = d1y = d2x = d2y = 0.0
+        d1x, d1y, = edge_dir(sv[(k + m - 1) % m], v) if closed || k > 0
+        d2x, d2y, = edge_dir(v, sv[(k + 1) % m]) if closed || k < m - 1
+        n1x = -d1y
+        n1y = d1x
+        n2x = -d2y
+        n2y = d2x
+
+        if v.ribbon
+          mx = n1x + n2x
+          my = n1y + n2y
+          mlen = Math.sqrt(mx * mx + my * my)
+          ml = 2.0 * hw / mlen
+          mx /= mlen
+          my /= mlen
+          v.sp = v.ep = [v.x + mx * ml, v.y + my * ml]
+          v.sn = v.en = [v.x - mx * ml, v.y - my * ml]
           next
         end
 
-        # Interior joint (every vertex when closed): miter.
-        prev = (i - 1 + n) % n
-        nxt = (i + 1) % n
-        d1x = vx - coords[prev * 2]
-        d1y = vy - coords[prev * 2 + 1]
-        d2x = coords[nxt * 2] - vx
-        d2y = coords[nxt * 2 + 1] - vy
-        len1 = Math.sqrt(d1x * d1x + d1y * d1y)
-        len2 = Math.sqrt(d2x * d2x + d2y * d2y)
-        if len1 < 0.0001 || len2 < 0.0001
-          outer[i] = [vx, vy]
-          inner[i] = [vx, vy]
-          next
-        end
-        d1x /= len1; d1y /= len1
-        d2x /= len2; d2y /= len2
-        n1x = -d1y; n1y = d1x
-        n2x = -d2y; n2y = d2x
+        v.sp = [v.x + n2x * hw, v.y + n2y * hw]
+        v.sn = [v.x - n2x * hw, v.y - n2y * hw]
+        v.ep = [v.x + n1x * hw, v.y + n1y * hw]
+        v.en = [v.x - n1x * hw, v.y - n1y * hw]
+        next if v.s_in == 0
+
+        so = -v.s_in
         mx = n1x + n2x
         my = n1y + n2y
         mlen = Math.sqrt(mx * mx + my * my)
-        if mlen < 0.0001
-          # 180° turn — degenerate; use the perpendicular of the first edge.
-          outer[i] = [vx + n1x * hw, vy + n1y * hw]
-          inner[i] = [vx - n1x * hw, vy - n1y * hw]
-          next
-        end
-        mx /= mlen; my /= mlen
-        dot = mx * n1x + my * n1y
-        dot = 0.0001 if dot.abs < 0.0001
+        dot = 0.5 * mlen
         ml = hw / dot
-        ml = max_ml if ml > max_ml
-        ml = -max_ml if ml < -max_ml
-        outer[i] = [vx + mx * ml, vy + my * ml]
-        inner[i] = [vx - mx * ml, vy - my * ml]
+        mox = so * mx / mlen
+        moy = so * my / mlen
+        c1 = [v.x + so * n1x * hw, v.y + so * n1y * hw]
+        c2 = [v.x + so * n2x * hw, v.y + so * n2y * hw]
+        if ml <= max_ml
+          v.wedge = [c1, [v.x + mox * ml, v.y + moy * ml], c2]
+        else
+          reach = max_ml - hw * dot
+          u = reach / (d1x * mox + d1y * moy)
+          w = reach / (d2x * mox + d2y * moy)
+          v.wedge = [c1, [c1[0] + d1x * u, c1[1] + d1y * u],
+                     [c2[0] + d2x * w, c2[1] + d2y * w], c2]
+        end
       end
 
-      [outer, inner]
+      [sv, closed]
     end
 
     # Apply rotation to every (x, y) pair in a flat coords array, writing into
