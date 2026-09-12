@@ -153,18 +153,35 @@ module Ruby2D
       return unless validate_vertex8(:fill_quad, x1, y1, x2, y2, x3, y3, x4, y4)
       opacity = clamp_opacity(opacity) if opacity
       c = resolve_color_or_set(color || colour)
+      # Split into two triangles along the diagonal that lies inside the quad,
+      # as the GPU `Quad` does: (1,2,3) and (1,3,4), or (1,2,4) and (2,3,4)
+      # when the reflex corner of a concave quad is vertex 2 or 4. Spelled out
+      # per branch so the single-color path allocates nothing.
+      split_24 = quad_splits_13?(x1, y1, x2, y2, x3, y3, x4, y4)
       if c.is_a?(Color::Set) || opacity.is_a?(Array)
         colors = per_vertex_fill_tuples(c, opacity, 4, :fill_quad)
-        # Split into triangles (0,1,2) and (0,2,3), each carrying its vertices'
-        # colors so the per-vertex gradient interpolates across the quad.
-        Ext.canvas_fill_triangle_lerp(self,
-          [x1, y1, *colors[0], x2, y2, *colors[1], x3, y3, *colors[2]])
-        Ext.canvas_fill_triangle_lerp(self,
-          [x1, y1, *colors[0], x3, y3, *colors[2], x4, y4, *colors[3]])
+        # Each triangle carries its vertices' colors so the per-vertex
+        # gradient interpolates across the quad.
+        if split_24
+          Ext.canvas_fill_triangle_lerp(self,
+            [x1, y1, *colors[0], x2, y2, *colors[1], x4, y4, *colors[3]])
+          Ext.canvas_fill_triangle_lerp(self,
+            [x2, y2, *colors[1], x3, y3, *colors[2], x4, y4, *colors[3]])
+        else
+          Ext.canvas_fill_triangle_lerp(self,
+            [x1, y1, *colors[0], x2, y2, *colors[1], x3, y3, *colors[2]])
+          Ext.canvas_fill_triangle_lerp(self,
+            [x1, y1, *colors[0], x3, y3, *colors[2], x4, y4, *colors[3]])
+        end
       else
         a = opacity || c.a
-        Ext.canvas_fill_triangle(self, x1, y1, x2, y2, x3, y3, c.r, c.g, c.b, a)
-        Ext.canvas_fill_triangle(self, x1, y1, x3, y3, x4, y4, c.r, c.g, c.b, a)
+        if split_24
+          Ext.canvas_fill_triangle(self, x1, y1, x2, y2, x4, y4, c.r, c.g, c.b, a)
+          Ext.canvas_fill_triangle(self, x2, y2, x3, y3, x4, y4, c.r, c.g, c.b, a)
+        else
+          Ext.canvas_fill_triangle(self, x1, y1, x2, y2, x3, y3, c.r, c.g, c.b, a)
+          Ext.canvas_fill_triangle(self, x1, y1, x3, y3, x4, y4, c.r, c.g, c.b, a)
+        end
       end
     end
 
@@ -630,6 +647,20 @@ module Ruby2D
         raise_vertex_type_error(name)
       end
       finite4?(x1, y1, x2, y2) && finite4?(x3, y3, x4, y4)
+    end
+
+    # Whether a quad's inside diagonal is 1-3 rather than 0-2. Mirrors
+    # `shapes_quad_splits_13` in `ext/ruby2d/shapes.c`: a simple concave quad
+    # has one reflex corner, a turn against the quad's winding, and the 0-2
+    # diagonal runs outside the outline when that corner is vertex 1 or 3.
+    def quad_splits_13?(x1, y1, x2, y2, x3, y3, x4, y4)
+      area2 = (x1 * y2 - x2 * y1) + (x2 * y3 - x3 * y2) +
+              (x3 * y4 - x4 * y3) + (x4 * y1 - x1 * y4)
+      return false if area2 == 0
+
+      c2 = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+      c4 = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)
+      c2 * area2 < 0 || c4 * area2 < 0
     end
 
     def raise_vertex_type_error(name)

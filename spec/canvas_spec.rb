@@ -109,6 +109,35 @@ RSpec.describe Ruby2D::Canvas do
         )
       }.not_to raise_error
     end
+
+    # A concave quad has one reflex corner. The 0-2 diagonal stays inside the
+    # quad when that corner is vertex 0 or 2; when it is vertex 1 or 3 the
+    # diagonal crosses the notch, and splitting there fills it. Same rule as
+    # the GPU `Quad`.
+    it 'splits a concave quad along the diagonal inside it' do
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle)
+        .with(canvas, 0, 0, 10, 10, 15, 30, 1, 1, 1, 1).ordered
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle)
+        .with(canvas, 10, 10, 30, 0, 15, 30, 1, 1, 1, 1).ordered
+      canvas.fill_quad(points: [[0, 0], [10, 10], [30, 0], [15, 30]], color: 'white')
+    end
+
+    it 'splits a convex quad along the 0-2 diagonal' do
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle)
+        .with(canvas, 0, 0, 30, 0, 30, 30, 1, 1, 1, 1).ordered
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle)
+        .with(canvas, 0, 0, 30, 30, 0, 30, 1, 1, 1, 1).ordered
+      canvas.fill_quad(points: [[0, 0], [30, 0], [30, 30], [0, 30]], color: 'white')
+    end
+
+    it 'keeps each vertex color on the inside diagonal' do
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle_lerp)
+        .with(canvas, [0, 0, 1, 0, 0, 1, 10, 10, 0, 1, 0, 1, 15, 30, 1, 1, 1, 1]).ordered
+      expect(Ruby2D::Ext).to receive(:canvas_fill_triangle_lerp)
+        .with(canvas, [10, 10, 0, 1, 0, 1, 30, 0, 0, 0, 1, 1, 15, 30, 1, 1, 1, 1]).ordered
+      canvas.fill_quad(points: [[0, 0], [10, 10], [30, 0], [15, 30]],
+                       color: ['#f00', '#0f0', '#00f', '#fff'])
+    end
   end
 
   describe '#fill_rectangle' do

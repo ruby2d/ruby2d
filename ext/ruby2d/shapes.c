@@ -867,13 +867,35 @@ void R2D_DrawTriangle(float x1, float y1,
 
 
 /*
+ * Which diagonal splits a quad into two triangles that stay inside it. The
+ * 0-2 diagonal is right for a convex quad and for a concave one whose reflex
+ * corner is vertex 0 or 2; when the reflex corner is vertex 1 or 3, 0-2 runs
+ * outside the outline and the fill spills into the notch, so 1-3 is the one
+ * inside. A corner is reflex when its turn goes against the quad's winding.
+ * Self-intersecting input (unsupported) lands on either diagonal, and
+ * neither is right for it; only a zero-area quad keeps 0-2. Returns 1 for
+ * the 1-3 split, 0 for 0-2. `Canvas#fill_quad` mirrors this in Ruby.
+ */
+static int shapes_quad_splits_13(float x1, float y1, float x2, float y2,
+                                 float x3, float y3, float x4, float y4) {
+  float verts[8] = { x1, y1, x2, y2, x3, y3, x4, y4 };
+  float area2 = shapes_polygon_signed_area2(verts, 4);
+  if (area2 == 0.0f) return 0;
+  float c2 = shapes_tri_cross(x1, y1, x2, y2, x3, y3);
+  float c4 = shapes_tri_cross(x3, y3, x4, y4, x1, y1);
+  return (c2 * area2 < 0.0f) || (c4 * area2 < 0.0f);
+}
+
+
+/*
  * Draws a filled quad with per-vertex colors.
  *
  * Parameters:
  *   x, y - Vertex position coordinates for each of the 4 corners
  *   r, g, b, a - Vertex color values (red, green, blue, alpha) for each corner
  *
- * The quad is rendered as two triangles with interpolated colors.
+ * The quad is rendered as two triangles with interpolated colors, split along
+ * the diagonal that lies inside it (see shapes_quad_splits_13).
  */
 void R2D_DrawQuad(float x1, float y1,
                   float r1, float g1, float b1, float a1,
@@ -902,8 +924,11 @@ void R2D_DrawQuad(float x1, float y1,
       .tex_coord = { 0.0f, 0.0f }
   }};
 
-  // Indices for two triangles forming the quad
-  int indices[6] = { 0, 1, 2, 0, 2, 3 };
+  // Indices for the two triangles forming the quad, one set per diagonal
+  static const int split_02[6] = { 0, 1, 2, 0, 2, 3 };
+  static const int split_13[6] = { 0, 1, 3, 1, 2, 3 };
+  const int *indices =
+    shapes_quad_splits_13(x1, y1, x2, y2, x3, y3, x4, y4) ? split_13 : split_02;
 
   R2D_CheckSDL(
     SDL_RenderGeometry(R2D_GetRenderer(), NULL, vertices, 4, indices, 6),
