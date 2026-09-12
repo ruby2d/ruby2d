@@ -887,14 +887,6 @@ void R2D_DrawLine(
 );
 
 /*
- * Draw a circle from triangles
- */
-void R2D_DrawCircle(
-  float x, float y, float radius, int sectors,
-  float r, float g, float b, float a
-);
-
-/*
  * One vertex of a stroked path as R2D_StrokeVertices lays it out: the corner
  * points of the edges meeting there and, when those edges keep their plain
  * ends, the wedge that fills the outer side of the corner. `s*` are the start

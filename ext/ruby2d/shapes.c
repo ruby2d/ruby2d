@@ -1077,23 +1077,3 @@ void R2D_DrawLine(float x1, float y1, float x2, float y2,
     SDL_RenderGeometry(R2D_GetRenderer(), NULL, vertices, 4, indices, 6),
     "SDL_RenderGeometry");
 }
-
-
-/*
- * Draws a filled circle with a solid color.
- *
- * Parameters:
- *   x, y - Center position of the circle
- *   radius - Radius of the circle
- *   sectors - Number of triangular sectors (higher = smoother circle)
- *   r, g, b, a - Color values for the circle
- *
- * The circle is rendered as a triangle fan from the center.
- */
-void R2D_DrawCircle(float x, float y, float radius, int sectors,
-                    float r, float g, float b, float a) {
-
-  // A circle is an ellipse with equal radii. Delegating reuses the ellipse
-  // rasterizer's heap allocation and NULL checks instead of stack VLAs.
-  R2D_DrawEllipse(x, y, radius, radius, 0.0f, sectors, r, g, b, a);
-}

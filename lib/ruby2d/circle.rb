@@ -155,10 +155,14 @@ module Ruby2D
       uniform = !resolved.is_a?(Color::Set) && !opacity.is_a?(Array)
       c = uniform ? nil : Renderable.flatten_resolved_color(resolved, 1, opacity, label: self)
 
+      # `rotate` (degrees) orbits the center around a pivot other than the
+      # center, as for Ellipse, and `rad` goes to the draw so the rim turns
+      # too: a low-sector circle is a visible polygon, and its hit-test
+      # already follows the turned rim.
+      rad = rotate * Math::PI / 180.0
       if rotate != 0
         cx = rx || x
         cy = ry || y
-        rad = rotate * Math::PI / 180.0
         sa = Math.sin(rad); ca = Math.cos(rad)
         dx = x - cx; dy = y - cy
         x = dx * ca - dy * sa + cx
@@ -167,10 +171,10 @@ module Ruby2D
 
       if fill
         if uniform
-          Ext.draw_circle(x, y, radius, sectors,
-                          resolved.r, resolved.g, resolved.b, opacity || resolved.a)
+          Ext.draw_ellipse(x, y, radius, radius, rad, sectors,
+                           resolved.r, resolved.g, resolved.b, opacity || resolved.a)
         else
-          Ext.draw_circle(x, y, radius, sectors, c[0], c[1], c[2], c[3])
+          Ext.draw_ellipse(x, y, radius, radius, rad, sectors, c[0], c[1], c[2], c[3])
         end
       end
       # Resolve the stroke color only when actually stroking. Without an
@@ -182,12 +186,14 @@ module Ruby2D
           # out a set), so the opacity override mutates nothing shared.
           sc = Color.set(explicit_stroke)
           sc.opacity = opacity if opacity
-          Ext.stroke_circle(x, y, radius, sectors, stroke_width, sc.r, sc.g, sc.b, sc.a)
+          Ext.stroke_ellipse(x, y, radius, radius, rad, sectors, stroke_width,
+                             sc.r, sc.g, sc.b, sc.a)
         elsif uniform
-          Ext.stroke_circle(x, y, radius, sectors, stroke_width,
-                            resolved.r, resolved.g, resolved.b, opacity || resolved.a)
+          Ext.stroke_ellipse(x, y, radius, radius, rad, sectors, stroke_width,
+                             resolved.r, resolved.g, resolved.b, opacity || resolved.a)
         else
-          Ext.stroke_circle(x, y, radius, sectors, stroke_width, c[0], c[1], c[2], c[3])
+          Ext.stroke_ellipse(x, y, radius, radius, rad, sectors, stroke_width,
+                             c[0], c[1], c[2], c[3])
         end
       end
     end
@@ -211,9 +217,9 @@ module Ruby2D
 
       x = @x; y = @y
 
+      rad = @rotate * Math::PI / 180.0
       if @rotate != 0
         cx = rx; cy = ry
-        rad = @rotate * Math::PI / 180.0
         sa = Math.sin(rad); ca = Math.cos(rad)
         dx = x - cx; dy = y - cy
         x = dx * ca - dy * sa + cx
@@ -222,12 +228,13 @@ module Ruby2D
 
       if @fill
         cc = @_cc
-        Ext.draw_circle(x, y, @radius, @sectors, cc[0], cc[1], cc[2], cc[3])
+        Ext.draw_ellipse(x, y, @radius, @radius, rad, @sectors, cc[0], cc[1], cc[2], cc[3])
       end
 
       if @stroke_width && @stroke_width > 0
         scc = @_stroke_cc
-        Ext.stroke_circle(x, y, @radius, @sectors, @stroke_width, scc[0], scc[1], scc[2], scc[3])
+        Ext.stroke_ellipse(x, y, @radius, @radius, rad, @sectors, @stroke_width,
+                           scc[0], scc[1], scc[2], scc[3])
       end
     end
 

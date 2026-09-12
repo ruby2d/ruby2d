@@ -108,8 +108,8 @@ RSpec.describe 'default stroke color' do
 
     it 'strokes Circle.render and Ellipse.render in the rolled color' do
       fill = stroke = nil
-      allow(Ruby2D::Ext).to receive(:draw_circle) { |*a| fill = a[4, 4] }
-      allow(Ruby2D::Ext).to receive(:stroke_circle) { |*a| stroke = a[5, 4] }
+      allow(Ruby2D::Ext).to receive(:draw_ellipse) { |*a| fill = a[6, 4] }
+      allow(Ruby2D::Ext).to receive(:stroke_ellipse) { |*a| stroke = a[7, 4] }
       Circle.render(color: 'random', stroke_width: 2, opacity: 0.5)
       expect(stroke).to eq(fill)
       expect(fill.last).to eq(0.5)
@@ -123,8 +123,8 @@ RSpec.describe 'default stroke color' do
 
     it 'clamps a scalar opacity for Circle.render and Ellipse.render, fill and stroke alike' do
       fill = stroke = nil
-      allow(Ruby2D::Ext).to receive(:draw_circle) { |*a| fill = a[7] }
-      allow(Ruby2D::Ext).to receive(:stroke_circle) { |*a| stroke = a[8] }
+      allow(Ruby2D::Ext).to receive(:draw_ellipse) { |*a| fill = a[9] }
+      allow(Ruby2D::Ext).to receive(:stroke_ellipse) { |*a| stroke = a[10] }
       Circle.render(color: 'red', opacity: 1.5, stroke_width: 2)
       expect([fill, stroke]).to eq([1.0, 1.0])
       Circle.render(color: 'red', opacity: -0.2, stroke_color: 'blue', stroke_width: 2)

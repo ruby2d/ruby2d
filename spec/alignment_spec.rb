@@ -7,7 +7,6 @@ RSpec.describe 'Symbolic alignment' do
   before do
     allow(Ruby2D::Window).to receive(:viewport_width).and_return(800)
     allow(Ruby2D::Window).to receive(:viewport_height).and_return(600)
-    allow(Ruby2D::Ext).to receive(:draw_circle)
     allow(Ruby2D::Ext).to receive(:draw_ellipse)
     allow(Ruby2D::Ext).to receive(:draw_quad)
     allow(Ruby2D::Ext).to receive(:draw_quad_uniform)

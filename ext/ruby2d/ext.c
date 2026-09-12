@@ -317,43 +317,6 @@ R_VAL ruby2d_ext_draw_dashed_line(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 /*
- * Ruby2D::Ext.draw_circle(x, y, radius, sectors, r, g, b, a)
- */
-R_VAL ruby2d_ext_draw_circle(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 8) r_raise("Ruby2D::Ext.draw_circle expects 8 args, got %d", (int)argc);
-
-  R2D_DrawCircle(
-    NUM2DBL(argv[0]), NUM2DBL(argv[1]),
-    NUM2DBL(argv[2]), NUM2INT(argv[3]),
-    NUM2DBL(argv[4]), NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7])
-  );
-
-  return R_NIL;
-}
-
-
-/*
- * Ruby2D::Ext.stroke_circle(x, y, radius, sectors, stroke_width, r, g, b, a)
- */
-R_VAL ruby2d_ext_stroke_circle(RUBY2D_METHOD_ARGS_VARIADIC) {
-  RUBY2D_EXTRACT_VARIADIC;
-  if (argc != 9) r_raise("Ruby2D::Ext.stroke_circle expects 9 args, got %d", (int)argc);
-
-  float x = NUM2DBL(argv[0]);
-  float y = NUM2DBL(argv[1]);
-  float r = NUM2DBL(argv[2]);
-  int sectors = NUM2INT(argv[3]);
-  float sw = NUM2DBL(argv[4]);
-
-  R2D_StrokeEllipse(x, y, r, r, 0.0f, sectors, sw,
-    NUM2DBL(argv[5]), NUM2DBL(argv[6]), NUM2DBL(argv[7]), NUM2DBL(argv[8]));
-
-  return R_NIL;
-}
-
-
-/*
  * Ruby2D::Ext.draw_ellipse(x, y, xradius, yradius, angle, sectors, r, g, b, a)
  */
 R_VAL ruby2d_ext_draw_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
@@ -532,8 +495,6 @@ void R2D_Ext_Init() {
   r_define_class_method(ruby2d_ext_module, "stroke_quad_uniform", ruby2d_ext_stroke_quad_uniform, r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "draw_line",        ruby2d_ext_draw_line,        r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "draw_dashed_line", ruby2d_ext_draw_dashed_line, r_args_variadic);
-  r_define_class_method(ruby2d_ext_module, "draw_circle",      ruby2d_ext_draw_circle,      r_args_variadic);
-  r_define_class_method(ruby2d_ext_module, "stroke_circle",    ruby2d_ext_stroke_circle,    r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "draw_ellipse",     ruby2d_ext_draw_ellipse,     r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "stroke_ellipse",   ruby2d_ext_stroke_ellipse,   r_args_variadic);
 

@@ -1003,7 +1003,7 @@ Circle.new(x: 0, y: 0, radius: 50)
 | `z` | `0` | Depth |
 | `radius` | `50` | Radius |
 | `sectors` | `30` | Number of segments around the perimeter (higher = smoother) |
-| `rotate` | `0` | Rotation in degrees |
+| `rotate` | `0` | Rotation in degrees; turns the rim too, visible at low `sectors` |
 | `rx`, `ry` | Center | Rotation center |
 | `color` | `'white'` | Single color only |
 | `opacity` | `nil` | Alpha override |
@@ -1036,7 +1036,7 @@ Ellipse.new(x: 100, y: 100, xradius: 60, yradius: 30)
 | `xradius` | `50` | Horizontal radius |
 | `yradius` | `30` | Vertical radius |
 | `sectors` | `30` | Number of segments around the perimeter (higher = smoother) |
-| `rotate` | `0` | Rotation in degrees |
+| `rotate` | `0` | Rotation in degrees; turns the rim too, visible at low `sectors` |
 | `rx`, `ry` | Center | Rotation center |
 | `color` | `'white'` | Single color only |
 | `opacity` | `nil` | Alpha override |

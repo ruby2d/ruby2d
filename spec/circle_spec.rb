@@ -90,6 +90,28 @@ RSpec.describe Ruby2D::Circle do
     end
   end
 
+  describe "rotation at render" do
+    # A low-sector circle is a visible polygon, so `rotate` has to turn its
+    # rim, not only orbit its center: the draw takes the angle in radians, as
+    # Ellipse's does, and `#contains?` already tests the turned rim.
+    it "turns the rim by the rotation, as Ellipse does" do
+      circle = Circle.new(x: 60, y: 20, radius: 15, sectors: 4, rotate: 45, add: false)
+      expect(Ruby2D::Ext).to receive(:draw_ellipse)
+        .with(60, 20, 15, 15, be_within(1e-9).of(Math::PI / 4), 4, 1.0, 1.0, 1.0, 1.0)
+      circle.send(:render)
+      expect(circle.contains?(69, 29)).to be true # inside the turned square, outside the diamond
+    end
+
+    it "turns the rim of a stroked Circle.render too" do
+      expect(Ruby2D::Ext).to receive(:draw_ellipse)
+        .with(60, 20, 15, 15, be_within(1e-9).of(Math::PI / 4), 4, 1.0, 1.0, 1.0, 1.0)
+      expect(Ruby2D::Ext).to receive(:stroke_ellipse)
+        .with(60, 20, 15, 15, be_within(1e-9).of(Math::PI / 4), 4, 2, 1.0, 1.0, 1.0, 1.0)
+      allow(Ruby2D::Window).to receive(:render_ready_check)
+      Circle.render(x: 60, y: 20, radius: 15, sectors: 4, rotate: 45, stroke_width: 2)
+    end
+  end
+
   describe "#contains? with few sectors" do
     it "follows the drawn polygon below 30 sectors, and the circle from 30 up" do
       # Four sectors draw a diamond with its points on the axes: (53, 53) is
