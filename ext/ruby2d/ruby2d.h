@@ -981,8 +981,9 @@ void R2D_StrokePath(
 );
 
 /*
- * Stroke an ellipse outline as a ring of triangles via SDL_RenderGeometry.
- * `angle` (radians) tilts the ellipse off-axis; pass 0 for axis-aligned.
+ * Stroke an ellipse outline via SDL_RenderGeometry: the rim polygon of
+ * `sectors` sides, stroked as a closed path. `angle` (radians) tilts the
+ * ellipse off-axis; pass 0 for axis-aligned.
  */
 void R2D_StrokeEllipse(
   float cx, float cy, float rx, float ry, float angle,

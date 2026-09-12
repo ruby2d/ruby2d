@@ -846,9 +846,12 @@ void R2D_DrawDashedLine(float x1, float y1, float x2, float y2,
 
 
 /*
- * Stroke an ellipse outline as a ring of triangles via SDL_RenderGeometry.
- * Outer radius is (rx + sw/2, ry + sw/2), inner is (rx - sw/2, ry - sw/2),
- * putting the stroke centered on the ellipse line.
+ * Stroke an ellipse outline: the rim polygon R2D_DrawEllipse fills, stroked
+ * as a closed path so the band is `stroke_width` thick across every side,
+ * mitered at the sector corners like Canvas#stroke_ellipse. Offsetting the
+ * radii instead would thin the band wherever the rim isn't perpendicular to
+ * the radius: along the flat sides of a flattened ellipse, and along every
+ * side of a low-sector polygon. See ruby2d.h for parameter documentation.
  */
 void R2D_StrokeEllipse(float cx, float cy, float rx, float ry, float angle,
                        int sectors, float stroke_width,
@@ -858,34 +861,23 @@ void R2D_StrokeEllipse(float cx, float cy, float rx, float ry, float angle,
   if (sectors < R2D_MIN_SECTORS) sectors = R2D_MIN_SECTORS;
   if (sectors > R2D_MAX_SECTORS) sectors = R2D_MAX_SECTORS;
 
-  float hw = stroke_width / 2.0f;
-  float orx = rx + hw, ory = ry + hw;
-  float irx = rx - hw, iry = ry - hw;
-  if (irx < 0.0f) irx = 0.0f;
-  if (iry < 0.0f) iry = 0.0f;
-
-  int num_vertices = sectors * 2;
-  int num_indices = sectors * 6;
-
   // Default 30 sectors fits the stack; fall back to the heap only past the
   // threshold. Avoids two malloc/free pairs per stroke on the per-frame path.
-  SDL_Vertex vertices_stack[R2D_STROKE_STACK_N * 2];
-  int indices_stack[R2D_STROKE_STACK_N * 6];
-
-  SDL_Vertex *vertices;
-  int *indices;
+  float verts_stack[R2D_STROKE_STACK_N * 2];
+  float colors_stack[R2D_STROKE_STACK_N * 4];
+  float *verts, *colors;
   bool heap = sectors > R2D_STROKE_STACK_N;
 
   if (heap) {
-    vertices = (SDL_Vertex *)malloc(num_vertices * sizeof(SDL_Vertex));
-    indices  = (int *)malloc(num_indices * sizeof(int));
-    if (!vertices || !indices) {
-      free(vertices); free(indices);
+    verts  = (float *)malloc(sectors * 2 * sizeof(float));
+    colors = (float *)malloc(sectors * 4 * sizeof(float));
+    if (!verts || !colors) {
+      free(verts); free(colors);
       return;
     }
   } else {
-    vertices = vertices_stack;
-    indices  = indices_stack;
+    verts  = verts_stack;
+    colors = colors_stack;
   }
 
   // Unit-circle cos/sin come from the cached table (no per-vertex trig); only a
@@ -893,54 +885,26 @@ void R2D_StrokeEllipse(float cx, float cy, float rx, float ry, float angle,
   const float *uc, *us;
   bool cached = R2D_UnitCircle(sectors, &uc, &us);
   float angle_step = cached ? 0.0f : (2.0f * M_PI) / sectors;
-  // Tilt both rims by `angle` (radians); identity when angle is 0.
+  // Tilt the rim by `angle` (radians); identity when angle is 0.
   float rot_c = 1.0f, rot_s = 0.0f;
   if (angle != 0.0f) { rot_c = cosf(angle); rot_s = sinf(angle); }
   for (int i = 0; i < sectors; i++) {
-    float ca = cached ? uc[i] : cosf(i * angle_step);
-    float sa = cached ? us[i] : sinf(i * angle_step);
-
-    float oox = orx * ca, ooy = ory * sa;   // outer rim offset
-    float iox = irx * ca, ioy = iry * sa;    // inner rim offset
-    vertices[i * 2].position.x = cx + oox * rot_c - ooy * rot_s;
-    vertices[i * 2].position.y = cy + oox * rot_s + ooy * rot_c;
-    vertices[i * 2].color.r = r;
-    vertices[i * 2].color.g = g;
-    vertices[i * 2].color.b = b;
-    vertices[i * 2].color.a = a;
-    vertices[i * 2].tex_coord.x = 0.0f;
-    vertices[i * 2].tex_coord.y = 0.0f;
-
-    vertices[i * 2 + 1].position.x = cx + iox * rot_c - ioy * rot_s;
-    vertices[i * 2 + 1].position.y = cy + iox * rot_s + ioy * rot_c;
-    vertices[i * 2 + 1].color.r = r;
-    vertices[i * 2 + 1].color.g = g;
-    vertices[i * 2 + 1].color.b = b;
-    vertices[i * 2 + 1].color.a = a;
-    vertices[i * 2 + 1].tex_coord.x = 0.0f;
-    vertices[i * 2 + 1].tex_coord.y = 0.0f;
+    float cv = cached ? uc[i] : cosf(i * angle_step);
+    float sv = cached ? us[i] : sinf(i * angle_step);
+    float ox = rx * cv, oy = ry * sv;
+    verts[i * 2]     = cx + ox * rot_c - oy * rot_s;
+    verts[i * 2 + 1] = cy + ox * rot_s + oy * rot_c;
+    colors[i * 4]     = r;
+    colors[i * 4 + 1] = g;
+    colors[i * 4 + 2] = b;
+    colors[i * 4 + 3] = a;
   }
 
-  for (int i = 0; i < sectors; i++) {
-    int j = (i + 1) % sectors;
-    int oi = i * 2,      ii = i * 2 + 1;
-    int oj = j * 2,      ij = j * 2 + 1;
-
-    indices[i * 6]     = oi;
-    indices[i * 6 + 1] = ii;
-    indices[i * 6 + 2] = ij;
-    indices[i * 6 + 3] = oi;
-    indices[i * 6 + 4] = ij;
-    indices[i * 6 + 5] = oj;
-  }
-
-  R2D_CheckSDL(SDL_RenderGeometry(R2D_GetRenderer(), NULL,
-                                  vertices, num_vertices, indices, num_indices),
-               "SDL_RenderGeometry");
+  R2D_StrokePath(verts, sectors, 1, stroke_width, R2D_MITER_LIMIT, colors);
 
   if (heap) {
-    free(indices);
-    free(vertices);
+    free(colors);
+    free(verts);
   }
 }
 
