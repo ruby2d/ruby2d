@@ -2429,7 +2429,7 @@ show
 
 ## Building Native Applications
 
-`ruby2d build app.rb` compiles your app into a standalone native executable in `build/native/` (on macOS it also produces an `App.app` bundle); run it with `ruby2d launch --native`. The build targets the machine it runs on and does not cross-compile.
+`ruby2d build app.rb` compiles your app into a standalone native executable in `build/native/` (on macOS it also produces an `App.app` bundle); run it with `ruby2d launch --native`, which runs the executable in your terminal and exits with its status, so a script or CI step fails when the app does. The build targets the machine it runs on and does not cross-compile.
 
 Native builds link SDL3 and mruby as static libraries. The gem bundles these for the most common platforms — macOS on Apple silicon, and Windows on x86-64 and ARM64 — where native building works with no extra setup.
 
