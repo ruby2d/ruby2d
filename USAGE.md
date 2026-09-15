@@ -2254,7 +2254,7 @@ pad.has?(:axis, :left_trigger)
 pad.battery  # :wired, :full, :medium, :low, :empty, or nil
 ```
 
-`id`, `name`, `type`, and capability checks are cached at connect time and never change for the lifetime of the connection. `battery` is queried live every call.
+`id` is fixed for the connection. `name`, `type`, and capability checks are read at connect, and again when a mapping added for the pad takes effect (see [Mappings](#mappings)), so a check costs no SDL call. `battery` is queried live every call.
 
 For debugging an unrecognized device or composing a custom mapping, `pad.debug_info` returns a Hash with the GUID, USB vendor / product / version IDs, serial number, connection state (`:wired` / `:wireless` / `:unknown`), un-remapped real type, touchpad count, and the resolved mapping string. Returns `nil` for a disconnected pad.
 
@@ -2276,9 +2276,11 @@ pad.led = [255, 0, 128]
 Ruby 2D ships with virtually all common mappings built in, so most projects never need this. For the rare exception:
 
 - `~/.ruby2d/gamepads.txt` is loaded automatically when the window is shown.
-- `add_gamepad_mapping(path_or_string)` smart-parses its argument: if it points at an existing file, it loads it; otherwise it's treated as a single mapping string
+- `add_gamepad_mapping(path_or_string)` smart-parses its argument: if it points at an existing file, it loads it; otherwise it's treated as a single mapping string. SDL skips a line in a file that has no `platform:` field (the community database's lines end with one, such as `platform:Mac OS X,`); the string form needs none.
 
 The string format is the standard SDL gamepad mapping (e.g. `030000005e040000ea02000000007801,Xbox One S Controller,a:b0,b:b1,...`); the [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB) community database works as-is.
+
+A mapping for a pad that is already connected takes effect on the next frame, on the same `Gamepad` object: its `name`, `type`, and capability checks are read again; a button held under a name the new mapping doesn't report down is released and one down under a new name is pressed, each with its event; and every axis reports its value under the new mapping, firing `:gamepad_axis` where that changed.
 
 The leading 32-hex segment is the gamepad's GUID: a stable identifier derived from the device's bus (USB or Bluetooth), USB vendor / product / version IDs, and a hash of its name. The same pad keeps the same GUID across reboots and machines, which is why a mapping written once works for every user with that hardware. Two things change it for the same physical pad: switching connection mode (a pad paired over USB and over Bluetooth gets two different GUIDs, and may need two mapping entries), and renaming the controller in the OS; on macOS, the label in System Settings → Game Controllers feeds into the name hash, so renaming a pad silently invalidates any mapping keyed to its old GUID.
 

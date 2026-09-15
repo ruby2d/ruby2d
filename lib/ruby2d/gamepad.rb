@@ -81,29 +81,29 @@ module Ruby2D
       @connected = true
       @dead_zone = DEFAULT_DEAD_ZONE
 
-      # Cached per-connection metadata. `type` and capabilities don't change
-      # while the pad is connected, so we read them once and avoid the SDL
+      # Cached per-connection metadata: `type` and the capability checks
+      # depend only on the device and its mapping, so they are read once here,
+      # and again when the mapping changes (`_apply_remap`), instead of an SDL
       # round-trip on every call.
-      @type = Ext.window_gamepad_type(window, id)
-      caps = Ext.window_gamepad_caps(window, id)
-      @cap_rumble          = caps & 0x1 != 0
-      @cap_rumble_triggers = caps & 0x2 != 0
-      @cap_led             = caps & 0x4 != 0
-
-      # Per-button and per-axis presence is also cached at connect — one SDL
-      # call per known enum, then `has?(:button, name)` / `has?(:axis, name)`
-      # are pure hash reads. Cheap (~27 calls total) and matches the
-      # "capability checks are cached at connect time" rule in USAGE.md.
-      @btn_present  = BUTTON_ENUM.each_with_object({}) do |(sym, enum), h|
-        h[sym] = Ext.window_gamepad_has_button(window, id, enum)
-      end
-      @axis_present = AXIS_ENUM.each_with_object({}) do |(sym, enum), h|
-        h[sym] = Ext.window_gamepad_has_axis(window, id, enum)
-      end
+      read_mapping
 
       # Pressed/released/axes_moved are frame-scoped, cleared by
       # `_clear_frame_state`. Held lasts from press to release, so it is
       # current inside a button handler; the C-side held loop only confirms it
+      # each frame.
+      @buttons_down  = []
+      @buttons_up    = []
+      @buttons_held  = []
+      @axes_moved    = []
+
+      # Sticky axis values populated by motion events.
+      @axis_values = {}
+      AXIS_NAMES.each { |a| @axis_values[a] = 0.0 }
+      @raw_axis_values = @axis_values.dup
+    end
+
+    def connected? = @connected
+
     # The threshold applies to the current readings as soon as it changes, not
     # only to the next motion event: a raised threshold silences drift that is
     # already there, and a disabled one lets a stationary stick's real offset
@@ -119,20 +119,6 @@ module Ruby2D
         @axis_values[a] = apply_dead_zone(a, @raw_axis_values[a] || 0.0)
       end
     end
-
-      # each frame.
-      @buttons_down  = []
-      @buttons_up    = []
-      @buttons_held  = []
-      @axes_moved    = []
-
-      # Sticky axis values populated by motion events.
-      @axis_values = {}
-      AXIS_NAMES.each { |a| @axis_values[a] = 0.0 }
-      @raw_axis_values = @axis_values.dup
-    end
-
-    def connected? = @connected
 
     # Capability check. Forms:
     #   pad.has?(:rumble)
@@ -327,6 +313,18 @@ module Ruby2D
       end
     end
 
+    # The pad's mapping changed (a mapping was added for it), so its name,
+    # type, and capabilities are read again. Button and axis state is brought
+    # in line by the caller through ordinary events.
+    def _apply_remap(name)
+      return unless @connected
+      @name = name if name
+      read_mapping
+    end
+
+    # `held?` without the name check, for the dispatcher's own bookkeeping.
+    def _held?(button) = @buttons_held.include?(button)
+
     def _clear_frame_state
       @buttons_down.clear
       @buttons_up.clear
@@ -346,6 +344,23 @@ module Ruby2D
     end
 
     private
+
+    # `type` and the feedback capabilities are one SDL call each; per-button
+    # and per-axis presence is one call per known name (32 in all), after
+    # which `has?` is a hash read.
+    def read_mapping
+      @type = Ext.window_gamepad_type(@window, @id)
+      caps = Ext.window_gamepad_caps(@window, @id)
+      @cap_rumble          = caps & 0x1 != 0
+      @cap_rumble_triggers = caps & 0x2 != 0
+      @cap_led             = caps & 0x4 != 0
+      @btn_present  = BUTTON_ENUM.each_with_object({}) do |(sym, enum), h|
+        h[sym] = Ext.window_gamepad_has_button(@window, @id, enum)
+      end
+      @axis_present = AXIS_ENUM.each_with_object({}) do |(sym, enum), h|
+        h[sym] = Ext.window_gamepad_has_axis(@window, @id, enum)
+      end
+    end
 
     def apply_dead_zone(axis, value)
       return value if @dead_zone <= 0.0 || TRIGGER_AXES.include?(axis)

@@ -53,18 +53,20 @@ module Ruby2D
         Ext.window_load_gamepad_mappings_file(self, DEFAULT_GAMEPAD_MAPPINGS_PATH)
       end
 
-      # Called from C for every gamepad event. Type is one of:
-      # :connect, :disconnect, :button_down, :button_held, :button_up, :axis.
+      # Called from C for every gamepad event. Type is one of: :connect,
+      # :disconnect, :button_down, :button_held, :button_up, :axis, :remap.
       # `data` is the button name (button events), axis name (axis events),
-      # or nil (connect/disconnect). `value` is the dead-zone-applied axis
-      # value, or nil. `name` is the gamepad's display name on connect/
-      # disconnect, otherwise nil.
+      # or nil. `value` is the raw axis value (axis events), the bitmask of
+      # buttons down under the new mapping (remap), or nil. `name` is the
+      # gamepad's display name on connect and remap, otherwise nil.
       def gamepad_callback(which, type, data, value, name = nil)
         case type
         when :connect
           handle_gamepad_connect(which, name)
         when :disconnect
           handle_gamepad_disconnect(which)
+        when :remap
+          handle_gamepad_remap(which, value, name)
         when :button_down
           handle_gamepad_button_down(which, data)
         when :button_held
@@ -107,8 +109,32 @@ module Ruby2D
         fire_event_handlers(:gamepad_disconnect) { GamepadConnectData.new(pad) }
       end
 
+      # A new mapping renames the pad's buttons and axes in place. The pad
+      # rereads its metadata, then the held buttons are reconciled with the
+      # ones down under the new mapping through the usual paths, so a button
+      # whose name changed is released under the old name and pressed under the
+      # new one, and handlers and polling both see it. C follows this event
+      # with every axis reread through the new mapping.
+      def handle_gamepad_remap(id, down_mask, name)
+        pad = @gamepads_by_id[id] or return
+        pad._apply_remap(name)
+        held = pad.buttons_held
+        down = Gamepad::BUTTON_ENUM.select { |_b, bit| down_mask & (1 << bit) != 0 }.keys
+        (held - down).each { |b| handle_gamepad_button_up(id, b) }
+        (down - held).each { |b| handle_gamepad_button_down(id, b) }
+      end
+
+      # A transition is reported once. SDL reports a button only on a real
+      # transition, and the remap reconciliation above reports the ones the
+      # new mapping implies; when a physical press or release lands in the
+      # same batch as a remap, both describe the one transition, so the second
+      # is dropped by the held state the first one set. An up for a button
+      # that isn't held is dropped the same way. The check doesn't validate the
+      # name, so a code the Ruby tables don't know is passed through as before.
       def handle_gamepad_button_down(id, button)
         pad = @gamepads_by_id[id] or return
+        return if pad._held?(button)
+
         pad._apply_button_down(button)
         fire_event_handlers(:gamepad_button_down) { GamepadButtonData.new(pad, button) }
       end
@@ -121,6 +147,8 @@ module Ruby2D
 
       def handle_gamepad_button_up(id, button)
         pad = @gamepads_by_id[id] or return
+        return unless pad._held?(button)
+
         pad._apply_button_up(button)
         fire_event_handlers(:gamepad_button_up) { GamepadButtonData.new(pad, button) }
       end

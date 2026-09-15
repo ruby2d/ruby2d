@@ -388,6 +388,7 @@ extern "C" {
 #define R2D_GAMEPAD_BUTTON_DOWN  4
 #define R2D_GAMEPAD_BUTTON_UP    5
 #define R2D_GAMEPAD_BUTTON_HELD  6
+#define R2D_GAMEPAD_REMAPPED     7
 
 // Gamepad axis labels
 #define R2D_AXIS_INVALID       SDL_GAMEPAD_AXIS_INVALID

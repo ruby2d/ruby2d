@@ -750,6 +750,7 @@ module Ruby2D
           when 4 then gamepad_callback(gp_id, :button_down, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
           when 5 then gamepad_callback(gp_id, :button_up, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
           when 6 then gamepad_callback(gp_id, :button_held, GP_BUTTON_MAP[raw[i + 3]], nil, nil)
+          when 7 then gamepad_callback(gp_id, :remap, nil, raw[i + 10], raw[i + 11])
           end
         when EVT_CLOSE
           close_callback

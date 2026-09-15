@@ -386,6 +386,28 @@ RSpec.describe Ruby2D::Window do
       pad.dead_zone = 1
       expect(pad.dead_zone).to eq(1.0)
     end
+
+    # SDL reports a button only on a transition, and a remap in the same batch
+    # reports the transitions its mapping implies, so one press can arrive
+    # twice; the second report is dropped, and so is an up for a button that
+    # isn't held.
+    it 'reports a button transition once, whatever repeats it' do
+      pad = connect(window)
+      events = []
+      window.on(:gamepad_button_down) { |_p, b| events << [:down, b] }
+      window.on(:gamepad_button_up) { |_p, b| events << [:up, b] }
+      window.gamepad_callback(pad.id, :button_down, :south, nil, nil)
+      window.gamepad_callback(pad.id, :button_down, :south, nil, nil)
+      window.gamepad_callback(pad.id, :button_up, :south, nil, nil)
+      window.gamepad_callback(pad.id, :button_up, :south, nil, nil)
+      window.gamepad_callback(pad.id, :button_up, :east, nil, nil)
+      expect(events).to eq([[:down, :south], [:up, :south]])
+      expect(pad.pressed?(:south)).to be true
+      expect(pad.released?(:south)).to be true
+      expect(pad.released?(:east)).to be false
+      # A code the tables don't know still passes through instead of raising.
+      expect { window.gamepad_callback(pad.id, :button_down, nil, nil, nil) }.not_to raise_error
+    end
   end
 
   describe 'per-frame polling state' do
@@ -596,6 +618,85 @@ RSpec.describe Ruby2D::Window do
         pad.has?(:button, :paddle1)
         pad.has?(:axis, :left_trigger)
       end
+    end
+  end
+
+  # A mapping added for a connected pad renames its buttons and axes in place,
+  # and SDL reports that as a remap event rather than as input. C delivers it
+  # with the set of buttons down under the new mapping, then every axis reread
+  # through it as ordinary axis events.
+  describe 'gamepad remapping' do
+    let(:window) { Ruby2D::Window.new }
+
+    def connect(window, id: 1)
+      window.gamepad_callback(id, :connect, nil, nil, 'Old name')
+      window.gamepads.find { |p| p.id == id }
+    end
+
+    def mask(*buttons)
+      buttons.sum { |b| 1 << Ruby2D::Gamepad::BUTTON_ENUM[b] }
+    end
+
+    it 'rereads name, type, and capabilities on the same object' do
+      pad = connect(window)
+      expect(pad.has?(:button, :misc1)).to be false
+
+      misc1 = Ruby2D::Gamepad::BUTTON_ENUM[:misc1]
+      allow(Ruby2D::Ext).to receive(:window_gamepad_type).and_return(:xbox)
+      allow(Ruby2D::Ext).to receive(:window_gamepad_caps).and_return(0x1)
+      allow(Ruby2D::Ext).to receive(:window_gamepad_has_button) { |_w, _id, enum| enum == misc1 }
+      allow(Ruby2D::Ext).to receive(:window_gamepad_has_axis).and_return(true)
+      window.gamepad_callback(pad.id, :remap, nil, 0, 'New name')
+
+      expect(window.gamepads.first).to equal(pad)
+      expect(pad.name).to eq('New name')
+      expect(pad.type).to eq(:xbox)
+      expect(pad.has?(:rumble)).to be true
+      expect(pad.has?(:button, :misc1)).to be true
+      expect(pad.has?(:button, :east)).to be false
+      expect(pad.has?(:axis, :left_y)).to be true
+    end
+
+    it 'keeps the name when C has none' do
+      pad = connect(window)
+      window.gamepad_callback(pad.id, :remap, nil, 0, nil)
+      expect(pad.name).to eq('Old name')
+    end
+
+    it 'releases a held button the new mapping drops and presses one it adds' do
+      pad = connect(window)
+      window.gamepad_callback(pad.id, :button_down, :east, nil, nil)
+      window.gamepad_callback(pad.id, :button_down, :south, nil, nil)
+      window.send(:clear_event_stores)
+      events = []
+      window.on(:gamepad_button_up) { |_p, b| events << [:up, b] }
+      window.on(:gamepad_button_down) { |_p, b| events << [:down, b] }
+
+      window.gamepad_callback(pad.id, :remap, nil, mask(:south, :misc1), 'New name')
+
+      expect(events).to eq([[:up, :east], [:down, :misc1]])
+      expect(pad.released?(:east)).to be true
+      expect(pad.held?(:east)).to be false
+      expect(pad.pressed?(:misc1)).to be true
+      expect(pad.buttons_held).to match_array(%i[south misc1])
+      expect(pad.pressed?(:south)).to be false
+    end
+
+    it 'ignores a remap for an unknown or disconnected pad' do
+      pad = connect(window)
+      window.gamepad_callback(pad.id, :disconnect, nil, nil, nil)
+      expect { window.gamepad_callback(pad.id, :remap, nil, 0, 'x') }.not_to raise_error
+      expect { window.gamepad_callback(99, :remap, nil, 0, 'x') }.not_to raise_error
+      expect(pad.name).to eq('Old name')
+    end
+
+    it 'decodes event code 7 as :remap with the button mask and name' do
+      pad = connect(window)
+      window.gamepad_callback(pad.id, :button_down, :east, nil, nil)
+      raw = [Ruby2D::Window::EVT_GAMEPAD, 7, pad.id, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, mask(:south), 'Decoded']
+      window.send(:dispatch_events, raw)
+      expect(pad.name).to eq('Decoded')
+      expect(pad.held?(:east)).to be false
     end
   end
 

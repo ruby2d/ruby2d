@@ -442,6 +442,34 @@ static void event_buf_push(R2D_QueuedEvent ev) {
 // connect events for already-plugged-in pads appear in the first drain.
 static bool first_poll = true;
 
+// Gamepads removed during a poll, closed at the start of the next one. Ruby
+// dispatches a poll's events after this call returns, and reads a pad's type
+// and capabilities from SDL while it does (a connect or remap in the same
+// batch as the removal), so the handle has to outlive the batch.
+static SDL_Gamepad **closing_pads = NULL;
+static int closing_count = 0;
+static int closing_capacity = 0;
+
+static void closing_pads_push(SDL_Gamepad *pad) {
+  // The handle stays visible to SDL_GetGamepadFromID until it is closed, so a
+  // second removal for the same pad in one poll finds it again: list it once
+  for (int i = 0; i < closing_count; i++) {
+    if (closing_pads[i] == pad) return;
+  }
+  if (closing_count >= closing_capacity) {
+    int new_capacity = closing_capacity ? closing_capacity * 2 : 4;
+    SDL_Gamepad **grown = SDL_realloc(closing_pads, new_capacity * sizeof(*grown));
+    if (!grown) {
+      // Leaking the handle beats closing it under the batch being dispatched
+      R2D_Error("closing_pads_push", "SDL_realloc failed for %d gamepad handles", new_capacity);
+      return;
+    }
+    closing_pads = grown;
+    closing_capacity = new_capacity;
+  }
+  closing_pads[closing_count++] = pad;
+}
+
 
 /*
  * Ext.poll_events(window)
@@ -456,6 +484,10 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   frame_start = SDL_GetPerformanceCounter();
   event_count = 0;
+
+  // Release the pads removed last poll, now that Ruby has dispatched that batch
+  for (int i = 0; i < closing_count; i++) SDL_CloseGamepad(closing_pads[i]);
+  closing_count = 0;
 
   // On the first call, push connect events for already-plugged-in gamepads
   if (first_poll) {
@@ -583,7 +615,39 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
           .category = R2D_EVT_GAMEPAD, .type = R2D_GAMEPAD_DISCONNECT,
           .id = gid
         });
-        if (pad) SDL_CloseGamepad(pad);
+        if (pad) closing_pads_push(pad);
+        break;
+      }
+
+      // A mapping added for a connected pad (`SDL_AddGamepadMapping` or a
+      // mappings file) changes what its buttons and axes are called without
+      // any input event, so Ruby is told to reread the pad's mapping-dependent
+      // metadata, gets the set of buttons down under the new mapping, and gets
+      // every axis reread through it as an ordinary axis event.
+      case SDL_EVENT_GAMEPAD_REMAPPED: {
+        SDL_JoystickID gid = e.gdevice.which;
+        SDL_Gamepad *pad = SDL_GetGamepadFromID(gid);
+        if (!pad) break;
+        // One bit per button in the event's `value`
+        SDL_COMPILE_TIME_ASSERT(button_mask, R2D_BUTTON_COUNT <= 31);
+        int down = 0;
+        for (int b = 0; b < R2D_BUTTON_COUNT; b++) {
+          if (SDL_GetGamepadButton(pad, b)) down |= 1 << b;
+        }
+        // Own the name: drain frees it. SDL_GetGamepadName returns a borrowed
+        // pointer that SDL_CloseGamepad frees, so copy it now (see drain).
+        const char *name = SDL_GetGamepadName(pad);
+        R2D_Log(R2D_INFO, "Gamepad remapped: id=%u, name=%s", (unsigned)gid, name ? name : "(unnamed)");
+        event_buf_push((R2D_QueuedEvent){
+          .category = R2D_EVT_GAMEPAD, .type = R2D_GAMEPAD_REMAPPED,
+          .id = gid, .value = down, .str = name ? SDL_strdup(name) : NULL
+        });
+        for (int a = 0; a < R2D_AXIS_COUNT; a++) {
+          event_buf_push((R2D_QueuedEvent){
+            .category = R2D_EVT_GAMEPAD, .type = R2D_GAMEPAD_AXIS,
+            .id = gid, .axis = a, .value = SDL_GetGamepadAxis(pad, a)
+          });
+        }
         break;
       }
 
@@ -746,9 +810,9 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     r_ary_push(ary, DBL2NUM(ev->delta_y));
     r_ary_push(ary, INT2NUM(ev->value));
     r_ary_push(ary, ev->str ? r_str_new(ev->str) : R_NIL);
-    // Ownership contract: poll strdups gamepad-connect names into ev->str, drain
-    // frees them here. All other events leave ev->str NULL via designated init,
-    // so freeing every non-NULL ev->str is correct.
+    // Ownership contract: poll strdups gamepad connect and remap names into
+    // ev->str, drain frees them here. All other events leave ev->str NULL via
+    // designated init, so freeing every non-NULL ev->str is correct.
     if (ev->str) {
       SDL_free((void *)ev->str);
       ev->str = NULL;
