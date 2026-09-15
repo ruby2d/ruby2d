@@ -2468,7 +2468,7 @@ Re-run `ruby2d setup` after upgrading Ruby 2D: a newer version may pin newer SDL
 
 ## Bundling Assets
 
-Apps that load external files — images, audio, sprite sheets — need those files available to the built app, whether it runs natively or in the browser. `ruby2d build` bundles a directory of assets for both targets: a web build mounts it into the WebAssembly virtual filesystem; a native build copies it next to the executable (under `build/native/`, and into the macOS `App.app` bundle). Either way the directory lands at the same relative path you name it, so one reference like `Image.new('media/x.png')` resolves in both.
+Apps that load external files — images, audio, sprite sheets — need those files available to the built app, whether it runs natively or in the browser. `ruby2d build` bundles a directory of assets for both targets: a web build mounts it into the WebAssembly virtual filesystem; a native build copies it next to the executable (under `build/native/`, and into the macOS `App.app` bundle). Either way the directory lands at the relative path you name it, so one reference like `Image.new('media/x.png')` resolves in both.
 
 Pass the directory with `--assets`:
 
@@ -2484,7 +2484,9 @@ require 'ruby2d'
 # ruby2d:assets media
 ```
 
-A directive behaves exactly like `--assets`, and the two combine (a build honors both the flag and every directive). Only a comment declares one: the same text inside a string or heredoc is your app's data. Paths resolve relative to the directory `ruby2d build` runs in, and a declared directory that doesn't exist aborts the build.
+A directive behaves exactly like `--assets`, and the two combine (a build honors both the flag and every directive); a directory declared twice, or inside another you declared, is bundled once. Only a comment declares one: the same text inside a string or heredoc is your app's data.
+
+Paths resolve relative to the directory `ruby2d build` runs in, and a directory inside it is bundled at that same relative path (`assets/media` stays `assets/media`). A directory outside it — an absolute path pointing elsewhere, or one reached through `..` — is bundled under its basename, and the build prints a note saying so: reference it by that name (`Image.new('media/x.png')` for `--assets /shared/media`). Symlinks inside a directory are followed, so the bundle is self-contained (a link back into the directory, or to one holding the build output, is skipped with a warning). A directory that doesn't exist aborts the build. So do two directories that would land at one path (`media` and `../shared/media`), one that overlaps the build output (`.`, `build`, or anything inside `build/`, which would copy the build into itself), and, for a native build, one named `app`, `app.exe`, or `App.app`, the names of the executable and its macOS bundle.
 
 ## Building for the Web
 

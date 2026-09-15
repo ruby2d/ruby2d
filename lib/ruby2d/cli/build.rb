@@ -321,12 +321,11 @@ def build(targets, ruby2d_app)
   compile(ruby2d_app)
 
   # Asset directories to bundle: the `--assets` flag plus any `# ruby2d:assets
-  # <dir>` directives in the app source. Each is bundled at its own relative
-  # path — mounted into the WebAssembly virtual filesystem for the web build,
-  # copied next to the executable for the native build. Validate once here so a
-  # missing directory fails before either target starts compiling.
-  @asset_dirs = ([@assets_dir] + asset_directives(ruby2d_app)).compact.uniq
-  @asset_dirs.each { |dir| check_asset_dir(dir) }
+  # <dir>` directives in the app source, resolved to their bundle paths once
+  # here (see Asset bundling below) so a bad declaration fails before either
+  # target starts compiling.
+  @asset_dirs = resolve_asset_dirs(([@assets_dir] + asset_directives(ruby2d_app)).compact,
+                                   native: targets.include?(:native))
 
   targets.each do |target|
     case target
@@ -421,25 +420,16 @@ def compile_native
 
   # Bundle the default font next to the executable so apps using the built-in
   # font (`Text.new('…')` with no `font:`) resolve it at runtime. The native app
-  # reads `ruby2d/fonts/…` relative to its working directory — which
-  # `ruby2d launch --native` sets to `build/native` — mirroring the WASM preload.
+  # reads `ruby2d/fonts/…` relative to its working directory — its own
+  # directory, which it changes to at startup — mirroring the WASM preload.
   fonts_src = "#{Ruby2D.assets}/resources/fonts"
-  if Dir.exist?(fonts_src)
-    fonts_dest = 'build/native/ruby2d/fonts'
-    FileUtils.mkdir_p fonts_dest
-    FileUtils.cp_r "#{fonts_src}/.", fonts_dest
-  end
+  copy_tree fonts_src, 'build/native/ruby2d/fonts' if Dir.exist?(fonts_src)
 
-  # Bundle each declared asset directory next to the executable — the native
-  # counterpart to the web build's virtual-filesystem preload. The app resolves
-  # them at runtime from its working directory (`build/native`, set by
-  # `ruby2d launch --native`), so a dir mounts at the same relative path it was
-  # given, matching how the app references it (`Image.new('media/x.png')`).
-  @asset_dirs.each do |dir|
-    dest = File.join('build/native', dir)
-    FileUtils.mkdir_p File.dirname(dest)
-    FileUtils.cp_r dir, dest
-  end
+  # Bundle each declared asset directory at its bundle path next to the
+  # executable — the native counterpart to the web build's virtual-filesystem
+  # preload. The app resolves it from its working directory, so a reference
+  # like `Image.new('media/x.png')` finds it.
+  @asset_dirs.each { |src, bundle| copy_tree src, File.join('build/native', bundle) }
 
   create_macos_bundle if AssetsTarget.host_os == 'macos'
   wrote 'build/native/app'
@@ -448,21 +438,153 @@ def compile_native
 end
 
 
-# Validate an asset directory (from `--assets` or a `# ruby2d:assets` directive)
-# before it's bundled. A missing dir aborts the build rather than ship an app
-# that can't find its assets. Both builds bundle the dir at the path given —
-# the web VFS mounts it there, the native build copies it there next to the
-# executable — so an absolute dir lands at that same absolute path, which the
-# relative references apps use won't find; warn rather than silently mislead.
+# Asset bundling ###############################################################
+#
+# A declared asset directory (from `--assets` or a `# ruby2d:assets` directive)
+# lands in the build at its *bundle path*, the path the app references it by:
+# the web build mounts it there in the virtual filesystem, the native build
+# copies it there next to the executable. Both are the app's working directory
+# at runtime, so one reference like `Image.new('media/x.png')` resolves in each.
+
+# Names the native build writes beside the bundled assets: the executable and,
+# on macOS, the app bundle. Compared without regard to case, since the macOS
+# and Windows filesystems don't distinguish it.
+RESERVED_BUNDLE_NAMES = %w[app app.exe app.app].freeze
+
+# The bundle path of a declared asset directory: its path relative to the
+# build's working directory when it sits inside it (`media`, `assets/media`),
+# so the app references it the way CRuby run from there does. A directory
+# elsewhere — absolute, or reached through `..` — can't keep its path, which
+# names the developer's machine rather than the build; it's bundled under its
+# basename, and the note says which name to reference.
+def asset_bundle_path(dir)
+  bundle = path_within_cwd(dir)
+  return bundle if bundle
+
+  base = File.basename(File.expand_path(dir))
+  note "assets dir `#{dir}` is outside this directory, so it's bundled as `#{base}`. Reference it by that name (e.g. `#{base}/x.png`)."
+  base
+end
+
+# Validate a declared asset directory before it's bundled. A missing one aborts
+# the build rather than ship an app that can't find its assets. So does one
+# that overlaps the build output: one containing it (`.`, `..`, or a symlink
+# to either) would be copied into its own descendant, nesting the output in
+# itself until a path is too long, and one inside it (`build`, `build/native`)
+# is wiped and rewritten by the build, and would be copied into itself the
+# same way.
 def check_asset_dir(dir)
   unless Dir.exist?(dir)
     error "asset directory not found: #{dir}"
     exit 1
   end
-  return unless File.absolute_path?(dir)
 
-  warning "assets dir `#{dir}` is absolute, so it's bundled at that same " \
-          'path. Reference it by that absolute path, or use a relative dir (e.g. `media`) instead.'
+  full = real_path(dir)
+  output = build_output_path
+  return unless within?(output, full) || within?(full, output)
+
+  error "asset directory `#{dir}` overlaps the build output `#{BUILD_DIR}/`, so bundling it would copy the build into itself. Keep assets in their own directory (e.g. `media`)."
+  exit 1
+end
+
+# Refuse a bundle path whose first component is a reserved name: the copy
+# would replace the executable (`app/` can't be created where `app` is a
+# file) or land inside the macOS bundle.
+def check_bundle_path(bundle, dir)
+  return unless RESERVED_BUNDLE_NAMES.include?(bundle.split('/').first.downcase)
+
+  error "asset directory `#{dir}` would be bundled as `#{bundle}`, but `app`, `app.exe`, and `App.app` are reserved for the native executable and its macOS bundle. Rename it (e.g. `media`)."
+  exit 1
+end
+
+# Resolve the declared asset directories to `[source, bundle_path]` pairs, in
+# declaration order, validating each. A directory declared twice (the flag
+# and a directive, or `media` and `./media`) is bundled once, and one inside
+# another declared directory, landing inside its bundle path, is dropped: the
+# parent's copy includes it, and bundling it again would duplicate its files
+# in the web data package. (One inside another but landing elsewhere — the
+# parent is outside the working directory, so bundled under its basename —
+# is kept: nothing else puts it where the app looks.) Two different
+# directories can't share a bundle path (`media` and `../x/media` both land
+# at `media`): the copies would merge, with whichever came later replacing
+# same-named files, and the web build packages the first — so that is refused
+# rather than shipped two ways.
+def resolve_asset_dirs(dirs, native:)
+  dirs.each { |dir| check_asset_dir(dir) }
+  sources = dirs.map { |dir| real_path(dir) }
+  dirs = dirs.each_with_index.reject { |_dir, i| sources.index(sources[i]) < i }.map(&:first)
+  sources.uniq!
+  bundles = dirs.map { |dir| asset_bundle_path(dir) }
+  claimed = {}
+  dirs.each_with_index.filter_map do |dir, i|
+    covered = sources.each_with_index.any? do |other, j|
+      j != i && within?(sources[i], other) && within?(bundles[i], bundles[j])
+    end
+    next if covered
+
+    bundle = bundles[i]
+    check_bundle_path(bundle, dir) if native
+    if claimed[bundle]
+      error "asset directory `#{dir}` would be bundled as `#{bundle}`, which `#{claimed[bundle]}` already is. Rename one of them."
+      exit 1
+    end
+    claimed[bundle] = dir
+    [dir, bundle]
+  end
+end
+
+# Copy a directory's contents into `dest`, creating it if needed and merging
+# into it if it exists — where `cp_r dir, dest` on an existing `dest` copies
+# the directory *inside* it, a level too deep. That's what a child declared
+# before its parent, or an asset directory named `ruby2d` beside the bundled
+# fonts, would otherwise hit. Symlinks are followed, so the copy is
+# self-contained: a link copied as a link points at the developer's tree, or
+# at nothing once the build moves. A link back into a directory being copied
+# (a loop), or to a directory the build writes into — the copy's own
+# destination, or the build output when the tree copied isn't itself part of
+# it, as the macOS bundle's is — is skipped with a warning, as is one pointing
+# at nothing; each link is reported once, though both targets copy through
+# here (the web build packages the staged copy) so they bundle the same tree.
+def copy_tree(src, dest, ancestors = {}, written = nil)
+  FileUtils.mkdir_p dest
+  ancestors = ancestors.merge(real_path(src) => src)
+  written ||= [real_path(dest)].tap do |dirs|
+    dirs << build_output_path unless within?(real_path(src), build_output_path)
+  end
+  Dir.children(src).sort.each do |name|
+    from = File.join(src, name)
+    to = File.join(dest, name)
+    if File.directory?(from)
+      real = real_path(from)
+      if ancestors[real]
+        skip_link from, "a link back into `#{ancestors[real]}`"
+      elsif written.any? { |dir| within?(real, dir) || within?(dir, real) }
+        skip_link from, 'a link to a directory the build writes into'
+      else
+        copy_tree(from, to, ancestors, written)
+      end
+    elsif File.exist?(from)
+      FileUtils.copy_file(from, to)
+    else
+      skip_link from, 'a link to nothing'
+    end
+  end
+end
+
+# Warn once per skipped link, however many targets copy past it.
+def skip_link(path, why)
+  @skipped_links ||= {}
+  return if @skipped_links[path]
+
+  @skipped_links[path] = true
+  warning "skipping `#{path}`, #{why}"
+end
+
+# An Emscripten `src@dst` file mapping. The packager splits the pair at the
+# first `@`, and reads `@@` as a literal one — so a directory like
+# `sprites@2x` is escaped on both sides.
+def emcc_file_map(src, dst)
+  "#{src.gsub('@', '@@')}@#{dst.gsub('@', '@@')}"
 end
 
 
@@ -490,14 +612,18 @@ def compile_web
   wasm_lib_dir = "#{Ruby2D.assets}/platform/wasm/lib"
   ld_flags = Dir["#{wasm_lib_dir}/*.a"].map { |f| shell_escape(f) }.join(' ')
 
-  # Always bundle the default font for WASM builds
+  # Bundle the default font and each declared asset directory into the virtual
+  # filesystem at its bundle path (the `src@dst` map; resolved in `build`). An
+  # asset directory is packaged from a staged copy, so the web build carries
+  # the same tree the native copy does (Emscripten's packager doesn't follow a
+  # symlinked directory).
   fonts_dir = "#{Ruby2D.assets}/resources/fonts"
-  preload_flag = "--preload-file #{shell_escape("#{fonts_dir}@ruby2d/fonts")}"
-
-  # Bundle each requested asset directory — from `--assets` and any
-  # `# ruby2d:assets` directive — into the virtual filesystem at its own path
-  # (the `src@dst` map uses the same string for both). Validated in `build`.
-  @asset_dirs.each { |dir| preload_flag += " --preload-file #{shell_escape("#{dir}@#{dir}")}" }
+  preload_flag = "--preload-file #{shell_escape(emcc_file_map(fonts_dir, 'ruby2d/fonts'))}"
+  @asset_dirs.each do |src, bundle|
+    staged = File.join(BUILD_DIR, 'stage', 'assets', bundle)
+    copy_tree src, staged
+    preload_flag += " --preload-file #{shell_escape(emcc_file_map(staged, bundle))}"
+  end
 
   # Faster page loads: restrict the JS glue to the browser environment (drops the
   # Node/worker probing) and, for release builds, minify it with Closure. Closure
@@ -591,23 +717,16 @@ def create_macos_bundle
   File.open('build/native/App.app/Contents/Info.plist', 'w') { |f| f.write(info_plist) }
   FileUtils.cp 'build/native/app', 'build/native/App.app/Contents/MacOS/'
 
-  # Bundle the runtime resources (default font) next to the executable. The app
-  # chdirs to its own directory at startup, so it resolves `ruby2d/fonts/…`
-  # here when launched from Finder (where the working directory is otherwise `/`).
-  if Dir.exist?('build/native/ruby2d')
-    FileUtils.cp_r 'build/native/ruby2d', 'build/native/App.app/Contents/MacOS/'
-  end
-
-  # Bundle any declared asset directories (copied next to build/native/app
-  # earlier) alongside the executable inside the bundle too, preserving their
-  # relative paths, so a Finder-launched app resolves them the same way.
-  @asset_dirs.each do |dir|
-    src = File.join('build/native', dir)
-    next unless Dir.exist?(src)
-
-    dest = File.join('build/native/App.app/Contents/MacOS', dir)
-    FileUtils.mkdir_p File.dirname(dest)
-    FileUtils.cp_r src, dest
+  # Bundle the runtime resources (default font) and the declared asset
+  # directories (copied next to build/native/app earlier) alongside the
+  # executable inside the bundle too, at the same paths. The app chdirs to its
+  # own directory at startup, so it resolves them here when launched from
+  # Finder (where the working directory is otherwise `/`). Each path is copied
+  # once, merging, so an asset directory bundled as `ruby2d` beside the fonts
+  # lands once and doesn't nest.
+  (['ruby2d'] + @asset_dirs.map { |_, bundle| bundle }).uniq.each do |bundle|
+    src = File.join('build/native', bundle)
+    copy_tree src, File.join('build/native/App.app/Contents/MacOS', bundle) if Dir.exist?(src)
   end
 
   # Bundle the icon referenced by CFBundleIconFile (the Ruby 2D default), so the
