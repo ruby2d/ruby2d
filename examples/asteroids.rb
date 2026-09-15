@@ -20,6 +20,7 @@ require 'ruby2d'
 WIDTH = 800        # window width in pixels
 HEIGHT = 600       # window height in pixels
 SHIP_R = 15        # ship radius (used for collision and drawing)
+BULLET_STEP = 12   # longest bullet move per hit test (px)
 THRUST = 1152      # acceleration while thrusting (px/sec²)
 HIT_PENALTY = 500  # score deducted when the ship is destroyed
 
@@ -238,28 +239,33 @@ update do |dt|
   end
   sparks.reject! { |s| s.life <= 0 }
 
-  # Bullets fly straight and disappear when they leave the window.
-  bullets.each do |b|
-    b.x += b.vx * dt
-    b.y += b.vy * dt
-  end
-  bullets.reject! { |b| b.x < 0 || b.x > WIDTH || b.y < 0 || b.y > HEIGHT }
-
   # Asteroids drift and wrap.
   asteroids.each do |a|
     a.x = (a.x + a.vx * dt) % WIDTH
     a.y = (a.y + a.vy * dt) % HEIGHT
   end
 
-  # Bullet vs. asteroid: simple circle test. `bullets.dup` lets us mutate
-  # the original array safely while iterating. A hit awards more for small
-  # asteroids and splits big ones into two smaller children at the same
-  # spot; asteroids below radius 20 don't split further.
+  # Bullets fly straight. A stalled frame can hand over up to 0.1 s of `dt`,
+  # enough for a bullet to jump clean over a small asteroid between two hit
+  # tests, so each bullet moves in steps no longer than BULLET_STEP (well under
+  # the smallest asteroid) with a simple circle test after every one. A hit
+  # awards more for small asteroids and splits big ones into two smaller
+  # children at the same spot; asteroids below radius 20 don't split further.
+  # `bullets.dup` lets us mutate the original array safely while iterating.
+  # Bullets that leave the window are dropped after their last chance to hit.
   bullets.dup.each do |b|
-    hit = asteroids.find do |a|
-      dx = b.x - a.x
-      dy = b.y - a.y
-      dx * dx + dy * dy < a.radius * a.radius
+    steps = [(Math.hypot(b.vx, b.vy) * dt / BULLET_STEP).ceil, 1].max
+    step_dt = dt / steps
+    hit = nil
+    steps.times do
+      b.x += b.vx * step_dt
+      b.y += b.vy * step_dt
+      hit = asteroids.find do |a|
+        dx = b.x - a.x
+        dy = b.y - a.y
+        dx * dx + dy * dy < a.radius * a.radius
+      end
+      break if hit
     end
     next unless hit
 
@@ -282,6 +288,7 @@ update do |dt|
       2.times { asteroids << make_asteroid(hit.x, hit.y, hit.radius * 0.58) }
     end
   end
+  bullets.reject! { |b| b.x < 0 || b.x > WIDTH || b.y < 0 || b.y > HEIGHT }
 
   # Ship vs. asteroid. The `((d + size/2) % size) - size/2` trick gives the
   # shortest distance across the toroidal screen, so an asteroid poking
