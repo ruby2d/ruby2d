@@ -2512,7 +2512,7 @@ A web build produces the following files in `build/web/`:
 - `app.html` — the HTML shell page
 - `app.js` — the compiled JavaScript/Wasm loader
 - `app.wasm` — the WebAssembly binary
-- `app.data` — bundled asset data (always produced: the default font, plus any [bundled assets](#bundling-assets))
+- `app.data` — bundled asset data (the default font, plus any [bundled assets](#bundling-assets))
 
 When you deploy these files, serve them with gzip or Brotli compression; `app.wasm` is by far the largest file and compresses to roughly a third of its size, which noticeably speeds up the first load. Most static hosts and CDNs (GitHub Pages, Netlify, Cloudflare, and the like) do this automatically; if you run your own server, enable it there.
 
@@ -2534,7 +2534,7 @@ Your template must load the compiled app and provide the canvas it draws to. The
 
 For a `--single-file` build (below) the template is passed to Emscripten as its [shell file](https://emscripten.org/docs/tools_reference/emcc.html) instead, so it follows that format: include the `{{{ SCRIPT }}}` placeholder where the inlined app code should go, rather than a `<script src>` tag.
 
-**Produce a single self-contained HTML file** (no separate `.js`, `.wasm`, or `.data` files):
+**Produce a single self-contained HTML file** (no separate `.js`, `.wasm`, or `.data` files; the default font and any bundled assets are embedded in the page, so it's larger than the split output by their size):
 
 ```bash
 ruby2d build --web --single-file app.rb

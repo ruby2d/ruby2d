@@ -616,13 +616,17 @@ def compile_web
   # filesystem at its bundle path (the `src@dst` map; resolved in `build`). An
   # asset directory is packaged from a staged copy, so the web build carries
   # the same tree the native copy does (Emscripten's packager doesn't follow a
-  # symlinked directory).
+  # symlinked directory). A regular build preloads them into a separate
+  # `app.data` the page fetches; `--single-file` embeds them in the code
+  # instead, since Emscripten keeps preloaded data outside even a
+  # `-sSINGLE_FILE` build, and the point of the option is one file.
   fonts_dir = "#{Ruby2D.assets}/resources/fonts"
-  preload_flag = "--preload-file #{shell_escape(emcc_file_map(fonts_dir, 'ruby2d/fonts'))}"
+  bundle_flag = @single_file ? '--embed-file' : '--preload-file'
+  preload_flag = "#{bundle_flag} #{shell_escape(emcc_file_map(fonts_dir, 'ruby2d/fonts'))}"
   @asset_dirs.each do |src, bundle|
     staged = File.join(BUILD_DIR, 'stage', 'assets', bundle)
     copy_tree src, staged
-    preload_flag += " --preload-file #{shell_escape(emcc_file_map(staged, bundle))}"
+    preload_flag += " #{bundle_flag} #{shell_escape(emcc_file_map(staged, bundle))}"
   end
 
   # Faster page loads: restrict the JS glue to the browser environment (drops the
