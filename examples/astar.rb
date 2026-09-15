@@ -14,7 +14,7 @@ WIDTH = 800              # window width in pixels
 HEIGHT = 600             # window height in pixels
 HEADER = 40              # HUD strip height in pixels
 CELL = 16                # rendered cell size in pixels
-REVEAL_PER_FRAME = 14    # cells revealed per frame during the playback
+REVEAL_RATE = 840        # cells revealed per second during the playback
 
 GRID_TOP = HEADER
 GRID_H   = HEIGHT - GRID_TOP
@@ -66,6 +66,7 @@ goal_cell  = [COLS - 4, ROWS / 2]
 closed_order = []        # cells closed by A*, in order
 path = []                # final reconstructed path
 reveal_idx = 0           # how many of `closed_order` have been drawn so far
+reveal_accum = 0.0        # cells owed by elapsed time but not yet revealed
 mouse_mode = :none
 dirty = true
 
@@ -75,6 +76,7 @@ clear_search = lambda do
   closed_order.clear
   path.clear
   reveal_idx = 0
+  reveal_accum = 0.0
   dirty = true
 end
 
@@ -214,11 +216,20 @@ end
 # The grid only needs a redraw when something has changed (mouse paint,
 # search complete, animation step). Marking `dirty` lets the rest of
 # the time skip the bucketing + canvas calls entirely.
-update do
+update do |dt|
+  # Reveal by elapsed time rather than a fixed count per frame, so the
+  # playback takes the same time on every display instead of finishing four
+  # times sooner at 240 Hz than at 60. The accumulator carries the fraction
+  # of a cell a frame doesn't cover into the next one.
   if reveal_idx < closed_order.length
-    reveal_idx += REVEAL_PER_FRAME
-    reveal_idx = closed_order.length if reveal_idx > closed_order.length
-    dirty = true
+    reveal_accum += REVEAL_RATE * dt
+    cells = reveal_accum.to_i
+    reveal_accum -= cells
+    if cells > 0
+      reveal_idx += cells
+      reveal_idx = closed_order.length if reveal_idx > closed_order.length
+      dirty = true
+    end
   end
 
   next unless dirty

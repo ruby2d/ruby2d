@@ -58,6 +58,7 @@ logo_text = Text.new('Ruby 2D', x: 0, y: 0, size: 40, add: false)
 # === Particles ===
 
 particles = []
+sparkle_accum = 0.0  # sparkles owed by elapsed time but not yet spawned
 
 # === Starfield (fixed positions, each star twinkles independently) ===
 
@@ -101,18 +102,26 @@ update do |dt|
   t = elapsed
   idle_t = [t - INTRO_END, 0.0].max
 
-  # Spawn sparkles along the outline after intro settles
-  if idle_t > 0.5 && rand < SPARKLE_RATE * dt
-    vx, vy = VERTICES[OUTLINE_KEYS.sample]
-    float_y = Math.sin(idle_t * 1.2) * 10.0
-    particles << {
-      x: vx + rand(-20.0..20.0),
-      y: vy + rand(-20.0..20.0) + float_y,
-      vx: rand(-42.0..42.0),
-      vy: rand(-84.0..-18.0),
-      life: 1.0,
-      size: rand(2.0..5.0)
-    }
+  # Spawn sparkles along the outline after the intro settles. The accumulator
+  # carries the fraction of a sparkle a frame doesn't cover into the next one,
+  # so the rate holds whether a frame is worth a third of a sparkle at 60 Hz
+  # or two at 10 Hz; a single spawn per frame capped the rate at the frame rate.
+  if idle_t > 0.5
+    sparkle_accum += SPARKLE_RATE * dt
+    count = sparkle_accum.to_i
+    sparkle_accum -= count
+    count.times do
+      vx, vy = VERTICES[OUTLINE_KEYS.sample]
+      float_y = Math.sin(idle_t * 1.2) * 10.0
+      particles << {
+        x: vx + rand(-20.0..20.0),
+        y: vy + rand(-20.0..20.0) + float_y,
+        vx: rand(-42.0..42.0),
+        vy: rand(-84.0..-18.0),
+        life: 1.0,
+        size: rand(2.0..5.0)
+      }
+    end
   end
 
   particles.each do |p|

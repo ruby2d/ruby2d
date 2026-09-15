@@ -29,8 +29,8 @@ Lift magic numbers to `SCREAMING_SNAKE_CASE` constants at the top and add a shor
 ```ruby
 WIDTH = 800        # window width in pixels
 HEIGHT = 600       # window height in pixels
-THRUST = 0.12      # acceleration while thrusting (per 60Hz frame)
-HIT_PENALTY = 200  # score deducted when the ship is destroyed
+THRUST = 1152      # acceleration while thrusting (px/sec²)
+HIT_PENALTY = 500  # score deducted when the ship is destroyed
 ```
 
 Derived values (e.g. `COLS = WIDTH / GRID`) live next to the constants they're derived from.
@@ -43,7 +43,7 @@ Derived values (e.g. `COLS = WIDTH / GRID`) live next to the constants they're d
 - Toggle visibility with `text.hide` / `text.show` (or `text.visible = false`/`true`). Initialize hidden with `Text.new(..., visible: false)`. Don't blank `content` to hide — that rebuilds the texture (`Ext.text_create`) on every toggle.
 - Per-frame draws with no persistent state use the immediate-mode form `Foo.render(...)`. Persistent HUD elements use `Foo.new(...)`.
 - Gameplay and other logic stays inside `update`; drawing stays inside `render`. Don't mutate state from `render`.
-- Use the `dt` argument from `update do |dt| ... end` for motion and timers. Store all rates in per-second units — velocities in px/sec, accelerations in px/sec², drag as a per-second decay rate (`vx *= Math.exp(-drag * dt)`, or its linear approximation `vx *= 1 - drag * dt` for small dt). Don't tie speed to frame count — refresh rates vary across machines, and the demo should feel the same on 60Hz, 120Hz, and 240Hz displays.
+- Use the `dt` argument from `update do |dt| ... end` for motion and timers. Store all rates in per-second units — velocities in px/sec, accelerations in px/sec², drag as a per-second decay rate (`vx *= Math.exp(-drag * dt)`, or its linear approximation `vx *= 1 - drag * dt` for small dt). Work that comes in whole units at a rate (spawns, cells, steps) accrues `RATE * dt` into an accumulator whose whole part is spent each frame and whose fraction carries over; work on an interval (moves, shots) counts a timer down by `dt` and, while it is due, does the work and adds the interval back, keeping the overshoot and looping so a long frame drops nothing. Don't tie speed to frame count — refresh rates vary across machines, and the demo should feel the same on 60Hz, 120Hz, and 240Hz displays.
 - Pick colors that feel like they belong with the rest of the gallery. Hex (`'#fde047'`) or [`clrs.cc`](https://clrs.cc) named colors generally read better than the raw `'red'`/`'blue'` defaults. Each example doesn't need to match every other one, but they should feel like they're part of the same set.
 - The default font (Outfit) covers only ~360 codepoints, and SDL_ttf renders a missing glyph as *nothing* — no error, just a blank. Available: `×` (the only X-shaped glyph), `✓`, the arrows `←↑→↓`, `•`, `·`, `–`, `—`. Not available: the dingbat X's (`✕✖✗✘`), geometric shapes (`○●◆★☆`), and all emoji.
 - Mixing gamepad polling with keyboard latches: derive an *effective* input each frame into a local both `update` and `render` can see. Never `||=` a poll result onto the keyboard's latched boolean — only `key_up` clears it, so a released pad control sticks on forever.

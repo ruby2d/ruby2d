@@ -23,7 +23,7 @@ SIGMA = 10.0             # classical Lorenz parameters
 RHO = 28.0
 BETA = 8.0 / 3.0
 DT = 0.005               # integration step (small enough for Euler stability)
-STEPS_PER_FRAME = 60     # integration steps applied each frame
+STEPS_PER_SEC = 3600     # integration steps per second
 TRAIL_LEN = 2200         # how many trail points to keep
 SCALE = 11               # pixels per Lorenz unit
 CAMERA = 180.0           # camera distance in scaled units
@@ -44,12 +44,14 @@ set close_on_esc: true
 lx = 0.0; ly = 0.0; lz = 0.0
 trail = []          # collected (lx, ly, lz) tuples in integration order
 spin = 0.0
+step_accum = 0.0    # integration steps owed but not yet taken
 
 reset = lambda do
   lx = 0.1
   ly = 0.0
   lz = 0.0
   trail.clear
+  step_accum = 0.0
 end
 
 reset.call
@@ -65,7 +67,15 @@ end
 update do |dt|
   spin += SPIN_RATE * dt
 
-  STEPS_PER_FRAME.times do
+  # Advance the model by elapsed time rather than a fixed count per frame, so
+  # the attractor unfolds at the same pace on every display instead of four
+  # times faster at 240 Hz than at 60. The step count is integer, so the
+  # accumulator carries the fraction a frame doesn't cover into the next one.
+  step_accum += STEPS_PER_SEC * dt
+  steps = step_accum.to_i
+  step_accum -= steps
+
+  steps.times do
     dxv = SIGMA * (ly - lx)
     dyv = lx * (RHO - lz) - ly
     dzv = lx * ly - BETA * lz

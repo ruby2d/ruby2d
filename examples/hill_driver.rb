@@ -48,6 +48,7 @@ GRASS_THICK = 34           # depth of the green grass band above the soil (px)
 CAN_HOVER = 22             # height a fuel can floats above the ground (px)
 SPARK_LIFE = 0.55          # fuel-can pickup spark lifetime (sec)
 EMBER_LIFE = 0.22          # turbo exhaust ember lifetime (sec)
+EMBER_RATE = 180           # turbo exhaust embers thrown per second
 FUEL_FLASH = 0.35          # fuel-bar flash duration on pickup (sec)
 PX_PER_M = 12              # world px shown as one meter in the HUD
 
@@ -183,6 +184,7 @@ fuel = START_FUEL
 score = 0
 sparks = []
 embers = []
+ember_accum = 0.0           # embers owed by elapsed time but not yet thrown
 fuel_flash = 0.0
 can_collected = Array.new(can_data.length, false)
 finished = false
@@ -200,6 +202,7 @@ reset = lambda do
   score = 0
   sparks.clear
   embers.clear
+  ember_accum = 0.0
   fuel_flash = 0.0
   can_collected.fill(false)
   finished = false
@@ -326,16 +329,25 @@ update do |dt|
   end
 
   # Turbo burns fuel fast and throws embers out the tailpipe, grounded or not.
+  # Embers are thrown by elapsed time, the accumulator carrying the fraction a
+  # frame doesn't cover into the next one, so the exhaust looks the same on
+  # every display; a fixed count per frame threw four times as many at 240 Hz
+  # as at 60. Releasing turbo drops the fraction so the next press starts clean.
   if boosting && fuel.positive?
     fuel -= TURBO_FUEL * dt
     pipe = -(CHASSIS_W / 2.0 + 4)
     exx = world_x + pipe * Math.cos(angle)
     exy = world_y + pipe * Math.sin(angle)
-    3.times do
+    ember_accum += EMBER_RATE * dt
+    count = ember_accum.to_i
+    ember_accum -= count
+    count.times do
       dir = angle + Math::PI + (rand - 0.5) * 0.3
       spd = 250 + rand * 150
       embers << [exx, exy, Math.cos(dir) * spd, Math.sin(dir) * spd, EMBER_LIFE * (0.6 + rand * 0.4)]
     end
+  else
+    ember_accum = 0.0
   end
 
   world_x += vx * dt
