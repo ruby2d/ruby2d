@@ -25,6 +25,8 @@ RSpec.describe Ruby2D::CLI::StaticServer do
     end
   end
 
+  # Fixtures live in a temp directory, whose path on macOS goes through a
+  # symlink (`/var` -> `/private/var`), so served paths are compared canonical.
   around do |example|
     Dir.mktmpdir do |base|
       @base = base
@@ -37,10 +39,12 @@ RSpec.describe Ruby2D::CLI::StaticServer do
     end
   end
 
+  def real(*parts) = File.realpath(File.join(@root, *parts))
+
   describe '.resolve' do
     it 'resolves a file under the root, stripping any query string' do
-      expect(described_class.resolve(@root, '/app.wasm')).to eq(File.join(@root, 'app.wasm'))
-      expect(described_class.resolve(@root, '/app.wasm?v=1')).to eq(File.join(@root, 'app.wasm'))
+      expect(described_class.resolve(@root, '/app.wasm')).to eq(real('app.wasm'))
+      expect(described_class.resolve(@root, '/app.wasm?v=1')).to eq(real('app.wasm'))
     end
 
     it 'returns nil for a missing file' do
@@ -48,13 +52,11 @@ RSpec.describe Ruby2D::CLI::StaticServer do
     end
 
     it 'serves index.html for a directory request' do
-      index = File.join(@root, 'index.html')
-      File.write(index, '<h1>hi</h1>')
-      expect(described_class.resolve(@root, '/')).to eq(index)
+      File.write(File.join(@root, 'index.html'), '<h1>hi</h1>')
+      expect(described_class.resolve(@root, '/')).to eq(real('index.html'))
       Dir.mkdir(File.join(@root, 'sub'))
-      sub_index = File.join(@root, 'sub', 'index.html')
-      File.write(sub_index, '<h1>sub</h1>')
-      expect(described_class.resolve(@root, '/sub')).to eq(sub_index)
+      File.write(File.join(@root, 'sub', 'index.html'), '<h1>sub</h1>')
+      expect(described_class.resolve(@root, '/sub')).to eq(real('sub', 'index.html'))
     end
 
     it 'returns nil for a directory request with no index.html' do
@@ -64,6 +66,7 @@ RSpec.describe Ruby2D::CLI::StaticServer do
     it 'blocks directory traversal (plain and percent-encoded)' do
       expect(described_class.resolve(@root, '/../secret.txt')).to be_nil
       expect(described_class.resolve(@root, '/%2e%2e/secret.txt')).to be_nil
+      expect(described_class.resolve(@root, '/sub/../../secret.txt')).to be_nil
     end
 
     it 'returns nil for a path with a NUL byte instead of raising' do
@@ -76,11 +79,49 @@ RSpec.describe Ruby2D::CLI::StaticServer do
       expect(described_class.resolve(root, '/app%ff.txt')).to be_nil
     end
 
+    it 'refuses a symlinked file that points outside the root' do
+      File.symlink(File.join(@base, 'secret.txt'), File.join(@root, 'linked.txt'))
+      expect(described_class.resolve(@root, '/linked.txt')).to be_nil
+    end
+
+    it 'refuses files reached through a symlinked directory outside the root' do
+      File.symlink(@base, File.join(@root, 'up'))
+      expect(described_class.resolve(@root, '/up/secret.txt')).to be_nil
+      expect(described_class.resolve(@root, '/up/')).to be_nil
+    end
+
+    it 'refuses a directory index that is a symlink outside the root' do
+      Dir.mkdir(File.join(@root, 'sub'))
+      File.symlink(File.join(@base, 'secret.txt'), File.join(@root, 'sub', 'index.html'))
+      expect(described_class.resolve(@root, '/sub/')).to be_nil
+    end
+
+    it 'follows a symlink that stays inside the root' do
+      File.symlink(File.join(@root, 'app.wasm'), File.join(@root, 'latest.wasm'))
+      expect(described_class.resolve(@root, '/latest.wasm')).to eq(real('app.wasm'))
+    end
+
+    it 'returns nil for a dangling symlink' do
+      File.symlink(File.join(@root, 'gone.wasm'), File.join(@root, 'link.wasm'))
+      expect(described_class.resolve(@root, '/link.wasm')).to be_nil
+    end
+
+    it 'serves through a root that is itself a symlink' do
+      link = File.join(@base, 'www')
+      File.symlink(@root, link)
+      expect(described_class.resolve(link, '/app.wasm')).to eq(real('app.wasm'))
+      expect(described_class.resolve(link, '/../secret.txt')).to be_nil
+    end
+
+    it 'returns nil for a missing root' do
+      expect(described_class.resolve(File.join(@base, 'nope'), '/app.wasm')).to be_nil
+    end
+
     it 'decodes a non-ASCII file name under a non-ASCII root' do
       root = File.join(@base, 'café')
       Dir.mkdir(root)
       File.write(File.join(root, 'naïve.txt'), 'hello')
-      expect(described_class.resolve(root, '/na%C3%AFve.txt')).to eq(File.join(root, 'naïve.txt'))
+      expect(described_class.resolve(root, '/na%C3%AFve.txt')).to eq(File.realpath(File.join(root, 'naïve.txt')))
     end
   end
 
@@ -125,6 +166,13 @@ RSpec.describe Ruby2D::CLI::StaticServer do
       status, _, body = request(root, 'GET /na%C3%AFve.txt HTTP/1.1')
       expect(status).to eq('HTTP/1.1 200 OK')
       expect(body).to eq('hello')
+    end
+
+    it 'does not serve a symlink pointing outside the root' do
+      File.symlink(File.join(@base, 'secret.txt'), File.join(@root, 'linked.txt'))
+      status, _, body = request(@root, 'GET /linked.txt HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 404 Not Found')
+      expect(body).not_to include('secret')
     end
   end
 end

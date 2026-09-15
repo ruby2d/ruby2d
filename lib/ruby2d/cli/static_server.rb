@@ -48,31 +48,50 @@ module Ruby2D
 
       # Resolve an HTTP request target (e.g. "/app.html?v=1") to a real file
       # under `root`. A directory request (e.g. "/") serves its `index.html`.
-      # Returns the absolute path, or nil if the file does not exist or the
-      # request escapes `root` (directory-traversal protection).
+      # Returns the canonical path, or nil if the file does not exist or the
+      # request escapes `root`, whether by `..` or through a symlink pointing
+      # outside it.
       def self.resolve(root, target)
         path = decode(target.split(/[?#]/, 2).first.to_s)
-        # A NUL byte (e.g. from `%00`) makes File.expand_path/File.file? raise
-        # ArgumentError; treat such a path as a non-existent file (clean 404).
+        # A NUL byte (e.g. from `%00`) makes File.realpath raise ArgumentError;
+        # treat such a path as a non-existent file (clean 404).
         return nil if path.include?("\u0000")
 
-        root_real = File.expand_path(root)
+        # Compare canonical paths: `File.expand_path` only normalizes the text,
+        # so a symlink inside `root` could still lead outside it. A path that
+        # doesn't exist (or is a dangling link) has no real path, hence nil.
+        root_real = real_path(root)
+        return nil unless root_real
+
         # A file name is bytes; give the decoded ones the root's encoding so the
         # two join (a binary string won't join with a non-ASCII UTF-8 root).
-        path.force_encoding(root_real.encoding)
-        full = File.expand_path(File.join(root_real, path))
-        return nil unless full == root_real || full.start_with?(root_real + File::SEPARATOR)
-        # Serve the directory index for a directory request. `full` is already
-        # confirmed within `root`, so the joined index stays in bounds too.
-        full = File.join(full, 'index.html') if File.directory?(full)
-        return nil unless File.file?(full)
+        full = real_path(File.join(root_real, path.force_encoding(root_real.encoding)))
+        return nil unless full && within?(full, root_real)
 
-        full
+        if File.directory?(full)
+          # The index may itself be a link, so it gets the same check.
+          full = real_path(File.join(full, 'index.html'))
+          return nil unless full && within?(full, root_real)
+        end
+        File.file?(full) ? full : nil
       end
 
       # Percent-decode a URL path (e.g. "%20" -> " ") to the bytes it spells.
       def self.decode(str)
         str.b.gsub(/%([0-9a-fA-F]{2})/) { Regexp.last_match(1).hex.chr }
+      end
+
+      # The canonical path of `path`, or nil if it can't be resolved (missing,
+      # a dangling link, a file used as a directory, too deep, unreadable).
+      def self.real_path(path)
+        File.realpath(path)
+      rescue SystemCallError
+        nil
+      end
+
+      # Whether `path` is `dir` or lies under it (both canonical).
+      def self.within?(path, dir)
+        path == dir || path.start_with?(File.join(dir, ''))
       end
 
       # Serve `dir` over HTTP on `port` and open `path` in the browser. Blocks
