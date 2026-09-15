@@ -17,6 +17,7 @@ N = 128                  # number of samples and DFT components
 TRAIL_PERIOD = 8.0       # seconds for one full revolution / heart trace
 SHAPE_SCALE = 14         # how big to draw the heart
 TRAIL_LEN = 800          # max points retained in the trace history
+TRAIL_DT = TRAIL_PERIOD / TRAIL_LEN  # minimum seconds between trail samples
 MIN_CIRCLE_R = 0.6       # circles smaller than this aren't drawn (clutter)
 
 CENTER_X = WIDTH  / 2.0
@@ -66,12 +67,14 @@ ANCHOR_Y = coeffs[0].imaginary
 chain = Array.new(order.length + 1) { [0.0, 0.0] }
 trail = []
 time = 0.0
+trail_time = -TRAIL_DT  # `time` at which the trail last took a sample
 
 # === Input ===
 
 on key_down: :r do
   trail.clear
   time = 0.0
+  trail_time = -TRAIL_DT
 end
 
 # === Per-frame update ===
@@ -100,8 +103,16 @@ update do |dt|
     slot[1] = py
   end
 
-  trail << [px, py]
-  trail.shift while trail.length > TRAIL_LEN
+  # Sample the trail on simulation time, no more often than every TRAIL_DT,
+  # rather than once per frame: the retained history then spans at least one
+  # full trace at any refresh rate. Sampling every frame let a 240 Hz display
+  # cycle TRAIL_LEN points in 3.3 s and erase the heart's first half before
+  # the second was drawn.
+  if time - trail_time >= TRAIL_DT
+    trail_time = time
+    trail << [px, py]
+    trail.shift while trail.length > TRAIL_LEN
+  end
 end
 
 # === Render ===
