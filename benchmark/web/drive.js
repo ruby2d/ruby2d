@@ -17,6 +17,10 @@ const { spawn } = require('child_process');
 
 const DIR = process.argv[2];
 const HTML = process.argv[3] || 'app.html';
+// The served directory, canonical: requests are confined to it (see below).
+let ROOT;
+try { ROOT = fs.realpathSync(DIR); }
+catch { console.error(`DRIVER: no such build directory: ${DIR}`); process.exit(2); }
 const CHROME = process.env.CHROME ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const DBG = 9333 + (process.pid % 500);        // avoid clashes across runs
@@ -28,12 +32,23 @@ const MIME = { '.wasm': 'application/wasm', '.js': 'text/javascript',
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Serve files from ROOT only. A request is resolved to a canonical path and
+// refused unless that lies under ROOT, so neither an encoded `..` (which
+// `path.join` would fold into the parent) nor a symlink inside the build can
+// reach a file outside it.
+const inRoot = (p) => p === ROOT || p.startsWith(ROOT + path.sep);
 const server = http.createServer((req, res) => {
-  const f = path.join(DIR, decodeURIComponent(req.url.split('?')[0]));
-  fs.readFile(f, (err, buf) => {
-    if (err) { res.writeHead(404); res.end(); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
-    res.end(buf);
+  let target;
+  try { target = decodeURIComponent(req.url.split('?')[0]); }
+  catch { res.writeHead(400); res.end(); return; }
+  if (target.includes('\0')) { res.writeHead(400); res.end(); return; }
+  fs.realpath(path.join(ROOT, target), (err, f) => {
+    if (err || !inRoot(f)) { res.writeHead(404); res.end(); return; }
+    fs.readFile(f, (err, buf) => {
+      if (err) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
+      res.end(buf);
+    });
   });
 });
 
@@ -51,17 +66,25 @@ const send = (ws, method, params, sessionId) =>
     '--window-size=1280,720', `--remote-debugging-port=${DBG}`,
     `--user-data-dir=${PROFILE}`, 'about:blank',
   ], { stdio: 'ignore' });
+  let done = false;
+  const bail = (reason) => {
+    if (done) return; done = true;
+    console.error(`DRIVER: ${reason}`);
+    chrome.kill('SIGKILL');
+    try { fs.rmSync(PROFILE, { recursive: true, force: true }); } catch {}
+    process.exit(2);
+  };
+  chrome.on('error', (e) => bail(`cannot run Chrome at ${CHROME}: ${e.message}`));
 
   let ver;
   for (let i = 0; i < 60 && !ver; i++) {
     try { ver = await (await fetch(`http://127.0.0.1:${DBG}/json/version`)).json(); }
     catch { await sleep(200); }
   }
-  if (!ver) { console.error('DRIVER: Chrome debug endpoint never came up'); process.exit(2); }
+  if (!ver) bail('Chrome debug endpoint never came up');
 
   const ws = new WebSocket(ver.webSocketDebuggerUrl);
   const lines = [];
-  let done = false;
 
   const finish = (reason) => {
     if (done) return; done = true;
