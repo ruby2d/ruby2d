@@ -198,6 +198,69 @@ RSpec.describe Ruby2D::Window do
       expect(hit).to eq(1)
     end
 
+    # A key the event's dispatch struct has no predicate for used to register
+    # fine and raise `NoMethodError` from inside dispatch at the first event.
+    it 'filter form: a hash key the event does not carry raises at `on`' do
+      connect(window)
+      expect { window.on(gamepad_button_down: { axis: :left_x }) { } }
+        .to raise_error(Ruby2D::Error, /`axis` is not a filter field for `gamepad_button_down`; use `gamepad` or `button`/)
+      expect { window.on(gamepad_button_down: { buton: :south }) { } }
+        .to raise_error(Ruby2D::Error, /`buton` is not a filter field/)
+      expect { window.on(gamepad_axis: { button: :south }) { } }
+        .to raise_error(Ruby2D::Error, /use `gamepad` or `axis`/)
+      expect { window.on(gamepad_connect: { button: :south }) { } }
+        .to raise_error(Ruby2D::Error, /use `gamepad`$/)
+      # Nothing was installed by the rejected registrations.
+      expect { window.gamepad_callback(1, :button_down, :south, nil, nil) }.not_to raise_error
+    end
+
+    it 'filter form: `gamepad:` must be a Gamepad, since anything else can never match' do
+      expect { window.on(gamepad_button_down: { gamepad: 1 }) { } }
+        .to raise_error(Ruby2D::Error, /`gamepad` filter for `gamepad_button_down` must be a Gamepad, got Integer/)
+    end
+
+    it 'filter form: a key that is not a name, and an empty hash, raise at `on`' do
+      pad = connect(window)
+      expect { window.on(gamepad_button_down: { pad => :south }) { } }
+        .to raise_error(Ruby2D::Error, /^`Ruby2D::Gamepad` is not a filter field for `gamepad_button_down`; use `gamepad` or `button`/)
+      expect { window.on(gamepad_button_down: { 1 => :south }) { } }
+        .to raise_error(Ruby2D::Error, /^`Integer` is not a filter field/)
+      expect { window.on(gamepad_button_down: {}) { } }
+        .to raise_error(Ruby2D::Error, /an empty hash filter for `gamepad_button_down` names no field; use `on\(:gamepad_button_down\)` for every event, or name `gamepad` or `button`/)
+      expect { window.on(gamepad_button_down: { gamepad: nil }) { } }
+        .to raise_error(Ruby2D::Error, /must be a Gamepad, got nil/)
+      # A String key names the field like a Symbol does.
+      hit = 0
+      window.on(gamepad_button_down: { 'button' => :south }) { hit += 1 }
+      window.gamepad_callback(pad.id, :button_down, :south, nil, nil)
+      expect(hit).to eq(1)
+    end
+
+    it 'filter form: connect and disconnect take a `gamepad:` hash' do
+      pad1 = connect(window, id: 1, name: 'A')
+      pad2 = connect(window, id: 2, name: 'B')
+      gone = []
+      window.on(gamepad_disconnect: { gamepad: pad1 }) { |p| gone << p }
+      window.gamepad_callback(pad2.id, :disconnect, nil, nil, nil)
+      window.gamepad_callback(pad1.id, :disconnect, nil, nil, nil)
+      expect(gone).to eq([pad1])
+    end
+
+    it 'every listed filter field is a predicate on that event\'s dispatch struct' do
+      structs = {
+        gamepad_connect:     Ruby2D::Window::GamepadEvents::GamepadConnectData,
+        gamepad_disconnect:  Ruby2D::Window::GamepadEvents::GamepadConnectData,
+        gamepad_button_down: Ruby2D::Window::GamepadEvents::GamepadButtonData,
+        gamepad_button_held: Ruby2D::Window::GamepadEvents::GamepadButtonData,
+        gamepad_button_up:   Ruby2D::Window::GamepadEvents::GamepadButtonData,
+        gamepad_axis:        Ruby2D::Window::GamepadEvents::GamepadAxisData
+      }
+      expect(Ruby2D::Window::GAMEPAD_FILTER_FIELDS.keys).to match_array(Ruby2D::Window::GAMEPAD_EVENT_UNPACK.keys)
+      Ruby2D::Window::GAMEPAD_FILTER_FIELDS.each do |type, fields|
+        fields.each { |f| expect(structs[type].method_defined?(:"#{f}?")).to be(true), "#{type} lacks #{f}?" }
+      end
+    end
+
     it 'filter form: cross-source match composes with key events' do
       pad = connect(window)
       hit = 0

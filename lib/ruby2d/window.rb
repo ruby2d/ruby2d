@@ -321,6 +321,18 @@ module Ruby2D
       gamepad_axis:        Gamepad::AXES
     }.freeze
 
+    # The fields a hash matcher may name for each gamepad event: the ones its
+    # dispatch struct has a predicate for. `gamepad:` matches an object, the
+    # rest match a name.
+    GAMEPAD_FILTER_FIELDS = {
+      gamepad_connect:     %i[gamepad],
+      gamepad_disconnect:  %i[gamepad],
+      gamepad_button_down: %i[gamepad button],
+      gamepad_button_held: %i[gamepad button],
+      gamepad_button_up:   %i[gamepad button],
+      gamepad_axis:        %i[gamepad axis]
+    }.freeze
+
     # Gamepad events dispatch an internal data struct, but user blocks
     # receive the unpacked args (gamepad / button / axis / value). This map
     # describes the unpack for each gamepad event type.
@@ -393,9 +405,29 @@ module Ruby2D
         unless unpack
           raise Error, "`#{type}` does not support hash filters with `on event: { ... }`"
         end
-        # `gamepad:` matches an object, so only the name-valued keys are checked.
+        # Every key must be a field this event has, or the first event would
+        # raise on a predicate the struct doesn't define. An empty hash would
+        # match everything, which `on(:event)` already says more plainly.
+        fields = GAMEPAD_FILTER_FIELDS[type]
+        allowed = fields.map { |f| "`#{f}`" }.join(' or ')
+        if matcher.empty?
+          raise Error, "an empty hash filter for `#{type}` names no field; " \
+                       "use `on(:#{type})` for every event, or name #{allowed}"
+        end
         matcher.each do |key, value|
-          case key
+          # A key that isn't a name is shown by class: a `Gamepad` written where
+          # the value belongs would otherwise inspect the whole window.
+          field = key.is_a?(Symbol) || key.is_a?(String) ? key.to_sym : nil
+          unless field && fields.include?(field)
+            raise Error, "`#{field || key.class}` is not a filter field for `#{type}`; " \
+                         "use #{allowed}"
+          end
+          case field
+          when :gamepad
+            unless value.is_a?(Gamepad)
+              raise Error, "`gamepad` filter for `#{type}` must be a Gamepad, " \
+                           "got #{value.nil? ? 'nil' : value.class}"
+            end
           when :button then Gamepad::BUTTONS.validate!(value)
           when :axis   then Gamepad::AXES.validate!(value)
           end

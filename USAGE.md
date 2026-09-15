@@ -2018,7 +2018,7 @@ on :gamepad_axis do |pad, axis, value|
 end
 ```
 
-Filter form takes either a scalar / array (matched against `button` for button events, `axis` for axis events) or a hash matched against any of `gamepad`, `button`, `axis`:
+Filter form takes either a scalar / array (matched against `button` for button events, `axis` for axis events) or a hash whose keys are matched together, one value per key: `gamepad` for every gamepad event, plus `button` for button events or `axis` for `:gamepad_axis`. Any other key, or a `gamepad` that isn't a `Gamepad`, raises when the handler is registered:
 
 ```ruby
 on gamepad_button_down: :south do |pad|
