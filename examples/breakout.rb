@@ -14,6 +14,7 @@ PADDLE_W = 110           # paddle width in pixels
 PADDLE_H = 16            # paddle height in pixels
 PADDLE_SPEED = 840       # paddle keyboard speed (px/sec)
 BALL_R = 8               # ball radius in pixels
+BALL_STEP = 8            # longest ball move per collision test (px)
 BALL_VX_INIT = 480       # initial ball horizontal velocity (px/sec)
 BALL_VY_INIT = -600      # initial ball vertical velocity (px/sec)
 BOUNCE_HIT_SCALE = 720   # paddle-bounce horizontal velocity scale (px/sec)
@@ -143,38 +144,49 @@ update do |dt|
     next
   end
 
-  ball.x += ball_vx * dt
-  ball.y += ball_vy * dt
+  # A stalled frame can hand over up to 0.1 s of `dt`, enough for the ball to
+  # jump clean over the paddle or a brick between two overlap tests. Splitting
+  # the frame into moves no longer than BALL_STEP (half the paddle's height)
+  # keeps every crossing visible. Each move is sized from the ball's current
+  # speed, since a paddle bounce can speed it up partway through the frame.
+  remaining = dt
+  while remaining > 0
+    step_dt = [remaining, BALL_STEP / Math.hypot(ball_vx, ball_vy)].min
+    remaining -= step_dt
+    ball.x += ball_vx * step_dt
+    ball.y += ball_vy * step_dt
 
-  if ball.x - BALL_R < 0 || ball.x + BALL_R > WIDTH
-    ball_vx *= -1
-    ball.x = ball.x.clamp(BALL_R, WIDTH - BALL_R)
-  end
+    if ball.x - BALL_R < 0 || ball.x + BALL_R > WIDTH
+      ball_vx *= -1
+      ball.x = ball.x.clamp(BALL_R, WIDTH - BALL_R)
+    end
 
-  if ball.y - BALL_R < 0
-    ball_vy = ball_vy.abs
-    ball.y = BALL_R
-  elsif ball.y - BALL_R > HEIGHT
-    launched = false
-    status_text.content = 'Missed · Press SPACE to relaunch'
-  end
+    if ball.y - BALL_R < 0
+      ball_vy = ball_vy.abs
+      ball.y = BALL_R
+    elsif ball.y - BALL_R > HEIGHT
+      launched = false
+      status_text.content = 'Missed · Press SPACE to relaunch'
+      break
+    end
 
-  if ball_vy > 0 && circle_hits_rect?(ball, paddle)
-    hit = ((ball.x - paddle.x) / PADDLE_W - 0.5) * 2.0
-    ball_vx = hit * BOUNCE_HIT_SCALE
-    ball_vy = -ball_vy.abs
-    ball.y = paddle.y - BALL_R
-  end
+    if ball_vy > 0 && circle_hits_rect?(ball, paddle)
+      hit = ((ball.x - paddle.x) / PADDLE_W - 0.5) * 2.0
+      ball_vx = hit * BOUNCE_HIT_SCALE
+      ball_vy = -ball_vy.abs
+      ball.y = paddle.y - BALL_R
+    end
 
-  bricks.each do |brick|
-    next unless brick.alive && circle_hits_rect?(ball, brick.shape)
+    bricks.each do |brick|
+      next unless brick.alive && circle_hits_rect?(ball, brick.shape)
 
-    brick.alive = false
-    brick.shape.remove
-    ball_vy *= -1
-    score += 10
-    score_text.content = "Score: #{score}"
-    break
+      brick.alive = false
+      brick.shape.remove
+      ball_vy *= -1
+      score += 10
+      score_text.content = "Score: #{score}"
+      break
+    end
   end
 
   if bricks.none?(&:alive)
