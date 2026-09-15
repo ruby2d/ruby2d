@@ -471,6 +471,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
         // Own the name: drain frees it. SDL_GetGamepadName returns a borrowed
         // pointer that SDL_CloseGamepad frees, so copy it now (see drain).
         const char *name = SDL_GetGamepadName(pad);
+        R2D_Log(R2D_INFO, "Gamepad added: id=%u, name=%s", (unsigned)gid, name ? name : "(unnamed)");
         event_buf_push((R2D_QueuedEvent){
           .category = R2D_EVT_GAMEPAD, .type = R2D_GAMEPAD_CONNECT,
           .id = gid, .str = name ? SDL_strdup(name) : NULL
@@ -553,6 +554,11 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
 
       case SDL_EVENT_GAMEPAD_ADDED: {
         SDL_JoystickID gid = e.gdevice.which;
+        // A pad plugged in before the first poll was opened and announced by
+        // the startup scan above, and its queued add event still arrives here.
+        // Opening it again would take a second reference that the one close on
+        // removal doesn't release, so a pad already open is left alone.
+        if (SDL_GetGamepadFromID(gid)) break;
         SDL_Gamepad *pad = SDL_OpenGamepad(gid);
         if (!pad) {
           R2D_Error("SDL_OpenGamepad", "SDL_OpenGamepad(%u) failed: %s", (unsigned)gid, SDL_GetError());
@@ -560,7 +566,7 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
           // Own the name: drain frees it. SDL_GetGamepadName returns a borrowed
           // pointer that SDL_CloseGamepad frees, so copy it now (see drain).
           const char *name = SDL_GetGamepadName(pad);
-          R2D_Log(R2D_INFO, "Gamepad added: id=%u, name=%s", (unsigned)gid, name);
+          R2D_Log(R2D_INFO, "Gamepad added: id=%u, name=%s", (unsigned)gid, name ? name : "(unnamed)");
           event_buf_push((R2D_QueuedEvent){
             .category = R2D_EVT_GAMEPAD, .type = R2D_GAMEPAD_CONNECT,
             .id = gid, .str = name ? SDL_strdup(name) : NULL
