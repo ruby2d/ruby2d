@@ -40,9 +40,10 @@ module Ruby2D
 
       DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 
-      # Content-Type for a file path, by extension.
+      # Content-Type for a file path, by extension. A name with bytes that
+      # aren't valid in its encoding (possible on Linux) gets the default.
       def self.content_type(path)
-        CONTENT_TYPES.fetch(File.extname(path).downcase, DEFAULT_CONTENT_TYPE)
+        CONTENT_TYPES.fetch(File.extname(path).scrub.downcase, DEFAULT_CONTENT_TYPE)
       end
 
       # Resolve an HTTP request target (e.g. "/app.html?v=1") to a real file
@@ -56,6 +57,9 @@ module Ruby2D
         return nil if path.include?("\u0000")
 
         root_real = File.expand_path(root)
+        # A file name is bytes; give the decoded ones the root's encoding so the
+        # two join (a binary string won't join with a non-ASCII UTF-8 root).
+        path.force_encoding(root_real.encoding)
         full = File.expand_path(File.join(root_real, path))
         return nil unless full == root_real || full.start_with?(root_real + File::SEPARATOR)
         # Serve the directory index for a directory request. `full` is already
@@ -66,9 +70,9 @@ module Ruby2D
         full
       end
 
-      # Percent-decode a URL path (e.g. "%20" -> " ").
+      # Percent-decode a URL path (e.g. "%20" -> " ") to the bytes it spells.
       def self.decode(str)
-        str.gsub(/%([0-9a-fA-F]{2})/) { Regexp.last_match(1).hex.chr }
+        str.b.gsub(/%([0-9a-fA-F]{2})/) { Regexp.last_match(1).hex.chr }
       end
 
       # Serve `dir` over HTTP on `port` and open `path` in the browser. Blocks
