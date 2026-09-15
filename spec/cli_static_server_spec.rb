@@ -152,11 +152,55 @@ RSpec.describe Ruby2D::CLI::StaticServer do
       expect(body).to eq('x')
     end
 
+    it 'answers a HEAD with the GET headers and no body' do
+      File.binwrite(File.join(@root, 'big.wasm'), 'x' * 1024)
+      status, headers, body = request(@root, 'HEAD /big.wasm HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 200 OK')
+      expect(headers['Content-Length']).to eq('1024')
+      expect(body).to eq('')
+    end
+
+    it 'answers a HEAD for a missing file with an empty 404' do
+      status, headers, body = request(@root, 'HEAD /nope.wasm HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 404 Not Found')
+      expect(headers['Content-Length']).to eq("404 Not Found\n".bytesize.to_s)
+      expect(body).to eq('')
+    end
+
     it 'returns 404 with a text body for a missing file' do
       status, headers, body = request(@root, 'GET /nope.wasm HTTP/1.1')
       expect(status).to eq('HTTP/1.1 404 Not Found')
       expect(headers['Content-Type']).to start_with('text/plain')
       expect(body).to eq("404 Not Found\n")
+    end
+
+    it 'answers 404 to a GET and a HEAD for a file it cannot read' do
+      skip 'root reads anything' if Process.uid.zero?
+      File.write(File.join(@root, 'locked.txt'), 'x')
+      File.chmod(0o000, File.join(@root, 'locked.txt'))
+      status, = request(@root, 'GET /locked.txt HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 404 Not Found')
+      status, _, body = request(@root, 'HEAD /locked.txt HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 404 Not Found')
+      expect(body).to eq('')
+    end
+
+    it 'survives a client that goes away before the response is written' do
+      File.binwrite(File.join(@root, 'big.wasm'), 'x' * (1 << 22))
+      server = TCPServer.new('127.0.0.1', 0)
+      client = TCPSocket.new('127.0.0.1', server.addr[1])
+      client.write("GET /big.wasm HTTP/1.1\r\nHost: localhost\r\n\r\n")
+      conn = server.accept
+      client.close
+      expect { described_class.handle(conn, @root) }.not_to raise_error
+    ensure
+      server&.close
+    end
+
+    it 'refuses methods other than GET and HEAD' do
+      status, headers, = request(@root, 'POST /app.wasm HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 405 Method Not Allowed')
+      expect(headers['Allow']).to eq('GET, HEAD')
     end
 
     it 'serves a non-ASCII file name under a non-ASCII root' do

@@ -127,20 +127,28 @@ module Ruby2D
         server&.close
       end
 
-      # Handle one HTTP connection: read the request line, serve the file or 404.
+      # Handle one HTTP connection: read the request line, then serve the file
+      # or answer 404. A HEAD request gets the headers its GET would, without
+      # the body; any other method gets 405.
       def self.handle(client, dir)
         request_line = client.gets
         return if request_line.nil?
 
-        target = request_line.split(' ')[1]
+        method, target = request_line.split(' ')
         # Drain the remaining request headers up to the blank line.
         while (line = client.gets) && line != "\r\n"; end
 
+        unless %w[GET HEAD].include?(method)
+          return write_response(client, 405, 'Method Not Allowed', TEXT_PLAIN, "405 Method Not Allowed\n",
+                                allow: 'GET, HEAD')
+        end
+
+        head = method == 'HEAD'
         full = target && resolve(dir, target)
         if full
-          write_response(client, 200, 'OK', content_type(full), File.binread(full))
+          serve_file(client, full, head)
         else
-          write_response(client, 404, 'Not Found', 'text/plain; charset=utf-8', "404 Not Found\n")
+          write_response(client, 404, 'Not Found', TEXT_PLAIN, "404 Not Found\n", head: head)
         end
       rescue Errno::EPIPE, Errno::ECONNRESET, IOError
         # Client disconnected mid-response — nothing to do.
@@ -148,15 +156,34 @@ module Ruby2D
         client.close rescue nil
       end
 
-      # Write a complete HTTP/1.1 response and close (no keep-alive).
-      def self.write_response(client, code, reason, type, body)
-        body = body.to_s
+      TEXT_PLAIN = 'text/plain; charset=utf-8'
+
+      # Send a resolved file: its contents for a GET, its length for a HEAD
+      # (opening it still tells whether a GET could read it). The read comes
+      # first, so a file that went away or can't be read since it resolved
+      # gets a whole 404 rather than a failure after the status line went out.
+      def self.serve_file(client, path, head)
+        body = head ? nil : File.binread(path)
+        length = head ? File.open(path, 'rb', &:size) : body.bytesize
+      rescue SystemCallError
+        write_response(client, 404, 'Not Found', TEXT_PLAIN, "404 Not Found\n", head: head)
+      else
+        write_response(client, 200, 'OK', content_type(path), body, length: length, head: head)
+      end
+
+      # Write a complete HTTP/1.1 response and close (no keep-alive). `head`
+      # sends the headers only, with `length` (the body's by default) as the
+      # Content-Length, so a HEAD request describes the GET response without
+      # transferring it.
+      def self.write_response(client, code, reason, type, body = nil, length: body.to_s.bytesize,
+                              head: false, allow: nil)
         client.write("HTTP/1.1 #{code} #{reason}\r\n")
         client.write("Content-Type: #{type}\r\n")
-        client.write("Content-Length: #{body.bytesize}\r\n")
+        client.write("Content-Length: #{length}\r\n")
+        client.write("Allow: #{allow}\r\n") if allow
         client.write("Cache-Control: no-cache\r\n")
         client.write("Connection: close\r\n\r\n")
-        client.write(body)
+        client.write(body.to_s) unless head
       end
 
       # Open `url` in the default browser, shortly after the server starts.
