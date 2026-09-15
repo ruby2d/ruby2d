@@ -21,8 +21,8 @@ BAND_ROWS = 16           # block-rows rendered per frame. The set is drawn one
                          # the tab. Larger = fewer frames, more peak memory.
 MAX_ITER = 80            # iterations before declaring "in the set"
 ZOOM_FACTOR = 4.0        # multiplicative zoom per click
-COOLDOWN_FRAMES = 15     # frames that ignore input after a render finishes, so a
-                         # rapid double-click reads as one zoom, not two
+COOLDOWN = 0.25          # seconds that ignore input after a render finishes, so
+                         # a rapid double-click reads as one zoom, not two
 HOME_X = -0.5            # home view center (real)
 HOME_Y = 0.0             # home view center (imaginary)
 HOME_W = 3.5             # home view width in complex-plane units
@@ -139,7 +139,7 @@ center_y  = HOME_Y
 view_w    = HOME_W
 rendering = false        # true while a view is streaming in across frames
 band_py   = 0            # next block-row to render this pass
-cooldown  = 0            # frames left before input is accepted again
+cooldown  = 0.0          # seconds left before input is accepted again
 
 # Begin streaming the current view. The `update` loop renders one band per
 # frame from here; the overlay stays up until the last band lands.
@@ -187,8 +187,8 @@ end
 # Render the next band, advance the progress bar, and — on the final band —
 # refresh the status line, drop the overlay, and start the input cooldown.
 
-update do
-  cooldown -= 1 if cooldown > 0
+update do |dt|
+  cooldown -= dt if cooldown > 0
   next unless rendering
 
   band_end = [band_py + BAND_ROWS, PIXELS_H].min
@@ -198,7 +198,7 @@ update do
 
   if band_py >= PIXELS_H
     rendering = false
-    cooldown = COOLDOWN_FRAMES
+    cooldown = COOLDOWN
     update_status(status, center_x, center_y, view_w)
     overlay.each { |element| element.hide }
   end

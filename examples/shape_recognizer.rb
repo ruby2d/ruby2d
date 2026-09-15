@@ -97,10 +97,11 @@ SPARKLINE_H = 70
 SPARKLINE_HISTORY = 200                                       # number of samples to plot
 SPARKLINE_SAMPLE_EVERY = TRAIN_TOTAL_STEPS / SPARKLINE_HISTORY # one sample every ~90 steps
 
-# Smoothing factor for the prediction bars/icons. Each frame the displayed
-# softmax moves SMOOTH_RATE of the way toward the raw network output, so
-# rapid training-shape switching doesn't read as flicker on the right panel.
-SMOOTH_RATE = 0.25
+# Ease rate for the prediction bars/icons (per-sec). The displayed softmax
+# closes on the raw network output as `gap *= exp(-SMOOTH_RATE * dt)`, a
+# quarter of the way per frame at 60 Hz, so rapid training-shape switching
+# doesn't read as flicker on the right panel.
+SMOOTH_RATE = 17.3
 
 IDLE_PULSE_RATE = 1.5    # rad/s — input lines breathe at ~4 s/cycle while idle
 
@@ -730,7 +731,8 @@ update do |dt|
   # smooth animation. Snap back to uniform when there's nothing to
   # predict so the bars don't drift on bias alone.
   if show_prediction
-    NUM_CLASSES.times { |k| display_y[k] += (current_y[k] - display_y[k]) * SMOOTH_RATE }
+    blend = 1 - Math.exp(-SMOOTH_RATE * dt)
+    NUM_CLASSES.times { |k| display_y[k] += (current_y[k] - display_y[k]) * blend }
   else
     display_y.fill(1.0 / NUM_CLASSES)
   end
