@@ -84,7 +84,7 @@ Use the #{'usage'.bold} command to browse the Ruby 2D usage guide by section.
 Usage: ruby2d usage [<name|number>|list|all]
 
   (no args)   Open the interactive browser
-  <name>      View a section by name (e.g. shapes)
+  <name>      View a section by name (e.g. window)
   <number>    View a section by its number in the list
   list        Print the full list and exit
   all         View the entire guide\n\n"
