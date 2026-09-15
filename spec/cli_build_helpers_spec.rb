@@ -106,6 +106,16 @@ RSpec.describe 'ruby2d/cli/build helpers' do
     it 'returns nil for an explicit path that does not exist' do
       expect(find_executable('/nonexistent/path/to/xyz')).to be_nil
     end
+
+    it 'accepts an explicit path containing spaces' do
+      Dir.mktmpdir do |dir|
+        tool_dir = File.join(dir, 'tool chain')
+        Dir.mkdir(tool_dir)
+        cc = File.join(tool_dir, 'cc')
+        File.symlink(find_executable('sh'), cc)
+        expect(find_executable(cc)).to eq(cc)
+      end
+    end
   end
 
   describe '#add_ld_flags' do

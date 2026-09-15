@@ -10,6 +10,7 @@ require 'ruby2d/gem_paths'
 require 'fileutils'
 require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/messages'
+require 'ruby2d/cli/executable'
 require 'ruby2d/version'
 require_relative '../../../assets/target'
 
@@ -40,10 +41,13 @@ def setup_tildify(path)
 end
 
 
-# Whether a command is on PATH. Unix only — setup's preflight runs there; on
+# Whether a command is available: on PATH, or an executable at an explicit
+# path — `CC=/opt/tool chain/cc` names one, spaces and all, which a shell
+# lookup would split. The same lookup `ruby2d build` uses, so a compiler that
+# builds an app passes here too. Unix only — setup's preflight runs there; on
 # Windows the assets Rakefile bootstraps git/cmake via MSYS2 pacman itself.
 def setup_command?(cmd)
-  system("command -v #{cmd} >/dev/null 2>&1")
+  !find_executable(cmd).nil?
 end
 
 
