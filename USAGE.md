@@ -2482,7 +2482,7 @@ require 'ruby2d'
 # ruby2d:assets media
 ```
 
-A directive behaves exactly like `--assets`, and the two combine (a build honors both the flag and every directive). Paths resolve relative to the directory `ruby2d build` runs in, and a declared directory that doesn't exist aborts the build.
+A directive behaves exactly like `--assets`, and the two combine (a build honors both the flag and every directive). Only a comment declares one: the same text inside a string or heredoc is your app's data. Paths resolve relative to the directory `ruby2d build` runs in, and a declared directory that doesn't exist aborts the build.
 
 ## Building for the Web
 

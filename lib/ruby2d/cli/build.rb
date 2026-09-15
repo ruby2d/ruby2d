@@ -7,6 +7,7 @@ require 'shellwords'
 require 'ruby2d/cli/colorize'
 require 'ruby2d/cli/messages'
 require 'ruby2d/cli/executable'
+require 'ruby2d/cli/asset_directives'
 require 'ruby2d/lib_files'
 require_relative '../../../assets/target'
 
@@ -70,20 +71,6 @@ def strip_require(file)
   File.foreach(file).map do |line|
     line.match?(/require ('|")ruby2d(\/core)?('|")/) ? "\n" : line
   end.join
-end
-
-
-# Collect the asset directories declared inline with `# ruby2d:assets <dir>`
-# directives in the app source — the flag-free equivalent of `--assets`, so an
-# app can carry its own bundling instructions instead of relying on the caller
-# to remember the flag. One directory per directive; repeat the line for
-# several. Paths are relative to the build's working directory, matching
-# `--assets`. Returns the directories in source order.
-def asset_directives(file)
-  File.foreach(file).filter_map do |line|
-    m = line.match(/\A\s*#\s*ruby2d:assets\s+(\S.*?)\s*\z/)
-    m && m[1]
-  end
 end
 
 

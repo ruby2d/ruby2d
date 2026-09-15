@@ -14,6 +14,7 @@ end
 require 'rspec/core/rake_task'
 require_relative 'lib/ruby2d/cli/examples'
 require_relative 'lib/ruby2d/cli/launch'
+require_relative 'lib/ruby2d/cli/asset_directives'
 require_relative 'lib/ruby2d/lib_files'
 require_relative 'assets/target'
 require_relative 'lib/ruby2d/version'
@@ -249,12 +250,10 @@ def show_example_header(example)
 end
 
 # Asset directories an example declares with `# ruby2d:assets <dir>` directives
-# (the same lines `ruby2d build` reads). The build resolves these against its
+# (read the way `ruby2d build` reads them). The build resolves these against its
 # working directory, so build_example mirrors them into the work dir first.
 def example_asset_dirs(example)
-  File.foreach("examples/#{example}.rb").filter_map do |line|
-    line[/\A\s*#\s*ruby2d:assets\s+(\S.*?)\s*\z/, 1]
-  end
+  asset_directives("examples/#{example}.rb")
 end
 
 # Build an example for a target (:native or :web) in examples/build/<target>,

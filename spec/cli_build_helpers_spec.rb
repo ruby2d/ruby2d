@@ -82,6 +82,23 @@ RSpec.describe 'ruby2d/cli/build helpers' do
       src = "# see the ruby2d:assets directive for bundling\n"
       expect(asset_directives(write_app(src))).to eq([])
     end
+
+    it 'ignores the directive text inside a string or heredoc' do
+      # A printed help text, or a code sample the app shows, is the app's data,
+      # not a declaration — a build used to fail on the directory it named.
+      src = "puts <<~'HELP'\n  # ruby2d:assets media\nHELP\nmsg = \"# ruby2d:assets audio\"\n"
+      expect(asset_directives(write_app(src))).to eq([])
+    end
+
+    it 'ignores the directive text inside an =begin/=end block' do
+      src = "=begin\n# ruby2d:assets media\n=end\n"
+      expect(asset_directives(write_app(src))).to eq([])
+    end
+
+    it 'reads a directive that trails code on its line' do
+      src = "require 'ruby2d' # ruby2d:assets media\n"
+      expect(asset_directives(write_app(src))).to eq(['media'])
+    end
   end
 
   describe '#find_executable' do
