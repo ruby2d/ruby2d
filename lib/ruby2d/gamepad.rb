@@ -72,8 +72,7 @@ module Ruby2D
     # shape is stable.
     AXIS_NAMES = AXIS_ENUM.keys.freeze
 
-    attr_reader :id, :name, :type
-    attr_accessor :dead_zone
+    attr_reader :id, :name, :type, :dead_zone
 
     def initialize(window, id, name)
       @window = window
@@ -105,6 +104,22 @@ module Ruby2D
       # Pressed/released/axes_moved are frame-scoped, cleared by
       # `_clear_frame_state`. Held lasts from press to release, so it is
       # current inside a button handler; the C-side held loop only confirms it
+    # The threshold applies to the current readings as soon as it changes, not
+    # only to the next motion event: a raised threshold silences drift that is
+    # already there, and a disabled one lets a stationary stick's real offset
+    # show. Changing it is not motion, so nothing is marked moved and no
+    # `:gamepad_axis` event fires.
+    def dead_zone=(value)
+      unless value.is_a?(Numeric)
+        raise Error, "`dead_zone` must be a number, got #{value.inspect}"
+      end
+
+      @dead_zone = value.to_f
+      AXIS_NAMES.each do |a|
+        @axis_values[a] = apply_dead_zone(a, @raw_axis_values[a] || 0.0)
+      end
+    end
+
       # each frame.
       @buttons_down  = []
       @buttons_up    = []

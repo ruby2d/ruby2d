@@ -287,6 +287,42 @@ RSpec.describe Ruby2D::Window do
       expect(pad.axis(:left_trigger)).to be_within(1e-9).of(0.05)
       expect(pad.axis(:right_trigger)).to be_within(1e-9).of(0.10)
     end
+
+    # The threshold used to apply only to the next motion event, so raising it
+    # left drift already read in place and disabling it kept a resting stick's
+    # real offset at zero until it moved again.
+    it 'changing the dead zone re-filters the current readings at once' do
+      pad = connect(window)
+      hit = 0
+      window.on(:gamepad_axis) { hit += 1 }
+      window.gamepad_callback(pad.id, :axis, :left_x, 0.1, nil)
+      window.gamepad_callback(pad.id, :axis, :left_trigger, 0.1, nil)
+      window.send(:clear_event_stores)
+
+      pad.dead_zone = 0.2
+      expect(pad.axis(:left_x)).to eq(0.0)
+      expect(pad.axis(:left_x, raw: true)).to eq(0.1)
+      expect(pad.axis(:left_trigger)).to eq(0.1)
+      expect(pad.axes[:left_x]).to eq(0.0)
+
+      pad.dead_zone = 0.0
+      expect(pad.axis(:left_x)).to eq(0.1)
+
+      # A threshold change is not motion.
+      expect(hit).to eq(2)
+      expect(pad.axis_moved?(:left_x)).to be false
+    end
+
+    it 'rejects a dead zone that is not a real number and keeps the old one' do
+      pad = connect(window)
+      pad.dead_zone = 0.3
+      expect { pad.dead_zone = nil }.to raise_error(Ruby2D::Error, /`dead_zone` must be a number, got nil/)
+      expect { pad.dead_zone = 'big' }.to raise_error(Ruby2D::Error, /got "big"/)
+      expect { pad.dead_zone = Complex(1, 2) }.to raise_error(RangeError)
+      expect(pad.dead_zone).to eq(0.3)
+      pad.dead_zone = 1
+      expect(pad.dead_zone).to eq(1.0)
+    end
   end
 
   describe 'per-frame polling state' do

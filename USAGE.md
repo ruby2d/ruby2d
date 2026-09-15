@@ -2195,6 +2195,8 @@ pad.dead_zone = 0.0           # disable
 pad.axis(:left_x, raw: true)  # bypass per-call
 ```
 
+Changing `dead_zone` re-filters the current readings at once; it isn't motion, so no `:gamepad_axis` event fires and `axis_moved?` stays as it was.
+
 ### Buttons and axes
 
 Names are positional; they describe the *layout*, not the labels printed on the pad. Face buttons use cardinal directions:
