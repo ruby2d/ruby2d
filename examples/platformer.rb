@@ -17,6 +17,7 @@ RUN_ACCEL = 2520         # horizontal acceleration while pressing left/right (px
 FRICTION = 11.9          # horizontal decay rate when no input (per-sec; vx *= exp(-FRICTION * dt))
 JUMP_V = -750            # initial jump velocity (px/sec, negative is up)
 MAX_SPEED = 420          # horizontal speed cap (px/sec)
+MOVE_STEP = 20           # longest player move per collision test (px)
 CAMERA_SMOOTHING = 7.67  # camera ease rate toward the player (per-sec)
 GEM_BOB_AMP = 6          # how far gems bob up and down (px)
 GEM_BOB_RATE = 2.6       # gem bob speed (rad/sec)
@@ -243,39 +244,52 @@ update do |dt|
   vx += RUN_ACCEL * dt if go_right
   vx *= Math.exp(-FRICTION * dt) unless go_left || go_right
   vx = vx.clamp(-MAX_SPEED, MAX_SPEED)
-  vy += GRAVITY * dt
 
-  player_world_x += vx * dt
-  player_box = Box.new(player_world_x, player_world_y, player.width, player.height)
-  level_data.each do |x, y, w, h|
-    p = Box.new(x, y, w, h)
-    next unless rects_overlap?(player_box, p)
+  # A stalled frame can hand over up to 0.1 s of `dt`, enough for a fall to
+  # jump clean over a platform between two overlap tests. Splitting the frame
+  # into moves no longer than MOVE_STEP (thinner than any platform) keeps every
+  # crossing visible; each move applies gravity, then resolves x and then y, so
+  # wall bumps and landings stay separate and a player standing on a platform
+  # is re-grounded by every move, not just the one that landed.
+  top_speed = [vx.abs, vy.abs, (vy + GRAVITY * dt).abs].max
+  steps = [(top_speed * dt / MOVE_STEP).ceil, 1].max
+  step_dt = dt / steps
 
-    if vx > 0
-      player_world_x = p.x - player.width
-    elsif vx < 0
-      player_world_x = p.x + p.width
+  steps.times do
+    vy += GRAVITY * step_dt
+    on_ground = false
+
+    player_world_x += vx * step_dt
+    player_box = Box.new(player_world_x, player_world_y, player.width, player.height)
+    level_data.each do |x, y, w, h|
+      p = Box.new(x, y, w, h)
+      next unless rects_overlap?(player_box, p)
+
+      if vx > 0
+        player_world_x = p.x - player.width
+      elsif vx < 0
+        player_world_x = p.x + p.width
+      end
+      vx = 0
+      player_box.x = player_world_x
     end
-    vx = 0
+
+    player_world_y += vy * step_dt
     player_box.x = player_world_x
-  end
-
-  player_world_y += vy * dt
-  player_box.x = player_world_x
-  player_box.y = player_world_y
-  on_ground = false
-  level_data.each do |x, y, w, h|
-    p = Box.new(x, y, w, h)
-    next unless rects_overlap?(player_box, p)
-
-    if vy > 0
-      player_world_y = p.y - player.height
-      on_ground = true
-    elsif vy < 0
-      player_world_y = p.y + p.height
-    end
-    vy = 0
     player_box.y = player_world_y
+    level_data.each do |x, y, w, h|
+      p = Box.new(x, y, w, h)
+      next unless rects_overlap?(player_box, p)
+
+      if vy > 0
+        player_world_y = p.y - player.height
+        on_ground = true
+      elsif vy < 0
+        player_world_y = p.y + p.height
+      end
+      vy = 0
+      player_box.y = player_world_y
+    end
   end
 
   if player_world_y > HEIGHT + 80
