@@ -46,16 +46,23 @@ module Ruby2D
         CONTENT_TYPES.fetch(File.extname(path).scrub.downcase, DEFAULT_CONTENT_TYPE)
       end
 
-      # Resolve an HTTP request target (e.g. "/app.html?v=1") to a real file
-      # under `root`. A directory request (e.g. "/") serves its `index.html`.
-      # Returns the canonical path, or nil if the file does not exist or the
-      # request escapes `root`, whether by `..` or through a symlink pointing
-      # outside it.
+      # Resolve an HTTP request target (e.g. "/app.html?v=1") to what to serve:
+      # `[:file, path]` for a file under `root` (a directory request such as
+      # "/" serves its `index.html`), `[:redirect, location]` for a directory
+      # requested without its trailing slash, or nil for anything else: a
+      # missing file, a directory with no index, or a request that escapes
+      # `root`, whether by `..` or through a symlink pointing outside it.
+      #
+      # The slash matters because the browser resolves a page's relative URLs
+      # against the address it loaded, so `/demo` would fetch its `app.js` from
+      # `/app.js`; the redirect sends it to `/demo/` (query string kept) first.
       def self.resolve(root, target)
-        path = decode(target.split(/[?#]/, 2).first.to_s)
+        path, query = target.split('#', 2).first.to_s.split('?', 2)
+        path = path.to_s # an empty target splits to nothing
+        decoded = decode(path)
         # A NUL byte (e.g. from `%00`) makes File.realpath raise ArgumentError;
         # treat such a path as a non-existent file (clean 404).
-        return nil if path.include?("\u0000")
+        return nil if decoded.include?("\u0000")
 
         # Compare canonical paths: `File.expand_path` only normalizes the text,
         # so a symlink inside `root` could still lead outside it. A path that
@@ -65,15 +72,22 @@ module Ruby2D
 
         # A file name is bytes; give the decoded ones the root's encoding so the
         # two join (a binary string won't join with a non-ASCII UTF-8 root).
-        full = real_path(File.join(root_real, path.force_encoding(root_real.encoding)))
+        full = real_path(File.join(root_real, decoded.force_encoding(root_real.encoding)))
         return nil unless full && within?(full, root_real)
 
         if File.directory?(full)
+          unless path.end_with?('/')
+            # Exactly one leading slash: a browser reads `//demo/` as a host.
+            slashed = path.sub(%r{\A/*}, '/')
+            slashed += '/' unless slashed.end_with?('/')
+            return [:redirect, "#{slashed}#{query && "?#{query}"}"]
+          end
+
           # The index may itself be a link, so it gets the same check.
           full = real_path(File.join(full, 'index.html'))
           return nil unless full && within?(full, root_real)
         end
-        File.file?(full) ? full : nil
+        File.file?(full) ? [:file, full] : nil
       end
 
       # Percent-decode a URL path (e.g. "%20" -> " ") to the bytes it spells.
@@ -127,9 +141,9 @@ module Ruby2D
         server&.close
       end
 
-      # Handle one HTTP connection: read the request line, then serve the file
-      # or answer 404. A HEAD request gets the headers its GET would, without
-      # the body; any other method gets 405.
+      # Handle one HTTP connection: read the request line, then serve the file,
+      # redirect, or answer 404. A HEAD request gets the headers its GET would,
+      # without the body; any other method gets 405.
       def self.handle(client, dir)
         request_line = client.gets
         return if request_line.nil?
@@ -144,9 +158,13 @@ module Ruby2D
         end
 
         head = method == 'HEAD'
-        full = target && resolve(dir, target)
-        if full
-          serve_file(client, full, head)
+        kind, value = target && resolve(dir, target)
+        case kind
+        when :file
+          serve_file(client, value, head)
+        when :redirect
+          write_response(client, 301, 'Moved Permanently', TEXT_PLAIN, "301 Moved Permanently\n",
+                         head: head, location: value)
         else
           write_response(client, 404, 'Not Found', TEXT_PLAIN, "404 Not Found\n", head: head)
         end
@@ -176,10 +194,11 @@ module Ruby2D
       # Content-Length, so a HEAD request describes the GET response without
       # transferring it.
       def self.write_response(client, code, reason, type, body = nil, length: body.to_s.bytesize,
-                              head: false, allow: nil)
+                              head: false, location: nil, allow: nil)
         client.write("HTTP/1.1 #{code} #{reason}\r\n")
         client.write("Content-Type: #{type}\r\n")
         client.write("Content-Length: #{length}\r\n")
+        client.write("Location: #{location}\r\n") if location
         client.write("Allow: #{allow}\r\n") if allow
         client.write("Cache-Control: no-cache\r\n")
         client.write("Connection: close\r\n\r\n")

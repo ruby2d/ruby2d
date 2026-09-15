@@ -43,20 +43,35 @@ RSpec.describe Ruby2D::CLI::StaticServer do
 
   describe '.resolve' do
     it 'resolves a file under the root, stripping any query string' do
-      expect(described_class.resolve(@root, '/app.wasm')).to eq(real('app.wasm'))
-      expect(described_class.resolve(@root, '/app.wasm?v=1')).to eq(real('app.wasm'))
+      expect(described_class.resolve(@root, '/app.wasm')).to eq([:file, real('app.wasm')])
+      expect(described_class.resolve(@root, '/app.wasm?v=1')).to eq([:file, real('app.wasm')])
     end
 
     it 'returns nil for a missing file' do
       expect(described_class.resolve(@root, '/nope.wasm')).to be_nil
     end
 
-    it 'serves index.html for a directory request' do
+    it 'serves index.html for a directory request ending in a slash' do
       File.write(File.join(@root, 'index.html'), '<h1>hi</h1>')
-      expect(described_class.resolve(@root, '/')).to eq(real('index.html'))
+      expect(described_class.resolve(@root, '/')).to eq([:file, real('index.html')])
       Dir.mkdir(File.join(@root, 'sub'))
       File.write(File.join(@root, 'sub', 'index.html'), '<h1>sub</h1>')
-      expect(described_class.resolve(@root, '/sub')).to eq(real('sub', 'index.html'))
+      expect(described_class.resolve(@root, '/sub/')).to eq([:file, real('sub', 'index.html')])
+    end
+
+    it 'redirects a directory request without the slash, keeping the query' do
+      Dir.mkdir(File.join(@root, 'sub'))
+      File.write(File.join(@root, 'sub', 'index.html'), '<h1>sub</h1>')
+      expect(described_class.resolve(@root, '/sub')).to eq([:redirect, '/sub/'])
+      expect(described_class.resolve(@root, '/sub?v=1&x=y')).to eq([:redirect, '/sub/?v=1&x=y'])
+      expect(described_class.resolve(@root, '/su%62')).to eq([:redirect, '/su%62/'])
+    end
+
+    it 'redirects with a single leading slash, so the location stays on this host' do
+      Dir.mkdir(File.join(@root, 'sub'))
+      expect(described_class.resolve(@root, '//sub')).to eq([:redirect, '/sub/'])
+      expect(described_class.resolve(@root, '')).to eq([:redirect, '/'])
+      expect(described_class.resolve(@root, '#top')).to eq([:redirect, '/'])
     end
 
     it 'returns nil for a directory request with no index.html' do
@@ -98,7 +113,7 @@ RSpec.describe Ruby2D::CLI::StaticServer do
 
     it 'follows a symlink that stays inside the root' do
       File.symlink(File.join(@root, 'app.wasm'), File.join(@root, 'latest.wasm'))
-      expect(described_class.resolve(@root, '/latest.wasm')).to eq(real('app.wasm'))
+      expect(described_class.resolve(@root, '/latest.wasm')).to eq([:file, real('app.wasm')])
     end
 
     it 'returns nil for a dangling symlink' do
@@ -109,7 +124,7 @@ RSpec.describe Ruby2D::CLI::StaticServer do
     it 'serves through a root that is itself a symlink' do
       link = File.join(@base, 'www')
       File.symlink(@root, link)
-      expect(described_class.resolve(link, '/app.wasm')).to eq(real('app.wasm'))
+      expect(described_class.resolve(link, '/app.wasm')).to eq([:file, real('app.wasm')])
       expect(described_class.resolve(link, '/../secret.txt')).to be_nil
     end
 
@@ -121,7 +136,7 @@ RSpec.describe Ruby2D::CLI::StaticServer do
       root = File.join(@base, 'café')
       Dir.mkdir(root)
       File.write(File.join(root, 'naïve.txt'), 'hello')
-      expect(described_class.resolve(root, '/na%C3%AFve.txt')).to eq(File.realpath(File.join(root, 'naïve.txt')))
+      expect(described_class.resolve(root, '/na%C3%AFve.txt')).to eq([:file, File.realpath(File.join(root, 'naïve.txt'))])
     end
   end
 
@@ -172,6 +187,16 @@ RSpec.describe Ruby2D::CLI::StaticServer do
       expect(status).to eq('HTTP/1.1 404 Not Found')
       expect(headers['Content-Type']).to start_with('text/plain')
       expect(body).to eq("404 Not Found\n")
+    end
+
+    it 'redirects a directory URL to its trailing-slash form' do
+      Dir.mkdir(File.join(@root, 'demo'))
+      File.write(File.join(@root, 'demo', 'index.html'), '<script src="app.js"></script>')
+      status, headers, = request(@root, 'GET /demo?v=2 HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 301 Moved Permanently')
+      expect(headers['Location']).to eq('/demo/?v=2')
+      status, = request(@root, 'GET /demo/ HTTP/1.1')
+      expect(status).to eq('HTTP/1.1 200 OK')
     end
 
     it 'answers 404 to a GET and a HEAD for a file it cannot read' do
