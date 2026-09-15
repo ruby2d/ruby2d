@@ -1,5 +1,6 @@
 require 'ruby2d/cli/build'
 require 'tmpdir'
+require 'pathname'
 
 # The build CLI defines its string-munging helpers as top-level methods. They
 # were previously untested and have had real bugs (see find_executable below),
@@ -20,33 +21,48 @@ RSpec.describe 'ruby2d/cli/build helpers' do
     end
   end
 
-  describe '#strip_require' do
-    around { |ex| Dir.mktmpdir { |d| @dir = d; ex.run } }
-
-    def write_app(contents)
-      path = File.join(@dir, 'app.rb')
-      File.write(path, contents)
-      path
+  # `app_source_name` and the asset helpers resolve against the working
+  # directory, so each example runs inside a fresh temporary one, with
+  # `outside` a second temporary directory beside it.
+  describe '#app_source_name' do
+    around do |ex|
+      Dir.mktmpdir do |d|
+        Dir.mktmpdir do |o|
+          Dir.chdir(d) { @dir = File.realpath(d); @outside = File.realpath(o); ex.run }
+        end
+      end
     end
 
-    it "blanks out `require 'ruby2d'` and `require 'ruby2d/core'` lines" do
-      src = "require 'ruby2d'\nrequire 'ruby2d/core'\nputs :hi\n"
-      expect(strip_require(write_app(src))).to eq("\n\nputs :hi\n")
+    it 'names a source inside the working directory by its relative path' do
+      FileUtils.mkdir_p('src')
+      File.write('main.rb', '')
+      File.write('src/main.rb', '')
+      expect(app_source_name('main.rb')).to eq('main.rb')
+      expect(app_source_name('src/main.rb')).to eq('src/main.rb')
+      expect(app_source_name('./src/main.rb')).to eq('src/main.rb')
+      expect(app_source_name(File.join(@dir, 'src/main.rb'))).to eq('src/main.rb')
     end
 
-    it 'accepts double-quoted requires' do
-      src = %(require "ruby2d"\nx = 1\n)
-      expect(strip_require(write_app(src))).to eq("\nx = 1\n")
+    it 'names a source elsewhere by its basename' do
+      File.write(File.join(@outside, 'main.rb'), '')
+      expect(app_source_name(File.join(@outside, 'main.rb'))).to eq('main.rb')
     end
 
-    it 'keeps unrelated requires and code' do
-      src = "require 'json'\nrequire 'ruby2d'\ny = 2\n"
-      expect(strip_require(write_app(src))).to eq("require 'json'\n\ny = 2\n")
+    it 'sees through a symlink in the path given, as the working directory has none' do
+      # `Dir.pwd` reports the resolved path; the path given may not be. On
+      # macOS `/tmp` is such a link, so an absolute path typed through it
+      # looked outside the working directory and lost its `src/` prefix.
+      FileUtils.mkdir_p('src')
+      File.write('src/main.rb', '')
+      File.symlink(@dir, File.join(@outside, 'link'))
+      expect(app_source_name(File.join(@outside, 'link/src/main.rb'))).to eq('src/main.rb')
     end
 
-    it 'blanks rather than deletes, so line numbers (and mrbc error lines) survive' do
-      src = "require 'ruby2d'\nx = 1\nbad syntax(\n"
-      expect(strip_require(write_app(src)).lines.size).to eq(src.lines.size)
+    it 'keeps the name of a project-local path that is itself a symlink elsewhere' do
+      FileUtils.mkdir_p('src')
+      File.write(File.join(@outside, 'main.rb'), '')
+      File.symlink(File.join(@outside, 'main.rb'), 'src/main.rb')
+      expect(app_source_name('src/main.rb')).to eq('src/main.rb')
     end
   end
 

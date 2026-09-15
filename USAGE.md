@@ -2431,6 +2431,8 @@ show
 
 `ruby2d build app.rb` compiles your app into a standalone native executable in `build/native/` (on macOS it also produces an `App.app` bundle); run it with `ruby2d launch --native`, which runs the executable in your terminal and exits with its status, so a script or CI step fails when the app does. The build targets the machine it runs on and does not cross-compile.
 
+A native build compiles your Ruby with [mruby](https://mruby.org), so the [mruby and CRuby differences](#mruby-and-cruby-differences) apply to it as they do to a web build. The compiled app is one source file: `__FILE__` names it by the path you gave `ruby2d build`, relative to the directory the build ran in (`main.rb`, or `src/main.rb`; a source outside that directory is named by its basename), and `__dir__` is that path's directory. Both resolve against the app's working directory, which is the executable's own, so `File.join(__dir__, 'media/x.png')` finds an asset [bundled](#bundling-assets) as `media` the same way it does under CRuby run from that directory.
+
 Native builds link SDL3 and mruby as static libraries. The gem bundles these for the most common platforms — macOS on Apple silicon, and Windows on x86-64 and ARM64 — where native building works with no extra setup.
 
 ### Setting Up Other Platforms
@@ -2538,10 +2540,10 @@ ruby2d build --web --single-file app.rb
 
 ### mruby and CRuby Differences
 
-Web builds compile your Ruby code using [mruby](https://mruby.org) rather than the standard CRuby interpreter. mruby is a lightweight, embeddable Ruby implementation and is not fully compatible with CRuby. Things to be aware of:
+Native and web builds compile your Ruby code using [mruby](https://mruby.org) rather than the standard CRuby interpreter. mruby is a lightweight, embeddable Ruby implementation and is not fully compatible with CRuby. Things to be aware of:
 
 - The standard library is limited: many CRuby built-in classes and modules are unavailable or have reduced functionality.
-- Gems that rely on C extensions or CRuby internals will not work.
+- Gems that rely on C extensions or CRuby internals will not work, and nothing can be loaded at all: `require 'ruby2d'` (or `'ruby2d/core'`) is accepted, since Ruby 2D is built in, while requiring anything else, `require_relative`, and `load` raise `NotImplementedError`. A compiled app is its one source file.
 - Some Ruby syntax and language features supported by CRuby may not be available in mruby.
 
 Test your app with `ruby2d build --web` early to catch any incompatibilities.

@@ -63,14 +63,48 @@ def native_target
 end
 
 
-# Neutralize `require 'ruby2d'` / `require 'ruby2d/core'` lines — the bundled
-# build already provides Ruby2D. Blank each one out rather than deleting it, so
-# every following line keeps its original number and an `mrbc` compile error
-# still points at the right line in the user's source.
-def strip_require(file)
-  File.foreach(file).map do |line|
-    line.match?(/require ('|")ruby2d(\/core)?('|")/) ? "\n" : line
-  end.join
+# Whether `path` is `dir` or lies inside it. Both are real paths (see
+# real_path), so a symlinked component on either side doesn't fool the test;
+# the root joins as `/` rather than `//`.
+def within?(path, dir)
+  path == dir || path.start_with?(File.join(dir, ''))
+end
+
+# A path with symlinks resolved. The path must exist.
+def real_path(path)
+  File.realpath(path)
+end
+
+# The build output directory, as a real path (`Dir.pwd` reports one).
+def build_output_path
+  File.join(real_path(Dir.pwd), BUILD_DIR)
+end
+
+# An existing path relative to the working directory, or nil when it lies
+# outside. Decided on the path as written first, so a project-local symlink
+# (`media` pointing at a shared directory) keeps its name, and then on real
+# paths, so a path typed through a symlinked component (`/tmp`, a link to
+# `/private/tmp` on macOS, where `Dir.pwd` reports the latter) still counts as
+# inside.
+def path_within_cwd(path)
+  full = File.expand_path(path)
+  return full.delete_prefix("#{Dir.pwd}/") if within?(full, Dir.pwd)
+
+  full = real_path(path)
+  cwd = real_path(Dir.pwd)
+  within?(full, cwd) ? full.delete_prefix("#{cwd}/") : nil
+end
+
+# The name a compiled app sees as `__FILE__` (and `__dir__` derives from): the
+# source path relative to the build's working directory when it sits inside it
+# (`main.rb`, `src/main.rb`), which is how CRuby names it when run from there —
+# so `File.join(__dir__, 'media/x.png')` resolves against the bundled layout,
+# which is laid out relative to that same directory. A source elsewhere is
+# named by its basename, as an asset directory elsewhere is (see
+# asset_bundle_path): its real path names the developer's machine, not the
+# build.
+def app_source_name(path)
+  path_within_cwd(path) || File.basename(File.expand_path(path))
 end
 
 
@@ -208,6 +242,11 @@ def compile(ruby2d_app)
   # Make Ruby2D classes and DSL methods available at the top level
   ruby2d_lib << "include Ruby2D\nextend Ruby2D::DSL\n"
 
+  # mruby has no `__dir__`. A compiled app is one source file, so its directory
+  # is known here: that of the name the app is compiled under (see below).
+  app_name = app_source_name(ruby2d_app)
+  ruby2d_lib << "def __dir__ = File.dirname(#{app_name.inspect})\n"
+
   File.write('build/ruby2d_lib.rb', ruby2d_lib)
 
   # Assemble the Ruby 2D C extension files into one '.c' file
@@ -239,18 +278,23 @@ def compile(ruby2d_app)
     exit 1
   end
 
-  # Stage the user's source (requires blanked — see strip_require) and compile it.
-  # `mrbc` reports diagnostics against the path it's given, so capture its output
-  # and rewrite the staging path back to the original filename: a syntax error
-  # then points at `asteroids.rb:LINE`, the file the user wrote, not the internal
-  # copy. Line numbers already line up because strip_require preserves them.
-  staged = 'build/ruby2d_app.rb'
-  File.write(staged, strip_require(ruby2d_app))
-  app_cmd = "#{shell_escape(mrbc)} #{debug_flag} -Bruby2d_app -obuild/ruby2d_app.c #{staged}"
-  cmd_echo(app_cmd) if @debug
-  app_output = `#{app_cmd} 2>&1`
+  # Compile the user's source as written: the `require 'ruby2d'` it starts with
+  # is answered by the shim in `mruby_compat`, so nothing is rewritten and an
+  # `mrbc` diagnostic's line points at the file the user wrote. `mrbc` bakes
+  # the path it's given into the bytecode as `__FILE__` (and reports against
+  # it), so it's given the name the app should see (see app_source_name): a
+  # staging tree under `build/` holds a copy at that name, and `mrbc` runs from
+  # its root. Its output is captured so a syntax error prints under the
+  # `Error:` line that explains it.
+  stage_dir = File.join(BUILD_DIR, 'stage')
+  staged = File.join(stage_dir, app_name)
+  FileUtils.mkdir_p File.dirname(staged)
+  FileUtils.cp ruby2d_app, staged
+  app_cmd = "#{shell_escape(mrbc)} #{debug_flag} -Bruby2d_app -o../ruby2d_app.c #{shell_escape(app_name)}"
+  cmd_echo("( cd #{stage_dir} && #{app_cmd} )") if @debug
+  app_output = Dir.chdir(stage_dir) { `#{app_cmd} 2>&1` }
   app_result = $?
-  print app_output.gsub(staged) { ruby2d_app } unless app_output.empty?
+  print app_output unless app_output.empty?
   unless app_result.success?
     error "Failed to compile #{ruby2d_app}."
     puts 'Check the error above for syntax issues or Ruby features mruby does not support.'
@@ -298,6 +342,7 @@ def build(targets, ruby2d_app)
   unless @debug
     FileUtils.rm(Dir.glob('build/*.rb'))
     FileUtils.rm(Dir.glob('build/*.c'))
+    FileUtils.rm_rf File.join(BUILD_DIR, 'stage')
   end
 
   # Trailing blank line so the output isn't flush against the next shell prompt.
