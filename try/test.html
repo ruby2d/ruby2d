@@ -349,10 +349,9 @@ function runCode() {
   clearConsole();
   var editor = document.getElementById('editor');
   editor.classList.remove('error');
-  var code = editor.value;
-  // Strip require 'ruby2d' / require "ruby2d" / require 'ruby2d/core' / etc.
-  code = code.replace(/^[ \t]*require\s+['"]ruby2d(?:\/\w+)*['"]\s*$/mg, '');
-  Module.ccall('try_run_code', null, ['string'], [code]);
+  // `require 'ruby2d'` is answered by the library's own mruby shim, so the
+  // code runs as typed.
+  Module.ccall('try_run_code', null, ['string'], [editor.value]);
 }
 
 // Load an example into the editor and run it
