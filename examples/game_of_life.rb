@@ -122,11 +122,15 @@ end
 update do |dt|
   paint.call(mouse_x, mouse_y, mouse_paint) if mouse_held
 
+  # The timer keeps its remainder across generations instead of restarting at
+  # a full interval, so the cadence holds at any refresh rate: restarting
+  # rounded each 0.083 s interval up to whole frames, 0.089 s at 90 Hz. A long
+  # frame can owe more than one generation, so step until the timer is ahead.
   unless paused
     step_timer -= dt
-    if step_timer <= 0
+    while step_timer <= 0
       step.call
-      step_timer = STEP_INTERVAL
+      step_timer += STEP_INTERVAL
     end
   end
 

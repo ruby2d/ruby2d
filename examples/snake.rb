@@ -97,48 +97,52 @@ end
 update do |dt|
   next unless alive
 
+  # The timer keeps its remainder across moves instead of restarting at a full
+  # interval, so the cadence holds at any refresh rate: restarting rounded each
+  # 0.067 s interval up to whole frames, 0.083 s at 60 Hz. A long frame can owe
+  # more than one move; each is taken in turn, stopping if one ends the game.
   move_timer -= dt
-  next if move_timer > 0
+  while move_timer <= 0
+    move_timer += interval
 
-  dir = next_dir
-  head = [(snake[0][0] + dir[0]) % COLS, (snake[0][1] + dir[1]) % ROWS]
+    dir = next_dir
+    head = [(snake[0][0] + dir[0]) % COLS, (snake[0][1] + dir[1]) % ROWS]
 
-  if snake.include?(head)
-    alive = false
-    label.content = "Game Over!  Score: #{score}  ▸  press r to restart"
-    next
+    if snake.include?(head)
+      alive = false
+      label.content = "Game Over!  Score: #{score}  ▸  press r to restart"
+      break
+    end
+
+    snake.unshift(head)
+    segments.unshift(
+      Square.new(x: head[0] * GRID + 1, y: head[1] * GRID + 1,
+                 size: GRID - 2, color: SNAKE_COLOR)
+    )
+
+    if head == food
+      score += 1
+      label.content = "Score: #{score}"
+      interval = [MIN_INTERVAL, interval - INTERVAL_STEP].max if score % SPEEDUP_EVERY == 0
+      grow += GROWTH
+      food = place_food(snake)
+      food_sq.x = food[0] * GRID + 2
+      food_sq.y = food[1] * GRID + 2
+    end
+
+    if grow > 0
+      grow -= 1
+    else
+      snake.pop
+      segments.last.remove
+      segments.pop
+    end
+
+    segments.each_with_index do |s, i|
+      g = i.to_f / [segments.size - 1, 1].max
+      s.color = [0.02 + 0.04 * g, 0.84 - 0.5 * g, 0.63 - 0.3 * g, 1]
+    end
   end
-
-  snake.unshift(head)
-  segments.unshift(
-    Square.new(x: head[0] * GRID + 1, y: head[1] * GRID + 1,
-               size: GRID - 2, color: SNAKE_COLOR)
-  )
-
-  if head == food
-    score += 1
-    label.content = "Score: #{score}"
-    interval = [MIN_INTERVAL, interval - INTERVAL_STEP].max if score % SPEEDUP_EVERY == 0
-    grow += GROWTH
-    food = place_food(snake)
-    food_sq.x = food[0] * GRID + 2
-    food_sq.y = food[1] * GRID + 2
-  end
-
-  if grow > 0
-    grow -= 1
-  else
-    snake.pop
-    segments.last.remove
-    segments.pop
-  end
-
-  segments.each_with_index do |s, i|
-    g = i.to_f / [segments.size - 1, 1].max
-    s.color = [0.02 + 0.04 * g, 0.84 - 0.5 * g, 0.63 - 0.3 * g, 1]
-  end
-
-  move_timer = interval
 end
 
 show

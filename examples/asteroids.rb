@@ -17,12 +17,13 @@ require 'ruby2d'
 
 # === Tunables ===
 
-WIDTH = 800        # window width in pixels
-HEIGHT = 600       # window height in pixels
-SHIP_R = 15        # ship radius (used for collision and drawing)
-BULLET_STEP = 12   # longest bullet move per hit test (px)
-THRUST = 1152      # acceleration while thrusting (px/sec²)
-HIT_PENALTY = 500  # score deducted when the ship is destroyed
+WIDTH = 800          # window width in pixels
+HEIGHT = 600         # window height in pixels
+SHIP_R = 15          # ship radius (used for collision and drawing)
+BULLET_STEP = 12     # longest bullet move per hit test (px)
+FIRE_INTERVAL = 0.1  # seconds between auto-fire shots while space is held
+THRUST = 1152        # acceleration while thrusting (px/sec²)
+HIT_PENALTY = 500    # score deducted when the ship is destroyed
 
 # === Window ===
 
@@ -195,15 +196,20 @@ update do |dt|
     # Toroidal wrap: drift off one edge, reappear on the opposite side.
     ship_x = (ship_x + ship_vx * dt) % WIDTH
     ship_y = (ship_y + ship_vy * dt) % HEIGHT
-    cooldown -= dt if cooldown.positive?
-
-    # Auto-fire while space is held; `cooldown` paces it.
+    # Auto-fire while space is held; `cooldown` paces it. After a shot the
+    # cooldown keeps whatever the frame overshot instead of restarting at a
+    # full interval, so the cadence holds at any refresh rate (restarting
+    # rounded it up to whole frames: 0.117 s at 60 Hz). With the trigger up it
+    # bottoms out at zero, so the next press fires at once and never a burst.
+    cooldown -= dt
     if firing && cooldown <= 0
       bullets << Bullet.new(ship_x + Math.cos(ship_angle) * SHIP_R,
                             ship_y + Math.sin(ship_angle) * SHIP_R,
                             Math.cos(ship_angle) * 840 + ship_vx,  # 840 px/sec muzzle speed
                             Math.sin(ship_angle) * 840 + ship_vy)
-      cooldown = 0.1  # seconds between auto-fire shots
+      cooldown += FIRE_INTERVAL
+    elsif !firing && cooldown < 0
+      cooldown = 0
     end
 
     # Spawn thrust sparks behind the ship while accelerating. Rate-based: ~240
