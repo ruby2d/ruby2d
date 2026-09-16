@@ -42,6 +42,15 @@ def circle_hits_rect?(circle, rect)
   dx * dx + dy * dy <= circle.radius * circle.radius
 end
 
+# The axis a circle overlapping a rectangle came in along: it crossed the
+# face it overlaps least deeply, so a side hit reflects x and a top or
+# bottom hit reflects y.
+def hit_axis(circle, rect)
+  depth_x = circle.radius + rect.width / 2.0 - (circle.x - rect.x - rect.width / 2.0).abs
+  depth_y = circle.radius + rect.height / 2.0 - (circle.y - rect.y - rect.height / 2.0).abs
+  depth_x < depth_y ? :x : :y
+end
+
 # === Persistent renderables ===
 
 score_text = Text.new('Score: 0', x: 16, y: 12, size: 18, color: '#e5e7eb')
@@ -186,7 +195,16 @@ update do |dt|
 
       brick.alive = false
       brick.shape.remove
-      ball_vy *= -1
+      # Reverse the component carrying the ball into the brick along the face
+      # it crossed. A corner clipped while already moving away on that axis
+      # reflects the other component instead, so every hit deflects the ball.
+      into_x = ball_vx * (brick.shape.x + BRICK_W / 2.0 - ball.x) > 0
+      into_y = ball_vy * (brick.shape.y + BRICK_H / 2.0 - ball.y) > 0
+      if into_x && (hit_axis(ball, brick.shape) == :x || !into_y)
+        ball_vx = -ball_vx
+      else
+        ball_vy = -ball_vy
+      end
       score += 10
       score_text.content = "Score: #{score}"
       break
