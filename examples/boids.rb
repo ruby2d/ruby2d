@@ -36,13 +36,14 @@ set close_on_esc: true
 
 # === Boid struct and helpers ===
 
-Boid = Struct.new(:x, :y, :vx, :vy, :tri)
+Boid = Struct.new(:x, :y, :vx, :vy, :ax, :ay, :tri)
 
 def make_boid
   angle = rand * Math::PI * 2
   Boid.new(
     rand(WIDTH), rand(HEIGHT),
     Math.cos(angle) * MAX_SPEED, Math.sin(angle) * MAX_SPEED,
+    0.0, 0.0,
     Triangle.new(x1: 0, y1: -8, x2: -5, y2: 6, x3: 5, y3: 6, color: '#67e8f9')
   )
 end
@@ -105,6 +106,10 @@ update do |dt|
     buckets[gy * GCOLS + gx] << b
   end
 
+  # First pass: steer every boid from the flock as it stands at the start of
+  # the frame. The move waits for a second pass: a boid moved here would sit
+  # in the bucket of the cell it left, and whether the boids after it saw it
+  # would turn on where the cell boundaries fall rather than on distance.
   boids.each do |b|
     sep_x = 0.0
     sep_y = 0.0
@@ -173,9 +178,12 @@ update do |dt|
       ay += mdy / md * MOUSE_REPULSION
     end
 
-    ax, ay = limit(ax, ay, MAX_FORCE)
-    b.vx += ax * dt
-    b.vy += ay * dt
+    b.ax, b.ay = limit(ax, ay, MAX_FORCE)
+  end
+
+  boids.each do |b|
+    b.vx += b.ax * dt
+    b.vy += b.ay * dt
     b.vx, b.vy = limit(b.vx, b.vy, MAX_SPEED)
     speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy)
     if speed < MIN_SPEED && speed > 0.01
