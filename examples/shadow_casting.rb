@@ -15,6 +15,8 @@ NUM_OBSTACLES = 7       # rectangles scattered across the scene
 OBS_MIN = 36            # smallest obstacle side, in pixels
 OBS_MAX = 130           # largest obstacle side, in pixels
 FALLOFF = 480           # distance over which the light fades to dark
+LIGHT_ALPHA = 0.92      # brightness at the light itself
+RING_RAYS = 72          # evenly spaced rays that round off the lit disc's edge
 ANGLE_EPS = 0.0003      # offset for the corner-peek rays (radians)
 HIT_EPS = 1e-6          # nearer hits lie on the segment under the light (px)
 LIGHT_RGB = [1.0, 0.86, 0.45].freeze  # warm flashlight tint
@@ -62,7 +64,7 @@ reset = lambda do
   segments.clear
   corners.clear
 
-  # The window border so every ray terminates somewhere.
+  # The window border, so the light stops at the edge of the world.
   segments.push([0, 0, WIDTH, 0],
                 [WIDTH, 0, WIDTH, HEIGHT],
                 [WIDTH, HEIGHT, 0, HEIGHT],
@@ -101,39 +103,42 @@ end
 # === Render ===
 
 render do
+  # A ray ends at the nearest wall or at FALLOFF, whichever comes first, so
+  # the lit fan never reaches past the distance the light has faded out at.
+  hits = []
+  cast = lambda do |ang|
+    dx = Math.cos(ang)
+    dy = Math.sin(ang)
+    best_t = FALLOFF
+    segments.each do |sx1, sy1, sx2, sy2|
+      t = ray_segment_t(light_x, light_y, dx, dy, sx1, sy1, sx2, sy2)
+      best_t = t if t && t < best_t
+    end
+    hits << [light_x + dx * best_t, light_y + dy * best_t, ang, best_t]
+  end
+
   # For every corner in the scene, cast three rays — one straight at
   # the corner and one tiny offset on each side — so the second pair
   # slips past and lands on whatever wall is hiding behind it. The
-  # difference between the two is exactly the shadow boundary.
-  hits = []
+  # difference between the two is exactly the shadow boundary. A ring of
+  # evenly spaced rays rounds off the light's own edge wherever no wall is
+  # near enough to shape it.
   corners.each do |cx, cy|
     base = Math.atan2(cy - light_y, cx - light_x)
-    [-ANGLE_EPS, 0.0, ANGLE_EPS].each do |off|
-      ang = base + off
-      dx  = Math.cos(ang)
-      dy  = Math.sin(ang)
-      best_t = nil
-      segments.each do |sx1, sy1, sx2, sy2|
-        t = ray_segment_t(light_x, light_y, dx, dy, sx1, sy1, sx2, sy2)
-        next if t.nil?
-
-        best_t = t if best_t.nil? || t < best_t
-      end
-      next if best_t.nil?
-
-      hits << [light_x + dx * best_t, light_y + dy * best_t, ang, best_t]
-    end
+    [-ANGLE_EPS, 0.0, ANGLE_EPS].each { |off| cast.call(base + off) }
   end
+  RING_RAYS.times { |i| cast.call(i * 2 * Math::PI / RING_RAYS - Math::PI) }
   hits.sort_by! { |h| h[2] }
 
   # Triangle fan from the light to each consecutive pair of hits. The
-  # per-vertex alpha (opaque at the source, transparent at FALLOFF)
-  # gives the radial falloff so far walls fade into shadow.
-  inner = [LIGHT_RGB[0], LIGHT_RGB[1], LIGHT_RGB[2], 0.92]
+  # per-vertex alpha falls off linearly with distance, from LIGHT_ALPHA at
+  # the source to zero at FALLOFF, which no ray now passes, so brightness
+  # depends on distance alone and far walls fade into shadow.
+  inner = [LIGHT_RGB[0], LIGHT_RGB[1], LIGHT_RGB[2], LIGHT_ALPHA]
   hits.each_with_index do |(hx, hy, _, t1), i|
     nx, ny, _, t2 = hits[(i + 1) % hits.length]
-    a1 = (1.0 - t1 / FALLOFF).clamp(0.0, 0.92)
-    a2 = (1.0 - t2 / FALLOFF).clamp(0.0, 0.92)
+    a1 = LIGHT_ALPHA * (1.0 - t1 / FALLOFF)
+    a2 = LIGHT_ALPHA * (1.0 - t2 / FALLOFF)
     Triangle.render(
       x1: light_x, y1: light_y,
       x2: hx,      y2: hy,
