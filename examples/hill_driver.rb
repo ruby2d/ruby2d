@@ -170,7 +170,8 @@ on_ground = true
 gas = false
 brake = false
 turbo = false
-tilt = 0
+tilt_up = false     # each arrow keeps its own latch, so releasing one
+tilt_down = false   # leaves the other tilting
 # Effective inputs, recombined each frame from the keyboard latches above and
 # the live gamepad (see the top of `update`). Declared here so both `update`
 # and `render` close over the same variables.
@@ -197,7 +198,7 @@ reset = lambda do
   ang_vel = 0.0
   wheel_spin = 0.0
   on_ground = true
-  gas = false; brake = false; turbo = false; tilt = 0
+  gas = false; brake = false; turbo = false; tilt_up = false; tilt_down = false
   fuel = START_FUEL
   score = 0
   sparks.clear
@@ -230,8 +231,8 @@ on :key_down do |event|
   case event.key
   when :right then gas = true
   when :left then brake = true
-  when :up then tilt = -1
-  when :down then tilt = 1
+  when :up then tilt_up = true
+  when :down then tilt_down = true
   when :space then turbo = true
   when :r then reset.call
   end
@@ -241,7 +242,8 @@ on :key_up do |event|
   case event.key
   when :right then gas = false
   when :left then brake = false
-  when :up, :down then tilt = 0
+  when :up then tilt_up = false
+  when :down then tilt_down = false
   when :space then turbo = false
   end
 end
@@ -263,7 +265,7 @@ update do |dt|
   accel    = gas
   braking  = brake
   boosting = turbo
-  tilt_dir = tilt
+  tilt_dir = (tilt_down ? 1 : 0) - (tilt_up ? 1 : 0)
   gamepads.each do |pad|
     accel    ||= pad.axis(:right_trigger) > 0.1 || pad.held?(:south) || pad.held?(:dpad_right)
     braking  ||= pad.axis(:left_trigger)  > 0.1 || pad.held?(:dpad_left)

@@ -230,7 +230,9 @@ player_x = 0.0       # lateral offset; -1 = left rumble, +1 = right rumble
 speed = 0.0
 throttle = false
 brake = false
-steer = 0
+steer_left = false   # each arrow keeps its own latch, so releasing one
+steer_right = false  # leaves the other steering; `steer` combines them
+steer = 0            # derived each update from the latches; `render` reads it
 sun_offset = 0.0
 
 reset = lambda do
@@ -239,7 +241,8 @@ reset = lambda do
   speed = 0.0
   throttle = false
   brake = false
-  steer = 0
+  steer_left = false
+  steer_right = false
   sun_offset = 0.0
   sun.x = WIDTH * 0.7
   sun_glow.x = WIDTH * 0.7
@@ -252,8 +255,8 @@ on :key_down do |event|
   case event.key
   when :up then throttle = true
   when :down then brake = true
-  when :left then steer = -1
-  when :right then steer = 1
+  when :left then steer_left = true
+  when :right then steer_right = true
   when :r then reset.call
   end
 end
@@ -262,14 +265,16 @@ on :key_up do |event|
   case event.key
   when :up then throttle = false
   when :down then brake = false
-  when :left then steer = 0 if steer == -1
-  when :right then steer = 0 if steer == 1
+  when :left then steer_left = false
+  when :right then steer_right = false
   end
 end
 
 # === Per-frame update ===
 
 update do |dt|
+  steer = (steer_right ? 1 : 0) - (steer_left ? 1 : 0)
+
   if throttle
     speed += ACCEL * dt
   elsif brake

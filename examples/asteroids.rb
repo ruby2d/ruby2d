@@ -62,6 +62,13 @@ ship_y = HEIGHT / 2.0
 ship_vx = 0.0
 ship_vy = 0.0
 ship_angle = -Math::PI / 2  # facing up (-y)
+key_left = false      # keyboard latches, flipped by the key handlers
+key_right = false
+key_thrust = false
+key_fire = false
+# Effective inputs, recombined each frame from the keyboard latches above
+# and every connected gamepad (see the top of `update`). Declared here so
+# `update` and `render` close over the same variables.
 left = false
 right = false
 thrust = false
@@ -119,48 +126,30 @@ reset.call
 
 # === Input ===
 #
-# Hold-to-repeat keys (left/right/up/space) flip booleans the update loop
-# reads each frame. The fire `cooldown` paces space-held auto-fire.
+# Hold-to-repeat keys (left/right/up/space) flip latches that the update
+# loop combines with the gamepads' held state each frame. The fire
+# `cooldown` paces space-held auto-fire.
 
 on :key_down do |event|
   case event.key
   when :left
-    left = true
+    key_left = true
   when :right
-    right = true
+    key_right = true
   when :up
-    thrust = true
+    key_thrust = true
   when :space
-    firing = true
+    key_fire = true
   when :r
     reset.call
   end
 end
 
 on :key_up do |event|
-  left = false if event.key? :left
-  right = false if event.key? :right
-  thrust = false if event.key? :up
-  firing = false if event.key? :space
-end
-
-# Gamepad: dpad left/right/up mirror the rotation and thrust keys; any button fires.
-on :gamepad_button_down do |_pad, button|
-  case button
-  when :dpad_left  then left = true
-  when :dpad_right then right = true
-  when :dpad_up    then thrust = true
-  end
-  firing = true
-end
-
-on :gamepad_button_up do |pad, button|
-  case button
-  when :dpad_left  then left = false
-  when :dpad_right then right = false
-  when :dpad_up    then thrust = false
-  end
-  firing = false if pad.buttons_held.empty?
+  key_left = false if event.key? :left
+  key_right = false if event.key? :right
+  key_thrust = false if event.key? :up
+  key_fire = false if event.key? :space
 end
 
 # === Per-frame update ===
@@ -171,6 +160,14 @@ end
 # rate `vx *= Math.exp(-rate * dt)`), so feel is identical at any refresh rate.
 
 update do |dt|
+  # Combine the keyboard latches with the live state of every gamepad, so
+  # a release on one device can't cancel a control another still holds. Dpad
+  # left/right/up mirror the rotation and thrust keys; any button fires.
+  left = key_left || gamepads.any? { |pad| pad.held?(:dpad_left) }
+  right = key_right || gamepads.any? { |pad| pad.held?(:dpad_right) }
+  thrust = key_thrust || gamepads.any? { |pad| pad.held?(:dpad_up) }
+  firing = key_fire || gamepads.any? { |pad| !pad.buttons_held.empty? }
+
   # Ship state machine: respawning, otherwise alive and being driven.
   if respawn_timer.positive?
     respawn_timer -= dt
