@@ -51,6 +51,8 @@ EMBER_LIFE = 0.22          # turbo exhaust ember lifetime (sec)
 EMBER_RATE = 180           # turbo exhaust embers thrown per second
 FUEL_FLASH = 0.35          # fuel-bar flash duration on pickup (sec)
 PX_PER_M = 12              # world px shown as one meter in the HUD
+FUEL_COLOR = '#fbbf24'     # fuel bar amber; a pickup flashes it white
+FUEL_RGB = Color.new(FUEL_COLOR)
 
 # Daytime sky, sun, and clouds. The sky, sun, and clouds are static backdrop
 # objects living behind the HUD; the world scrolls past in the render block.
@@ -144,7 +146,7 @@ CLOUDS.each { |cx, cy, s| build_cloud(cx, cy, s) }
 fuel_label = Text.new('', x: 16, y: 12, size: 16, color: '#1e293b', z: 20)
 score_label = Text.new('', x: 16, y: 34, size: 16, color: '#1e293b', z: 20)
 Rectangle.new(x: 16, y: 60, width: 220, height: 8, color: '#1e293b', z: 19)
-fuel_bar = Rectangle.new(x: 16, y: 60, width: 0, height: 8, color: '#fbbf24', z: 20)
+fuel_bar = Rectangle.new(x: 16, y: 60, width: 0, height: 8, color: FUEL_COLOR, z: 20)
 dist_label = Text.new('', x: WIDTH - 128, y: 12, size: 16, color: '#1e293b', z: 20)
 
 # End-of-run banner — hidden until the run finishes. `x: :center` re-resolves
@@ -205,6 +207,7 @@ reset = lambda do
   embers.clear
   ember_accum = 0.0
   fuel_flash = 0.0
+  fuel_bar.color = FUEL_COLOR   # a flash cut short here would stay white
   can_collected.fill(false)
   finished = false
   banner_panel.hide
@@ -434,13 +437,13 @@ update do |dt|
   end
   embers.reject! { |e| e[4] <= 0 }
 
-  # Fade the fuel bar from a white flash back to its amber (#fbbf24).
+  # Fade the fuel bar from a white flash back to its amber.
   if fuel_flash > 0
     fuel_flash -= dt
     t = (fuel_flash / FUEL_FLASH).clamp(0.0, 1.0)
-    fuel_bar.color.r = 0.984 + (1 - 0.984) * t
-    fuel_bar.color.g = 0.749 + (1 - 0.749) * t
-    fuel_bar.color.b = 0.141 + (1 - 0.141) * t
+    fuel_bar.color.r = FUEL_RGB.r + (1 - FUEL_RGB.r) * t
+    fuel_bar.color.g = FUEL_RGB.g + (1 - FUEL_RGB.g) * t
+    fuel_bar.color.b = FUEL_RGB.b + (1 - FUEL_RGB.b) * t
   end
 
   if fuel <= 0
