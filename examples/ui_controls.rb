@@ -70,6 +70,7 @@ random_btn = Button.new(x: 134, y: 440, width: 106, height: 34,
 mode = :circle
 pulse = false
 drag_slider = nil
+drag_button = nil
 t = 0.0
 
 redraw = lambda do
@@ -132,17 +133,20 @@ random_btn.on(:click) do
 end
 
 # Sliders drag rather than click, so they stay on the window's mouse handlers.
+# Only the button that started the drag ends it; another is ignored meanwhile.
 on :mouse_down do |event|
+  next if drag_slider
   sliders.each do |s|
     next unless event.x.between?(15, 215) && event.y.between?(s[:y] - 10, s[:y] + 16)
 
     drag_slider = s
+    drag_button = event.button
     set_slider.call(s, event.x)
   end
 end
 
-on :mouse_up do
-  drag_slider = nil
+on :mouse_up do |event|
+  drag_slider = nil if event.button == drag_button
 end
 
 on :mouse_move do |event|

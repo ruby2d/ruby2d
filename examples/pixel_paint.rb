@@ -287,7 +287,7 @@ on :mouse_down do |event|
   last_y = cy
 end
 
-on :mouse_up do
+on mouse_up: :left do
   drawing = false
   last_x = nil
   last_y = nil

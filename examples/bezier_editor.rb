@@ -31,6 +31,7 @@ handles = points.each_with_index.map do |(x, y), i|
 end
 
 drag_index = nil
+drag_button = nil
 
 def bezier_point(points, t)
   u = 1.0 - t
@@ -68,16 +69,19 @@ redraw.call
 
 # === Input ===
 
+# Only the button that started the drag ends it; another is ignored meanwhile.
 on :mouse_down do |event|
+  next if drag_index
   drag_index = points.each_index.find do |i|
     dx = points[i][0] - event.x
     dy = points[i][1] - event.y
     dx * dx + dy * dy <= GRAB_RADIUS * GRAB_RADIUS
   end
+  drag_button = event.button
 end
 
-on :mouse_up do
-  drag_index = nil
+on :mouse_up do |event|
+  drag_index = nil if event.button == drag_button
 end
 
 on :mouse_move do |event|

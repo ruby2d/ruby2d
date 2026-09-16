@@ -51,15 +51,19 @@ SPHERE.freeze
 rot_x = 0.4
 rot_y = 0.0
 drag_from = nil
+drag_button = nil
 
 # === Input ===
 
+# Only the button that started the drag ends it; another is ignored meanwhile.
 on :mouse_down do |event|
+  next if drag_from
   drag_from = [event.x, event.y]
+  drag_button = event.button
 end
 
-on :mouse_up do
-  drag_from = nil
+on :mouse_up do |event|
+  drag_from = nil if event.button == drag_button
 end
 
 on :mouse_move do |event|

@@ -51,7 +51,7 @@ next_grid = Array.new(ROWS) { Array.new(COLS, 0) }
 paused = false
 step_timer = STEP_INTERVAL
 generation = 0
-mouse_held = false
+paint_button = nil   # mouse button painting, nil between clicks
 mouse_paint = 1
 mouse_x = -1
 mouse_y = -1
@@ -84,15 +84,17 @@ end
 
 # === Input ===
 
+# Only the button that started the stroke ends it; another is ignored meanwhile.
 on :mouse_down do |event|
-  mouse_held = true
+  next if paint_button
+  paint_button = event.button
   mouse_paint = event.button?(:right) ? 0 : 1
   mouse_x = event.x
   mouse_y = event.y
 end
 
-on :mouse_up do
-  mouse_held = false
+on :mouse_up do |event|
+  paint_button = nil if event.button == paint_button
 end
 
 on :mouse_move do |event|
@@ -120,7 +122,7 @@ end
 # === Per-frame update ===
 
 update do |dt|
-  paint.call(mouse_x, mouse_y, mouse_paint) if mouse_held
+  paint.call(mouse_x, mouse_y, mouse_paint) if paint_button
 
   # The timer keeps its remainder across generations instead of restarting at
   # a full interval, so the cadence holds at any refresh rate: restarting

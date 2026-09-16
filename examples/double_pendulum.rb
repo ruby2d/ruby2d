@@ -187,7 +187,7 @@ end
 
 # Release: keep the drag-estimated angular velocity (capped) as the
 # throw, so a flick imparts spin and letting go at rest just drops it.
-on :mouse_up do
+on mouse_up: :left do
   next unless dragging
   dragging = false
   w1 = w1.clamp(-THROW_MAX, THROW_MAX)

@@ -197,7 +197,7 @@ next_active = Array.new(ROWS, false)
 dirty = []                               # cell indices touched since last repaint
 
 material = SAND
-mouse_held = false
+brush_button = nil   # mouse button dropping material, nil between clicks
 brush_x = -1
 brush_y = -1
 sim_accum = 0.0
@@ -220,15 +220,16 @@ end
 
 # === Input ===
 
+# Only the button that started the stroke ends it; another is ignored meanwhile.
 on :mouse_down do |event|
-  next if event.y < TOOLBAR_H
-  mouse_held = true
+  next if brush_button || event.y < TOOLBAR_H
+  brush_button = event.button
   brush_x = event.x
   brush_y = event.y - TOOLBAR_H
 end
 
-on :mouse_up do
-  mouse_held = false
+on :mouse_up do |event|
+  brush_button = nil if event.button == brush_button
 end
 
 on :mouse_move do |event|
@@ -260,7 +261,7 @@ end
 
 update do |dt|
   dt = [dt, 1.0 / 30].min  # cap to bound sim catchup on lag spikes
-  paint(grid, active, dirty, brush_x, brush_y, material) if mouse_held && brush_y >= 0
+  paint(grid, active, dirty, brush_x, brush_y, material) if brush_button && brush_y >= 0
 
   sim_accum += SIM_RATE * dt
   count = sim_accum.to_i

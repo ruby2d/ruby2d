@@ -619,7 +619,7 @@ on :mouse_down do |event|
   last_mouse = pos
 end
 
-on :mouse_up do
+on mouse_up: :left do
   mouse_held = false
   last_mouse = nil
 end

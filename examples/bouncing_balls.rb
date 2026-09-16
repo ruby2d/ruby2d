@@ -51,23 +51,25 @@ end
 
 balls = Array.new(INITIAL_BALLS) { make_ball }
 
-mouse_held = false
+spawn_button = nil   # mouse button held to keep spawning, nil between clicks
 mouse_x = 0
 mouse_y = 0
 spawn_accum = 0.0  # seconds accumulated toward the next spawn while held
 
 # === Input ===
 
+# Only the button that started spawning ends it; another is ignored meanwhile.
 on :mouse_down do |event|
-  mouse_held = true
+  next if spawn_button
+  spawn_button = event.button
   mouse_x = event.x
   mouse_y = event.y
   add_ball(balls, mouse_x, mouse_y)
   spawn_accum = 0.0
 end
 
-on :mouse_up do
-  mouse_held = false
+on :mouse_up do |event|
+  spawn_button = nil if event.button == spawn_button
 end
 
 on :mouse_move do |event|
@@ -83,7 +85,7 @@ end
 # === Per-frame update ===
 
 update do |dt|
-  if mouse_held
+  if spawn_button
     spawn_accum += dt
     while spawn_accum >= SPAWN_INTERVAL
       spawn_accum -= SPAWN_INTERVAL

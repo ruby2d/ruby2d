@@ -68,6 +68,7 @@ path = []                # final reconstructed path
 reveal_idx = 0           # how many of `closed_order` have been drawn so far
 reveal_accum = 0.0        # cells owed by elapsed time but not yet revealed
 mouse_mode = :none
+mouse_button = nil
 dirty = true
 
 # === Operations ===
@@ -135,14 +136,16 @@ end
 
 # === Input ===
 
+# Only the button that started the edit ends it; another is ignored meanwhile.
 on :mouse_down do |event|
-  next if event.y < GRID_TOP
+  next if mouse_mode != :none || event.y < GRID_TOP
 
   cx = (event.x / CELL).floor
   cy = ((event.y - GRID_TOP) / CELL).floor
   next if cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS
 
   cell = [cx, cy]
+  mouse_button = event.button
   mouse_mode = if cell == start_cell
                  :move_start
                elsif cell == goal_cell
@@ -158,8 +161,8 @@ on :mouse_down do |event|
                end
 end
 
-on :mouse_up do
-  mouse_mode = :none
+on :mouse_up do |event|
+  mouse_mode = :none if event.button == mouse_button
 end
 
 on :mouse_move do |event|
