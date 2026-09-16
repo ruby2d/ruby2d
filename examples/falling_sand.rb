@@ -107,7 +107,7 @@ end
 # render pass repaints just those.
 def step(grid, active, next_active, dirty)
   next_active.fill(false)
-  r = ROWS - 2
+  r = ROWS - 1
   while r >= 0
     unless active[r]
       r -= 1
@@ -115,6 +115,7 @@ def step(grid, active, next_active, dirty)
     end
     row_moved = false
     base = r * COLS
+    floor = r == ROWS - 1   # nothing below the last row: read it as stone
     # Scan alternating directions at random so piles don't lean one way
     if rand < 0.5
       c = 0; last_c = COLS; c_step = 1
@@ -126,7 +127,7 @@ def step(grid, active, next_active, dirty)
       cell = grid[i]
       if cell == SAND || cell == WATER
         bi = i + COLS
-        below = grid[bi]
+        below = floor ? STONE : grid[bi]
 
         # Fall straight down into empty or (sand only) sink through water
         if below == EMPTY || (cell == SAND && below == WATER)
@@ -142,7 +143,7 @@ def step(grid, active, next_active, dirty)
           while tries < 2
             nc = c + d
             if nc >= 0 && nc < COLS
-              target = grid[bi + d]
+              target = floor ? STONE : grid[bi + d]
               if target == EMPTY || (cell == SAND && target == WATER)
                 grid[bi + d] = cell
                 grid[i] = target
@@ -180,7 +181,7 @@ def step(grid, active, next_active, dirty)
     if row_moved
       next_active[r] = true
       next_active[r - 1] = true if r > 0
-      next_active[r + 1] = true
+      next_active[r + 1] = true unless floor
     end
     r -= 1
   end
