@@ -631,7 +631,13 @@ end
 on :mouse_move do |event|
   next unless mouse_held
   pos = user_grid_coords(event)
-  next unless pos
+  # Leaving the grid breaks the stroke, so the first point back inside
+  # starts a new one instead of being joined to the last point before the
+  # detour by a line the cursor never drew.
+  unless pos
+    last_mouse = nil
+    next
+  end
   if last_mouse
     stroke(user_grid, *last_mouse, *pos, USER_BRUSH)
   else

@@ -165,27 +165,34 @@ mouse_y = HEIGHT / 2
 prev_mx = mouse_x
 prev_my = mouse_y
 mouse_inside = false
+mouse_fresh = true   # no move since the cursor entered, so `prev_m*` is stale
 paused = false
 tick = 0
 sim_accum = 0.0
 
 # === Input ===
 
+# Where the cursor went while outside is unknown, so injection waits for
+# the first move after re-entry, which sets both the position and the
+# baseline its delta is measured from. Measuring that move against the
+# last position inside would inject the travel outside as one stroke.
 on :mouse_enter do
   mouse_inside = true
+  mouse_fresh = true
 end
 
 on :mouse_leave do
   mouse_inside = false
-  # Resync prev on re-entry so the first move post-leave doesn't inject
-  # a huge ghost delta from the stale prior position.
-  prev_mx = mouse_x
-  prev_my = mouse_y
 end
 
 on :mouse_move do |event|
   mouse_x = event.x
   mouse_y = event.y
+  if mouse_fresh
+    prev_mx = mouse_x
+    prev_my = mouse_y
+    mouse_fresh = false
+  end
 end
 
 on key_down: :space do
@@ -246,7 +253,7 @@ update do |dt|
       end
     end
 
-    if mouse_inside
+    if mouse_inside && !mouse_fresh
       cx = (mouse_x.to_f / CELL).to_i.clamp(1, NX)
       cy = (mouse_y.to_f / CELL).to_i.clamp(1, NY)
       # Mouse delta stays in pixels so MOUSE_VEL is comparable to stable_fluids'

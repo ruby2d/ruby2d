@@ -294,12 +294,21 @@ on mouse_up: :left do
 end
 
 on :mouse_move do |event|
-  next unless drawing && event.y >= CANVAS_Y
+  next unless drawing
+
+  # A detour through the toolbar breaks the stroke, so the first point back
+  # on the canvas starts a new one instead of being joined to the last
+  # point before the detour by a line the cursor never drew.
+  if event.y < CANVAS_Y
+    last_x = nil
+    last_y = nil
+    next
+  end
 
   cx = event.x
   cy = event.y - CANVAS_Y
   sz = SIZES[current_size_idx]
-  stroke(last_x, last_y, cx, cy, sz) do |x, y|
+  stroke(last_x || cx, last_y || cy, cx, cy, sz) do |x, y|
     if eraser_on
       erase(canvas, x, y, sz)
     else
