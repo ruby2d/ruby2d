@@ -397,26 +397,25 @@ render z: :background do
     # Local-space layout (nose at +x), rotated into world space:
     #   wx = ship_x + px*cos - py*sin
     #   wy = ship_y + px*sin + py*cos
+    c = Math.cos(ship_angle)
+    s = Math.sin(ship_angle)
+    to_world = ->(px, py) { [ship_x + px * c - py * s, ship_y + px * s + py * c] }
     ship_pts = [[SHIP_R, 0], [-SHIP_R * 0.8, -SHIP_R * 0.65], [-SHIP_R * 0.45, 0],
-                [-SHIP_R * 0.8, SHIP_R * 0.65]].map do |px, py|
-      c = Math.cos(ship_angle)
-      s = Math.sin(ship_angle)
-      [ship_x + px * c - py * s, ship_y + px * s + py * c]
-    end
-    if thrust
-      # Flame triangle behind the ship, flickering via random length offsets.
-      outer = 22 + rand * 14
-      inner = 8 + rand * 4
-      flame = [
-        ship_pts[2],
-        [ship_x - Math.cos(ship_angle) * outer, ship_y - Math.sin(ship_angle) * outer],
-        [ship_x - Math.cos(ship_angle) * inner, ship_y - Math.sin(ship_angle) * inner]
-      ]
-      Triangle.render(x1: flame[0][0], y1: flame[0][1], x2: flame[1][0], y2: flame[1][1],
-                      x3: flame[2][0], y3: flame[2][1],
-                      color: ['#fde047', '#f97316', '#fbbf24'], opacity: ship_alpha)
-    end
-    wrap_offsets.call(ship_x, ship_y, SHIP_R).each do |ox, oy|
+                [-SHIP_R * 0.8, SHIP_R * 0.65]].map { |px, py| to_world.call(px, py) }
+    # Flame triangle behind the ship, laid out in ship space like the hull:
+    # its base spans the tail notch and its tip flickers along the axis, so
+    # it keeps its width at every heading. It wraps with the hull, reaching
+    # `outer` behind the ship.
+    outer = 22 + rand * 14
+    flame = [to_world.call(-SHIP_R * 0.5, -SHIP_R * 0.32),
+             to_world.call(-outer, (rand - 0.5) * 4),
+             to_world.call(-SHIP_R * 0.5, SHIP_R * 0.32)]
+    wrap_offsets.call(ship_x, ship_y, thrust ? outer : SHIP_R).each do |ox, oy|
+      if thrust
+        Triangle.render(x1: flame[0][0] + ox, y1: flame[0][1] + oy, x2: flame[1][0] + ox, y2: flame[1][1] + oy,
+                        x3: flame[2][0] + ox, y3: flame[2][1] + oy,
+                        color: ['#fde047', '#f97316', '#fbbf24'], opacity: ship_alpha)
+      end
       pts = ship_pts.map { |px, py| [px + ox, py + oy] }
       Polyline.render(points: pts, closed: true, stroke_width: 2,
                       color: '#e5e7eb', opacity: ship_alpha)
