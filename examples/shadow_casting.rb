@@ -16,6 +16,7 @@ OBS_MIN = 36            # smallest obstacle side, in pixels
 OBS_MAX = 130           # largest obstacle side, in pixels
 FALLOFF = 480           # distance over which the light fades to dark
 ANGLE_EPS = 0.0003      # offset for the corner-peek rays (radians)
+HIT_EPS = 1e-6          # nearer hits lie on the segment under the light (px)
 LIGHT_RGB = [1.0, 0.86, 0.45].freeze  # warm flashlight tint
 
 # === Window ===
@@ -28,8 +29,10 @@ set render_mode: :on_demand
 # === Helpers ===
 
 # Ray (rx, ry) + t * (dx, dy) intersected with segment (s1)→(s2).
-# Returns the ray parameter t (>= 0) of the closest hit, or nil. Since
-# (dx, dy) is a unit vector, t is the hit distance in pixels.
+# Returns the ray parameter t (> 0) of the closest hit, or nil. Since
+# (dx, dy) is a unit vector, t is the hit distance in pixels. A hit at the
+# origin is the segment the light sits on (the window border, when the
+# cursor is at its edge), which must not stop the ray from leaving it.
 def ray_segment_t(rx, ry, dx, dy, sx1, sy1, sx2, sy2)
   ex = sx2 - sx1
   ey = sy2 - sy1
@@ -39,7 +42,7 @@ def ray_segment_t(rx, ry, dx, dy, sx1, sy1, sx2, sy2)
   inv = 1.0 / denom
   t = ((sx1 - rx) * ey - (sy1 - ry) * ex) * inv
   u = ((sx1 - rx) * dy - (sy1 - ry) * dx) * inv
-  return nil if t < 0 || u < 0 || u > 1
+  return nil if t < HIT_EPS || u < 0 || u > 1
 
   t
 end
