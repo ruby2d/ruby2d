@@ -3,7 +3,8 @@
 #
 # Eat the red square to grow longer and earn a point. Every five points
 # the snake speeds up. The world wraps at the edges, but the snake dies
-# if it crosses itself. Press `r` at any time to start a new game.
+# if it crosses itself; fill every cell and you win. Press `r` at any
+# time to start a new game.
 
 require 'ruby2d'
 
@@ -31,7 +32,11 @@ set close_on_esc: true
 
 # === Helpers ===
 
+# A random free cell, or nil once the snake fills the board (the rejection
+# loop below would otherwise never end).
 def place_food(snake)
+  return nil if snake.length >= COLS * ROWS
+
   pos = [rand(COLS), rand(ROWS)]
   pos = [rand(COLS), rand(ROWS)] while snake.include?(pos)
   pos
@@ -70,6 +75,7 @@ reset = lambda do
   food = place_food(snake)
   food_sq.x = food[0] * GRID + 2
   food_sq.y = food[1] * GRID + 2
+  food_sq.show
   score = 0
   interval = START_INTERVAL
   move_timer = 0  # first move runs immediately on next frame
@@ -126,8 +132,14 @@ update do |dt|
       interval = [MIN_INTERVAL, interval - INTERVAL_STEP].max if score % SPEEDUP_EVERY == 0
       grow += GROWTH
       food = place_food(snake)
-      food_sq.x = food[0] * GRID + 2
-      food_sq.y = food[1] * GRID + 2
+      if food.nil?
+        alive = false
+        food_sq.hide
+        label.content = "You win!  Score: #{score}  ▸  press r to restart"
+      else
+        food_sq.x = food[0] * GRID + 2
+        food_sq.y = food[1] * GRID + 2
+      end
     end
 
     if grow > 0
@@ -142,6 +154,7 @@ update do |dt|
       g = i.to_f / [segments.size - 1, 1].max
       s.color = [0.02 + 0.04 * g, 0.84 - 0.5 * g, 0.63 - 0.3 * g, 1]
     end
+    break unless alive
   end
 end
 
