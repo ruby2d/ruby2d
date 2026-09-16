@@ -222,7 +222,8 @@ update do |dt|
                else                facing
                end
 
-  # Animation transitions on the ground only — mid-air sticks on :jump.
+  # Animation transitions on the ground only — mid-air sticks on :jump, but
+  # the held pose still turns with the steering.
   if on_ground
     desired = vx.abs > 20 ? :walk : :idle
     if desired != state || new_facing != facing
@@ -230,6 +231,8 @@ update do |dt|
       player.play(animation: desired, loop: true, flip: flip)
       state = desired
     end
+  elsif new_facing != facing
+    player.flip = new_facing == :left ? :horizontal : nil
   end
   facing = new_facing
 

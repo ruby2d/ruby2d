@@ -1349,6 +1349,7 @@ sprite.paused?   # => true / false
 sprite.playing?  # true while actively animating; false when idle, paused, or held
 sprite.looping?  # true if the current animation loops
 sprite.loop = false  # toggle looping mid-play (doesn't restart the animation)
+sprite.flip = :horizontal  # turn the pose mid-play (doesn't restart the animation)
 ```
 
 `pause` is idempotent and a no-op when nothing is playing. `play` and `stop` both clear the paused state.
