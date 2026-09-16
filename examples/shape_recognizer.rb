@@ -603,10 +603,14 @@ end
 
 # === Input ===
 
+# Cursor position in grid units, where an integer coordinate is the center
+# of the cell drawn at that index (the convention `stamp` and the training
+# shapes use), so a click in the middle of a cell lands on that cell alone.
 def user_grid_coords(event)
   return nil unless event.x.between?(DRAW_X, DRAW_RIGHT - 1) &&
                     event.y.between?(DRAW_Y, DRAW_Y + DRAW_W - 1)
-  [(event.x - DRAW_X) / DRAW_CELL.to_f, (event.y - DRAW_Y) / DRAW_CELL.to_f]
+  [(event.x - DRAW_X) / DRAW_CELL.to_f - 0.5,
+   (event.y - DRAW_Y) / DRAW_CELL.to_f - 0.5]
 end
 
 on :mouse_down do |event|
