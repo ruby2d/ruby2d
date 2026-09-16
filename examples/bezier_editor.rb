@@ -69,14 +69,16 @@ redraw.call
 
 # === Input ===
 
-# Only the button that started the drag ends it; another is ignored meanwhile.
+# Of the handles under the cursor, take the last: it was created last, so
+# it draws on top and is the one the user sees. Only the button that started
+# the drag ends it; another is ignored meanwhile.
 on :mouse_down do |event|
   next if drag_index
-  drag_index = points.each_index.find do |i|
+  drag_index = points.each_index.select do |i|
     dx = points[i][0] - event.x
     dy = points[i][1] - event.y
     dx * dx + dy * dy <= GRAB_RADIUS * GRAB_RADIUS
-  end
+  end.last
   drag_button = event.button
 end
 

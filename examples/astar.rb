@@ -146,10 +146,12 @@ on :mouse_down do |event|
 
   cell = [cx, cy]
   mouse_button = event.button
-  mouse_mode = if cell == start_cell
-                 :move_start
-               elsif cell == goal_cell
+  # The goal is painted after the start, so where the two share a cell the
+  # goal is the marker showing, and the one a press there should take.
+  mouse_mode = if cell == goal_cell
                  :move_goal
+               elsif cell == start_cell
+                 :move_start
                elsif walls[cy][cx]
                  walls[cy][cx] = false
                  clear_search.call
