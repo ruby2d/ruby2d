@@ -25,6 +25,8 @@ BETA = 8.0 / 3.0
 DT = 0.005               # integration step (small enough for Euler stability)
 STEPS_PER_SEC = 3600     # integration steps per second
 TRAIL_LEN = 2200         # how many trail points to keep
+CENTER_Z = 25.0          # the attractor's vertical middle, in Lorenz units
+SEED_SPREAD = 20.0       # a restart begins within this much of that middle on each axis
 SCALE = 11               # pixels per Lorenz unit
 CAMERA = 180.0           # camera distance in scaled units
 TILT = 0.35              # fixed tilt around the screen-X axis (radians)
@@ -46,10 +48,13 @@ trail = []          # collected (lx, ly, lz) tuples in integration order
 spin = 0.0
 step_accum = 0.0    # integration steps owed but not yet taken
 
+# Start from a random point in the box around the attractor: every point is
+# drawn onto it within a few dozen steps, and a fresh one each time is what
+# gives a restart something new to show.
 reset = lambda do
-  lx = 0.1
-  ly = 0.0
-  lz = 0.0
+  lx = rand(-SEED_SPREAD..SEED_SPREAD)
+  ly = rand(-SEED_SPREAD..SEED_SPREAD)
+  lz = CENTER_Z + rand(-SEED_SPREAD..SEED_SPREAD)
   trail.clear
   step_accum = 0.0
 end
@@ -103,7 +108,7 @@ render do
   colors = []
   trail.each do |px, py, pz|
     wx = px
-    wy = pz - 25     # center the attractor vertically
+    wy = pz - CENTER_Z   # center the attractor vertically
     wz = py
 
     wy2 =  wy * ct - wz * st
