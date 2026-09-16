@@ -106,6 +106,13 @@ end
 
 # === Logic helpers ===
 
+# Seat a pad in the first open slot, hovering the color at that index.
+enroll = lambda do |pad|
+  i = slots.index(nil) or next
+  slots[i] = pad
+  players[pad] = { sel: i % COLORS.size, ready: false, seq: (arrivals += 1) }
+end
+
 # True if some other player has already locked the given color index.
 locked_by_other = lambda do |pad, color_idx|
   players.any? { |other, p| !other.equal?(pad) && p[:ready] && p[:sel] == color_idx }
@@ -206,6 +213,9 @@ end
 
 reset = lambda do
   players.each_value { |p| p[:ready] = false }   # return to the picker unlocked
+  # Pads that connected during play were held out until the picker was
+  # back, so seat them now.
+  gamepads.each { |pad| enroll.call(pad) unless players.key?(pad) }
   state = :select
   show_select.call
   refresh_hint.call
@@ -217,9 +227,7 @@ reset.call
 
 on :gamepad_connect do |pad|
   next unless state == :select
-  i = slots.index(nil) or next
-  slots[i] = pad
-  players[pad] = { sel: i % COLORS.size, ready: false, seq: (arrivals += 1) }
+  enroll.call(pad)
   update_all_markers.call
   update_rings.call
   refresh_hint.call
