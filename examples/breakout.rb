@@ -118,6 +118,10 @@ on key_up: :right do
 end
 
 on key_down: :space, gamepad_button_down: :south do
+  next if launched
+  # The mouse may have moved the paddle since the last update sat the ball
+  # on it, so the launch leaves from where the paddle is now.
+  ball.x = paddle.x + PADDLE_W / 2
   launched = true
   status_text.content = ''
 end

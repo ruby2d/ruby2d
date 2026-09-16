@@ -226,6 +226,9 @@ on :mouse_down do |event|
   brush_button = event.button
   brush_x = event.x
   brush_y = event.y - TOOLBAR_H
+  # The press paints at once: `update` paints only while a button is held,
+  # so a click over before the next update would otherwise leave nothing.
+  paint(grid, active, dirty, brush_x, brush_y, material)
 end
 
 on :mouse_up do |event|

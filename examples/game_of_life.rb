@@ -91,6 +91,9 @@ on :mouse_down do |event|
   mouse_paint = event.button?(:right) ? 0 : 1
   mouse_x = event.x
   mouse_y = event.y
+  # The press paints at once: `update` paints only while a button is held,
+  # so a click over before the next update would otherwise leave nothing.
+  paint.call(mouse_x, mouse_y, mouse_paint)
 end
 
 on :mouse_up do |event|

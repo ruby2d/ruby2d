@@ -129,6 +129,7 @@ t2 = 0.0
 w2 = 0.0
 hue = 0.0
 dragging = false
+releasing = false   # the drag ends after its last cursor sample is used
 mouse_x = PIVOT_X
 mouse_y = PIVOT_Y
 
@@ -161,6 +162,7 @@ reset = lambda do
   w1 = 0.0
   w2 = 0.0
   dragging = false
+  releasing = false
   grab_ring.hide
   canvas.clear
 end
@@ -177,22 +179,22 @@ on mouse_down: :left do |event|
   w1 = 0.0
   w2 = 0.0
   dragging = true
+  releasing = false
   grab_ring.show
 end
 
 on :mouse_move do |event|
+  next if releasing   # a move after the release is not part of the throw
   mouse_x = event.x
   mouse_y = event.y
 end
 
-# Release: keep the drag-estimated angular velocity (capped) as the
-# throw, so a flick imparts spin and letting go at rest just drops it.
+# Release: the drag ends in the next update, once the cursor's last
+# position has gone into the throw estimate; ending it here would drop a
+# move that arrived in the same frame as the release, and with it the
+# flick.
 on mouse_up: :left do
-  next unless dragging
-  dragging = false
-  w1 = w1.clamp(-THROW_MAX, THROW_MAX)
-  w2 = w2.clamp(-THROW_MAX, THROW_MAX)
-  grab_ring.hide
+  releasing = true if dragging
 end
 
 on(key_down: :r) { reset.call }
@@ -210,6 +212,16 @@ update do |dt|
       w2 += (wrap_pi(target[1] - t2) / dt - w2) * blend
     end
     t1, t2 = target
+
+    # Keep the drag-estimated angular velocity (capped) as the throw, so a
+    # flick imparts spin and letting go at rest just drops it.
+    if releasing
+      dragging = false
+      releasing = false
+      w1 = w1.clamp(-THROW_MAX, THROW_MAX)
+      w2 = w2.clamp(-THROW_MAX, THROW_MAX)
+      grab_ring.hide
+    end
   else
     step_dt = dt / SUB_STEPS
 
