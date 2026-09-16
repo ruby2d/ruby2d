@@ -20,6 +20,8 @@ require 'ruby2d'
 WIDTH = 800          # window width in pixels
 HEIGHT = 600         # window height in pixels
 SHIP_R = 15          # ship radius (used for collision and drawing)
+ROCK_JAG_MIN = 0.72  # shortest outline vertex, as a fraction of the collision radius
+ROCK_JAG_MAX = 1.17  # longest outline vertex, as a fraction of the collision radius
 BULLET_STEP = 12     # longest bullet move per hit test (px)
 FIRE_INTERVAL = 0.1  # seconds between auto-fire shots while space is held
 THRUST = 1152        # acceleration while thrusting (px/sec²)
@@ -46,7 +48,7 @@ Spark = Struct.new(:x, :y, :vx, :vy, :life, :max_life, :hue)
 def make_asteroid(x = rand(WIDTH), y = rand(HEIGHT), radius = 42)
   points = 10.times.map do |i|
     angle = i / 10.0 * Math::PI * 2
-    r = radius * (0.72 + rand * 0.45)
+    r = radius * rand(ROCK_JAG_MIN..ROCK_JAG_MAX)
     [Math.cos(angle) * r, Math.sin(angle) * r]
   end
   Asteroid.new(x, y, rand(-156.0..156.0), rand(-156.0..156.0), radius, points)
@@ -263,9 +265,11 @@ update do |dt|
     steps.times do
       b.x += b.vx * step_dt
       b.y += b.vy * step_dt
+      # Wrapped like the ship test below, so the copy of a rock drawn across
+      # an edge can be shot where it shows.
       hit = asteroids.find do |a|
-        dx = b.x - a.x
-        dy = b.y - a.y
+        dx = ((b.x - a.x + WIDTH / 2) % WIDTH) - WIDTH / 2
+        dy = ((b.y - a.y + HEIGHT / 2) % HEIGHT) - HEIGHT / 2
         dx * dx + dy * dy < a.radius * a.radius
       end
       break if hit
@@ -353,6 +357,22 @@ end
 # The whole game draws behind the HUD (z: :background), so the score and the
 # cleared banner always stay on top.
 render z: :background do
+  # The ship and bullet tests wrap across the screen, so anything reaching
+  # over an edge is drawn again on the far side (four times in a corner) and
+  # what shows is what can hit. The offsets to draw at, for a center and how
+  # far its outline reaches.
+  wrap_offsets = lambda do |x, y, reach|
+    xs = [0]
+    xs << WIDTH if x < reach
+    xs << -WIDTH if x > WIDTH - reach
+    ys = [0]
+    ys << HEIGHT if y < reach
+    ys << -HEIGHT if y > HEIGHT - reach
+    offsets = []
+    xs.each { |ox| ys.each { |oy| offsets << [ox, oy] } }
+    offsets
+  end
+
   # Background stars.
   stars.each do |sx, sy, sr, sa|
     Circle.render(x: sx, y: sy, radius: sr, color: [1.0, 1.0, 1.0, sa])
@@ -396,8 +416,11 @@ render z: :background do
                       x3: flame[2][0], y3: flame[2][1],
                       color: ['#fde047', '#f97316', '#fbbf24'], opacity: ship_alpha)
     end
-    Polyline.render(points: ship_pts, closed: true, stroke_width: 2,
-                    color: '#e5e7eb', opacity: ship_alpha)
+    wrap_offsets.call(ship_x, ship_y, SHIP_R).each do |ox, oy|
+      pts = ship_pts.map { |px, py| [px + ox, py + oy] }
+      Polyline.render(points: pts, closed: true, stroke_width: 2,
+                      color: '#e5e7eb', opacity: ship_alpha)
+    end
   end
 
   bullets.each do |b|
@@ -405,8 +428,10 @@ render z: :background do
   end
 
   asteroids.each do |a|
-    pts = a.points.map { |px, py| [a.x + px, a.y + py] }
-    Polyline.render(points: pts, closed: true, stroke_width: 2, color: '#94a3b8')
+    wrap_offsets.call(a.x, a.y, a.radius * ROCK_JAG_MAX).each do |ox, oy|
+      pts = a.points.map { |px, py| [a.x + ox + px, a.y + oy + py] }
+      Polyline.render(points: pts, closed: true, stroke_width: 2, color: '#94a3b8')
+    end
   end
 end
 
