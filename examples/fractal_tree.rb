@@ -70,7 +70,7 @@ set close_on_esc: true
 # === Structs and helpers ===
 
 Branch = Struct.new(:parent_idx, :base_angle, :length, :depth, :phase,
-                    :line, :tip_x, :tip_y, :leaf, :hue, :leaf_size)
+                    :line, :tip_x, :tip_y, :leaf, :hue, :leaf_size, :fade_from)
 Petal = Struct.new(:x, :y, :speed, :phase, :amp, :circle)
 
 def lerp(a, b, t)
@@ -135,7 +135,6 @@ season_idx = 0       # starts on winter (bare)
 season_timer = 0.0
 canopy = 0.0         # 0 bare … 1 full; eases toward the season's leafiness
 blend = 1.0          # canopy color cross-fade, 0 → 1 (1 = settled on season)
-from_season = 0      # season the cross-fade is coming from
 reseed_petals = false
 ground_top = GROUND_RGB[0][0].dup   # current ground colors, eased per season
 ground_bot = GROUND_RGB[0][1].dup
@@ -160,7 +159,9 @@ end
 
 # Advance to the next season. Petals recolor instantly (they were hidden in
 # between); the canopy either snaps to the new palette while it is hidden, or
-# cross-fades from the season it is leaving when the leaves are on show.
+# cross-fades from the colors each leaf is showing, so skipping ahead during
+# a fade carries on from where it had got to rather than jumping to the
+# palette it never reached.
 next_season = lambda do
   prev = season_idx
   season_idx = (season_idx + 1) % SEASONS.length
@@ -180,7 +181,10 @@ next_season = lambda do
       b.leaf.color = [c[0], c[1], c[2], 1]
     end
   else
-    from_season = prev
+    leaf_branches.each do |b|
+      c = b.leaf.color
+      b.fade_from = [c.r, c.g, c.b]
+    end
     blend = 0.0
   end
 end
@@ -256,7 +260,6 @@ update do |dt|
   if blending
     blend = [blend + dt / SEASON_FADE, 1.0].min
     blend_e = ease(blend)
-    from_pal = LEAF_RGB[from_season]
     to_pal = LEAF_RGB[season_idx]
   end
 
@@ -293,7 +296,7 @@ update do |dt|
     b.leaf.visible = canopy > 0.02 && grow > 0.5
     next unless blending
 
-    fc = from_pal[(b.hue * from_pal.size).to_i]
+    fc = b.fade_from
     tc = to_pal[(b.hue * to_pal.size).to_i]
     b.leaf.color = [lerp(fc[0], tc[0], blend_e), lerp(fc[1], tc[1], blend_e),
                     lerp(fc[2], tc[2], blend_e), 1]
