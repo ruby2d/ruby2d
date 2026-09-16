@@ -177,7 +177,9 @@ on :mouse_move do |event|
 
   case mouse_mode
   when :paint
-    unless walls[cy][cx]
+    # The start and goal stay open: a wall under a marker would hide behind
+    # it and block the search unseen.
+    unless walls[cy][cx] || [cx, cy] == start_cell || [cx, cy] == goal_cell
       walls[cy][cx] = true
       clear_search.call
     end
