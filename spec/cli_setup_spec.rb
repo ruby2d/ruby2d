@@ -16,8 +16,7 @@ RSpec.describe 'ruby2d/cli/setup helpers' do
       Dir.mktmpdir do |dir|
         tool_dir = File.join(dir, 'tool chain')
         Dir.mkdir(tool_dir)
-        cc = File.join(tool_dir, 'cc')
-        File.symlink(find_executable('sh'), cc)
+        cc = write_executable(tool_dir, 'cc')
         expect(setup_command?(cc)).to be true
         expect(find_executable(cc)).to eq(cc)
       end

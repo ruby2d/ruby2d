@@ -1,8 +1,20 @@
 require 'fileutils'
 require 'tmpdir'
+require_relative '../assets/target'
 
 RSpec.describe Ruby2D::Text do
   ROBOTO_MONO = File.expand_path('../assets/resources/fonts/roboto_mono/roboto_mono.ttf', __dir__)
+
+  # A temporary directory for font files. A loaded font stays open in the
+  # extension's font cache for reuse, and Windows refuses to delete an open
+  # file, so there the directory is left for the OS to clean up rather than
+  # failing the example on the way out.
+  def font_tmpdir
+    dir = Dir.mktmpdir
+    yield dir
+  ensure
+    FileUtils.remove_entry(dir) unless AssetsTarget.host_os == 'windows'
+  end
 
   describe '#new' do
     context 'using pathname' do
@@ -185,7 +197,7 @@ RSpec.describe Ruby2D::Text do
     end
 
     it 'keeps the previous font when the new file fails to load, so a retry is not a no-op' do
-      Dir.mktmpdir do |dir|
+      font_tmpdir do |dir|
         path = File.join(dir, 'selected.ttf')
         File.write(path, 'not a font')
         txt = Text.new('iiiiiiii', size: 24)
@@ -255,7 +267,7 @@ RSpec.describe Ruby2D::Text do
     end
 
     it 'loads a file named that way rather than expanding a home directory' do
-      Dir.mktmpdir do |dir|
+      font_tmpdir do |dir|
         FileUtils.cp(ROBOTO_MONO, File.join(dir, '~mono.ttf'))
         Dir.chdir(dir) do
           expect(Text.new('A', font: '~mono.ttf').font).to eq(File.join(Dir.pwd, '~mono.ttf'))
@@ -274,7 +286,7 @@ RSpec.describe Ruby2D::Text do
 
     it 'keeps naming the loaded file after the working directory changes' do
       # Two different fonts, both called `font.ttf`, in sibling directories
-      Dir.mktmpdir do |dir|
+      font_tmpdir do |dir|
         a = File.join(dir, 'a')
         b = File.join(dir, 'b')
         FileUtils.mkdir_p([a, b])

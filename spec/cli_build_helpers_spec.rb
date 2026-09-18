@@ -126,6 +126,15 @@ RSpec.describe 'ruby2d/cli/build helpers' do
       end
     end
 
+    # Windows makes a symlink a directory link only when Ruby can see that the
+    # target is a directory at creation, and it looks relative to the working
+    # directory, not the link. A relative target that only resolves from the
+    # link's directory comes out as a file link that nothing can traverse, so
+    # links to directories are created with the target resolved.
+    def link_dir(target, link)
+      File.symlink(File.expand_path(target, File.dirname(link)), link)
+    end
+
     describe '#asset_bundle_path' do
       it 'keeps the relative path of a directory inside the working directory' do
         FileUtils.mkdir_p('assets/media')
@@ -294,7 +303,7 @@ RSpec.describe 'ruby2d/cli/build helpers' do
         File.write('outside/big.txt', 'b')
         File.write('outside/deep/d.txt', 'd')
         File.symlink('../outside/big.txt', 'media/big.txt')
-        File.symlink('../outside/deep', 'media/deep')
+        link_dir('../outside/deep', 'media/deep')
         copy_tree('media', 'out/media')
         expect(File.symlink?('out/media/big.txt')).to be false
         expect(File.read('out/media/big.txt')).to eq('b')
@@ -305,9 +314,9 @@ RSpec.describe 'ruby2d/cli/build helpers' do
       it 'copies a second link to a directory, skips a link loop, and warns on a dangling one' do
         FileUtils.mkdir_p('media/real/deep')
         File.write('media/real/r.txt', 'r')
-        File.symlink('real', 'media/again')
-        File.symlink('.', 'media/loop')
-        File.symlink('../..', 'media/real/deep/up')
+        link_dir('real', 'media/again')
+        link_dir('.', 'media/loop')
+        link_dir('../..', 'media/real/deep/up')
         File.symlink('gone.txt', 'media/dangling.txt')
         expect { copy_tree('media', 'out/media') }
           .to output(/skipping `media\/dangling.txt`, a link to nothing.*skipping `media\/loop`, a link back into `media`.*skipping `media\/real\/deep\/up`, a link back into `media`/m).to_stdout
@@ -323,9 +332,9 @@ RSpec.describe 'ruby2d/cli/build helpers' do
         # part of, so the second target's copy would package the first's output.
         FileUtils.mkdir_p(%w[media build/native build/web])
         File.write('media/x.txt', 'x')
-        File.symlink('..', 'media/all')
-        File.symlink('../build', 'media/out')
-        File.symlink('../build/web', 'media/web')
+        link_dir('..', 'media/all')
+        link_dir('../build', 'media/out')
+        link_dir('../build/web', 'media/web')
         expect { copy_tree('media', 'build/native/media') }
           .to output(/skipping `media\/all`, a link to a directory the build writes into.*`media\/out`.*`media\/web`/m).to_stdout
         expect(File.read('build/native/media/x.txt')).to eq('x')
@@ -373,8 +382,7 @@ RSpec.describe 'ruby2d/cli/build helpers' do
       Dir.mktmpdir do |dir|
         tool_dir = File.join(dir, 'tool chain')
         Dir.mkdir(tool_dir)
-        cc = File.join(tool_dir, 'cc')
-        File.symlink(find_executable('sh'), cc)
+        cc = write_executable(tool_dir, 'cc')
         expect(find_executable(cc)).to eq(cc)
       end
     end

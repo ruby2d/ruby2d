@@ -71,8 +71,12 @@ def within?(path, dir)
 end
 
 # A path with symlinks resolved. The path must exist.
+# `File.realpath` alone leaves a bare `/` as `/` on Windows, where the root of
+# the current drive is `D:/`, so it would never match a real working directory
+# and `check_asset_dir('/')` would pass. Absolute first (without `~`
+# expansion, which `Ruby2D.absolute_path` reserves for asset paths).
 def real_path(path)
-  File.realpath(path)
+  File.realpath(File.absolute_path(path))
 end
 
 # The build output directory, as a real path (`Dir.pwd` reports one).
