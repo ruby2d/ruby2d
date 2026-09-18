@@ -45,6 +45,18 @@ extern "C" {
   #include <emscripten.h>
 #endif
 
+// Executable path lookup and `chdir`, for the native-app working-directory
+// fixup in `ruby2d.c` (`R2D_ChdirToExeDir`).
+#if defined(MRUBY) && !defined(__EMSCRIPTEN__)
+  #if defined(__APPLE__)
+    #include <mach-o/dyld.h>
+  #elif defined(_WIN32)
+    #include <windows.h>
+    #include <direct.h>
+    #define chdir _chdir
+  #endif
+#endif
+
 
 // Ruby/MRuby Abstraction Macros ///////////////////////////////////////////////
 //

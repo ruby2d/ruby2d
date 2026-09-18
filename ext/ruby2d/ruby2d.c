@@ -1,4 +1,4 @@
-// Native C extension for Ruby and MRuby
+// ruby2d.c
 
 #include "ruby2d.h"
 
@@ -415,15 +415,6 @@ static R_VAL ruby2d_web_p(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 #if defined(MRUBY) && !defined(__EMSCRIPTEN__)
-
-#include <string.h>
-#if defined(__APPLE__)
-  #include <mach-o/dyld.h>
-#elif defined(_WIN32)
-  #include <windows.h>
-  #include <direct.h>
-  #define chdir _chdir
-#endif
 
 /*
  * Change the working directory to the one containing this executable, so

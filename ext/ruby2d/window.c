@@ -1,7 +1,6 @@
 // window.c
 
 #include "ruby2d.h"
-#include <math.h>  // isinf, for the Float::INFINITY (uncapped) fps_cap path
 
 
 // =============================================================================
