@@ -1,5 +1,13 @@
 #!/usr/bin/env ruby
 
+# The CLI never loads the native extension, so never `require 'ruby2d'`. Two
+# commands must work while it doesn't exist: `ruby2d setup` builds the native
+# libraries the extension links against, and `extconf.rb` prints its messages
+# at install time. The rest (`-h`, `usage`, `examples`) shouldn't dlopen SDL3
+# just to print text. `lib/ruby2d/cli/` may use only the extension-free pieces
+# of the library: `gem_paths`, `version`, `lib_files`, and `assets/target` —
+# with `require_relative`, so a file resolves to its own tree whether loaded
+# from the installed gem, the Rakefile, or `extconf.rb`.
 require 'ruby2d/cli/colorize'
 require 'ruby2d/version'
 

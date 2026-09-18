@@ -1,15 +1,15 @@
 # Build a compiled Ruby 2D app with mruby
 
-require 'ruby2d'
-require 'ruby2d/version'
 require 'fileutils'
 require 'shellwords'
-require 'ruby2d/cli/colorize'
-require 'ruby2d/cli/messages'
-require 'ruby2d/cli/executable'
-require 'ruby2d/cli/asset_directives'
-require 'ruby2d/lib_files'
+require_relative '../gem_paths'
+require_relative '../version'
+require_relative '../lib_files'
 require_relative '../../../assets/target'
+require_relative 'colorize'
+require_relative 'messages'
+require_relative 'executable'
+require_relative 'asset_directives'
 
 
 # The Ruby 2D library files (shared with the WASM/Try build — see `lib_files.rb`)
@@ -661,7 +661,7 @@ def compile_web
     run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} -I#{shell_escape(incl_dir_deps)} "\
             "-sUSE_SDL=0 -sSINGLE_FILE #{memory_flags} #{web_opt_flags} #{shell_flag}"\
             "build/app.c #{ld_flags} #{preload_flag} "\
-            "-o build/web/app.html"
+            '-o build/web/app.html'
 
     unless $?.success?
       error 'Web build failed.'
@@ -673,7 +673,7 @@ def compile_web
     run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} -I#{shell_escape(incl_dir_deps)} "\
             "-sUSE_SDL=0 #{memory_flags} #{web_opt_flags} "\
             "build/app.c #{ld_flags} #{preload_flag} "\
-            "-o build/web/app.js"
+            '-o build/web/app.js'
 
     unless $?.success?
       error 'Web build failed.'

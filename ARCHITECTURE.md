@@ -52,7 +52,7 @@ Events flow **up** through a pull model: C queues raw events into a buffer durin
 
 ## Key Directories
 
-- **`lib/ruby2d/`** — Ruby classes. Entry point is `ruby2d.rb` which loads `core.rb` (all classes + native extension) then mixes the DSL into `main`. Each drawable type, the window, audio, color parsing, and the CLI live here.
+- **`lib/ruby2d/`** — Ruby classes. Entry point is `ruby2d.rb` which loads `core.rb` (all classes + native extension) then mixes the DSL into `main`. Each drawable type, the window, audio, color parsing, and the CLI live here. The CLI (`cli/`, `bin/ruby2d`) never loads the native extension; the rule and the files it may use are stated at the top of `bin/ruby2d`.
 - **`ext/ruby2d/`** — Native C extension. Roughly one `.c` file per subsystem — `window`, `shapes`, `canvas`, `image`, `text`, `font` (the internal bitmap font for diagnostic overlays, and the native backing for the user-facing `BitmapText` class), `audio`, `keyboard` (the scancode-to-name table, so Ruby sees key symbols and never a scancode) — plus `ext.c` (the `Ruby2D::Ext` method bindings), `ruby2d.c` (initialization, logging, and the mruby entry point), and `fps.c` (the FPS overlay). `ruby2d.h` contains the multi-runtime abstraction macros, structs, and prototypes. `extconf.rb` handles platform-specific build configuration.
 - **`assets/`** — Pre-built headers and static libraries for SDL3 and mruby (macOS, Windows), bundled fonts, and test media.
 - **`spec/`** — RSpec automated tests (`*_spec.rb`), the machine-verifiable suite that `rake` runs.

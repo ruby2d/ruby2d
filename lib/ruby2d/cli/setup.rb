@@ -4,15 +4,13 @@
 # macOS) into a per-user cache outside the — possibly read-only — gem, where
 # `ruby2d build --native` then resolves them (see cli/build's deps_platform_dir).
 
-# Requires only extension-free pieces (gem_paths, not ruby2d) so `setup` can run
-# to build the native extension when it doesn't exist yet.
-require 'ruby2d/gem_paths'
 require 'fileutils'
-require 'ruby2d/cli/colorize'
-require 'ruby2d/cli/messages'
-require 'ruby2d/cli/executable'
-require 'ruby2d/version'
+require_relative '../gem_paths'
+require_relative '../version'
 require_relative '../../../assets/target'
+require_relative 'colorize'
+require_relative 'messages'
+require_relative 'executable'
 
 
 # A ruby-red diamond banner, matching the `ruby2d` CLI and `rake` output.

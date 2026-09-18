@@ -1,7 +1,7 @@
 # Locate an executable. Shared by `ruby2d build` (the C compiler, `emcc`,
 # `mrbc`) and `ruby2d setup`'s preflight (git, cmake, the compiler), so a
-# `CC=…` value means the same thing to both. Extension-free, like setup's
-# other requires: setup runs before the native extension exists.
+# `CC=…` value means the same thing to both. Extension-free, like the rest of
+# the CLI (see `bin/ruby2d`).
 
 require_relative '../../../assets/target'
 
