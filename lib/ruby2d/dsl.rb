@@ -1,3 +1,5 @@
+# Ruby2D::DSL
+
 module Ruby2D
   # Domain-specific language methods for the top-level Ruby2D interface
   module DSL

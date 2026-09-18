@@ -1,3 +1,5 @@
+# Ruby2D::DepsHelp
+
 # Extension-free guidance for when Ruby 2D's native dependency, SDL3, isn't
 # available. Shared by `ext/ruby2d/extconf.rb` (install time, when the extension
 # can't link) and the native-load rescue in `ruby2d/core` (run time, when the

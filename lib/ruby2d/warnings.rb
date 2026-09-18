@@ -1,3 +1,5 @@
+# Ruby2D.warn / Ruby2D.info / Ruby2D.absolute_path
+
 module Ruby2D
   # Messages already emitted by `warn`, so a bad value produced every frame in a
   # render loop warns a single time rather than flooding the console. Keyed by

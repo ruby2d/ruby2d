@@ -1,3 +1,5 @@
+# Ruby2D::Benchmark
+
 module Ruby2D
   # Lightweight benchmarking harness for Ruby 2D rendering performance.
   #

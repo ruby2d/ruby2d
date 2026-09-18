@@ -1,3 +1,5 @@
+# Ruby2D::LIB_FILES
+
 module Ruby2D
   # The Ruby 2D library files, in load order. Single source of truth for every
   # Ruby: `core.rb` requires them under CRuby (skipping `mruby_compat`, and

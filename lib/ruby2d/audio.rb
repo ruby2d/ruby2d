@@ -1,3 +1,5 @@
+# Ruby2D::Audio
+
 module Ruby2D
   class Audio
     attr_reader :path
