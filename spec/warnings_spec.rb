@@ -4,10 +4,6 @@
 # always prints but dedups per distinct message; `info` is gated behind
 # diagnostics and never dedups. See `lib/ruby2d/warnings.rb`.
 RSpec.describe 'Ruby2D logging' do
-  # `warn`'s dedup cache lives on the Ruby2D module; reset it so each example
-  # starts fresh (the suite's global before(:each) only resets DSL.window).
-  before { Ruby2D.instance_variable_set(:@warned_messages, {}) }
-
   describe 'Ruby2D.warn' do
     it 'prints a bold-yellow [WARN] tag and the message to stderr' do
       expect { Ruby2D.warn 'bad thing' }.to output("\e[1;33m[WARN]\e[0m bad thing\n").to_stderr

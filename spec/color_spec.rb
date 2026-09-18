@@ -43,8 +43,6 @@ RSpec.describe Ruby2D::Color do
   # Array colors are plain numbers on the 0.0..1.0 scale (the graphics
   # convention used internally), whether given as integers or floats.
   describe "array colors (0.0..1.0 scale)" do
-    before { Ruby2D.instance_variable_set(:@warned_messages, {}) }
-
     it "treats RGB floats literally on the 0.0..1.0 scale" do
       c = Ruby2D::Color.new([1.0, 0.5, 0.0])
       expect([c.r, c.g, c.b, c.a]).to eq([1.0, 0.5, 0.0, 1.0]) # 3-element rgb is opaque
@@ -271,9 +269,9 @@ RSpec.describe Ruby2D::Color do
       c = Ruby2D::Color.new('#FF0000')
       expect { c.r = 1.75 }.to output(/color value 1.75.*0\.0\.\.1\.0/).to_stderr
       expect(c.r).to eq(1.0)
-      c.g = -0.25
+      expect { c.g = -0.25 }.to output(/color value -0.25/).to_stderr
       expect(c.g).to eq(0.0)
-      c.b = 2
+      expect { c.b = 2 }.to output(/color value 2 is out of range/).to_stderr
       expect(c.b).to eq(1.0)
       expect(c.to_a).to eq(Ruby2D::Color.new([1.75, -0.25, 2]).to_a)
     end
@@ -314,7 +312,7 @@ RSpec.describe Ruby2D::Color do
 
     it "still bump the revision" do
       c = Ruby2D::Color.new('red')
-      c.r = 1.5
+      expect { c.r = 1.5 }.to output(/color value 1.5/).to_stderr
       c.a = -1
       expect(c._rev).to eq(2)
     end
