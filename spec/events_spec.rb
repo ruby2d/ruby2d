@@ -70,7 +70,99 @@ RSpec.describe Ruby2D::Window do
     end
 
     include_examples 'event family', :key_down,
-                     [:key, :key_down, :key_held, :key_up], 'key'
+                     [:key, :key_down, :key_held, :key_up, :key_repeat], 'key'
+  end
+
+  # Text input is its own stream: SDL produces the finished UTF-8 text with the
+  # layout and input method applied, and it rides the string slot of the event
+  # buffer, so a key handler never sees it and a text handler never sees keys.
+  describe 'text input' do
+    let(:window) { Ruby2D::Window.new }
+
+    def text_event(text)
+      [Ruby2D::Window::EVT_TEXT, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0, text]
+    end
+
+    it 'is off by default' do
+      expect(window.text_input).to be false
+      expect(Ruby2D::Window.text_input).to be false
+    end
+
+    it 'records the flag before show and reports it through set and get' do
+      expect(Ruby2D::Ext).not_to receive(:window_set_text_input)
+      window.set(text_input: true)
+      expect(window.text_input).to be true
+      expect(window.get(:text_input)).to be true
+      window.text_input = nil
+      expect(window.text_input).to be false
+    end
+
+    # There is no real SDL window in the suite, so stub the native call and
+    # restore the global shown flag afterward.
+    it 'applies changes after show through the extension' do
+      allow(Ruby2D::Ext).to receive(:window_set_text_input)
+      Ruby2D::Window.shown = true
+      begin
+        window.set(text_input: true)
+        window.text_input = false
+      ensure
+        Ruby2D::Window.shown = false
+      end
+      expect(Ruby2D::Ext).to have_received(:window_set_text_input).with(window, true).ordered
+      expect(Ruby2D::Ext).to have_received(:window_set_text_input).with(window, false).ordered
+    end
+
+    it 'gives each handler its own copy of the text' do
+      seen = []
+      window.text_input = true
+      window.on(:text_input) { |e| e.text << '!' }
+      window.on(:text_input) { |e| seen << e.text }
+      window.send(:dispatch_events, text_event(+'a'))
+      expect(seen).to eq(['a'])
+    end
+
+    it 'drops text queued after a handler turns text input off' do
+      texts = []
+      window.text_input = true
+      window.on(:text_input) { |e| texts << e.text }
+      window.on(key_down: :tab) { window.text_input = false }
+      tab = [Ruby2D::Window::EVT_KEY, 1, :tab, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0, nil]
+      window.send(:dispatch_events, text_event('a') + tab + text_event('b'))
+      expect(texts).to eq(['a'])
+    end
+
+    it 'fires :text_input with the text and nothing else' do
+      texts = []
+      keys = 0
+      window.text_input = true
+      window.on(:text_input) { |e| texts << e.text }
+      window.on(:key) { keys += 1 }
+      window.send(:dispatch_events, text_event('é') + text_event('ab'))
+      expect(texts).to eq(['é', 'ab'])
+      expect(keys).to eq(0)
+    end
+
+    it 'does not reach text handlers from key events' do
+      texts = []
+      window.text_input = true
+      window.on(:text_input) { |e| texts << e.text }
+      window.key_callback(:down, :a)
+      expect(texts).to be_empty
+    end
+
+    it 'has no value filter form' do
+      expect { window.on(text_input: 'a') {} }
+        .to raise_error(Ruby2D::Error, /does not support filtering/)
+    end
+
+    it 'unregisters with off' do
+      count = 0
+      window.text_input = true
+      handler = window.on(:text_input) { count += 1 }
+      window.off(handler)
+      window.send(:dispatch_events, text_event('x'))
+      expect(count).to eq(0)
+    end
   end
 
   # Key events arrive from the extension already carrying their name symbol —
@@ -88,6 +180,40 @@ RSpec.describe Ruby2D::Window do
       window.on(key_held: :space) { value += 1 }
       window.send(:dispatch_events, key_event(2, :space)) # type 2 → :held
       expect(value).to eq(1)
+    end
+
+    # The OS repeats a held key. Repeats are their own type, so a press still
+    # fires :key_down once, and the :key catch-all sees them as :repeat.
+    it 'dispatches a repeat to :key_repeat and :key, not :key_down' do
+      seen = []
+      window.on(:key_down) { seen << :key_down }
+      window.on(:key_repeat) { |e| seen << [:key_repeat, e.key] }
+      window.on(:key) { |e| seen << [:key, e.type] }
+      window.send(:dispatch_events, key_event(4, :backspace)) # type 4 → :repeat
+      expect(seen).to eq([[:key, :repeat], [:key_repeat, :backspace]])
+    end
+
+    it 'filters :key_repeat by key name' do
+      count = 0
+      window.on(key_repeat: :backspace) { count += 1 }
+      window.key_callback(:repeat, :backspace)
+      window.key_callback(:repeat, :a)
+      expect(count).to eq(1)
+      expect { window.on(key_repeat: 'backspace') {} }.to raise_error(Ruby2D::Error)
+    end
+
+    it 'shares one handler across a press and its repeats' do
+      count = 0
+      window.on(key_down: :backspace, key_repeat: :backspace) { count += 1 }
+      window.key_callback(:down, :backspace)
+      2.times { window.key_callback(:repeat, :backspace) }
+      expect(count).to eq(3)
+    end
+
+    it 'counts a repeat as held but not as a press' do
+      window.key_callback(:repeat, :a)
+      expect(window.key_held?(:a)).to be true
+      expect(window.key_pressed?(:a)).to be false
     end
 
     # SDL's own scancode names vary by platform ("Left GUI" vs "Left Windows")

@@ -14,6 +14,7 @@ module Ruby2D
     KeyEvent              = Struct.new(:type, :key) do
       def key?(name) = key == Keyboard.validate!(name)
     end
+    TextEvent             = Struct.new(:text)
 
     include KeyEvents
     include MouseEvents
@@ -27,7 +28,7 @@ module Ruby2D
                 :viewport_width, :viewport_height, :viewport_mode,
                 :render_mode, :scale_mode,
                 :mouse_x, :mouse_y, :diagnostics, :show_fps, :close_on_esc,
-                :scene_generation
+                :text_input, :scene_generation
 
     # Accepted `fps_cap` values, shared by the strict constructor check and the
     # lenient runtime setter so the two messages can't drift apart.
@@ -185,6 +186,8 @@ module Ruby2D
 
       @close_on_esc = opts[:close_on_esc] unless opts[:close_on_esc].nil?
 
+      self.text_input = opts[:text_input] unless opts[:text_input].nil?
+
       self.cursor = opts[:cursor] unless opts[:cursor].nil?
 
       unless opts[:show_fps].nil?
@@ -304,7 +307,7 @@ module Ruby2D
     # bare scalar matcher targets); hash matchers like
     # `{ gamepad: pad1, button: :south }` derive the predicate from each key.
     EVENT_FILTER_PREDICATES = {
-      key_down: :key?, key_held: :key?, key_up: :key?,
+      key_down: :key?, key_held: :key?, key_up: :key?, key_repeat: :key?,
       mouse_down: :button?, mouse_held: :button?, mouse_up: :button?,
       gamepad_button_down: :button?, gamepad_button_held: :button?,
       gamepad_button_up:   :button?, gamepad_axis: :axis?
@@ -314,6 +317,7 @@ module Ruby2D
     # when the handler is registered rather than at the first keypress.
     EVENT_FILTER_VOCABULARIES = {
       key_down: Keyboard, key_held: Keyboard, key_up: Keyboard,
+      key_repeat: Keyboard,
       mouse_down: Mouse, mouse_held: Mouse, mouse_up: Mouse,
       gamepad_button_down: Gamepad::BUTTONS,
       gamepad_button_held: Gamepad::BUTTONS,
@@ -669,6 +673,13 @@ module Ruby2D
       end
     end
 
+    # Turn text input events on or off. The native side needs the window, so
+    # before `show` this only records the flag and `show` applies it.
+    def text_input=(enabled)
+      @text_input = enabled ? true : false
+      Ext.window_set_text_input(self, @text_input) if Window.shown?
+    end
+
     # Close the window. A no-op on the web, where a page can't close itself —
     # only the person viewing it can — so there's nothing to shut down: the
     # `:close` handler doesn't fire, the window isn't marked closed, and the
@@ -711,8 +722,9 @@ module Ruby2D
     EVT_MOUSE   = 2
     EVT_GAMEPAD = 3
     EVT_CLOSE   = 4
+    EVT_TEXT    = 5
 
-    KEY_TYPE_MAP   = { 1 => :down, 2 => :held, 3 => :up }.freeze
+    KEY_TYPE_MAP   = { 1 => :down, 2 => :held, 3 => :up, 4 => :repeat }.freeze
     MOUSE_TYPE_MAP = { 1 => :down, 2 => :up, 3 => :scroll, 4 => :move,
                        5 => :held, 6 => :enter, 7 => :leave }.freeze
     MOUSE_BTN_MAP  = { 1 => :left, 2 => :middle, 3 => :right, 4 => :x1, 5 => :x2 }.freeze
@@ -756,6 +768,10 @@ module Ruby2D
           close_callback
           Ext.window_close(self)
           @close = true
+        when EVT_TEXT
+          # A handler earlier in this batch may have turned text input off;
+          # text typed after that point is dropped, not delivered late
+          text_input_callback(raw[i + 11]) if @text_input
         end
         i += EVT_STRIDE
       end
@@ -966,6 +982,8 @@ module Ruby2D
         key_down: {},
         key_held: {},
         key_up: {},
+        key_repeat: {},
+        text_input: {},
         mouse: {},
         mouse_up: {},
         mouse_down: {},
@@ -1011,6 +1029,7 @@ module Ruby2D
       @diagnostics = false
       @show_fps = false
       @close_on_esc = false
+      @text_input = false
     end
 
     # Whether `name` (`:update` or `:render`) is a class-pattern override rather

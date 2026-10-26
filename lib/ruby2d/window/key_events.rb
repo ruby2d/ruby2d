@@ -19,6 +19,15 @@ module Ruby2D
         @keys_up.include? Keyboard.validate!(key)
       end
 
+      # Text input callback. `text` is the UTF-8 string the platform produced
+      # from the keystrokes, with the keyboard layout, dead keys, and any input
+      # method already applied; it can be more than one character. Each handler
+      # gets its own copy, so one that appends to the text in place doesn't
+      # change what the next one sees.
+      def text_input_callback(text)
+        fire_event_handlers(:text_input) { TextEvent.new(text.dup) }
+      end
+
       # Key callback method. `key` is a key name symbol, supplied by the
       # extension with the event or passed directly by a caller.
       def key_callback(type, key)
@@ -34,6 +43,9 @@ module Ruby2D
         # When key is being held down, fired every frame
         when :held
           handle_key_held type, key
+        # When a held key auto-repeats, fired at the OS repeat rate
+        when :repeat
+          handle_key_repeat type, key
         # When key released, fired once
         when :up
           handle_key_up type, key
@@ -50,7 +62,7 @@ module Ruby2D
       # that was already down when the window opened.
       def update_key_held(type, key)
         case type
-        when :down, :held
+        when :down, :held, :repeat
           @keys_held << key unless @keys_held.include? key
         when :up
           @keys_held.delete(key)
@@ -67,6 +79,10 @@ module Ruby2D
 
       def handle_key_held(type, key)
         fire_event_handlers(:key_held) { KeyEvent.new(type, key) }
+      end
+
+      def handle_key_repeat(type, key)
+        fire_event_handlers(:key_repeat) { KeyEvent.new(type, key) }
       end
 
       def handle_key_up(type, key)

@@ -24,6 +24,7 @@ Note that `rake test:native` and `rake test:web` build from the **installed** ge
 Each device test focuses on raw events and per-device feedback. Higher-level abstractions (per-shape `on()`, `Button`, cursor styling) live in `input.rb`.
 
 - **`keyboard.rb`** — `:key_down` / `:key_held` / `:key_up`, last-key readout, held-key grid, modifier indicators.
+- **`text_input.rb`** — `:text_input` and the `text_input` flag: the flag beside SDL's own state, on/off buttons (the setter) and TAB (`set`), live checks (set before `show` applied, flag and SDL agree, no text while off), a field with character and byte counts and the last event's code points, Backspace that keeps deleting while held (`:key_repeat`), and a log interleaving key downs, repeats, text, and toggles.
 - **`mouse.rb`** — buttons, motion + delta, scroll deltas with a draggable square inside a scroll-tracked area.
 - **`gamepad.rb`** — single-pad connect/disconnect, button visualization in a controller layout, raw stick + trigger axes, drift-max readout, mouse-clickable rumble.
 - **`input.rb`** — three panels of input abstractions: per-object events (click/hover/drag/scroll on shapes), `Button` showcase (default + wrapped + stroked, auto and explicit hover/pressed tints, visual-less hit area, filtered click), and cursor styling (visibility + system cursor grid).

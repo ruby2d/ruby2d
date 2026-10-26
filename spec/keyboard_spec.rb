@@ -141,5 +141,10 @@ RSpec.describe 'keyboard input' do
       window.key_callback(:down, :space)
       expect(window).not_to have_received(:close)
     end
+
+    it 'does not close on a repeat of a held escape' do
+      window.key_callback(:repeat, :escape)
+      expect(window).not_to have_received(:close)
+    end
   end
 end

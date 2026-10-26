@@ -150,6 +150,11 @@ module Ruby2D
         DSL.window.close_on_esc
       end
 
+      # Get whether text input events are enabled
+      def text_input
+        DSL.window.text_input
+      end
+
       # Take a screenshot, saving to `path` (or a timestamped file if omitted)
       def screenshot(path = nil)
         DSL.window.screenshot(path)

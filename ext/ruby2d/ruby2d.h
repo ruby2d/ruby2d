@@ -129,14 +129,18 @@ extern "C" {
 // --- Function Calls, Strings, Truthiness -------------------------------------
 // r_funcall: call a Ruby method by name on an object.
 // r_str_new: create a Ruby string from a C string.
+// r_str_new_utf8: the same, tagged UTF-8 so Ruby code can concatenate it with
+//   its own literals; mruby strings are already UTF-8, so it's r_str_new there.
 // r_test: check if a Ruby value is truthy (not nil/false).
 #ifdef MRUBY
   #define r_funcall(self, method, n, ...)  mrb_funcall(mrb, self, method, n, ##__VA_ARGS__)
   #define r_str_new(str)                   mrb_str_new(mrb, str, strlen(str))
+  #define r_str_new_utf8(str)              r_str_new(str)
   #define r_test(val)                      (mrb_test(val) == true)
 #else
   #define r_funcall(self, method, n, ...)  rb_funcall(self, rb_intern(method), n, ##__VA_ARGS__)
   #define r_str_new(str)                   rb_str_new2(str)
+  #define r_str_new_utf8(str)              rb_utf8_str_new_cstr(str)
   #define r_test(val)                      (val != Qfalse && val != Qnil)
 #endif
 
@@ -371,9 +375,10 @@ extern "C" {
 #define R2D_RENDER_ON_DEMAND   2
 
 // Keyboard events
-#define R2D_KEY_DOWN 1  // key is pressed
-#define R2D_KEY_HELD 2  // key is held down
-#define R2D_KEY_UP   3  // key is released
+#define R2D_KEY_DOWN   1  // key is pressed
+#define R2D_KEY_HELD   2  // key is held down
+#define R2D_KEY_UP     3  // key is released
+#define R2D_KEY_REPEAT 4  // held key auto-repeats, at the OS delay and rate
 
 // Mouse events
 #define R2D_MOUSE_DOWN   1  // mouse button pressed
@@ -469,6 +474,7 @@ extern "C" {
 #define R2D_EVT_MOUSE   2
 #define R2D_EVT_GAMEPAD 3
 #define R2D_EVT_CLOSE   4
+#define R2D_EVT_TEXT    5
 #define R2D_EVT_STRIDE  12
 
 typedef struct {
@@ -1207,6 +1213,12 @@ bool R2D_CursorVisible(void);
 bool R2D_SetSystemCursor(const char *name);
 
 /*
+ * Turn text input events on or off for the window. Returns true on success,
+ * false on failure or when the window isn't shown yet.
+ */
+bool R2D_SetTextInput(R2D_Window *window, bool enabled);
+
+/*
  * Close the window
  */
 int R2D_Close(R2D_Window *window);
@@ -1255,6 +1267,8 @@ R_VAL ruby2d_ext_window_hide_cursor(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_cursor_visible(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_set_system_cursor(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_close(RUBY2D_METHOD_ARGS_VARIADIC);
+R_VAL ruby2d_ext_window_set_text_input(RUBY2D_METHOD_ARGS_VARIADIC);
+R_VAL ruby2d_ext_window_text_input_active(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_set_render_mode(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_set_scale_mode(RUBY2D_METHOD_ARGS_VARIADIC);
 R_VAL ruby2d_ext_window_request_render(RUBY2D_METHOD_ARGS_VARIADIC);

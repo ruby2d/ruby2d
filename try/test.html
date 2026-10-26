@@ -397,6 +397,12 @@ editorEl.addEventListener('keydown', function(e) {
 editorEl.addEventListener('keyup', function(e) {
   e.stopPropagation();
 });
+// While a program has text input on, SDL turns keypresses that reach window
+// into text events and cancels them, so the editor would never see the
+// characters typed into it.
+editorEl.addEventListener('keypress', function(e) {
+  e.stopPropagation();
+});
 </script>
 <script async src="app.js"></script>
 </body>

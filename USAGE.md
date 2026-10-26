@@ -115,6 +115,7 @@ set cursor: :hidden  # or :visible, :pointer, :crosshair, etc.
 set show_fps: true
 set diagnostics: true
 set close_on_esc: true
+set text_input: true
 ```
 
 | Option | Type | Default | Description |
@@ -137,6 +138,7 @@ set close_on_esc: true
 | `show_fps` | Boolean | `false` | Display an FPS counter |
 | `diagnostics` | Boolean | `false` | Print diagnostic (`[INFO]`) messages; also displays the FPS counter (implies `show_fps`) |
 | `close_on_esc` | Boolean | `false` | Close the window when Escape is pressed |
+| `text_input` | Boolean | `false` | Deliver typed characters as `:text_input` events (see [Text Input](#text-input)) |
 
 These can be set before `show` or changed live afterward — `set title:`, `set width:`/`height:`, `set resizable:`, `set viewport_width:`/`viewport_height:`, and the rest take effect immediately. The one exception is `highdpi`, fixed when the window is created; `pixel_scale` can be toggled live but only has an effect when `highdpi` is enabled.
 
@@ -1155,6 +1157,8 @@ text.height  # => calculated height of the rendered text
 
 Embedded newlines (`"line one\nline two"`) are laid out as separate lines; `width` is the widest line and `height` covers the whole block, including blank lines at the end (`"line one\n"` is two lines high). Content cannot contain a NUL byte; that raises.
 
+The default font covers Latin text and common symbols. A character it lacks, such as Chinese, Japanese, or an emoji, draws as nothing, so text in other scripts needs a `font` that has those characters.
+
 Font `style` combines one or more of `:bold`, `:italic`, `:underline`, and `:strikethrough` (pass an array for several). It can be set at construction or changed later, and `font`/`size`/`style` all re-render the text:
 
 ```ruby
@@ -1841,7 +1845,7 @@ on key_down: :right, gamepad_button_down: :dpad_right do  # multi-event
 end
 ```
 
-The filtering form works for `:key_down` / `:key_held` / `:key_up`, `:mouse_down` / `:mouse_held` / `:mouse_up`, `:gamepad_button_down` / `:gamepad_button_held` / `:gamepad_button_up`, and `:gamepad_axis`. Other events have no matcher field and use the regular `on :event do |e| ... end` form: this includes the `:key` and `:mouse` catch-alls (which fire for *any* key or mouse event, so there's no single value to filter on — branch on the event object's `type` instead), as well as `:mouse_move`, `:mouse_scroll`, `:close`, and so on. A single filter returns one `EventDescriptor`; multiple filters return an array. Gamepad events also accept a hash matcher; see [Gamepads](#gamepads).
+The filtering form works for `:key_down` / `:key_held` / `:key_repeat` / `:key_up`, `:mouse_down` / `:mouse_held` / `:mouse_up`, `:gamepad_button_down` / `:gamepad_button_held` / `:gamepad_button_up`, and `:gamepad_axis`. Other events have no matcher field and use the regular `on :event do |e| ... end` form: this includes the `:key` and `:mouse` catch-alls (which fire for *any* key or mouse event, so there's no single value to filter on — branch on the event object's `type` instead), as well as `:mouse_move`, `:mouse_scroll`, `:text_input`, `:close`, and so on. A single filter returns one `EventDescriptor`; multiple filters return an array. Gamepad events also accept a hash matcher; see [Gamepads](#gamepads).
 
 ### Keyboard Events
 
@@ -1850,6 +1854,7 @@ The filtering form works for `:key_down` / `:key_held` / `:key_up`, `:mouse_down
 | `:key` | On any key event | `KeyEvent` (type, key) |
 | `:key_down` | Once when a key is pressed | `KeyEvent` |
 | `:key_held` | Every frame while a key is held | `KeyEvent` |
+| `:key_repeat` | Repeatedly while a key is held, at the system's key repeat delay and rate | `KeyEvent` |
 | `:key_up` | Once when a key is released | `KeyEvent` |
 
 ```ruby
@@ -1862,7 +1867,9 @@ on :key_held do |event|
 end
 ```
 
-The `KeyEvent` struct has fields: `type` (`:down`, `:held`, `:up`) and `key` (a symbol), plus `key?(name)` for matching.
+The `KeyEvent` struct has fields: `type` (`:down`, `:held`, `:repeat`, `:up`) and `key` (a symbol), plus `key?(name)` for matching.
+
+`:key_held` fires once per frame, which suits continuous movement. `:key_repeat` follows the player's key repeat settings, the way a held key repeats in a text editor, which suits deleting with a held Backspace or stepping through a menu. The first repeat comes only after the delay, so bind the press too: `on key_down: :backspace, key_repeat: :backspace`.
 
 **Class pattern polling:**
 
@@ -1905,6 +1912,61 @@ A name outside the set raises rather than silently never matching:
 ```ruby
 key_pressed?(:spcae)   # Ruby2D::Error: `:spcae` is not a valid key name
 key_pressed?('space')  # Ruby2D::Error: key names are symbols, use `:space`
+```
+
+### Text Input
+
+Key events say which key was pressed, not what character it produced: `$` is Shift + `:digit_4` on a US layout and its own key on a French one, and `é` may take a dead key and a letter. To read what the player typed, turn on text input and handle `:text_input` events, which carry the finished text with the keyboard layout, dead keys, and any input method already applied:
+
+```ruby
+set text_input: true
+
+name = Text.new('', x: 20, y: 20)
+
+on :text_input do |event|
+  name.content += event.text
+end
+
+on key_down: :backspace, key_repeat: :backspace do
+  name.content = name.content.chop
+end
+```
+
+| Event | Fires | Event Object |
+|---|---|---|
+| `:text_input` | When typing produces text | `TextEvent` (text) |
+
+`event.text` is a UTF-8 string and can be more than one character: an input method commit arrives as one event. Showing what an input method types may need a `font` beyond the default; see [Text](#text).
+
+Text input is off by default and can be turned on or off at any time, before or after `show`, with `set text_input:`. Leave it off when nothing is being typed: while it is on, some platforms show an on-screen keyboard or activate an input method that swallows key events. Key events keep firing alongside text events, which is how a text field handles Backspace, Return, and the arrow keys.
+
+A game that only sometimes takes typed input turns it on when a prompt opens and off when it closes, so the keys go back to being controls in between. Here Return opens a name prompt, and Return again saves the name and returns to play:
+
+```ruby
+prompt = Text.new('', x: 20, y: 20)
+name = ''
+typing = false
+
+on key_down: :return do
+  typing = !typing
+  set text_input: typing
+  prompt.content = typing ? "Name: #{name}" : "Hello, #{name}!"
+end
+
+on :text_input do |event|
+  name += event.text
+  prompt.content = "Name: #{name}"
+end
+
+on key_down: :backspace, key_repeat: :backspace do
+  next unless typing
+  name = name.chop
+  prompt.content = "Name: #{name}"
+end
+
+on key_down: :space do
+  puts 'jump' unless typing
+end
 ```
 
 ### Mouse Events

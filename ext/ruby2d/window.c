@@ -30,6 +30,7 @@ static R_ID id_fps_cap, id_render_mode;
 static R_ID id_sm_linear, id_sm_nearest, id_sm_pixel_art;
 static R_ID id_background, id_mouse_x, id_mouse_y;
 static R_ID id_frames, id_fps, id_close;
+static R_ID id_text_input;
 
 
 /*
@@ -54,6 +55,7 @@ void R2D_Window_Init() {
   id_frames          = r_id("@frames");
   id_fps             = r_id("@fps");
   id_close           = r_id("@close");
+  id_text_input      = r_id("@text_input");
 
   r_define_class_method(ruby2d_ext_module, "window_create",                     ruby2d_ext_window_create,                     r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_show",                       ruby2d_ext_window_show,                       r_args_variadic);
@@ -89,6 +91,8 @@ void R2D_Window_Init() {
   r_define_class_method(ruby2d_ext_module, "window_cursor_visible",             ruby2d_ext_window_cursor_visible,             r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_set_system_cursor",          ruby2d_ext_window_set_system_cursor,          r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_close",                      ruby2d_ext_window_close,                      r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "window_set_text_input",             ruby2d_ext_window_set_text_input,             r_args_variadic);
+  r_define_class_method(ruby2d_ext_module, "window_text_input_active",          ruby2d_ext_window_text_input_active,          r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_set_render_mode",            ruby2d_ext_window_set_render_mode,            r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_set_scale_mode",             ruby2d_ext_window_set_scale_mode,             r_args_variadic);
   r_define_class_method(ruby2d_ext_module, "window_request_render",             ruby2d_ext_window_request_render,             r_args_variadic);
@@ -429,8 +433,12 @@ static void event_buf_push(R2D_QueuedEvent ev) {
     R2D_QueuedEvent *grown = (R2D_QueuedEvent *)realloc(event_buf,
       new_capacity * sizeof(R2D_QueuedEvent));
     // On failure realloc leaves the old buffer intact; drop this event rather
-    // than overwrite event_buf with NULL and crash on the next write.
-    if (!grown) return;
+    // than overwrite event_buf with NULL and crash on the next write. A
+    // dropped event never reaches drain, so free the string it owns here.
+    if (!grown) {
+      SDL_free((void *)ev.str);
+      return;
+    }
     event_buf = grown;
     event_capacity = new_capacity;
   }
@@ -519,13 +527,14 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     SDL_ConvertEventToRenderCoordinates(r2d_window->sdl_renderer, &e);
 
     switch (e.type) {
+      // The OS repeats a held key after its own delay and at its own rate.
+      // Repeats get their own type so :key_down still fires once per press.
       case SDL_EVENT_KEY_DOWN:
-        if (e.key.repeat == 0) {
-          event_buf_push((R2D_QueuedEvent){
-            .category = R2D_EVT_KEY, .type = R2D_KEY_DOWN,
-            .id = e.key.scancode
-          });
-        }
+        event_buf_push((R2D_QueuedEvent){
+          .category = R2D_EVT_KEY,
+          .type = e.key.repeat ? R2D_KEY_REPEAT : R2D_KEY_DOWN,
+          .id = e.key.scancode
+        });
         break;
 
       case SDL_EVENT_KEY_UP:
@@ -534,6 +543,19 @@ R_VAL ruby2d_ext_window_poll_events(RUBY2D_METHOD_ARGS_VARIADIC) {
           .id = e.key.scancode
         });
         break;
+
+      case SDL_EVENT_TEXT_INPUT: {
+        // Only delivered while SDL_StartTextInput is in effect. SDL owns the
+        // text for this pump only, so copy it into the slot drain frees.
+        if (!e.text.text || !e.text.text[0]) break;
+        char *text = SDL_strdup(e.text.text);
+        if (!text) {
+          R2D_Error("poll_events", "SDL_strdup failed for typed text");
+          break;
+        }
+        event_buf_push((R2D_QueuedEvent){ .category = R2D_EVT_TEXT, .str = text });
+        break;
+      }
 
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
       case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -808,10 +830,13 @@ R_VAL ruby2d_ext_window_drain_events(RUBY2D_METHOD_ARGS_VARIADIC) {
     r_ary_push(ary, DBL2NUM(ev->delta_x));
     r_ary_push(ary, DBL2NUM(ev->delta_y));
     r_ary_push(ary, INT2NUM(ev->value));
-    r_ary_push(ary, ev->str ? r_str_new(ev->str) : R_NIL);
-    // Ownership contract: poll strdups gamepad connect and remap names into
-    // ev->str, drain frees them here. All other events leave ev->str NULL via
-    // designated init, so freeing every non-NULL ev->str is correct.
+    // SDL strings are UTF-8, so tag them: typed text gets concatenated with
+    // the program's own literals, which raises on CRuby if it's binary.
+    r_ary_push(ary, ev->str ? r_str_new_utf8(ev->str) : R_NIL);
+    // Ownership contract: poll strdups gamepad connect and remap names and
+    // typed text into ev->str, drain frees them here. All other events leave
+    // ev->str NULL via designated init, so freeing every non-NULL ev->str is
+    // correct.
     if (ev->str) {
       SDL_free((void *)ev->str);
       ev->str = NULL;
@@ -1179,6 +1204,10 @@ R_VAL ruby2d_ext_window_show(RUBY2D_METHOD_ARGS_VARIADIC) {
   if (r_test(icon_val)) {
     R2D_SetIcon(r2d_window, RSTRING_PTR(icon_val));
   }
+
+  // Text input needs the SDL window, so a `set text_input: true` from before
+  // `show` is applied here; later changes go through window_set_text_input.
+  if (obj_bool(obj, id_text_input)) R2D_SetTextInput(r2d_window, true);
 
   // Reset first_poll so the initial gamepad scan runs on the first tick
   first_poll = true;
@@ -1871,7 +1900,7 @@ R_VAL ruby2d_ext_window_gamepad_debug_info(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_GUID guid = SDL_GetGamepadGUIDForID(jid);
   char guid_str[33] = {0};
   SDL_GUIDToString(guid, guid_str, sizeof(guid_str));
-  r_ary_push(arr, r_str_new(guid_str));
+  r_ary_push(arr, r_str_new_utf8(guid_str));
 
   // Vendor / Product / Version (USB-style 16-bit IDs)
   r_ary_push(arr, INT2NUM(SDL_GetGamepadVendor(pad)));
@@ -1880,7 +1909,7 @@ R_VAL ruby2d_ext_window_gamepad_debug_info(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // Serial number — frequently NULL
   const char *serial = SDL_GetGamepadSerial(pad);
-  r_ary_push(arr, serial ? r_str_new(serial) : R_NIL);
+  r_ary_push(arr, serial ? r_str_new_utf8(serial) : R_NIL);
 
   // Connection state
   R_VAL conn_sym;
@@ -1902,7 +1931,7 @@ R_VAL ruby2d_ext_window_gamepad_debug_info(RUBY2D_METHOD_ARGS_VARIADIC) {
   // that the caller must release via SDL_free.
   char *mapping = SDL_GetGamepadMapping(pad);
   if (mapping) {
-    r_ary_push(arr, r_str_new(mapping));
+    r_ary_push(arr, r_str_new_utf8(mapping));
     SDL_free(mapping);
   } else {
     r_ary_push(arr, R_NIL);
@@ -2024,6 +2053,46 @@ R_VAL ruby2d_ext_window_set_system_cursor(RUBY2D_METHOD_ARGS_VARIADIC) {
   if (argc != 2) r_raise("Ruby2D::Ext.window_set_system_cursor expects 2 args, got %d", (int)argc);
   R_VAL name = argv[1];
   return R2D_SetSystemCursor(RSTRING_PTR(name)) ? R_TRUE : R_FALSE;
+}
+
+
+/*
+ * Enable or disable text input events for the window. Returns whether SDL
+ * accepted the change; a window that isn't shown yet has nothing to enable,
+ * and `window_show` applies the flag then.
+ */
+bool R2D_SetTextInput(R2D_Window *window, bool enabled) {
+  if (!window || !window->sdl_window) return false;
+  bool ok = enabled ? SDL_StartTextInput(window->sdl_window)
+                    : SDL_StopTextInput(window->sdl_window);
+  if (!ok) {
+    R2D_Error("R2D_SetTextInput", "%s", SDL_GetError());
+  }
+  return ok;
+}
+
+
+/*
+ * Ruby2D::Window#ext_set_text_input
+ */
+R_VAL ruby2d_ext_window_set_text_input(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 2) r_raise("Ruby2D::Ext.window_set_text_input expects 2 args, got %d", (int)argc);
+  return R2D_SetTextInput(r2d_window, r_test(argv[1])) ? R_TRUE : R_FALSE;
+}
+
+
+/*
+ * Ruby2D::Window#ext_text_input_active
+ *
+ * Whether SDL is currently delivering text input events for the window —
+ * false before `show`, whatever the Ruby flag says.
+ */
+R_VAL ruby2d_ext_window_text_input_active(RUBY2D_METHOD_ARGS_VARIADIC) {
+  RUBY2D_EXTRACT_VARIADIC;
+  if (argc != 1) r_raise("Ruby2D::Ext.window_text_input_active expects 1 arg (window), got %d", (int)argc);
+  if (!r2d_window || !r2d_window->sdl_window) return R_FALSE;
+  return SDL_TextInputActive(r2d_window->sdl_window) ? R_TRUE : R_FALSE;
 }
 
 

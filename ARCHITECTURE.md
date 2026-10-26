@@ -73,7 +73,7 @@ Each C subsystem file registers its Ext bindings in an init function (e.g., `R2D
 Ruby's `Window#tick` method orchestrates each frame by calling Ext primitives:
 
 1. **`Ext.poll_events`** — C polls the SDL event queue, detects held keys/buttons, updates timing, and syncs state (mouse position, window dimensions, close flag) to Ruby ivars. Raw events are queued into a C-side buffer.
-2. **`Ext.drain_events`** — Returns the queued events to Ruby as a flat integer/float array. Ruby's `dispatch_events` maps the raw codes to symbols and fires user-registered handlers.
+2. **`Ext.drain_events`** — Returns the queued events to Ruby as one flat array, a fixed number of slots per event. Ruby's `dispatch_events` maps the raw codes to symbols and fires user-registered handlers.
 3. **`update_callback`** — Ruby calls the user's update block, then clears per-frame input stores.
 4. **`Ext.begin_frame`** — C syncs the background color from Ruby, decides whether to render (always in continuous mode, conditionally in on-demand mode), clears the renderer, and on frames actually rendered syncs the frame count and fps to Ruby ivars. Returns true/false.
 5. **Render** — If `begin_frame` returned true, Ruby iterates the window's objects in z-order (each calls into C, which issues SDL render calls), then runs the user's render block.
