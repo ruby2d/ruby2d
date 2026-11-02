@@ -545,6 +545,15 @@ RSpec.describe Ruby2D::Canvas do
         canvas.draw_line(x1: 0, y1: 0, x2: 100, y2: 0, color: %w[red green blue])
       }.to raise_error('Color::Set for draw_line must have 2 colors (start, end)')
     end
+
+    # Past 2^24 pixels a dash stopped advancing a float position, and the
+    # loop never finished
+    it 'finishes a dashed line far longer than the canvas' do
+      [nil, %w[red aqua]].each do |color|
+        canvas.draw_line(x1: 0, y1: 10, x2: 2e7, y2: 10, dash: 1, gap: 1, color: color)
+        canvas.draw_line(x1: -1e30, y1: 10, x2: 1e30, y2: 10, dash: 1, gap: 1, color: color)
+      end
+    end
   end
 
   describe 'per-vertex stroke gradients' do

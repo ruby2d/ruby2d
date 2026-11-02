@@ -558,6 +558,44 @@ static inline Uint8 lerp_u8(Uint8 a, Uint8 b, float t) {
 
 
 /*
+ * The dashes of a dashed line that can touch `surface`. Dash k covers
+ * [k * period, k * period + dash] along the line, butt-capped, so only those
+ * overlapping the surface's own extent along the line can reach it: at most
+ * its diagonal over `period`, however long the line or wide the stroke.
+ * Summing a float `t` dash by dash instead took time in proportion to the
+ * whole line, and once a dash no longer changed `t` (past 2^24 pixels) it
+ * never finished. Sets *first to where the first such period starts, a whole
+ * number of periods along so the pattern keeps its phase, and *count to how
+ * many periods to draw (0 when none can show).
+ */
+static void canvas_dash_span(SDL_Surface *surface, double x1, double y1,
+                             double ux, double uy, double len, double period,
+                             double *first, int64_t *count) {
+  // The surface's extent along the line, a pixel wider for edge coverage
+  double lo = INFINITY, hi = -INFINITY;
+  for (int i = 0; i < 4; i++) {
+    double cx = (i & 1) ? surface->w : 0.0;
+    double cy = (i & 2) ? surface->h : 0.0;
+    double s = (cx - x1) * ux + (cy - y1) * uy;
+    if (s < lo) lo = s;
+    if (s > hi) hi = s;
+  }
+  lo = fmax(lo - 1.0, 0.0);
+  hi = fmin(hi + 1.0, len);
+  *first = 0.0;
+  *count = 0;
+  if (lo > hi) return;
+
+  *first = floor(lo / period) * period;
+  // The extent's own bound too, for coordinates so far off that the
+  // subtraction has lost its precision
+  double n = fmin(floor((hi - *first) / period) + 1.0,
+                  ((double)surface->w + surface->h + 2.0) / period + 2.0);
+  *count = (int64_t)n;
+}
+
+
+/*
  * Stroke a polyline on an SDL_Surface with miter joins.
  * When closed is true, the last vertex connects back to the first.
  * When closed is false, endpoints get butt caps.
@@ -1326,22 +1364,18 @@ R_VAL ruby2d_ext_canvas_draw_line(RUBY2D_METHOD_ARGS_VARIADIC) {
       float ux = dx / len;
       float uy = dy / len;
 
-      float t = 0.0f;
-      int drawing = 1;
-      while (t < len) {
-        float seg = drawing ? dash : gap;
-        if (t + seg > len) seg = len - t;
+      double period = (double)dash + gap, first;
+      int64_t count;
+      canvas_dash_span(can->surface, x1, y1, ux, uy, len, period, &first, &count);
+      for (int64_t k = 0; k < count; k++) {
+        double t = first + (double)k * period;
+        double seg = fmin(dash, len - t);
+        if (seg <= 0.0) break;
 
-        if (drawing) {
-          float sx1 = x1 + ux * t;
-          float sy1 = y1 + uy * t;
-          float sx2 = x1 + ux * (t + seg);
-          float sy2 = y1 + uy * (t + seg);
-          canvas_draw_line_on_surface(can->surface, sx1, sy1, sx2, sy2, sw, cr, cg, cb, ca);
-        }
-
-        t += seg;
-        drawing = !drawing;
+        canvas_draw_line_on_surface(can->surface,
+          (float)(x1 + ux * t), (float)(y1 + uy * t),
+          (float)(x1 + ux * (t + seg)), (float)(y1 + uy * (t + seg)),
+          sw, cr, cg, cb, ca);
       }
     }
   } else {
@@ -1422,39 +1456,35 @@ R_VAL ruby2d_ext_canvas_draw_line_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
       float ux = dx / len;
       float uy = dy / len;
 
-      float t = 0.0f;
-      int drawing = 1;
-      while (t < len) {
-        float seg = drawing ? dash : gap;
-        if (t + seg > len) seg = len - t;
+      double period = (double)dash + gap, first;
+      int64_t count;
+      canvas_dash_span(can->surface, x1, y1, ux, uy, len, period, &first, &count);
+      for (int64_t k = 0; k < count; k++) {
+        double t = first + (double)k * period;
+        double seg = fmin(dash, len - t);
+        if (seg <= 0.0) break;
 
-        if (drawing) {
-          float t1 = t / len;
-          float t2 = (t + seg) / len;
+        float t1 = (float)(t / len);
+        float t2 = (float)((t + seg) / len);
 
-          // Top edge (c1->c4) and bottom edge (c2->c3) interpolated at t1,t2
-          Uint8 sr1 = lerp_u8(r1, r4, t1), sg1 = lerp_u8(g1, g4, t1);
-          Uint8 sb1 = lerp_u8(b1, b4, t1), sa1 = lerp_u8(a1, a4, t1);
-          Uint8 er1 = lerp_u8(r1, r4, t2), eg1 = lerp_u8(g1, g4, t2);
-          Uint8 eb1 = lerp_u8(b1, b4, t2), ea1 = lerp_u8(a1, a4, t2);
+        // Top edge (c1->c4) and bottom edge (c2->c3) interpolated at t1,t2
+        Uint8 sr1 = lerp_u8(r1, r4, t1), sg1 = lerp_u8(g1, g4, t1);
+        Uint8 sb1 = lerp_u8(b1, b4, t1), sa1 = lerp_u8(a1, a4, t1);
+        Uint8 er1 = lerp_u8(r1, r4, t2), eg1 = lerp_u8(g1, g4, t2);
+        Uint8 eb1 = lerp_u8(b1, b4, t2), ea1 = lerp_u8(a1, a4, t2);
 
-          Uint8 sr2 = lerp_u8(r2, r3, t1), sg2 = lerp_u8(g2, g3, t1);
-          Uint8 sb2 = lerp_u8(b2, b3, t1), sa2 = lerp_u8(a2, a3, t1);
-          Uint8 er2 = lerp_u8(r2, r3, t2), eg2 = lerp_u8(g2, g3, t2);
-          Uint8 eb2 = lerp_u8(b2, b3, t2), ea2 = lerp_u8(a2, a3, t2);
+        Uint8 sr2 = lerp_u8(r2, r3, t1), sg2 = lerp_u8(g2, g3, t1);
+        Uint8 sb2 = lerp_u8(b2, b3, t1), sa2 = lerp_u8(a2, a3, t1);
+        Uint8 er2 = lerp_u8(r2, r3, t2), eg2 = lerp_u8(g2, g3, t2);
+        Uint8 eb2 = lerp_u8(b2, b3, t2), ea2 = lerp_u8(a2, a3, t2);
 
-          float sx1 = x1 + ux * t,         sy1 = y1 + uy * t;
-          float sx2 = x1 + ux * (t + seg), sy2 = y1 + uy * (t + seg);
-
-          canvas_draw_line_lerp_on_surface(can->surface, sx1, sy1, sx2, sy2, sw,
-            sr1, sg1, sb1, sa1,
-            sr2, sg2, sb2, sa2,
-            er2, eg2, eb2, ea2,
-            er1, eg1, eb1, ea1);
-        }
-
-        t += seg;
-        drawing = !drawing;
+        canvas_draw_line_lerp_on_surface(can->surface,
+          (float)(x1 + ux * t), (float)(y1 + uy * t),
+          (float)(x1 + ux * (t + seg)), (float)(y1 + uy * (t + seg)), sw,
+          sr1, sg1, sb1, sa1,
+          sr2, sg2, sb2, sa2,
+          er2, eg2, eb2, ea2,
+          er1, eg1, eb1, ea1);
       }
     }
   } else {
