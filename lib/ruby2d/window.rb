@@ -53,8 +53,9 @@ module Ruby2D
               'a Window class method or the top-level DSL).'
       end
 
-      # Title of the window
-      @title = title
+      # Title of the window, as a String: the native side reads it as one, so
+      # anything else would crash it. Converted like `Text` content.
+      @title = title.to_s
 
       # Window size
       @width  = width
@@ -833,7 +834,7 @@ module Ruby2D
     def set_any_window_properties(opts)
       @background = Color.new(opts[:background]) if Color.valid? opts[:background]
       if opts[:title]
-        @title = opts[:title]
+        @title = opts[:title].to_s
         Ext.window_set_title(self) if Window.shown?
       end
       if opts[:icon]

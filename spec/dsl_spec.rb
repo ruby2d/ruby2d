@@ -26,6 +26,24 @@ RSpec.describe Ruby2D::DSL do
       expect(get :height).to eq(600)
       expect(get :title).to eq("Hello tests!")
     end
+
+    # The native side reads the title as a String and crashed on anything else
+    it 'converts a title that is not a String, as Text does its content' do
+      set title: 42
+      expect(get :title).to eq('42')
+    end
+
+    it 'gives a live window a String title' do
+      allow(Ruby2D::Window).to receive(:shown?).and_return(true)
+      allow(Ruby2D::Ext).to receive(:window_set_title)
+      set title: :game
+      expect(Ruby2D::Ext).to have_received(:window_set_title)
+      expect(get :title).to eq('game')
+    end
+
+    it 'converts a title passed to Window.new' do
+      expect(Ruby2D::Window.new(title: 1.5).title).to eq('1.5')
+    end
   end
 
   describe "#elapsed" do
