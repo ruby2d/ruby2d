@@ -107,13 +107,21 @@ module Ruby2D
 
           path = "#{dir}/#{entry}"
           if File.directory?(path)
-            collect_font_files(path, depth + 1, files) if depth < MAX_DEPTH && !File.symlink?(path)
+            collect_font_files(path, depth + 1, files) if depth < MAX_DEPTH && !symlink?(path)
           elsif EXTENSIONS.any? { |ext| entry.downcase.end_with?(ext) }
             files << path
           end
         end
       rescue StandardError
         nil
+      end
+
+      # mruby can't see symlinks on Windows, where `File.symlink?` raises
+      # `NotImplementedError`, so there a loop is walked until `MAX_DEPTH`.
+      def symlink?(path)
+        File.symlink?(path)
+      rescue NotImplementedError
+        false
       end
 
       # The platform's font directories that exist on this machine
