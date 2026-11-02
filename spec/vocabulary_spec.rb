@@ -53,7 +53,7 @@ RSpec.describe 'input vocabularies match the C bridge maps' do
   it 'reports names in scancode order, pinning them to their physical keys' do
     names = Ruby2D::Ext.key_names
     expect(names.first).to eq(:unknown)
-    expect(names[1, 26]).to eq((:a..:z).to_a)
+    expect(names[1, 26]).to eq(('a'..'z').map(&:to_sym))
     expect(names[27, 10]).to eq(%i[digit_1 digit_2 digit_3 digit_4 digit_5
                                    digit_6 digit_7 digit_8 digit_9 digit_0])
     expect(names[37, 5]).to eq(%i[return escape backspace tab space])

@@ -56,7 +56,9 @@ Either way you'll need the **development** packages (headers, not just the runti
 
 Ruby 2D's test suite has two halves: automated [RSpec](https://rspec.info) tests for things a machine can verify, and interactive tests in [`test/`](test/) for things a person needs to see, hear, or click on.
 
-Run `rake` to build, install, and run the full automated suite. To run an interactive test, use `rake test <name_of_test>`.
+Run `rake` to build, install, and run the automated suite. To run an interactive test, use `rake test <name_of_test>`.
+
+`rake` runs the specs on CRuby, but built apps run on mruby. To run the same specs there, use `rake spec:native` for a native executable or `rake spec:web` for a web app in headless Chrome.
 
 ```bash
 # Run `test/shapes.rb` with CRuby (the default)

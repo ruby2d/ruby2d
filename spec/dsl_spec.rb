@@ -42,7 +42,7 @@ RSpec.describe Ruby2D::DSL do
   # Window class too. Nothing at runtime tells a method `attr_reader` defined
   # from one written out, so the list is read from the source.
   describe "Window class getters" do
-    it "cover every attribute reader on the window instance" do
+    it "cover every attribute reader on the window instance", skip_mruby: "reads `lib/` source" do
       source = File.read(File.expand_path('../lib/ruby2d/window.rb', __dir__))
       readers = source[/^ *attr_reader (.*?)\n\n/m, 1].scan(/:(\w+)/).flatten.map(&:to_sym)
       expect(readers).to include(:title, :render_mode, :close_on_esc, :icon)

@@ -637,8 +637,9 @@ RSpec.describe Ruby2D::Window do
     let(:window) { Ruby2D::Window.new }
 
     it 'add_gamepad_mapping treats existing files as files, strings as mappings' do
-      expect(Ruby2D::Ext).to receive(:window_load_gamepad_mappings_file).with(window, __FILE__)
-      window.add_gamepad_mapping(__FILE__)
+      path = "#{Ruby2D.test_images}/image.png"
+      expect(Ruby2D::Ext).to receive(:window_load_gamepad_mappings_file).with(window, path)
+      window.add_gamepad_mapping(path)
 
       mapping = '030000005e040000ea02000000007801,Test,a:b0,b:b1,'
       expect(Ruby2D::Ext).to receive(:window_add_gamepad_mapping).with(window, mapping)

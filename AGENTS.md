@@ -6,7 +6,7 @@ Run `rake` to test: it reinstalls the gem (rebuilding the native C extension) an
 
 The `test/` directory contains interactive tests for human verification. Don't run them.
 
-Anything built through the `ruby2d` CLI — `rake test:native`, `rake test:web`, `rake benchmark:web` — compiles the **installed** gem's `lib/`, not the working tree, so run `rake` after editing `lib/` or the build silently won't include the change. `rake try:build` is the exception; it reads the working tree directly.
+Anything built through the `ruby2d` CLI — `rake test:native`, `rake test:web`, `rake spec:native`, `rake spec:web`, `rake benchmark:web` — compiles the **installed** gem's `lib/`, not the working tree, so run `rake` after editing `lib/` or the build silently won't include the change. `rake try:build` is the exception; it reads the working tree directly.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ Always use SDL3 libraries and APIs. SDL2 is not supported. Verify any constant, 
 
 Both the C extension and `lib/` compile against CRuby and mruby. In `.c` files, use the `r_*` macros from `ext/ruby2d/ruby2d.h`, never `rb_*` or `mrb_*` directly (`ARCHITECTURE.md` covers the layer; its few sanctioned exceptions are documented at the sites that need them).
 
-In `lib/`, CRuby-only idioms compile fine under `mrbc` and keep the specs green, then crash the native and web builds at runtime. `defined?` is the common one — use `instance_variable_defined?(:@x)` for ivar guards. Calling a private setter through `self` (`self.width = w`, which CRuby allows) is another — mruby raises `NoMethodError`; write the ivars or use `send`. Two more: `Dir.glob`/`Dir[]` and `ENV` don't exist in mruby (`Dir.entries` and `File.expand_path` with `~` do), and a bare `raise` inside `rescue` raises an empty error instead of re-raising — use `raise e`. When unsure whether something exists in mruby, confirm it with a throwaway script built by `ruby2d build --native`, ending the script's `update` block with `close` (closing any earlier leaves a window that has to be force-killed).
+In `lib/`, CRuby-only idioms compile fine under `mrbc` and keep `rake` green, then crash the native and web builds at runtime. `defined?` is the common one — use `instance_variable_defined?(:@x)` for ivar guards. Calling a private setter through `self` (`self.width = w`, which CRuby allows) is another — mruby raises `NoMethodError`; write the ivars or use `send`. Two more: `Dir.glob`/`Dir[]` and `ENV` don't exist in mruby (`Dir.entries` and `File.expand_path` with `~` do), and a bare `raise` inside `rescue` raises an empty error instead of re-raising — use `raise e`. When unsure whether something exists in mruby, confirm it with a throwaway script built by `ruby2d build --native`, ending the script's `update` block with `close` (closing any earlier leaves a window that has to be force-killed). After changing `lib/`, run `rake spec:native` and `rake spec:web`, which run the specs on mruby.
 
 ## Documentation
 

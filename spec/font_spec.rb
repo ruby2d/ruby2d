@@ -73,7 +73,11 @@ RSpec.describe Ruby2D::Font do
     it 'does not follow a symlinked directory, so a loop is walked once' do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, 'One.ttf'), '')
-        File.symlink(dir, File.join(dir, 'loop'))
+        begin
+          File.symlink(dir, File.join(dir, 'loop'))
+        rescue NotImplementedError
+          skip 'mruby has no symlinks on Windows'
+        end
         allow(Ruby2D::Font).to receive(:directories).and_return([dir])
 
         expect(Ruby2D::Font.send(:find_os_font_files)).to eq([File.join(dir, 'One.ttf')])
