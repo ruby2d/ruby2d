@@ -1021,14 +1021,50 @@ static void wasm_set_pace_mode(R_VAL fps_cap_val) {
   }
 }
 
+// One tick, in the shape mrb_protect_error calls
+static mrb_value wasm_tick(mrb_state *state, void *userdata) {
+  (void)state;
+  (void)userdata;
+  return r_funcall(ruby2d_window, "tick", 0);
+}
+
+// Stop the app after a tick raised, as an uncaught exception or `Kernel#exit`
+// ends a native one: stop ticking, so the error isn't raised again every
+// frame, and stop the audio, which the browser goes on mixing by itself. Then
+// print the message and backtrace to the browser console, unless it was exit.
+static void wasm_tick_raised(mrb_value exc) {
+  emscripten_cancel_main_loop();
+  MIX_Mixer *mixer = R2D_GetMixer();
+  if (mixer && !MIX_StopAllTracks(mixer, 0)) {
+    R2D_Error("MIX_StopAllTracks", "%s", SDL_GetError());
+  }
+  if (MRB_EXC_EXIT_P(mrb_exc_ptr(exc))) return;
+
+  mrb->exc = mrb_obj_ptr(exc);
+  mrb_print_error(mrb);
+  mrb->exc = NULL;
+}
+
+// Web builds are mruby-only and the r_* layer has no protected call, so this
+// uses mruby's API directly.
 static void wasm_tick_trampoline(void) {
+  // `show` handed the loop to the browser by unwinding the stack it ran on, so
+  // the handler that caught a raise there is gone, and `mrb->jmp` still points
+  // into it: raising would jump into a dead frame, and the browser reports
+  // only a minified JS exception. Nothing above this call can catch anything,
+  // so clear it and give the tick a handler of its own.
+  mrb->jmp = NULL;
+
   // Release the tick's return value from the GC arena — this call runs outside
   // the VM once per frame, and mrb_funcall arena-protects what it returns, so
   // a heap-object return would otherwise accumulate one pinned object per
   // frame, forever.
   int ai = r_gc_arena_save();
-  r_funcall(ruby2d_window, "tick", 0);
+  mrb_bool raised = FALSE;
+  mrb_value result = mrb_protect_error(mrb, wasm_tick, NULL, &raised);
+  if (raised) wasm_tick_raised(result);
   r_gc_arena_restore(ai);
+  if (raised) return;
 
   // Re-assert the loop timing after every tick, not once: SDL's Emscripten
   // backend defers the renderer's creation-time vsync-0 swap interval

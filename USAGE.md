@@ -2615,6 +2615,8 @@ Native and web builds compile your Ruby code using [mruby](https://mruby.org) ra
 
 Test your app with `ruby2d build --web` early to catch any incompatibilities.
 
+In the browser, an error raised while the app runs, in `update` or an event callback, stops the app and prints its message and backtrace to the browser's console. A `rescue` around `show` won't see it: on the web, `show` hands the loop to the browser and never returns.
+
 ### Frame Rate
 
 Web builds drive the render loop from the browser's `requestAnimationFrame`, so they run at the display's refresh rate, including high-refresh displays (120 Hz and up). Write motion to be [frame-rate independent with `dt`](#frame-rate-independence-with-dt) so it looks the same at any refresh rate; this matters more on the web, where a complex scene may not reach native frame rates (mruby is slower than CRuby, and WebAssembly trails native code).
