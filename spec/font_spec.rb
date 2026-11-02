@@ -80,6 +80,17 @@ RSpec.describe Ruby2D::Font do
       end
     end
 
+    it 'still walks subdirectories where symlinks are unsupported, as on mruby on Windows' do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, 'Sub'))
+        File.write(File.join(dir, 'Sub/Two.ttf'), '')
+        allow(File).to receive(:symlink?).and_raise(NotImplementedError)
+        allow(Ruby2D::Font).to receive(:directories).and_return([dir])
+
+        expect(Ruby2D::Font.send(:find_os_font_files)).to eq([File.join(dir, 'Sub/Two.ttf')])
+      end
+    end
+
     it 'keeps a regular face whose family name contains a variant word' do
       allow(Ruby2D::Font).to receive(:find_os_font_files)
         .and_return(['/f/NotoSansOldItalic-Regular.ttf', '/f/NotoSansOldItalic-Bold.ttf'])
