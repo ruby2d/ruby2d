@@ -1654,6 +1654,114 @@ R_VAL ruby2d_ext_canvas_stroke_polyline(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 /*
+ * The source pixel, and its 7-bit blend fraction toward the next one, for
+ * pixel `i` of a stamp `dst_n` pixels long scaled from `src_n` source pixels.
+ * Nearest takes the source pixel whose span holds the pixel's center; linear
+ * samples at the center (minus half a source pixel), clamped at both ends.
+ * Up to 65535 pixels this is SDL_stretch.c's own 16.16 arithmetic, so the
+ * stamp is the one SDL would scale. Past that SDL can't scale at all, and a
+ * 16.16 step would land whole pixels off, so the same points are found in
+ * double.
+ */
+static void canvas_stamp_axis(int64_t i, int src_n, int dst_n, bool linear,
+                              int *idx, int *frac) {
+  *frac = 0;
+  if (dst_n <= SDL_MAX_UINT16) {
+    int64_t step = (int64_t)(((uint64_t)src_n << 16) / (uint64_t)dst_n);
+    if (!linear) {
+      int64_t s = (step / 2 + i * step) >> 16;
+      *idx = s < src_n ? (int)s : src_n - 1;
+      return;
+    }
+    int64_t pos = (step + 1) / 2 - 32768 + i * step;
+    if (pos < 0) {
+      *idx = 0;
+    } else if ((pos >> 16) > src_n - 2) {
+      *idx = src_n - 1;
+    } else {
+      *idx = (int)(pos >> 16);
+      *frac = (int)((pos >> 9) & 127);
+    }
+    return;
+  }
+
+  double p = ((double)i + 0.5) * src_n / dst_n;
+  if (!linear) {
+    int64_t s = (int64_t)p;
+    *idx = s < src_n ? (int)s : src_n - 1;
+    return;
+  }
+  p -= 0.5;
+  double f = floor(p);
+  if (p < 0.0) {
+    *idx = 0;
+  } else if (f > src_n - 2) {
+    *idx = src_n - 1;
+  } else {
+    *idx = (int)f;
+    *frac = (int)((p - f) * 128.0);
+  }
+}
+
+
+/*
+ * Fill `out` with its window of a stamp: `src_rect` of the RGBA32 `src`
+ * scaled to `w` x `h`, its top-left at (`at_x`, `at_y`) in `out`. SDL's own
+ * scaled blit, given a stamp that runs past the destination's edges, first
+ * scales the source to the stamp's full size and then copies the part that
+ * shows, which for a huge stamp means gigabytes or more; this samples only
+ * the pixels `out` holds. Linear blends vertically and then horizontally with
+ * 7-bit fractions and rounds once at the end, as SDL's SSE2 and NEON scalers
+ * do; its plain-C fallback rounds after each pass, so where SDL runs that
+ * instead, the two differ by at most 1.
+ */
+static void canvas_sample_stamp(SDL_Surface *src, SDL_Rect src_rect, SDL_Surface *out,
+                                int at_x, int at_y, int w, int h, bool linear) {
+  int *col_idx = malloc(sizeof(int) * 2 * (size_t)out->w);
+  if (!col_idx) {
+    R2D_Error("canvas_sample_stamp", "Out of memory");
+    return;
+  }
+  int *col_frac = col_idx + out->w;
+  for (int x = 0; x < out->w; x++) {
+    canvas_stamp_axis((int64_t)x - at_x, src_rect.w, w, linear, &col_idx[x], &col_frac[x]);
+  }
+
+  for (int y = 0; y < out->h; y++) {
+    int row, fh;
+    canvas_stamp_axis((int64_t)y - at_y, src_rect.h, h, linear, &row, &fh);
+    int row1 = row + 1 < src_rect.h ? row + 1 : row;
+    const Uint8 *base = (const Uint8 *)src->pixels + (size_t)src_rect.x * 4;
+    const Uint8 *s0 = base + (size_t)(src_rect.y + row) * src->pitch;
+    const Uint8 *s1 = base + (size_t)(src_rect.y + row1) * src->pitch;
+    Uint8 *o = (Uint8 *)out->pixels + (size_t)y * out->pitch;
+    for (int x = 0; x < out->w; x++, o += 4) {
+      int c = col_idx[x];
+      if (!linear) {
+        SDL_memcpy(o, s0 + c * 4, 4);
+        continue;
+      }
+      int c1 = c + 1 < src_rect.w ? c + 1 : c;
+      int fw = col_frac[x];
+      for (int k = 0; k < 4; k++) {
+        int left  = s0[c * 4 + k] * (128 - fh) + s1[c * 4 + k] * fh;
+        int right = s0[c1 * 4 + k] * (128 - fh) + s1[c1 * 4 + k] * fh;
+        o[k] = (Uint8)((left * (128 - fw) + right * fw) >> 14);
+      }
+    }
+  }
+  free(col_idx);
+}
+
+
+// Stamps larger than this, in pixels, are sampled by canvas_sample_stamp when
+// they run past the canvas (see canvas_stamp_surface): 4096 x 4096, a 64 MB
+// scratch surface on SDL's path, which takes milliseconds to scale. So is one
+// past 65535 pixels on a side, which SDL can't scale at all.
+#define CANVAS_STAMP_SDL_MAX ((int64_t)4096 * 4096)
+
+
+/*
  * Stamp a source surface onto the canvas: scale `src_rect` of `src` (the whole
  * surface when NULL) to `dst`, flip it, modulate it by an RGBA color, and
  * composite it over the canvas pixels. `dst` is in surface pixel space and may
@@ -1698,18 +1806,45 @@ static void canvas_stamp_surface(R2D_Canvas *can, SDL_Surface *src,
   if (flip & SDL_FLIP_HORIZONTAL) place.x = x1 - dst.x - dst.w;
   if (flip & SDL_FLIP_VERTICAL)   place.y = y1 - dst.y - dst.h;
 
-  // A plain copy; modulation and blending happen below. The source's blend
-  // mode is put back afterwards: text surfaces are shared through a cache and
-  // image textures are created from their surfaces.
-  SDL_BlendMode saved = SDL_BLENDMODE_BLEND;
-  SDL_GetSurfaceBlendMode(src, &saved);
-  SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
-  bool ok = SDL_BlitSurfaceScaled(src, src_rect, scaled, &place, mode);
-  SDL_SetSurfaceBlendMode(src, saved);
-  if (!ok) {
-    R2D_Error("canvas_stamp_surface", "SDL_BlitSurfaceScaled failed: %s", SDL_GetError());
-    SDL_DestroySurface(scaled);
-    return;
+  // A stamp that runs past the scratch surface is one SDL would scale to its
+  // full size first (see canvas_sample_stamp), so a large one is sampled here
+  // for just the pixels that show.
+  bool clipped = place.x < 0 || place.y < 0 || place.x + dst.w > vw || place.y + dst.h > vh;
+  bool oversized = dst.w > SDL_MAX_UINT16 || dst.h > SDL_MAX_UINT16 ||
+                   (int64_t)dst.w * dst.h > CANVAS_STAMP_SDL_MAX;
+  if (clipped && oversized) {
+    SDL_Rect whole = { 0, 0, src->w, src->h };
+    SDL_Rect from;
+    if (!SDL_GetRectIntersection(src_rect ? src_rect : &whole, &whole, &from)) {
+      SDL_DestroySurface(scaled);
+      return;
+    }
+    SDL_Surface *rgba = src->format == SDL_PIXELFORMAT_RGBA32
+                      ? src : SDL_ConvertSurface(src, SDL_PIXELFORMAT_RGBA32);
+    if (!rgba || !SDL_LockSurface(rgba)) {
+      R2D_Error("canvas_stamp_surface", "Couldn't read the source: %s", SDL_GetError());
+      if (rgba && rgba != src) SDL_DestroySurface(rgba);
+      SDL_DestroySurface(scaled);
+      return;
+    }
+    canvas_sample_stamp(rgba, from, scaled,
+                        place.x, place.y, dst.w, dst.h, mode == SDL_SCALEMODE_LINEAR);
+    SDL_UnlockSurface(rgba);
+    if (rgba != src) SDL_DestroySurface(rgba);
+  } else {
+    // A plain copy; modulation and blending happen below. The source's blend
+    // mode is put back afterwards: text surfaces are shared through a cache
+    // and image textures are created from their surfaces.
+    SDL_BlendMode saved = SDL_BLENDMODE_BLEND;
+    SDL_GetSurfaceBlendMode(src, &saved);
+    SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
+    bool ok = SDL_BlitSurfaceScaled(src, src_rect, scaled, &place, mode);
+    SDL_SetSurfaceBlendMode(src, saved);
+    if (!ok) {
+      R2D_Error("canvas_stamp_surface", "SDL_BlitSurfaceScaled failed: %s", SDL_GetError());
+      SDL_DestroySurface(scaled);
+      return;
+    }
   }
   if (flip != SDL_FLIP_NONE && !SDL_FlipSurface(scaled, flip)) {
     R2D_Error("canvas_stamp_surface", "SDL_FlipSurface failed: %s", SDL_GetError());

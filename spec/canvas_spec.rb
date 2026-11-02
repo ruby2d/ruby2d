@@ -556,6 +556,19 @@ RSpec.describe Ruby2D::Canvas do
     end
   end
 
+  describe 'draw_image far larger than the canvas' do
+    # SDL scaled a stamp that runs past the canvas to its full size before
+    # copying out the part that shows: terabytes at a million pixels square
+    it 'finishes, in both scale modes' do
+      %i[linear nearest].each do |mode|
+        img = Image.new(test_image('image.png'), scale_mode: mode)
+        canvas.draw_image(img, x: -5e5, y: -5e5, width: 1e6, height: 1e6)
+        # Small in area, but past the 65535 pixels SDL can scale on a side
+        canvas.draw_image(img, x: -5e5, y: 0, width: 1e6, height: 16)
+      end
+    end
+  end
+
   describe 'per-vertex stroke gradients' do
     it 'accepts Color::Set on stroke_triangle (3 colors)' do
       expect {
