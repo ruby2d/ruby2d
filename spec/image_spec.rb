@@ -54,14 +54,14 @@ RSpec.describe Ruby2D::Image do
 
     it 'treats a tilde path naming no user as a relative path' do
       expect { Image.new('~ruby2d-no-such-user/x.png') }
-        .to raise_error(Ruby2D::Error, /#{Regexp.escape(File.join(Dir.pwd, '~ruby2d-no-such-user/x.png'))}/)
+        .to raise_error(Ruby2D::Error, /#{Regexp.escape(File.join(File.expand_path('.'), '~ruby2d-no-such-user/x.png'))}/)
     end
 
     it 'loads a file whose name starts with a tilde' do
       Dir.mktmpdir do |dir|
         FileUtils.cp(path, File.join(dir, '~colors.png'))
         Dir.chdir(dir) do
-          expect(Image.new('~colors.png').path).to eq(File.join(Dir.pwd, '~colors.png'))
+          expect(Image.new('~colors.png').path).to eq(File.join(File.expand_path('.'), '~colors.png'))
         end
       end
     end

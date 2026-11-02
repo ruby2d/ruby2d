@@ -13,8 +13,8 @@ RSpec.describe Ruby2D::SpriteSheet do
         end
         Dir.chdir(dir) do
           sheet = described_class.new('~sheets/spritesheet.xml')
-          expect(sheet.path).to eq(File.join(Dir.pwd, '~sheets/spritesheet.xml'))
-          expect(sheet.image_path).to eq(File.join(Dir.pwd, '~sheets/spritesheet.png'))
+          expect(sheet.path).to eq(File.join(File.expand_path('.'), '~sheets/spritesheet.xml'))
+          expect(sheet.image_path).to eq(File.join(File.expand_path('.'), '~sheets/spritesheet.png'))
         end
       end
     end
@@ -22,7 +22,7 @@ RSpec.describe Ruby2D::SpriteSheet do
     it 'resolves a relative atlas path to an absolute image path' do
       Dir.chdir(File.dirname(atlas_path)) do
         sheet = described_class.new('spritesheet.xml')
-        expect(sheet.image_path).to eq(File.join(Dir.pwd, 'spritesheet.png'))
+        expect(sheet.image_path).to eq(File.join(File.expand_path('.'), 'spritesheet.png'))
         expect(sheet.image_path).to eq(sheet.texture.path)
       end
     end

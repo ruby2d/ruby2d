@@ -2,6 +2,7 @@
 build/
 docs/
 test/build/
+spec/build/
 test/screenshot*
 try/build/
 *.gem

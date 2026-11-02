@@ -85,7 +85,19 @@ end
 RSpec.describe 'Window#show unwinding' do
   after { Ruby2D::Window.shown = false }
 
-  it 'clears the running flag when a callback raises, so a later screenshot raises' do
+  # The mruby frame loop runs inside `window_show`, so this is how a callback's
+  # exception reaches `show` there. CRuby sets the flag only after that call.
+  it 'clears the running flag when the native side raises' do
+    window = Ruby2D::Window.new
+    allow(Ruby2D::Ext).to receive(:window_show).and_raise('application failure')
+    allow(Ruby2D::Ext).to receive(:window_load_gamepad_mappings_file)
+
+    expect { window.show }.to raise_error(RuntimeError, 'application failure')
+    expect(window.instance_variable_get(:@running)).to be false
+  end
+
+  it 'clears the running flag when a callback raises, so a later screenshot raises',
+     skip_mruby: 'the frame loop runs inside `window_show` there, and this stubs it' do
     window = Ruby2D::Window.new
     allow(Ruby2D::Ext).to receive(:window_show)
     allow(Ruby2D::Ext).to receive(:window_load_gamepad_mappings_file)
@@ -97,7 +109,8 @@ RSpec.describe 'Window#show unwinding' do
       .to raise_error(Ruby2D::Error, /after the frame loop ended/)
   end
 
-  it 'keeps the running flag when a callback calls show again and rescues' do
+  it 'keeps the running flag when a callback calls show again and rescues',
+     skip_mruby: 'the frame loop runs inside `window_show` there, and this stubs it' do
     window = Ruby2D::Window.new
     allow(Ruby2D::Ext).to receive(:window_show)
     allow(Ruby2D::Ext).to receive(:window_load_gamepad_mappings_file)

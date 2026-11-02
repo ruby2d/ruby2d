@@ -5,9 +5,11 @@
 // report (captured from the page console) to stdout. No npm dependencies —
 // uses node's built-in http server and global WebSocket/fetch (node >= 22).
 //
-// Usage: node drive.js <build/web dir> [app.html]
+// Usage: node drive.js <build/web dir> [app.html] [done-pattern]
 //
 // Exit code 0 if a report was captured (contains "CPU build"), else non-zero.
+// A done-pattern, used by `rake spec:web`, ends the run at the first console
+// line that matches it instead, and that line is what exit code 0 then means.
 
 const http = require('http');
 const fs = require('fs');
@@ -17,6 +19,7 @@ const { spawn } = require('child_process');
 
 const DIR = process.argv[2];
 const HTML = process.argv[3] || 'app.html';
+const DONE = process.argv[4] ? new RegExp(process.argv[4]) : null;
 // The served directory, canonical: requests are confined to it (see below).
 let ROOT;
 try { ROOT = fs.realpathSync(DIR); }
@@ -94,7 +97,7 @@ const send = (ws, method, params, sessionId) =>
     chrome.kill('SIGKILL');
     server.close();
     try { fs.rmSync(PROFILE, { recursive: true, force: true }); } catch {}
-    process.exit(lines.some((l) => l.includes('CPU build')) ? 0 : 1);
+    process.exit(lines.some((l) => (DONE ? DONE.test(l) : l.includes('CPU build'))) ? 0 : 1);
   };
 
   ws.addEventListener('open', () => {
@@ -115,7 +118,8 @@ const send = (ws, method, params, sessionId) =>
     if (msg.method === 'Runtime.consoleAPICalled') {
       const text = msg.params.args.map((a) => (a.value !== undefined ? a.value : '')).join(' ');
       lines.push(text);
-      if (/^-{20,}/.test(text) && lines.some((l) => l.includes('Throughput'))) finish(null);
+      const reported = /^-{20,}/.test(text) && lines.some((l) => l.includes('Throughput'));
+      if (DONE ? DONE.test(text) : reported) finish(null);
     }
     if (msg.method === 'Runtime.exceptionThrown') {
       const e = msg.params.exceptionDetails;

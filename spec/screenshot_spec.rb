@@ -4,12 +4,12 @@
 RSpec.describe 'Window#screenshot' do
   after { Ruby2D::Window.shown = false }
 
-  it 'returns the path it will write to' do
+  it 'returns the path it will write to', skip_web: '`screenshot` is a no-op on the web' do
     win = Ruby2D::Window.new
     expect(win.screenshot('./ruby2d-spec.png')).to eq('./ruby2d-spec.png')
   end
 
-  it 'defaults to a timestamped file' do
+  it 'defaults to a timestamped file', skip_web: '`screenshot` is a no-op on the web' do
     win = Ruby2D::Window.new
     expect(win.screenshot).to match(%r{\A\./screenshot-[\d-]+\.png\z})
   end
@@ -19,7 +19,7 @@ RSpec.describe 'Window#screenshot' do
     expect { win.screenshot('./ruby2d-spec.png') }.not_to raise_error
   end
 
-  it 'raises once the window has closed rather than saving nothing' do
+  it 'raises once the window has closed rather than saving nothing', skip_web: '`screenshot` is a no-op on the web' do
     win = Ruby2D::Window.new
     Ruby2D::Window.shown = true # shown, but the frame loop is no longer running
     expect { win.screenshot('./ruby2d-spec.png') }

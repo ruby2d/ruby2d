@@ -180,7 +180,7 @@ RSpec.describe Ruby2D::Tileset do
 
     # Runs on every mouse move; a per-call allocation would show as 100 here
     # (the counter itself adds one or two).
-    it 'allocates nothing per call hitting a rotated tile' do
+    it 'allocates nothing per call hitting a rotated tile', skip_mruby: '`GC.stat` is CRuby-only' do
       tileset[80, 40] = :turned
       tileset.contains?(90, 60)
       before = GC.stat(:total_allocated_objects)

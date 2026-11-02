@@ -63,3 +63,20 @@ jobs:
           # audio device as a hard error. macOS has a real one, so it keeps
           # exercising the actual driver; empty here means SDL picks the default.
           SDL_AUDIO_DRIVER: ${{ runner.os == 'Windows' && 'dummy' || '' }}
+
+      # The same specs on mruby, which is what a built app runs.
+      - name: Test on mruby, native
+        run: rake spec:native
+
+      # Wasm is the same on every OS, so one lane runs the web specs. The macOS
+      # image already has the Node (22+) and Chrome that `drive.js` needs.
+      - name: Install Emscripten (macOS)
+        if: runner.os == 'macOS'
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 6.0.13 # pinned: the bundled wasm libraries have to link with it
+          actions-cache-folder: emsdk-cache
+
+      - name: Test on mruby, web (macOS)
+        if: runner.os == 'macOS'
+        run: rake spec:web

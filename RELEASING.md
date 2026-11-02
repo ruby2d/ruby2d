@@ -53,14 +53,15 @@ The whole checklist is framed in terms of the version being *released*: `1.0.0.d
 
 ## Test platforms
 
-Step 4 is the one part of a release nothing on this machine can vouch for. On each platform, with the latest Ruby installed, run all four:
+Step 4 is the one part of a release nothing on this machine can vouch for. On each platform, with the latest Ruby installed, run all five:
 
 - `rake` — full build, install, and RSpec
+- `rake spec:native` — the same specs on mruby
 - `rake test:all` — manually verify each interactive test (press Esc to advance)
 - `rake test:all native` — the same, built as native executables
 - `rake test:all web` — the same, served as web apps (press Enter in the terminal to advance)
 
-The platforms themselves are listed in `RELEASE_TEST_PLATFORMS` in the [`Rakefile`](Rakefile), which is where the checklist reads them from. Windows on ARM counts once but needs both terminals: install RubyInstaller's Ruby+Devkit for `arm64` and for `x64`, and run the four commands in each.
+The platforms themselves are listed in `RELEASE_TEST_PLATFORMS` in the [`Rakefile`](Rakefile), which is where the checklist reads them from. Windows on ARM counts once but needs both terminals: install RubyInstaller's Ruby+Devkit for `arm64` and for `x64`, and run the five commands in each.
 
 Nothing aggregates these ticks across machines: `.release-state` is local, so you confirm all four on the machine you're releasing from, once you've actually run the tests on each box. The prompts default to no, and the release can't move past step 4 until every platform is ticked.
 

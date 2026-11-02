@@ -278,6 +278,113 @@ def build_example(target, example)
   work_dir
 end
 
+# mruby specs ##################################################################
+
+# Spec files that can't run on mruby: `cli_*` and `benchmark` test code that
+# isn't compiled into an app, `lib_files` reads `lib/`, and `mruby_compat` loads
+# what the app already has.
+MRUBY_UNPORTED_SPECS = %w[benchmark lib_files mruby_compat].freeze
+
+# What the specs run on, in load order. See `spec/mruby/rspec.rb`.
+MRUBY_SPEC_HARNESS = %w[regexp rspec stdlib].freeze
+
+# Seconds a built spec run gets. It takes a few, and a hang in C can't stop
+# itself, so the task has to.
+MRUBY_SPEC_TIMEOUT = 120
+
+# The last line of a finished run, as a string for the web driver to match.
+MRUBY_SPEC_SUMMARY = '^\d+ examples?, '
+
+def mruby_spec_files
+  Dir['spec/*_spec.rb'].sort.reject do |path|
+    name = File.basename(path, '_spec.rb')
+    name.start_with?('cli_') || MRUBY_UNPORTED_SPECS.include?(name)
+  end
+end
+
+# An app compiles from one source file, so the harness, the support files, and
+# the specs all go into one, the way `spec_helper` would load them.
+def write_mruby_spec_bundle(path)
+  sources = MRUBY_SPEC_HARNESS.map { |name| "spec/mruby/#{name}.rb" } +
+            Dir['spec/support/*.rb'].sort + mruby_spec_files
+  File.write(path, "#{sources.map { |source| File.read(source) }.join("\n")}\nMiniSpec.run\n")
+end
+
+# Build the specs for a target (:native or :web) in spec/build/<target>, and
+# return the working directory. `stdlib.rb` points `Ruby2D.test_media` at the
+# media bundled here.
+def build_mruby_specs(target)
+  work_dir = File.expand_path("spec/build/#{target}", __dir__)
+  FileUtils.rm_rf(work_dir)
+  FileUtils.mkdir_p(work_dir)
+  write_mruby_spec_bundle(File.join(work_dir, 'specs.rb'))
+  FileUtils.cp_r(File.expand_path('assets/test_media', __dir__), File.join(work_dir, 'media'))
+  run_cmd "( cd #{work_dir} && ruby2d build --#{target} --assets media specs.rb )"
+  work_dir
+end
+
+def spawn_mruby_specs(target, work_dir, log)
+  output = { out: log, err: %i[child out] }
+  if target == :native
+    native_dir = File.join(work_dir, 'build/native')
+    app = File.join(native_dir, AssetsTarget.host_os == 'windows' ? 'app.exe' : 'app')
+    env = { 'SDL_VIDEODRIVER' => 'dummy', 'SDL_AUDIO_DRIVER' => 'dummy' }
+    spawn(env, app, chdir: native_dir, **output)
+  else
+    driver = File.expand_path('benchmark/web/drive.js', __dir__)
+    # Well under the task's own limit, so the driver gets to shut Chrome down:
+    # its clock starts once Chrome is up, which can take it 12 seconds.
+    env = { 'DRIVE_TIMEOUT' => ((MRUBY_SPEC_TIMEOUT - 20) * 1000).to_s }
+    spawn(env, 'node', driver, File.join(work_dir, 'build/web'), 'app.html', MRUBY_SPEC_SUMMARY, **output)
+  end
+end
+
+# Print the failures and summary, and exit non-zero unless examples ran, they
+# all passed, and the run ended cleanly. A run with no summary stopped partway,
+# on the example it announced last, and whatever else it printed says why.
+def report_mruby_specs(log, ended_cleanly)
+  output = File.read(log).scrub
+  report = output[/^(?:Failures:|\d+ examples?, ).*/m]
+  unless report
+    last_example = output.lines.grep(/^>> /).last
+    stopped = last_example ? "during: #{last_example.delete_prefix('>> ').strip}" : 'before any example'
+    error "The spec run crashed or hung #{stopped}", spaced: true
+    puts output.lines.reject { |line| line.start_with?('>> ') }.last(5)
+    puts "  Output is in #{log}"
+    exit 1
+  end
+
+  puts report
+  passed = report.lines.last.match?(/^[1-9]\d* examples?, 0 failures, /)
+  error 'The spec run crashed or hung after its last example', spaced: true if passed && !ended_cleanly
+  exit 1 unless passed && ended_cleanly
+end
+
+# Wait out a spec run and return whether it ended cleanly. The app ignores
+# Ctrl-C, so stopping the task has to stop it too.
+def wait_for_mruby_specs(pid)
+  Timeout.timeout(MRUBY_SPEC_TIMEOUT) { Process.waitpid(pid) }
+  $?.success?
+rescue Timeout::Error
+  terminate_process(pid)
+  false
+rescue Interrupt
+  terminate_process(pid)
+  exit(130)
+end
+
+def run_mruby_specs(target)
+  require 'timeout'
+
+  build = target == :native ? 'a native executable (mruby)' : 'a web app (mruby + WebAssembly)'
+  print_task "Building the specs as #{build}", spaced: false
+  work_dir = build_mruby_specs(target)
+  print_task 'Running the specs'
+  log = File.join(work_dir, 'specs.log')
+  pid = spawn_mruby_specs(target, work_dir, log)
+  report_mruby_specs(log, wait_for_mruby_specs(pid))
+end
+
 # Tasks ########################################################################
 
 task default: 'all'
@@ -341,6 +448,18 @@ end
 desc "Run the RSpec tests"
 RSpec::Core::RakeTask.new(:spec) do
   print_task "Running RSpec"
+end
+
+namespace :spec do
+  desc 'Run the RSpec tests on a native executable (mruby)'
+  task :native do
+    run_mruby_specs(:native)
+  end
+
+  desc 'Run the RSpec tests on a web app in headless Chrome (mruby + WebAssembly)'
+  task :web do
+    run_mruby_specs(:web)
+  end
 end
 
 desc "Run a test with CRuby (or use test:native/web/all/auto)"
@@ -1001,11 +1120,14 @@ def release_check_repo
 end
 
 # Step 3 — the default task: uninstall, rebuild the C extension, reinstall, and
-# run RSpec. The local gate before going near four machines; the gem it leaves
-# behind is still the working version's, so step 7 rebuilds after the bump.
+# run RSpec, then the same specs on mruby, native and web. The local gate before
+# going near four machines; the gem it leaves behind is still the working
+# version's, so step 7 rebuilds after the bump.
 def release_build_and_test
   print_task 'Build, install, and test'
   Rake::Task['all'].invoke
+  Rake::Task['spec:native'].invoke
+  Rake::Task['spec:web'].invoke
   release_confirm!('test')
 end
 
@@ -1015,8 +1137,9 @@ end
 # one survives.
 def release_verify_platforms
   print_task 'Verify each platform by hand'
-  puts "    On each, with the latest Ruby installed, run all four:\n\n"
+  puts "    On each, with the latest Ruby installed, run all five:\n\n"
   print_cmd 'rake'
+  print_cmd 'rake spec:native'
   print_cmd 'rake test:all'
   print_cmd 'rake test:all native'
   print_cmd 'rake test:all web'
@@ -1026,7 +1149,7 @@ def release_verify_platforms
     key = "platform:#{platform}"
     if release_confirmed?(key)
       puts "    #{'✓'.success} #{platform}"
-    elsif ask?("#{'○'.dim} #{platform} — all four passed?", default: false)
+    elsif ask?("#{'○'.dim} #{platform} — all five passed?", default: false)
       release_confirm!(key)
     end
   end

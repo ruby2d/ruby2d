@@ -2,7 +2,7 @@
 # the Emscripten (WASM) build, false for native builds and the CRuby gem. Specs
 # run under CRuby, so an app branching on it here must take the native path.
 RSpec.describe 'Ruby2D.web?' do
-  it 'is false under CRuby' do
+  it 'is false under CRuby', skip_mruby: 'this pins the CRuby answer' do
     expect(Ruby2D.web?).to be false
   end
 end
