@@ -774,9 +774,14 @@ void R2D_DrawDashedLine(float x1, float y1, float x2, float y2,
     return;
   }
 
+  // Place each dash from its index rather than by adding up `step`: summed
+  // over thousands of dashes, float error let `pos` fall behind and the loop
+  // wrote a quad past the end of both arrays. Bounded by the allocation too.
   int q = 0;
-  float pos = 0.0f;
-  while (pos < length) {
+  for (; q < max_dashes; q++) {
+    float pos = (float)q * step;
+    if (pos >= length) break;
+
     float end = pos + dash;
     if (end > length) end = length;
 
@@ -829,9 +834,6 @@ void R2D_DrawDashedLine(float x1, float y1, float x2, float y2,
     indices[ix + 3] = v + 0;
     indices[ix + 4] = v + 2;
     indices[ix + 5] = v + 3;
-
-    q++;
-    pos += step;
   }
 
   if (q > 0) {
