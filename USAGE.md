@@ -1938,6 +1938,8 @@ end
 
 `event.text` is a UTF-8 string and can be more than one character: an input method commit arrives as one event. Showing what an input method types may need a `font` beyond the default; see [Text](#text).
 
+In the browser, text input doesn't support input methods, and a character beyond U+FFFF, such as most emoji, arrives as U+FFFD (`�`).
+
 Text input is off by default and can be turned on or off at any time, before or after `show`, with `set text_input:`. Leave it off when nothing is being typed: while it is on, some platforms show an on-screen keyboard or activate an input method that swallows key events. Key events keep firing alongside text events, which is how a text field handles Backspace, Return, and the arrow keys.
 
 A game that only sometimes takes typed input turns it on when a prompt opens and off when it closes, so the keys go back to being controls in between. Here Return opens a name prompt, and Return again saves the name and returns to play:
