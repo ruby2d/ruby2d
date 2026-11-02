@@ -40,6 +40,11 @@ module Ruby2D
       end
     end
 
+    # Indexes the source by byte, not by character: once a string holds any
+    # non-ASCII character, `str[i]` counts characters from the start to find
+    # the i-th, which made parsing quadratic. Every token here is ASCII, and no
+    # byte of a UTF-8 multibyte character is, so a slice between tokens is
+    # always whole characters.
     class Parser
       # Cap nesting so pathological input fails with a ParseError instead of
       # allocating a container per opening bracket without bound. Containers
@@ -50,6 +55,7 @@ module Ruby2D
 
       def initialize(str)
         @s = str
+        @n = str.bytesize
         @i = 0
       end
 
@@ -57,7 +63,7 @@ module Ruby2D
         skip_ws
         value = parse_value
         skip_ws
-        raise ParseError, "unexpected trailing data at offset #{@i}" if @i < @s.length
+        raise ParseError, "unexpected trailing data at offset #{@i}" if @i < @n
 
         value
       end
@@ -66,7 +72,7 @@ module Ruby2D
 
       def parse_value
         skip_ws
-        c = @s[@i]
+        c = peek
         if c == '{' || c == '['
           parse_container
         else
@@ -81,7 +87,8 @@ module Ruby2D
         when 'n' then parse_null
         when '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' then parse_number
         else
-          raise ParseError, "unexpected character #{c.inspect} at offset #{@i}"
+          # The whole character, not just its first byte
+          raise ParseError, "unexpected character #{@s.byteslice(@i, @n - @i)[0].inspect} at offset #{@i}"
         end
       end
 
@@ -99,14 +106,14 @@ module Ruby2D
         while true
           # At the start of a value.
           skip_ws
-          c = @s[@i]
+          c = peek
           if c == '{' || c == '['
             raise ParseError, "nesting too deep (over #{MAX_DEPTH} levels)" if containers.length >= MAX_DEPTH
 
             @i += 1
             container = c == '{' ? {} : []
             skip_ws
-            if @s[@i] == (c == '{' ? '}' : ']')
+            if peek == (c == '{' ? '}' : ']')
               @i += 1
               value = container
             else
@@ -133,7 +140,7 @@ module Ruby2D
               closer = ']'
             end
             skip_ws
-            c = @s[@i]
+            c = peek
             if c == ','
               @i += 1
               keys[-1] = parse_key if container.is_a?(Hash)
@@ -151,11 +158,11 @@ module Ruby2D
 
       def parse_key
         skip_ws
-        raise ParseError, "expected string key at offset #{@i}" unless @s[@i] == '"'
+        raise ParseError, "expected string key at offset #{@i}" unless peek == '"'
 
         key = parse_string
         skip_ws
-        raise ParseError, "expected ':' at offset #{@i}" unless @s[@i] == ':'
+        raise ParseError, "expected ':' at offset #{@i}" unless peek == ':'
 
         @i += 1
         key
@@ -164,7 +171,7 @@ module Ruby2D
       def parse_string
         @i += 1
         result = ''.dup
-        while (c = @s[@i])
+        while (c = peek)
           case c
           when '"'
             @i += 1
@@ -181,7 +188,7 @@ module Ruby2D
 
       def parse_escape
         @i += 1
-        esc = @s[@i]
+        esc = peek
         @i += 1
         case esc
         when '"'  then '"'
@@ -202,7 +209,7 @@ module Ruby2D
         code = read_hex4
         # Handle a UTF-16 surrogate pair
         if code >= 0xD800 && code <= 0xDBFF
-          raise ParseError, "expected low surrogate at offset #{@i}" unless @s[@i, 2] == '\\u'
+          raise ParseError, "expected low surrogate at offset #{@i}" unless @s.byteslice(@i, 2) == '\\u'
 
           @i += 2
           lo = read_hex4
@@ -218,8 +225,8 @@ module Ruby2D
       end
 
       def read_hex4
-        hex = @s[@i, 4]
-        unless hex && hex.length == 4 && hex_only?(hex)
+        hex = @s.byteslice(@i, 4)
+        unless hex && hex.bytesize == 4 && hex_only?(hex)
           raise ParseError, "bad unicode escape at offset #{@i}"
         end
 
@@ -233,31 +240,31 @@ module Ruby2D
 
       def parse_number
         start = @i
-        @i += 1 if @s[@i] == '-'
-        if @s[@i] == '0'
+        @i += 1 if peek == '-'
+        if peek == '0'
           @i += 1
-        elsif digit?(@s[@i])
-          @i += 1 while digit?(@s[@i])
+        elsif digit?(peek)
+          @i += 1 while digit?(peek)
         else
           raise ParseError, "bad number at offset #{start}"
         end
         is_float = false
-        if @s[@i] == '.'
+        if peek == '.'
           is_float = true
           @i += 1
           frac_start = @i
-          @i += 1 while digit?(@s[@i])
+          @i += 1 while digit?(peek)
           raise ParseError, "expected digits after '.' at offset #{frac_start}" if @i == frac_start
         end
-        if @s[@i] == 'e' || @s[@i] == 'E'
+        if peek == 'e' || peek == 'E'
           is_float = true
           @i += 1
-          @i += 1 if @s[@i] == '+' || @s[@i] == '-'
+          @i += 1 if peek == '+' || peek == '-'
           exp_start = @i
-          @i += 1 while digit?(@s[@i])
+          @i += 1 while digit?(peek)
           raise ParseError, "expected digits after exponent at offset #{exp_start}" if @i == exp_start
         end
-        token = @s[start...@i]
+        token = @s.byteslice(start, @i - start)
         is_float ? token.to_f : token.to_i
       end
 
@@ -266,10 +273,10 @@ module Ruby2D
       end
 
       def parse_bool
-        if @s[@i, 4] == 'true'
+        if @s.byteslice(@i, 4) == 'true'
           @i += 4
           true
-        elsif @s[@i, 5] == 'false'
+        elsif @s.byteslice(@i, 5) == 'false'
           @i += 5
           false
         else
@@ -278,16 +285,21 @@ module Ruby2D
       end
 
       def parse_null
-        raise ParseError, "bad literal at offset #{@i}" unless @s[@i, 4] == 'null'
+        raise ParseError, "bad literal at offset #{@i}" unless @s.byteslice(@i, 4) == 'null'
 
         @i += 4
         nil
       end
 
       def skip_ws
-        while (c = @s[@i]) && (c == ' ' || c == "\t" || c == "\n" || c == "\r")
+        while (c = peek) && (c == ' ' || c == "\t" || c == "\n" || c == "\r")
           @i += 1
         end
+      end
+
+      # The one-byte string at `@i`, or nil at the end. See the class comment.
+      def peek
+        @i < @n ? @s.byteslice(@i, 1) : nil
       end
     end
   end

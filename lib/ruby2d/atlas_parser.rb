@@ -28,8 +28,8 @@ module Ruby2D
 
     def self.sniff(data, path)
       i = 0
-      i += 1 while i < data.length && ws?(data[i])
-      first = data[i]
+      i += 1 while i < data.bytesize && ws?(byte_at(data, i))
+      first = byte_at(data, i)
       return parse_xml(data) if first == '<'
       return parse_json(data) if first == '{'
 
@@ -145,25 +145,31 @@ module Ruby2D
     # hash in document order. Comments, CDATA sections, processing
     # instructions, and the DOCTYPE are skipped whole, so a frame kept in a
     # comment never reads as an active one; end tags are skipped too.
+    #
+    # Every index in this parser counts bytes, not characters: once a string
+    # holds any non-ASCII character, `str[i]` and `str.index(x, i)` count
+    # characters from the start to find the i-th, which made parsing
+    # quadratic. Every token here is ASCII, and no byte of a UTF-8 multibyte
+    # character is, so a slice between tokens is always whole characters.
     def self.each_start_tag(str)
       i = 0
-      len = str.length
-      while (i = str.index('<', i))
-        if str[i, 4] == '<!--'
+      len = str.bytesize
+      while (i = byte_index(str, '<', i))
+        if str.byteslice(i, 4) == '<!--'
           i = skip_past(str, '-->', i + 4, 'comment', i)
-        elsif str[i, 9] == '<![CDATA['
+        elsif str.byteslice(i, 9) == '<![CDATA['
           i = skip_past(str, ']]>', i + 9, 'CDATA section', i)
-        elsif str[i, 2] == '<?'
+        elsif str.byteslice(i, 2) == '<?'
           i = skip_past(str, '?>', i + 2, 'processing instruction', i)
-        elsif str[i, 2] == '<!'
+        elsif str.byteslice(i, 2) == '<!'
           i = skip_declaration(str, i)
-        elsif str[i, 2] == '</'
+        elsif str.byteslice(i, 2) == '</'
           i = skip_past(str, '>', i + 2, 'end tag', i)
         else
           name_start = i + 1
           i = name_start
-          i += 1 while i < len && !ws?(str[i]) && str[i] != '>' && str[i] != '/'
-          name = str[name_start...i]
+          i += 1 while i < len && !ws?(byte_at(str, i)) && byte_at(str, i) != '>' && byte_at(str, i) != '/'
+          name = str.byteslice(name_start, i - name_start)
           attrs, i = parse_xml_attrs(str, i)
           yield name, attrs
         end
@@ -171,10 +177,10 @@ module Ruby2D
     end
 
     def self.skip_past(str, terminator, from, what, at)
-      close = str.index(terminator, from)
+      close = byte_index(str, terminator, from)
       raise ParseError, "Unterminated #{what} at offset #{at}" unless close
 
-      close + terminator.length
+      close + terminator.bytesize
     end
 
     # Skip a `<!DOCTYPE ...>` declaration, whose internal subset in square
@@ -184,12 +190,12 @@ module Ruby2D
     def self.skip_declaration(str, at)
       i = at + 2
       depth = 0
-      while (c = str[i])
-        if c == '<' && str[i, 4] == '<!--'
+      while (c = byte_at(str, i))
+        if c == '<' && str.byteslice(i, 4) == '<!--'
           i = skip_past(str, '-->', i + 4, 'comment', i)
           next
         elsif c == '"' || c == "'"
-          i = str.index(c, i + 1)
+          i = byte_index(str, c, i + 1)
           break unless i
         elsif c == '['
           depth += 1
@@ -211,39 +217,39 @@ module Ruby2D
     # frame with zero coordinates.
     def self.parse_xml_attrs(str, i)
       attrs = {}
-      len = str.length
+      len = str.bytesize
       while i < len
-        i += 1 while i < len && ws?(str[i])
-        c = str[i]
+        i += 1 while i < len && ws?(byte_at(str, i))
+        c = byte_at(str, i)
         return attrs, i + 1 if c == '>'
 
         if c == '/'
           i += 1
-          i += 1 while i < len && ws?(str[i])
-          raise ParseError, "Expected '>' after '/' at offset #{i}" unless str[i] == '>'
+          i += 1 while i < len && ws?(byte_at(str, i))
+          raise ParseError, "Expected '>' after '/' at offset #{i}" unless byte_at(str, i) == '>'
 
           return attrs, i + 1
         end
 
         name_start = i
-        i += 1 while i < len && str[i] != '=' && str[i] != '>' && str[i] != '/' && !ws?(str[i])
-        name = str[name_start...i]
+        i += 1 while i < len && (c = byte_at(str, i)) != '=' && c != '>' && c != '/' && !ws?(c)
+        name = str.byteslice(name_start, i - name_start)
         raise ParseError, "Expected an attribute name at offset #{name_start}" if name.empty?
 
-        i += 1 while i < len && ws?(str[i])
-        raise ParseError, "Expected '=' after attribute `#{name}` at offset #{i}" unless str[i] == '='
+        i += 1 while i < len && ws?(byte_at(str, i))
+        raise ParseError, "Expected '=' after attribute `#{name}` at offset #{i}" unless byte_at(str, i) == '='
 
         i += 1
-        i += 1 while i < len && ws?(str[i])
-        quote = str[i]
+        i += 1 while i < len && ws?(byte_at(str, i))
+        quote = byte_at(str, i)
         unless quote == '"' || quote == "'"
           raise ParseError, "Expected a quoted value for attribute `#{name}` at offset #{i}"
         end
 
-        close = str.index(quote, i + 1)
+        close = byte_index(str, quote, i + 1)
         raise ParseError, "Unterminated value for attribute `#{name}` at offset #{i}" unless close
 
-        attrs[name] = decode_entities(str[(i + 1)...close])
+        attrs[name] = decode_entities(str.byteslice(i + 1, close - i - 1))
         i = close + 1
       end
       raise ParseError, "Unterminated tag at offset #{i}"
@@ -258,10 +264,10 @@ module Ruby2D
 
       out = ''.dup
       i = 0
-      while (amp = value.index('&', i))
-        out << value[i...amp]
-        semi = value.index(';', amp)
-        decoded = semi && decode_entity(value[(amp + 1)...semi])
+      while (amp = byte_index(value, '&', i))
+        out << value.byteslice(i, amp - i)
+        semi = byte_index(value, ';', amp)
+        decoded = semi && decode_entity(value.byteslice(amp + 1, semi - amp - 1))
         if decoded
           out << decoded
           i = semi + 1
@@ -270,7 +276,7 @@ module Ruby2D
           i = amp + 1
         end
       end
-      out << value[i..-1]
+      out << value.byteslice(i, value.bytesize - i)
     end
 
     def self.decode_entity(ref)
@@ -304,6 +310,21 @@ module Ruby2D
 
     def self.ws?(c)
       c == ' ' || c == "\t" || c == "\n" || c == "\r"
+    end
+
+    # The one-byte string at byte `i` of `str`, or nil past the end. See
+    # `each_start_tag` for why this parser reads bytes.
+    def self.byte_at(str, i)
+      i < str.bytesize ? str.byteslice(i, 1) : nil
+    end
+
+    # The byte offset of the next ASCII `needle` at or after `from`, or nil.
+    # CRuby's `byteindex` raises if `from` lands on a UTF-8 continuation byte,
+    # which only malformed UTF-8 can put after an ASCII token, so step past
+    # those first: none of them can begin an ASCII match.
+    def self.byte_index(str, needle, from)
+      from += 1 while (b = str.getbyte(from)) && (b & 0xC0) == 0x80
+      str.byteindex(needle, from)
     end
   end
 end
