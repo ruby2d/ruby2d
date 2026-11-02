@@ -243,6 +243,42 @@ static int R2D_TextBlockHeight(TTF_Font *font, const char *body, size_t body_len
 
 
 /*
+ * Whether SDL_ttf can render `body_len` bytes of body content without
+ * overflowing: it finds each glyph's row as `y * pitch` in an int, which
+ * overflows on a surface past 2 GB, and then writes outside the surface. Most
+ * text can't come near that, so it's bounded first without a layout: its
+ * lines are its newlines plus one (the only break SDL_ttf makes at wrap width
+ * 0), each a font height or line skip tall, and each byte of its longest line
+ * is taken as 8 font heights wide, which no glyph approaches. Only text whose
+ * bound passes the limit pays for an exact measurement, which costs nearly as
+ * much as the render. Sets the SDL error when the text is too large.
+ */
+static bool R2D_TextFitsSurface(TTF_Font *font, const char *body, size_t body_len) {
+  const double limit = (double)SDL_MAX_SINT32;
+  size_t lines = 1, line_len = 0, longest = 0;
+  for (size_t i = 0; i < body_len; i++) {
+    if (body[i] == '\n') {
+      lines++;
+      line_len = 0;
+    } else if (++line_len > longest) {
+      longest = line_len;
+    }
+  }
+  double line_h = SDL_max(TTF_GetFontHeight(font), TTF_GetFontLineSkip(font));
+  double bound = (double)longest * 8.0 * line_h * 4.0 * (double)lines * line_h;
+  if (bound <= limit) return true;
+
+  int w, h;
+  if (!TTF_GetStringSizeWrapped(font, body, body_len, 0, &w, &h)) return false;
+  // 64 pixels of slack covers any pitch alignment
+  if ((double)(w + 64) * 4.0 * (double)h <= limit) return true;
+
+  SDL_SetError("the text is %d x %d pixels, too large to render", w, h);
+  return false;
+}
+
+
+/*
  * Number of lines in `len` bytes of body content: one plus its newlines.
  */
 static int R2D_TextLineCount(const char *msg, size_t len) {
@@ -315,6 +351,7 @@ static SDL_Surface *R2D_TextSurfaceCacheGet(
   // Trailing newlines are left out of the rasterization and added back below.
   size_t body_len;
   int trailing = R2D_TextTrailingNewlines(msg, msg_len, &body_len);
+  if (!R2D_TextFitsSurface(entry->font, msg, body_len)) return NULL;
   SDL_Surface *surface = TTF_RenderText_Blended_Wrapped(entry->font, msg, body_len, color, 0);
   if (!surface) return NULL;
 

@@ -259,6 +259,13 @@ RSpec.describe Ruby2D::Text do
       expect { txt.size = 2**31 }.to raise_error(RangeError)
       expect(txt.size).to eq(20)
     end
+
+    # SDL_ttf overflows an int past a 2 GB surface and writes outside it
+    it 'refuses a text too large to render instead of crashing, and restores the size' do
+      txt = Text.new((['Hello'] * 120).join("\n"), size: 20)
+      expect { txt.size = 1461 }.to raise_error(Ruby2D::Error, /too large to render/)
+      expect(txt.size).to eq(20)
+    end
   end
 
   describe 'font paths starting with a tilde' do
