@@ -13,6 +13,22 @@ static R_ID id_fill_r, id_fill_g, id_fill_b, id_fill_a;
 
 
 /*
+ * `v` as an int pixel position or size, saturated at 2^30 - 1 either way: a
+ * float past the int range makes a cast undefined behavior (arm64 saturates,
+ * x86 gives INT_MIN, so a huge shape drew on one and not the other), and the
+ * callers add a pixel or a size to what this returns. Every bound it gives is
+ * clipped to the canvas afterwards, which is far smaller, so saturating moves
+ * nothing that's drawn. Callers rule out NaN first.
+ */
+static inline int canvas_pixel(double v) {
+  const double limit = (double)((1 << 30) - 1);
+  if (v > limit) return (1 << 30) - 1;
+  if (v < -limit) return -((1 << 30) - 1);
+  return (int)v;
+}
+
+
+/*
  * Initialize
  */
 void R2D_Canvas_Init() {
@@ -79,8 +95,8 @@ R_VAL ruby2d_ext_canvas_create(RUBY2D_METHOD_ARGS_VARIADIC) {
   } else {
     scale = R2D_GetWindow() ? R2D_GetAssetScale() : R2D_GetInitDisplayScale();
   }
-  int pixel_w = (int)(width  * scale);
-  int pixel_h = (int)(height * scale);
+  int pixel_w = canvas_pixel(width  * scale);
+  int pixel_h = canvas_pixel(height * scale);
 
   SDL_Surface *surface = SDL_CreateSurface(pixel_w, pixel_h, SDL_PIXELFORMAT_RGBA32);
   if (!surface) {
@@ -296,7 +312,7 @@ static void canvas_fill_triangle_on_surface(
   if (a == 0) return;  // fully transparent: nothing to draw
 
   // A non-finite vertex (NaN/Inf, e.g. from a degenerate user coordinate) would
-  // make the (int)ceilf casts below undefined behavior and could index out of
+  // make the int conversions below undefined behavior and could index out of
   // the surface. Skip the draw, matching the no-op philosophy for degenerate
   // geometry elsewhere in this file.
   if (!isfinite(fx1) || !isfinite(fy1) || !isfinite(fx2) ||
@@ -311,9 +327,9 @@ static void canvas_fill_triangle_on_surface(
   // matching the x-extent rule below and canvas_fill_rectangle_on_surface. Using
   // floorf here would close the interval and over-cover integer-aligned bottom
   // edges by one row (visible as 1px-too-thick horizontal lines at 2x scale).
-  int top    = (int)ceilf(fy1);
-  int middle = (int)ceilf(fy2);
-  int bottom = (int)ceilf(fy3) - 1;
+  int top    = canvas_pixel(ceilf(fy1));
+  int middle = canvas_pixel(ceilf(fy2));
+  int bottom = canvas_pixel(ceilf(fy3)) - 1;
 
   if (top < 0) top = 0;
   if (bottom >= surface->h) bottom = surface->h - 1;
@@ -352,8 +368,8 @@ static void canvas_fill_triangle_on_surface(
       }
     }
 
-    int x_start = (int)ceilf(fminf(xa, xb));
-    int x_end   = (int)ceilf(fmaxf(xa, xb)) - 1;
+    int x_start = canvas_pixel(ceilf(fminf(xa, xb)));
+    int x_end   = canvas_pixel(ceilf(fmaxf(xa, xb))) - 1;
 
     if (x_start < 0) x_start = 0;
     if (x_end >= surface->w) x_end = surface->w - 1;
@@ -388,7 +404,7 @@ static void canvas_fill_triangle_lerp_on_surface(
   // mirroring the solid rasterizer's `a == 0` early-out.
   if (a1 == 0 && a2 == 0 && a3 == 0) return;
 
-  // A non-finite vertex (NaN/Inf) would make the (int)ceilf casts below
+  // A non-finite vertex (NaN/Inf) would make the int conversions below
   // undefined behavior; skip the draw rather than risk an out-of-bounds write.
   if (!isfinite(fx1) || !isfinite(fy1) || !isfinite(fx2) ||
       !isfinite(fy2) || !isfinite(fx3) || !isfinite(fy3)) return;
@@ -410,9 +426,9 @@ static void canvas_fill_triangle_lerp_on_surface(
   // Half-open y coverage (see canvas_fill_triangle_on_surface) — keeps the lerp
   // rasterizer consistent with the solid one and avoids over-covering integer-
   // aligned bottom edges by a row.
-  int top    = (int)ceilf(sy1);
-  int middle = (int)ceilf(sy2);
-  int bottom = (int)ceilf(sy3) - 1;
+  int top    = canvas_pixel(ceilf(sy1));
+  int middle = canvas_pixel(ceilf(sy2));
+  int bottom = canvas_pixel(ceilf(sy3)) - 1;
 
   if (top < 0) top = 0;
   if (bottom >= surface->h) bottom = surface->h - 1;
@@ -441,8 +457,8 @@ static void canvas_fill_triangle_lerp_on_surface(
         xb = sx2;
     }
 
-    int x_start = (int)ceilf(fminf(xa, xb));
-    int x_end   = (int)ceilf(fmaxf(xa, xb)) - 1;
+    int x_start = canvas_pixel(ceilf(fminf(xa, xb)));
+    int x_end   = canvas_pixel(ceilf(fmaxf(xa, xb))) - 1;
 
     if (x_start < 0) x_start = 0;
     if (x_end >= surface->w) x_end = surface->w - 1;
@@ -673,10 +689,10 @@ static void canvas_mark_dirty(R2D_Canvas *can, float min_x, float min_y,
   } else {
     if (min_x > max_x) swap_float(&min_x, &max_x);
     if (min_y > max_y) swap_float(&min_y, &max_y);
-    x0 = (int)floorf(min_x) - 1;
-    y0 = (int)floorf(min_y) - 1;
-    x1 = (int)ceilf(max_x) + 1;
-    y1 = (int)ceilf(max_y) + 1;
+    x0 = canvas_pixel(floorf(min_x)) - 1;
+    y0 = canvas_pixel(floorf(min_y)) - 1;
+    x1 = canvas_pixel(ceilf(max_x)) + 1;
+    y1 = canvas_pixel(ceilf(max_y)) + 1;
     if (x0 < 0) x0 = 0;
     if (y0 < 0) y0 = 0;
     if (x1 > can->surface->w) x1 = can->surface->w;
@@ -843,7 +859,7 @@ static void canvas_fill_rectangle_on_surface(
     float fx, float fy, float fw, float fh,
     Uint8 cr, Uint8 cg, Uint8 cb, Uint8 ca) {
 
-  // A non-finite coordinate or size (NaN/Inf) makes the (int)ceilf casts below
+  // A non-finite coordinate or size (NaN/Inf) makes the int conversions below
   // undefined behavior and could produce an out-of-bounds rect. Skip the draw.
   if (!isfinite(fx) || !isfinite(fy) || !isfinite(fw) || !isfinite(fh)) return;
 
@@ -851,26 +867,21 @@ static void canvas_fill_rectangle_on_surface(
   // region [x, x+w) x [y, y+h), so pixel i is filled iff ceil(x) <= i < ceil(x+w).
   // Matches the ceilf convention used by the triangle rasterizer, so
   // fill_rectangle and draw_line share pixel edges for non-integer inputs.
-  int rx = (int)ceilf(fx);
-  int ry = (int)ceilf(fy);
-  int rw = (int)ceilf(fx + fw) - rx;
-  int rh = (int)ceilf(fy + fh) - ry;
-  SDL_Rect rect = { rx, ry, rw, rh };
+  // Each edge is clipped to the canvas before it becomes an int: a width past
+  // the int range came out negative, so an opaque fill drew nothing.
+  int x_start = canvas_pixel(fmaxf(ceilf(fx), 0.0f));
+  int y_start = canvas_pixel(fmaxf(ceilf(fy), 0.0f));
+  int x_end   = canvas_pixel(fminf(ceilf(fx + fw), (float)surface->w));
+  int y_end   = canvas_pixel(fminf(ceilf(fy + fh), (float)surface->h));
+  if (x_start >= x_end || y_start >= y_end) return;
 
   if (ca == 255) {
     // Opaque — use fast SDL fill
+    SDL_Rect rect = { x_start, y_start, x_end - x_start, y_end - y_start };
     Uint32 color = SDL_MapSurfaceRGBA(surface, cr, cg, cb, 255);
     SDL_FillSurfaceRect(surface, &rect, color);
   } else if (ca > 0) {
     // Semi-transparent — alpha blend per pixel
-    // Clamp rect to surface bounds
-    int x_start = rx < 0 ? 0 : rx;
-    int y_start = ry < 0 ? 0 : ry;
-    int x_end = rx + rw;
-    int y_end = ry + rh;
-    if (x_end > surface->w) x_end = surface->w;
-    if (y_end > surface->h) y_end = surface->h;
-
     SDL_LockSurface(surface);
     for (int y = y_start; y < y_end; y++) {
       Uint8 *row = (Uint8 *)surface->pixels + y * surface->pitch;
@@ -1032,7 +1043,7 @@ R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
   float oy     = (float)NUM2DBL(r_ary_entry(header, 5)) * scale;
 
   // A non-finite cell size or origin (NaN/Inf) would make the per-cell
-  // (int)ceilf casts below undefined behavior; every cell derives from these
+  // int conversions below undefined behavior; every cell derives from these
   // four values, so skip the whole grid.
   if (!isfinite(cell_w) || !isfinite(cell_h) || !isfinite(ox) || !isfinite(oy))
     return R_TRUE;
@@ -1067,10 +1078,10 @@ R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
       // neighbors' edges, so adjoining cells share one boundary exactly; a
       // separately computed `fx + cell_w` can land a rounding error past the
       // next cell's start and paint that pixel twice.
-      int rx = (int)ceilf(ox + gc * cell_w);
-      int ry = (int)ceilf(oy + gr * cell_h);
-      int x_end = (int)ceilf(ox + (gc + 1) * cell_w);
-      int y_end = (int)ceilf(oy + (gr + 1) * cell_h);
+      int rx = canvas_pixel(ceilf(ox + gc * cell_w));
+      int ry = canvas_pixel(ceilf(oy + gr * cell_h));
+      int x_end = canvas_pixel(ceilf(ox + (gc + 1) * cell_w));
+      int y_end = canvas_pixel(ceilf(oy + (gr + 1) * cell_h));
 
       int x_start = rx < 0 ? 0 : rx;
       int y_start = ry < 0 ? 0 : ry;
@@ -1132,8 +1143,8 @@ R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   if (ca == 0) return R_TRUE;
 
-  // A non-finite center or radius (NaN/Inf) would make the (int)ceilf/floorf
-  // casts below undefined behavior (and `radius <= 0` does not catch NaN, since
+  // A non-finite center or radius (NaN/Inf) would make the int conversions
+  // below undefined behavior (and `radius <= 0` does not catch NaN, since
   // every NaN comparison is false). Skip the draw before the scanline math.
   if (!isfinite(cx) || !isfinite(cy) || !isfinite(xradius) || !isfinite(yradius))
     return R_TRUE;
@@ -1147,8 +1158,8 @@ R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
   SDL_Surface *surface = can->surface;
   float yr2 = yradius * yradius;
 
-  int y_start = (int)ceilf(cy - yradius);
-  int y_end   = (int)floorf(cy + yradius);
+  int y_start = canvas_pixel(ceilf(cy - yradius));
+  int y_end   = canvas_pixel(floorf(cy + yradius));
   if (y_start < 0) y_start = 0;
   if (y_end >= surface->h) y_end = surface->h - 1;
 
@@ -1160,12 +1171,12 @@ R_VAL ruby2d_ext_canvas_fill_ellipse(RUBY2D_METHOD_ARGS_VARIADIC) {
   for (int y = y_start; y <= y_end; y++) {
     float dy = (float)y - cy;
     // Boundary-row float rounding can push (dy*dy)/yr2 just above 1.0, making
-    // the radicand negative; sqrtf would yield NaN and (int)ceilf(NaN) is UB.
+    // the radicand negative; sqrtf would yield NaN, which no int conversion takes.
     float t = 1.0f - (dy * dy) / yr2;
     if (t < 0.0f) t = 0.0f;
     float dx = xradius * sqrtf(t);
-    int x_start = (int)ceilf(cx - dx);
-    int x_end   = (int)floorf(cx + dx);
+    int x_start = canvas_pixel(ceilf(cx - dx));
+    int x_end   = canvas_pixel(floorf(cx + dx));
     if (x_start < 0) x_start = 0;
     if (x_end >= surface->w) x_end = surface->w - 1;
 
@@ -1930,10 +1941,10 @@ R_VAL ruby2d_ext_canvas_draw_image(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
 
   float scale = can->scale;
-  int dx = (int)(NUM2DBL(r_ary_entry(a, 0)) * scale);
-  int dy = (int)(NUM2DBL(r_ary_entry(a, 1)) * scale);
-  int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
-  int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
+  int dx = canvas_pixel(NUM2DBL(r_ary_entry(a, 0)) * scale);
+  int dy = canvas_pixel(NUM2DBL(r_ary_entry(a, 1)) * scale);
+  int dw = canvas_pixel(NUM2DBL(r_ary_entry(a, 2)) * scale);
+  int dh = canvas_pixel(NUM2DBL(r_ary_entry(a, 3)) * scale);
 
   // Stamp the frame the image draws — a sprite's current clip, placed by its
   // trim and flip — not the whole surface.
@@ -1997,10 +2008,10 @@ R_VAL ruby2d_ext_canvas_draw_text(RUBY2D_METHOD_ARGS_VARIADIC) {
   }
 
   float scale = can->scale;
-  int dx = (int)(NUM2DBL(r_ary_entry(a, 0)) * scale);
-  int dy = (int)(NUM2DBL(r_ary_entry(a, 1)) * scale);
-  int dw = (int)(NUM2DBL(r_ary_entry(a, 2)) * scale);
-  int dh = (int)(NUM2DBL(r_ary_entry(a, 3)) * scale);
+  int dx = canvas_pixel(NUM2DBL(r_ary_entry(a, 0)) * scale);
+  int dy = canvas_pixel(NUM2DBL(r_ary_entry(a, 1)) * scale);
+  int dw = canvas_pixel(NUM2DBL(r_ary_entry(a, 2)) * scale);
+  int dh = canvas_pixel(NUM2DBL(r_ary_entry(a, 3)) * scale);
 
   float rf = (float)NUM2DBL(r_ary_entry(a, 4));
   float gf = (float)NUM2DBL(r_ary_entry(a, 5));
@@ -2038,23 +2049,32 @@ R_VAL ruby2d_ext_canvas_clear(RUBY2D_METHOD_ARGS_VARIADIC) {
   Uint8 cb = (Uint8)((float)NUM2DBL(r_ary_entry(a, 2)) * 255);
   Uint8 ca = (Uint8)((float)NUM2DBL(r_ary_entry(a, 3)) * 255);
 
+  // Position and size truncate to whole pixels, and the far edge is their
+  // sum. Each edge is clipped to the canvas before it becomes an int: a size
+  // past the int range made the casts undefined and the width negative, so a
+  // huge clear did nothing.
   float scale = can->scale;
-  int rx = (int)(NUM2DBL(r_ary_entry(a, 4)) * scale);
-  int ry = (int)(NUM2DBL(r_ary_entry(a, 5)) * scale);
-  int rw = (int)(NUM2DBL(r_ary_entry(a, 6)) * scale);
-  int rh = (int)(NUM2DBL(r_ary_entry(a, 7)) * scale);
+  double sx = trunc(NUM2DBL(r_ary_entry(a, 4)) * scale);
+  double sy = trunc(NUM2DBL(r_ary_entry(a, 5)) * scale);
+  double sw = trunc(NUM2DBL(r_ary_entry(a, 6)) * scale);
+  double sh = trunc(NUM2DBL(r_ary_entry(a, 7)) * scale);
+  int x0 = canvas_pixel(fmax(sx, 0.0));
+  int y0 = canvas_pixel(fmax(sy, 0.0));
+  int x1 = canvas_pixel(fmin(sx + sw, (double)can->surface->w));
+  int y1 = canvas_pixel(fmin(sy + sh, (double)can->surface->h));
+  if (x0 >= x1 || y0 >= y1) return R_TRUE;
 
   Uint32 color = SDL_MapSurfaceRGBA(can->surface, cr, cg, cb, ca);
 
   // If the rect covers the entire surface, pass NULL for a full clear
-  if (rx == 0 && ry == 0 && rw == can->surface->w && rh == can->surface->h) {
+  if (x0 == 0 && y0 == 0 && x1 == can->surface->w && y1 == can->surface->h) {
     SDL_FillSurfaceRect(can->surface, NULL, color);
   } else {
-    SDL_Rect rect = { rx, ry, rw, rh };
+    SDL_Rect rect = { x0, y0, x1 - x0, y1 - y0 };
     SDL_FillSurfaceRect(can->surface, &rect, color);
   }
 
-  canvas_mark_dirty(can, (float)rx, (float)ry, (float)(rx + rw), (float)(ry + rh));
+  canvas_mark_dirty(can, (float)x0, (float)y0, (float)x1, (float)y1);
 
   return R_TRUE;
 }
