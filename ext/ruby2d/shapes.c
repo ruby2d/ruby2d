@@ -562,12 +562,10 @@ int *R2D_TriangulatePolygon(const float *verts, int n, int *out_tri_count) {
 
   int remaining = n;
   int out = 0;
-  // Guard against pathological inputs (e.g. self-intersecting polygons
-  // where no ear can ever be found): cap total iterations.
-  int safety = 0;
-  int safety_limit = n * n + 4;
 
-  while (remaining > 3 && safety++ < safety_limit) {
+  // Each pass clips an ear or, when none can be found (self-intersecting
+  // input), stops, so the loop runs at most n - 3 times.
+  while (remaining > 3) {
     int found_ear = 0;
 
     for (int i = 0; i < remaining; i++) {
