@@ -68,6 +68,28 @@ extern "C" {
 // CRuby provides these natively; mruby needs shims to match the CRuby API.
 // The full set is kept for parity even if a given macro is currently unused.
 #ifdef MRUBY
+  // NUM2INT as CRuby's: a value outside `int`, NaN, or an infinity raises
+  // RangeError where a cast would wrap it or be undefined. The setters that
+  // put a value back when the native side raises depend on that. The class
+  // is looked up by name, as r_raise's is: a compile-time symbol id from
+  // these headers doesn't match the wasm libmruby (see ruby2d.c).
+  static inline int r2d_num2int(mrb_state *m, mrb_value val) {
+    if (mrb_float_p(val)) {
+      mrb_float f = mrb_float(val);
+      // NaN fails both comparisons, so it's tested on its own
+      if (isnan(f) || f <= (mrb_float)SDL_MIN_SINT32 - 1 || f >= (mrb_float)SDL_MAX_SINT32 + 1) {
+        mrb_raisef(m, mrb_class_get(m, "RangeError"), "float %f out of range of integer", f);
+      }
+      return (int)f;
+    }
+    mrb_int i = mrb_as_int(m, val);
+    if ((int64_t)i < SDL_MIN_SINT32 || (int64_t)i > SDL_MAX_SINT32) {
+      mrb_raisef(m, mrb_class_get(m, "RangeError"), "integer %i too %s to convert to 'int'",
+                 i, i < 0 ? "small" : "big");
+    }
+    return (int)i;
+  }
+
   // C to Ruby value
   #define INT2FIX(val)   (mrb_fixnum_value(val))
   #define INT2NUM(val)   (mrb_fixnum_value((mrb_int)(val)))
@@ -78,7 +100,7 @@ extern "C" {
   // Ruby value to C
   #define TO_PDT(val)    ((mrb_type(val) == MRB_TT_FLOAT) ? mrb_float(val) : mrb_int(mrb, (val)))
   #define FIX2INT(val)   (mrb_fixnum(val))
-  #define NUM2INT(val)   ((mrb_int)TO_PDT(val))
+  #define NUM2INT(val)   (r2d_num2int(mrb, (val)))
   #define NUM2UINT(val)  ((unsigned mrb_int)TO_PDT(val))
   #define NUM2LONG(val)  (mrb_int(mrb, (val)))
   #define NUM2LL(val)    ((int64_t)(TO_PDT(val)))

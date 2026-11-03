@@ -162,7 +162,7 @@ RSpec.describe Ruby2D::BitmapText do
       expect { BitmapText.new('hi', scale: Float::INFINITY) }.to raise_error(Ruby2D::Error, /at least 1/)
     end
 
-    it 'restores the scale when the native call raises', skip_mruby: 'known bug: its `NUM2INT` has no range check' do
+    it 'restores the scale when the native call raises' do
       bt = BitmapText.new('hi', scale: 3)
       expect { bt.scale = 2**31 }.to raise_error(RangeError)
       expect(bt.scale).to eq(3)

@@ -253,8 +253,7 @@ RSpec.describe Ruby2D::Text do
       expect(txt.font).to eq(Font.default)
     end
 
-    it 'restores the size when the native side rejects it with another error class',
-       skip_mruby: 'known bug: its `NUM2INT` has no range check' do
+    it 'restores the size when the native side rejects it with another error class' do
       txt = Text.new('hello', size: 20)
       expect { txt.size = 2**31 }.to raise_error(RangeError)
       expect(txt.size).to eq(20)
