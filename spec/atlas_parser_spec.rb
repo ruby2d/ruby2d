@@ -174,6 +174,13 @@ RSpec.describe Ruby2D::AtlasParser do
   end
 
   describe '.parse_json (TexturePacker Hash form)' do
+    it 'raises its own ParseError, a Ruby2D::Error, for malformed JSON' do
+      expect { described_class.parse_json('{"frames": }') }
+        .to raise_error(described_class::ParseError, /\AInvalid JSON atlas: unexpected character/)
+      expect(described_class::ParseError).to be < Ruby2D::Error
+      expect(Ruby2D::JsonParser::ParseError).to be < Ruby2D::Error
+    end
+
     it 'raises ParseError when the top-level value is not an object' do
       expect { described_class.parse_json('[1, 2, 3]') }.to raise_error(described_class::ParseError)
       expect { described_class.parse_json('42') }.to raise_error(described_class::ParseError)

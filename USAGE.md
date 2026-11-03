@@ -1396,7 +1396,7 @@ A `SpriteSheet` (alias `TextureAtlas`) loads a packed atlas where named regions 
 - **Sparrow XML** (TexturePacker "Generic XML", Kenney.nl asset packs) — `<TextureAtlas imagePath="…"><SubTexture name="…" x y width height/></TextureAtlas>`.
 - **TexturePacker JSON** — both the Hash form (frames keyed by name) and the Array form (frames with `filename` fields).
 
-The format is detected from the file extension (`.xml` / `.json`); the texture image referenced inside the atlas is loaded relative to the atlas file's directory. All `Sprite`s built from the same `SpriteSheet` share one GPU texture, so loading a single atlas once and constructing many sprites against it is cheap.
+The format is detected from the file extension (`.xml` / `.json`); the texture image referenced inside the atlas is loaded relative to the atlas file's directory. A malformed atlas in either format raises `Ruby2D::AtlasParser::ParseError`, a `Ruby2D::Error`. All `Sprite`s built from the same `SpriteSheet` share one GPU texture, so loading a single atlas once and constructing many sprites against it is cheap.
 
 `SpriteSheet.new` also takes `scale_mode:`, which every `Sprite` built from the sheet starts with. See [Scale Mode](#scale-mode).
 

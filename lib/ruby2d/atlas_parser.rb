@@ -12,7 +12,7 @@ module Ruby2D
   # in the same shape from either format. Hand-written and Regexp-free so it
   # works on mruby builds without the regex mrbgem.
   module AtlasParser
-    class ParseError < StandardError; end
+    class ParseError < Error; end
 
     def self.parse_file(path)
       data = File.read(path)
@@ -84,7 +84,12 @@ module Ruby2D
     end
 
     def self.parse_json(str)
-      data = JsonParser.parse(str)
+      begin
+        data = JsonParser.parse(str)
+      rescue JsonParser::ParseError => e
+        # One error class for a bad atlas in either format
+        raise ParseError, "Invalid JSON atlas: #{e.message}"
+      end
       raise ParseError, 'Invalid JSON atlas: top-level value must be an object' unless data.is_a?(Hash)
 
       meta = data['meta']

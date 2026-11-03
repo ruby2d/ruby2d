@@ -5,7 +5,7 @@ module Ruby2D
   # stdlib `require 'json'` and stays mruby-compatible without an mrbgem
   # dependency. Public API: `Ruby2D::JsonParser.parse(str)`.
   module JsonParser
-    class ParseError < StandardError; end
+    class ParseError < Error; end
 
     def self.parse(str)
       Parser.new(str).parse
