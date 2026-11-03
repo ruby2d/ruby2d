@@ -93,13 +93,13 @@ module Ruby2D
       frames = {}
       frames_data = data['frames']
       if frames_data.is_a?(Hash)
-        frames_data.each { |name, info| frames[name] = extract_json_frame(info) }
+        frames_data.each { |name, info| frames[name] = extract_json_frame(info, name) }
       elsif frames_data.is_a?(Array)
         frames_data.each do |info|
           next unless info.is_a?(Hash)
 
           name = info['filename']
-          frames[name] = extract_json_frame(info) if name
+          frames[name] = extract_json_frame(info, name) if name
         end
       else
         raise ParseError, "Invalid JSON atlas: 'frames' must be a hash or array"
@@ -108,14 +108,14 @@ module Ruby2D
       { image_path: image_path, frames: frames }
     end
 
-    def self.extract_json_frame(info)
+    def self.extract_json_frame(info, name)
       frame = info.is_a?(Hash) ? info['frame'] : nil
       frame = {} unless frame.is_a?(Hash)
       result = {
-        x: (frame['x'] || 0).to_i,
-        y: (frame['y'] || 0).to_i,
-        width: (frame['w'] || frame['width'] || 0).to_i,
-        height: (frame['h'] || frame['height'] || 0).to_i
+        x: json_int(frame['x'] || 0, name, 'frame.x'),
+        y: json_int(frame['y'] || 0, name, 'frame.y'),
+        width: json_int(frame['w'] || frame['width'] || 0, name, 'frame.w'),
+        height: json_int(frame['h'] || frame['height'] || 0, name, 'frame.h')
       }
       # TexturePacker can pack frames rotated 90° to save atlas space.
       # We capture the flag so the consumer can refuse or handle it; the
@@ -127,11 +127,11 @@ module Ruby2D
       source = info.is_a?(Hash) ? info['sourceSize'] : nil
       sprite_source = info.is_a?(Hash) ? info['spriteSourceSize'] : nil
       if source.is_a?(Hash) && (source['w'] || source['h'])
-        result[:source_width]  = (source['w'] || result[:width]).to_i
-        result[:source_height] = (source['h'] || result[:height]).to_i
+        result[:source_width]  = json_int(source['w'] || result[:width], name, 'sourceSize.w')
+        result[:source_height] = json_int(source['h'] || result[:height], name, 'sourceSize.h')
         if sprite_source.is_a?(Hash)
-          result[:trim_x] = (sprite_source['x'] || 0).to_i
-          result[:trim_y] = (sprite_source['y'] || 0).to_i
+          result[:trim_x] = json_int(sprite_source['x'] || 0, name, 'spriteSourceSize.x')
+          result[:trim_y] = json_int(sprite_source['y'] || 0, name, 'spriteSourceSize.y')
         else
           result[:trim_x] = 0
           result[:trim_y] = 0
@@ -139,6 +139,21 @@ module Ruby2D
       end
 
       result
+    end
+
+    # A JSON frame number as an Integer, truncated. A numeric string is read
+    # with `to_i`, as before; anything else that isn't a finite number within
+    # the native int range raises here, naming the frame, where it used to
+    # raise an internal error (`to_i` on a Hash, `Infinity`) or pass a number
+    # that fails later, when the sprite draws.
+    def self.json_int(value, name, key)
+      return value.to_i if value.is_a?(String)
+
+      number = value.is_a?(Integer) || (value.is_a?(Float) && value.finite?)
+      if !number || value.abs > 2_147_483_647
+        raise ParseError, "Invalid JSON atlas: frame `#{name}` has #{key} #{value.inspect}, not a number in range"
+      end
+      value.to_i
     end
 
     # Walk the document once, yielding each start tag's name and attribute

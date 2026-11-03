@@ -180,6 +180,22 @@ RSpec.describe Ruby2D::AtlasParser do
       expect { described_class.parse_json('null') }.to raise_error(described_class::ParseError)
     end
 
+    # These raised an internal error (`to_i` on a Hash, `Infinity`), or passed
+    # a number that failed later, when the sprite drew
+    it 'raises ParseError, naming the frame, for a frame number that is not a finite number in range' do
+      ['{}', '[1]', 'true', '1e400', '1e30'].each do |bad|
+        json = %({"frames": {"a.png": {"frame": {"x": #{bad}, "y": 0, "w": 16, "h": 16}}}})
+        expect { described_class.parse_json(json) }
+          .to raise_error(described_class::ParseError, /frame `a.png` has frame.x/)
+      end
+    end
+
+    it 'still reads a numeric string, a null, and a fraction as before' do
+      json = '{"frames": {"a.png": {"frame": {"x": "12", "y": null, "w": 16.9, "h": 16}}}}'
+      frame = described_class.parse_json(json)[:frames]['a.png']
+      expect([frame[:x], frame[:y], frame[:width], frame[:height]]).to eq([12, 0, 16, 16])
+    end
+
     it 'parses frames as an object keyed by name' do
       json = <<~JSON
         {
