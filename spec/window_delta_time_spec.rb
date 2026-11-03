@@ -60,9 +60,9 @@ RSpec.describe 'Window#delta_time' do
     expect(calls).to eq(1)
   end
 
-  # On CRuby a Method's proc is a lambda with the method's arity; mruby wraps
-  # it in a splat lambda, so there a zero-parameter method still gets `dt`
-  it 'calls a method that takes no parameters without one', skip_mruby: 'known bug: it gets `dt`, as above, and raises' do
+  # mruby's own Method proc reports arity -1; `mruby_compat` gives a method
+  # that takes no arguments a proc that takes none, as CRuby's does
+  it 'calls a method that takes no parameters without one' do
     counter = Class.new { attr_reader :calls; def tick; @calls = (@calls || 0) + 1; end }.new
     window.update(&counter.method(:tick))
     expect { tick_at(5.0) }.not_to raise_error

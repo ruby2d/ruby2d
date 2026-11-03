@@ -31,4 +31,18 @@ if RUBY_ENGINE == 'mruby'
       raise NotImplementedError, "can't load `#{name}`: a compiled app is its one source file and can't load others"
     end
   end
+
+  # A Method's proc reports the method's arity on CRuby, but mruby's passes any
+  # arguments through and reports -1. `update` reads the arity to decide
+  # whether to pass `dt`, so `update(&method(:tick))` handed a zero-parameter
+  # `tick` one and raised. A method that takes no arguments now gets a proc
+  # that takes none, as on CRuby; any other keeps mruby's own pass-through.
+  class Method
+    def to_proc
+      method = self
+      return ->(&block) { method.call(&block) } if arity.zero?
+
+      ->(*args, **opts, &block) { method.call(*args, **opts, &block) }
+    end
+  end
 end

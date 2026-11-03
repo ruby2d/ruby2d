@@ -30,4 +30,16 @@ RSpec.describe 'mruby_compat' do
     expect { app.load('player.rb', true) }
       .to raise_error(NotImplementedError, /can't load `player.rb`/)
   end
+
+  # `update` leaves out `dt` only for a lambda that takes no arguments
+  it "gives a method that takes no arguments a lambda that takes none, and any other mruby's pass-through" do
+    method_class = sandbox.const_get(:Method)
+    none = method_class.new.tap { |m| def m.arity = 0; def m.call(&b) = [:none, b&.call] }
+    expect(none.to_proc.arity).to eq(0)
+    expect(none.to_proc.lambda?).to be true
+    expect(none.to_proc.call { :block }).to eq([:none, :block])
+
+    one = method_class.new.tap { |m| def m.arity = 1; def m.call(*args, **opts) = [args, opts] }
+    expect(one.to_proc.call(1, key: 2)).to eq([[1], { key: 2 }])
+  end
 end
