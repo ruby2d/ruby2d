@@ -921,6 +921,17 @@ R_VAL ruby2d_ext_canvas_fill_rectangle(RUBY2D_METHOD_ARGS_VARIADIC) {
 
 
 /*
+ * `n` as decimal text in `buf`, for an error message: mruby's raise formatter
+ * has no length modifiers (`%l` there is a string and its length, so `%ld`
+ * crashed), and a count past `int` needs one in CRuby's.
+ */
+static const char *canvas_count_str(int64_t n, char buf[24]) {
+  snprintf(buf, 24, "%lld", (long long)n);
+  return buf;
+}
+
+
+/*
  * Ruby2D::Canvas#ext_fill_rectangles
  * Arguments: [n, x1, y1, w1, h1, x2, y2, w2, h2, ..., r, g, b, a]
  * Fills n rectangles with a single shared color in one FFI crossing.
@@ -940,10 +951,12 @@ R_VAL ruby2d_ext_canvas_fill_rectangles(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // Guard the array length: [count] + n*[x,y,w,h] + [r,g,b,a]. A short array
   // would make r_ary_entry return nil and NUM2DBL(nil) error (mruby aborts).
-  long need = 5L + (long)n * 4;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_rectangles: array has %d values for %d rects (need %ld)",
-            (int)r_ary_len(a), n, need);
+  int64_t need = 5 + (int64_t)n * 4;
+  if ((int64_t)r_ary_len(a) < need) {
+    char need_s[24];
+    r_raise("Ruby2D::Ext.canvas_fill_rectangles: array has %d values for %d rects (need %s)",
+            (int)r_ary_len(a), n, canvas_count_str(need, need_s));
+  }
 
   int base = 1 + n * 4;
   float rf = (float)NUM2DBL(r_ary_entry(a, base));
@@ -1005,10 +1018,12 @@ R_VAL ruby2d_ext_canvas_fill_pixel_grid(RUBY2D_METHOD_ARGS_VARIADIC) {
   int rows = (int)NUM2INT(r_ary_entry(header, 1));
   if (cols < 1 || rows < 1) return R_TRUE;
 
-  long need = (long)cols * rows * 4;
-  if ((long)r_ary_len(colors) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_pixel_grid: %d color values for a %dx%d grid (need %ld)",
-            (int)r_ary_len(colors), cols, rows, need);
+  int64_t need = (int64_t)cols * rows * 4;
+  if ((int64_t)r_ary_len(colors) < need) {
+    char need_s[24];
+    r_raise("Ruby2D::Ext.canvas_fill_pixel_grid: %d color values for a %dx%d grid (need %s)",
+            (int)r_ary_len(colors), cols, rows, canvas_count_str(need, need_s));
+  }
 
   float scale  = can->scale;
   float cell_w = (float)NUM2DBL(r_ary_entry(header, 2)) * scale;
@@ -1193,10 +1208,12 @@ R_VAL ruby2d_ext_canvas_fill_polygon(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // [n, x1, y1, ... xn, yn, r, g, b, a] — guard before indexing (a short array
   // would hard-abort under mruby), matching the sibling fill_* methods.
-  long need = 1 + (long)n * 2 + 4;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_polygon: array has %d values for %d vertices (need %ld)",
-            (int)r_ary_len(a), n, need);
+  int64_t need = 1 + (int64_t)n * 2 + 4;
+  if ((int64_t)r_ary_len(a) < need) {
+    char need_s[24];
+    r_raise("Ruby2D::Ext.canvas_fill_polygon: array has %d values for %d vertices (need %s)",
+            (int)r_ary_len(a), n, canvas_count_str(need, need_s));
+  }
 
   float scale = can->scale;
   float *verts = (float *)malloc(n * 2 * sizeof(float));
@@ -1266,10 +1283,12 @@ R_VAL ruby2d_ext_canvas_fill_polygon_lerp(RUBY2D_METHOD_ARGS_VARIADIC) {
 
   // [n, x1, y1, r1, g1, b1, a1, ...] — 6 entries per vertex. Guard before
   // indexing (a short array would hard-abort under mruby).
-  long need = 1 + (long)n * 6;
-  if ((long)r_ary_len(a) < need)
-    r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp: array has %d values for %d vertices (need %ld)",
-            (int)r_ary_len(a), n, need);
+  int64_t need = 1 + (int64_t)n * 6;
+  if ((int64_t)r_ary_len(a) < need) {
+    char need_s[24];
+    r_raise("Ruby2D::Ext.canvas_fill_polygon_lerp: array has %d values for %d vertices (need %s)",
+            (int)r_ary_len(a), n, canvas_count_str(need, need_s));
+  }
 
   float scale = can->scale;
   float *verts  = (float *)malloc(n * 2 * sizeof(float));

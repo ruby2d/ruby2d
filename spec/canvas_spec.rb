@@ -569,6 +569,22 @@ RSpec.describe Ruby2D::Canvas do
     end
   end
 
+  # The public methods size these payloads themselves, so only a direct call
+  # can fall short. Formatting the count with `%ld` crashed a built app,
+  # whose mruby formatter reads `%l` as a string and its length.
+  describe 'native payload length checks' do
+    it 'raises with the count each short payload needs' do
+      expect { Ruby2D::Ext.canvas_fill_rectangles(canvas, [2, 0, 0]) }
+        .to raise_error(RuntimeError, /need 13\)/)
+      expect { Ruby2D::Ext.canvas_fill_pixel_grid(canvas, [2, 2, 1, 1, 0, 0], [0.5]) }
+        .to raise_error(RuntimeError, /need 16\)/)
+      expect { Ruby2D::Ext.canvas_fill_polygon(canvas, [3, 0, 0]) }
+        .to raise_error(RuntimeError, /need 11\)/)
+      expect { Ruby2D::Ext.canvas_fill_polygon_lerp(canvas, [3, 0]) }
+        .to raise_error(RuntimeError, /need 19\)/)
+    end
+  end
+
   describe 'per-vertex stroke gradients' do
     it 'accepts Color::Set on stroke_triangle (3 colors)' do
       expect {
