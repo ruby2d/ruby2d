@@ -156,6 +156,18 @@ def deps_include_dir
   dir ? File.join(File.dirname(dir), 'include') : "#{Ruby2D.assets}/platform/include"
 end
 
+# The -I flag for a target's own headers: mruby's symbol IDs
+# (mruby/presym/id.h), which mruby numbers per build, so they must come from
+# the same build as the libmruby.a being linked (the shared macOS ones made
+# E_RUNTIME_ERROR raise Exception on web). They sit in an include/ beside the
+# target's lib/, searched ahead of the shared platform/include. Empty when that
+# dir is absent: assets built before the split still carry the IDs in
+# platform/include, and the system-lib build (nil) has none of its own.
+def target_include_flag(platform_dir)
+  dir = platform_dir && File.join(platform_dir, 'include')
+  dir && Dir.exist?(dir) ? "-I#{shell_escape(dir)} " : ''
+end
+
 # Find the `mrbc` executable: prefer bundled assets, then a `ruby2d setup` cache
 # build, then $PATH.
 def find_mrbc
@@ -359,6 +371,7 @@ def compile_native
   # Get include directories
   incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
   incl_dir_deps = deps_include_dir
+  incl_flag_target = target_include_flag(deps_platform_dir) # ahead of incl_dir_deps
 
   # Set C flags, if any
   c_flags = ''
@@ -411,7 +424,7 @@ def compile_native
   step 'Building native'
   puts "    #{"for #{native_target}".dim}"
   FileUtils.mkdir_p 'build/native'
-  run_cmd "#{shell_escape(cc)} #{c_flags} -I#{shell_escape(incl_dir_ruby2d)} -I#{shell_escape(incl_dir_deps)} build/app.c #{ld_flags} -o build/native/app"
+  run_cmd "#{shell_escape(cc)} #{c_flags} -I#{shell_escape(incl_dir_ruby2d)} #{incl_flag_target}-I#{shell_escape(incl_dir_deps)} build/app.c #{ld_flags} -o build/native/app"
 
   unless $?.success?
     error 'Native build failed.'
@@ -612,6 +625,8 @@ def compile_web
 
   incl_dir_ruby2d = "#{Ruby2D.gem_dir}/ext/ruby2d/"
   incl_dir_deps = "#{Ruby2D.assets}/platform/include/"
+  # The wasm libmruby.a's own symbol IDs, ahead of incl_dir_deps
+  incl_flag_target = target_include_flag(AssetsTarget.wasm_platform_dir(root: Ruby2D.assets))
 
   wasm_lib_dir = "#{Ruby2D.assets}/platform/wasm/lib"
   ld_flags = Dir["#{wasm_lib_dir}/*.a"].map { |f| shell_escape(f) }.join(' ')
@@ -658,7 +673,7 @@ def compile_web
     # A custom template becomes Emscripten's shell file (it must contain the
     # `{{{ SCRIPT }}}` placeholder); otherwise emcc emits its default shell.
     shell_flag = @template ? "--shell-file #{shell_escape(@template)} " : ''
-    run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} -I#{shell_escape(incl_dir_deps)} "\
+    run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} #{incl_flag_target}-I#{shell_escape(incl_dir_deps)} "\
             "-sUSE_SDL=0 -sSINGLE_FILE #{memory_flags} #{web_opt_flags} #{shell_flag}"\
             "build/app.c #{ld_flags} #{preload_flag} "\
             '-o build/web/app.html'
@@ -670,7 +685,7 @@ def compile_web
 
     wrote 'build/web/app.html'
   else
-    run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} -I#{shell_escape(incl_dir_deps)} "\
+    run_cmd "emcc -O3 #{mruby_abi_flag} -I#{shell_escape(incl_dir_ruby2d)} #{incl_flag_target}-I#{shell_escape(incl_dir_deps)} "\
             "-sUSE_SDL=0 #{memory_flags} #{web_opt_flags} "\
             "build/app.c #{ld_flags} #{preload_flag} "\
             '-o build/web/app.js'

@@ -77,6 +77,26 @@ RSpec.describe 'ruby2d/cli/build native-deps resolution' do
     end
   end
 
+  # mruby's symbol IDs are numbered per build, so each target's own
+  # include/mruby/presym must be searched ahead of the shared platform/include.
+  describe '#target_include_flag' do
+    it "adds the target's own include dir when it has one" do
+      make_platform(@bundled, libs: ['libSDL3.a'])
+      dir = File.join(@bundled, 'platform', target, 'include')
+      FileUtils.mkdir_p dir
+      expect(target_include_flag(deps_platform_dir)).to eq("-I#{shell_escape(dir)} ")
+    end
+
+    it 'adds nothing for assets built before the per-target headers' do
+      make_platform(@bundled, libs: ['libSDL3.a'])
+      expect(target_include_flag(deps_platform_dir)).to eq('')
+    end
+
+    it 'adds nothing for the system-lib build' do
+      expect(target_include_flag(nil)).to eq('')
+    end
+  end
+
   describe '#find_mrbc' do
     let(:mrbc) { AssetsTarget.host_os == 'windows' ? 'mrbc.exe' : 'mrbc' }
 
